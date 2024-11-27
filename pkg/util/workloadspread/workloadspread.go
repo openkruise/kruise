@@ -224,16 +224,25 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) (skip bool, err error) {
 			continue
 		}
 		// determine if the reference of workloadSpread and pod is equal
-		if ok, err := h.isReferenceEqual(ws.Spec.TargetReference, ref, pod.Namespace); ok {
-			matchedWS = &ws
-			// pod has at most one matched workloadSpread
-			break
-		} else if err != nil {
+		referenceEqual, err := h.isReferenceEqual(ws.Spec.TargetReference, ref, pod.GetNamespace())
+		if err != nil {
 			klog.ErrorS(err, "failed to determine whether workloadspread refers pod's owner",
 				"pod", klog.KObj(pod), "workloadspread", klog.KObj(&ws))
 			if errors.IsNotFound(err) {
 				return true, err
 			}
+			continue
+		}
+		selected, err := IsPodSelected(ws.Spec.TargetFilter, pod.GetLabels())
+		if err != nil {
+			klog.ErrorS(err, "failed to determine whether workloadspread selects pod",
+				"pod", klog.KObj(pod), "workloadspread", klog.KObj(&ws))
+			continue
+		}
+		if referenceEqual && selected {
+			matchedWS = &ws
+			// pod has at most one matched workloadSpread
+			break
 		}
 	}
 	// not found matched workloadSpread
@@ -512,8 +521,8 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 
 		suitableSubset = h.getSuitableSubset(subsetStatuses)
 		if suitableSubset == nil {
-			klog.InfoS("WorkloadSpread don't have a suitable subset for Pod when creating",
-				"namespace", ws.Namespace, "wsName", ws.Name, "podName", pod.Name)
+			klog.InfoS("WorkloadSpread doesn't have a suitable subset for Pod when creating",
+				"namespace", ws.Namespace, "wsName", ws.Name, "podName", pod.GetGenerateName())
 			return false, nil, "", nil
 		}
 		// no need to update WorkloadSpread status if MaxReplicas == nil
@@ -791,11 +800,13 @@ func initializeWorkloadsInWhiteList(c client.Client) {
 			})
 		}
 	}
+	klog.InfoS("initialized workload list", "workloads", workloads)
 	workloadsInWhiteListInitialized = true
 }
 
 func (h *Handler) initializedSubsetStatuses(ws *appsv1alpha1.WorkloadSpread) ([]appsv1alpha1.WorkloadSpreadSubsetStatus, error) {
 	replicas, err := h.getWorkloadReplicas(ws)
+	klog.V(5).InfoS("get workload replicas", "replicas", replicas, "err", err, "workloadSpread", klog.KObj(ws))
 	if err != nil {
 		return nil, err
 	}
@@ -815,7 +826,7 @@ func (h *Handler) initializedSubsetStatuses(ws *appsv1alpha1.WorkloadSpread) ([]
 }
 
 func (h *Handler) getWorkloadReplicas(ws *appsv1alpha1.WorkloadSpread) (int32, error) {
-	if ws.Spec.TargetReference == nil {
+	if ws.Spec.TargetReference == nil || !hasPercentSubset(ws) {
 		return 0, nil
 	}
 	gvk := schema.FromAPIVersionAndKind(ws.Spec.TargetReference.APIVersion, ws.Spec.TargetReference.Kind)
@@ -826,6 +837,10 @@ func (h *Handler) getWorkloadReplicas(ws *appsv1alpha1.WorkloadSpread) (int32, e
 	err := h.Get(context.TODO(), key, object)
 	if err != nil {
 		return 0, client.IgnoreNotFound(err)
+	}
+
+	if ws.Spec.TargetFilter != nil && len(ws.Spec.TargetFilter.ReplicasPathList) > 0 {
+		return GetReplicasFromWorkloadWithTargetFilter(object, ws.Spec.TargetFilter)
 	}
 
 	switch o := object.(type) {
@@ -871,6 +886,21 @@ func GenerateEmptyWorkloadObject(gvk schema.GroupVersionKind, key types.Namespac
 	return
 }
 
+func GetReplicasFromObject(object *unstructured.Unstructured, replicasPath string) (int32, error) {
+	if replicasPath == "" {
+		return 0, nil
+	}
+	var exists bool
+	var replicas int64
+	var err error
+	path := strings.Split(replicasPath, ".")
+	replicas, exists, err = NestedField[int64](object.Object, path...)
+	if err != nil || !exists {
+		return 0, err
+	}
+	return int32(replicas), nil
+}
+
 func GetReplicasFromCustomWorkload(reader client.Reader, object *unstructured.Unstructured) int32 {
 	if object == nil {
 		return 0
@@ -886,23 +916,30 @@ func GetReplicasFromCustomWorkload(reader client.Reader, object *unstructured.Un
 		if wl.GroupVersionKind.GroupKind() != gvk.GroupKind() {
 			continue
 		}
-		var exists bool
-		var replicas int64
-		path := strings.Split(wl.ReplicasPath, ".")
-		if len(path) > 0 {
-			replicas, exists, err = unstructured.NestedInt64(object.Object, path...)
-			if err != nil || !exists {
-				klog.ErrorS(err, "Failed to get replicas", "from", gvk, "replicasPath", wl.ReplicasPath)
-			}
-		} else {
-			replicas, exists, err = unstructured.NestedInt64(object.Object, "spec", "replicas")
-			if err != nil || !exists {
-				klog.ErrorS(err, "Failed to get replicas", "from", gvk, "replicasPath", wl.ReplicasPath)
-			}
+		replicas, err := GetReplicasFromObject(object, wl.ReplicasPath)
+		if err != nil {
+			klog.ErrorS(err, "Failed to get replicas from custom workload", "gvk", gvk, "object", klog.KObj(object), "replicasPath", wl.ReplicasPath)
 		}
-		return int32(replicas)
+		return replicas
 	}
 	return 0
+}
+
+func GetReplicasFromWorkloadWithTargetFilter(object client.Object, targetFilter *appsv1alpha1.TargetFilter) (int32, error) {
+	objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(object)
+	if err != nil {
+		return 0, err
+	}
+	obj := &unstructured.Unstructured{Object: objMap}
+	var replicas int32 = 0
+	for _, path := range targetFilter.ReplicasPathList {
+		r, err := GetReplicasFromObject(obj, path)
+		if err != nil {
+			return 0, err
+		}
+		replicas += r
+	}
+	return replicas, nil
 }
 
 func GetPodVersion(pod *corev1.Pod) string {

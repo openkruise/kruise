@@ -121,6 +121,8 @@ func sliceContains(a, b []string) bool {
 	return true
 }
 
+// ValidatedLabelSelectorAsSelector is faster than native `metav1.LabelSelectorAsSelector` for the newRequirement function
+// performs no validation. MAKE SURE the `ps` param is validated with `metav1.LabelSelectorAsSelector` before.
 func ValidatedLabelSelectorAsSelector(ps *metav1.LabelSelector) (labels.Selector, error) {
 	if ps == nil {
 		return labels.Nothing(), nil
