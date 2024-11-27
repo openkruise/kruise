@@ -91,6 +91,7 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, acti
 		labelSelector = obj.Selector
 		workloadUIDs = append(workloadUIDs, obj.UID)
 	}
+	klog.V(5).InfoS("find pods and replicas result", "workloadReplicas", workloadReplicas, "workloadUIDs", workloadUIDs, "labelSelector", labelSelector)
 	if workloadReplicas == 0 {
 		return nil, workloadReplicas, nil
 	}
@@ -120,6 +121,7 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, acti
 			FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(uid)}),
 		}
 		pods, err := listPods(&listOption)
+		klog.V(5).InfoS("result of list pods with owner ref uid", "pods", len(pods), "err", err, "refUid", uid)
 		if err != nil {
 			return nil, -1, err
 		}

@@ -617,6 +617,8 @@ jobs:
       - name: Install Kruise
         run: |
           set -ex
+          kubectl create ns kruise-system
+          kubectl apply -f test/kruise-e2e-config.yaml
           kubectl cluster-info
           IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} ./scripts/deploy_kind.sh
           NODES=$(kubectl get node | wc -l)
