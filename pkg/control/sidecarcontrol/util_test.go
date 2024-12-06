@@ -50,6 +50,8 @@ var (
 		"hot-sidecar:v1":   "docker-pullable://hot-sidecar@sha256:86618128c92e",
 		"hot-sidecar:v2":   "docker-pullable://hot-sidecar@sha256:74abd85af1e9",
 		"hotupgrade:empty": "docker-pullable://hotupgrade@sha256:0e9daf5c02e7",
+		"init-sidecar:v1":  "docker-pullable://init-sidecar@sha256:0e9daf5c02e7",
+		"init-sidecar:v2":  "docker-pullable://init-sidecar@sha256:0e9daf5c02e7",
 	}
 
 	podDemo = &corev1.Pod{
@@ -269,6 +271,74 @@ func TestIsSidecarContainerUpdateCompleted(t *testing.T) {
 				return sets.NewString(sidecarSetDemo.Name), sets.NewString("cold-sidecar", "hot-sidecar-1", "hot-sidecar-2")
 			},
 			expectedCompleted: true,
+		},
+		{
+			name: "upgrade init sidecar not completed",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				control := New(sidecarSetDemo.DeepCopy())
+				pod.Spec.InitContainers = []corev1.Container{
+					{
+						Name:  "init-sidecar",
+						Image: "init-sidecar:v1",
+					},
+				}
+				pod.Status.InitContainerStatuses = []corev1.ContainerStatus{
+					{
+						Name:    "init-sidecar",
+						Image:   "init-sidecar:v1",
+						ImageID: ImageIds["init-sidecar:v1"],
+						Ready:   true,
+					},
+				}
+				UpdatePodSidecarSetHash(pod, control.GetSidecarset())
+				control.UpdatePodAnnotationsInUpgrade([]string{"init-sidecar"}, pod)
+				pod.Status.InitContainerStatuses[0].ImageID = ImageIds["init-sidecar:v1"]
+				return pod
+			},
+			upgradeSidecars: func() (sets.String, sets.String) {
+				return sets.NewString(sidecarSetDemo.Name), sets.NewString("init-sidecar")
+			},
+			expectedCompleted: true,
+		},
+		{
+			name: "upgrade init sidecar, upgrade init-sidecar-1 not completed",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				control := New(sidecarSetDemo.DeepCopy())
+				pod.Spec.InitContainers = []corev1.Container{
+					{
+						Name:  "init-sidecar",
+						Image: "init-sidecar:v1",
+					},
+					{
+						Name:  "init-sidecar-1",
+						Image: "init-sidecar:v1",
+					},
+				}
+				pod.Status.InitContainerStatuses = []corev1.ContainerStatus{
+					{
+						Name:    "init-sidecar",
+						Image:   "init-sidecar:v1",
+						ImageID: ImageIds["init-sidecar:v1"],
+						Ready:   true,
+					},
+					{
+						Name:    "init-sidecar-1",
+						Image:   "init-sidecar:v2",
+						ImageID: ImageIds["init-sidecar:v1"],
+						Ready:   false,
+					},
+				}
+				UpdatePodSidecarSetHash(pod, control.GetSidecarset())
+				control.UpdatePodAnnotationsInUpgrade([]string{"init-sidecar", "init-sidecar-1"}, pod)
+				pod.Status.InitContainerStatuses[0].ImageID = ImageIds["init-sidecar:v1"]
+				return pod
+			},
+			upgradeSidecars: func() (sets.String, sets.String) {
+				return sets.NewString(sidecarSetDemo.Name), sets.NewString("init-sidecar", "init-sidecar-1")
+			},
+			expectedCompleted: false,
 		},
 	}
 

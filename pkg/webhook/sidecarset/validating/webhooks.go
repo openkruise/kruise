@@ -20,6 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	"github.com/openkruise/kruise/pkg/util"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 	"github.com/openkruise/kruise/pkg/webhook/types"
 )
 
@@ -29,9 +31,12 @@ var (
 	// HandlerGetterMap contains admission webhook handlers
 	HandlerGetterMap = map[string]types.HandlerGetter{
 		"validate-apps-kruise-io-v1alpha1-sidecarset": func(mgr manager.Manager) admission.Handler {
+			curVersion := utildiscovery.DiscoverServerVersion()
 			return &SidecarSetCreateUpdateHandler{
-				Client:  mgr.GetClient(),
-				Decoder: admission.NewDecoder(mgr.GetScheme()),
+				curVersion:                  curVersion.String(),
+				supportInitContainerInPlace: util.IsSupportInitContainerInPlace(curVersion),
+				Client:                      mgr.GetClient(),
+				Decoder:                     admission.NewDecoder(mgr.GetScheme()),
 			}
 		},
 	}

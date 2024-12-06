@@ -21,6 +21,7 @@ import (
 	"time"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/version"
 
 	"github.com/openkruise/kruise/apis"
 	"github.com/openkruise/kruise/pkg/client"
@@ -89,4 +90,17 @@ func DiscoverObject(obj runtime.Object) bool {
 		return false
 	}
 	return DiscoverGVK(gvk)
+}
+
+func DiscoverServerVersion() (version version.Info) {
+	genericClient := client.GetGenericClient()
+	if genericClient == nil {
+		return
+	}
+	serverVersion, err := genericClient.DiscoveryClient.ServerVersion()
+	if err != nil {
+		klog.ErrorS(err, "Failed to get server version")
+		return
+	}
+	return *serverVersion
 }
