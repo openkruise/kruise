@@ -19,7 +19,6 @@ package validating
 import (
 	"context"
 
-	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +26,8 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/policy"
+
+	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
 
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
