@@ -1,5 +1,6 @@
 # Image URL to use all building/pushing image targets
 IMG ?= openkruise/kruise-manager:test
+HOOK_IMG ?= openkruise/kruise-helm-hook:test
 # Platforms to build the image for
 PLATFORMS ?= linux/amd64,linux/arm64,linux/ppc64le
 CRD_OPTIONS ?= "crd:crdVersions=v1"
@@ -182,3 +183,7 @@ generate_helm_crds:
 # kruise-e2e-test runs kruise e2e tests.
 .PHONY: kruise-e2e-test
 kruise-e2e-test: $(tools/kind) delete-cluster create-cluster install-csi docker-build kube-load-image install-kruise run-kruise-e2e-test delete-cluster
+
+.PHONY: docker-build-hook
+docker-build-hook:
+	docker build -f ./Dockerfile_helm_hook . -t ${HOOK_IMG}
