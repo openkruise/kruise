@@ -18,13 +18,13 @@ package sync
 
 import (
 	"flag"
-	"math"
-	"reflect"
-
+	"github.com/openkruise/kruise/pkg/util/hotstandby"
 	v1 "k8s.io/api/core/v1"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/integer"
+	"math"
+	"reflect"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -81,6 +81,20 @@ type expectationDiffs struct {
 	updateNum int
 	// updateMaxUnavailable is the maximum number of ready Pods that can be updating
 	updateMaxUnavailable int
+
+	// hotStandbyScaleUpNum is the diff number that hot-standby pods should update
+	// '0' means no need to update
+	// positive number means need to update more Pods to updateRevision
+	// negative number means need to update more Pods to currentRevision (rollback)
+	hotStandbyUpdateNum int
+	// hotStandbyScaleUpNum is a non-negative integer, which indicates the number that hot-standby should scale up.
+	hotStandbyScaleUpNum int
+	// hotStandbyScaleDownNum is a non-negative integer, which indicates the number that hot-standby should scale down.
+	// It has excluded the number of Pods that are already specified to delete.
+	hotStandbyScaleDownNum int
+	// hotStandbyOldRevCount is part of the useSurge number of hot-standby pods
+	// it indicates the above number of old revision hot-standby Pods
+	hotStandbyOldRevCount int
 }
 
 func (e expectationDiffs) isEmpty() bool {
@@ -91,7 +105,7 @@ type IsPodUpdateFunc func(pod *v1.Pod, updateRevision string) bool
 
 // This is the most important algorithm in cloneset-controller.
 // It calculates the pod numbers to scaling and updating for current CloneSet.
-func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string, isPodUpdate IsPodUpdateFunc) (res expectationDiffs) {
+func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string, isPodUpdate IsPodUpdateFunc) (res expectationDiffs, newAvailableHotStandbyPods []*v1.Pod) {
 	coreControl := clonesetcore.New(cs)
 	replicas := int(*cs.Spec.Replicas)
 	var partition, maxSurge, maxUnavailable, scaleMaxUnavailable int
@@ -143,8 +157,18 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		}
 	}
 
+	// Split pods into normal pods and hot-standby pods
+	var oldHotStandbyCount int
+	var newHotStandbyCount int
 	for _, p := range pods {
 		if isPodUpdate(p, updateRevision) {
+			if hotstandby.IsHotStandbyPod(p) {
+				newHotStandbyCount++
+				if IsPodAvailable(coreControl, p, cs.Spec.MinReadySeconds) {
+					newAvailableHotStandbyPods = append(newAvailableHotStandbyPods, p)
+				}
+				continue
+			}
 
 			newRevisionCount++
 
@@ -162,6 +186,11 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 			}
 
 		} else {
+			if hotstandby.IsHotStandbyPod(p) {
+				oldHotStandbyCount++
+				continue
+			}
+
 			oldRevisionCount++
 
 			switch state := lifecycle.GetPodLifecycleState(p); state {
@@ -228,7 +257,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 	}
 
 	// prepare for scale calculation
-	currentTotalCount := len(pods)
+	currentTotalCount := newRevisionCount + oldRevisionCount
 	currentTotalOldCount := oldRevisionCount
 	if shouldScalingExcludePreparingDelete(cs) {
 		currentTotalCount = currentTotalCount - preDeletingOldRevisionCount - preDeletingNewRevisionCount
@@ -264,6 +293,34 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 	if res.updateNum != 0 {
 		res.updateMaxUnavailable = maxUnavailable + len(pods) - replicas
 	}
+
+	// calculate hot-standby replicas
+	var hotStandbyReplicas int
+	if cs.Spec.HotStandbyReplicas != nil {
+		hotStandbyReplicas = int(*cs.Spec.HotStandbyReplicas)
+	}
+
+	if oldHotStandbyCount+newHotStandbyCount < hotStandbyReplicas {
+		res.hotStandbyScaleUpNum = hotStandbyReplicas - (oldHotStandbyCount + newHotStandbyCount)
+	} else {
+		res.hotStandbyScaleDownNum = (oldHotStandbyCount + newHotStandbyCount) - hotStandbyReplicas
+	}
+
+	updateHotStandbyOldDiff := oldHotStandbyCount
+	updateHotStandbyNewDiff := newHotStandbyCount - hotStandbyReplicas
+	// If the currentRevision and updateRevision are consistent, Pods can only update to this revision
+	// If the CloneSetPartitionRollback is not enabled, Pods can only update to the new revision
+	if updateRevision == currentRevision || !utilfeature.DefaultFeatureGate.Enabled(features.CloneSetPartitionRollback) {
+		updateHotStandbyOldDiff = integer.IntMax(updateHotStandbyOldDiff, 0)
+		updateHotStandbyNewDiff = integer.IntMin(updateHotStandbyNewDiff, 0)
+	}
+	if util.IntAbs(updateHotStandbyOldDiff) <= util.IntAbs(updateHotStandbyNewDiff) {
+		res.hotStandbyUpdateNum = updateHotStandbyOldDiff
+	} else {
+		res.hotStandbyUpdateNum = 0 - updateHotStandbyNewDiff
+	}
+
+	res.hotStandbyOldRevCount = oldHotStandbyCount
 
 	return
 }
