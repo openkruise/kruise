@@ -161,6 +161,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 				whiteList, err := configuration.GetWSWatchCustomWorkloadWhiteList(h.Client)
 				if err != nil {
 					allErrs = append(allErrs, field.InternalError(fldPath.Child("targetRef"), err))
+					break
 				}
 				matched := false
 				for _, wl := range whiteList.Workloads {

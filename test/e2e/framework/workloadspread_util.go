@@ -18,36 +18,41 @@ package framework
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/onsi/gomega"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/util"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/ptr"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/pkg/util"
 )
 
 type WorkloadSpreadTester struct {
 	C  clientset.Interface
 	kc kruiseclientset.Interface
+	dc dynamic.Interface
 }
 
-func NewWorkloadSpreadTester(c clientset.Interface, kc kruiseclientset.Interface) *WorkloadSpreadTester {
+func NewWorkloadSpreadTester(c clientset.Interface, kc kruiseclientset.Interface, dc dynamic.Interface) *WorkloadSpreadTester {
 	return &WorkloadSpreadTester{
 		C:  c,
 		kc: kc,
+		dc: dc,
 	}
 }
 
@@ -231,6 +236,64 @@ func (t *WorkloadSpreadTester) NewBaseDeployment(namespace string) *appsv1.Deplo
 	}
 }
 
+func (t *WorkloadSpreadTester) NewTFJob(name, namespace string, ps, master, worker int64) *unstructured.Unstructured {
+	un := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"spec": map[string]interface{}{
+				"tfReplicaSpecs": map[string]interface{}{
+					"PS": map[string]interface{}{
+						"replicas": ps,
+					},
+					"MASTER": map[string]interface{}{
+						"replicas": master,
+					},
+					"Worker": map[string]interface{}{
+						"replicas": worker,
+					},
+				},
+			},
+		},
+	}
+	un.SetAPIVersion("kubeflow.org/v1")
+	un.SetKind("TFJob")
+	un.SetNamespace(namespace)
+	un.SetName(name)
+	return un
+}
+
+func (t *WorkloadSpreadTester) NewBaseDaemonSet(name, namespace string) *appsv1alpha1.DaemonSet {
+	return &appsv1alpha1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: appsv1alpha1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": name,
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": name,
+					},
+				},
+				Spec: corev1.PodSpec{
+					TerminationGracePeriodSeconds: ptr.To(int64(0)),
+					Containers: []corev1.Container{
+						{
+							Name:    "main",
+							Image:   imageutils.GetE2EImage(imageutils.Httpd),
+							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func (t *WorkloadSpreadTester) SetNodeLabel(c clientset.Interface, node *corev1.Node, key, value string) {
 	labels := node.GetLabels()
 	if labels == nil {
@@ -251,12 +314,14 @@ func (t *WorkloadSpreadTester) SetNodeLabel(c clientset.Interface, node *corev1.
 }
 
 func (t *WorkloadSpreadTester) CreateWorkloadSpread(workloadSpread *appsv1alpha1.WorkloadSpread) *appsv1alpha1.WorkloadSpread {
-	Logf("create WorkloadSpread (%s/%s)", workloadSpread.Namespace, workloadSpread.Name)
-	_, err := t.kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Create(context.TODO(), workloadSpread, metav1.CreateOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	t.WaitForWorkloadSpreadRunning(workloadSpread)
-	Logf("create workloadSpread (%s/%s) success", workloadSpread.Namespace, workloadSpread.Name)
-	workloadSpread, _ = t.kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+	gomega.Eventually(func(g gomega.Gomega) {
+		Logf("create WorkloadSpread (%s/%s)", workloadSpread.Namespace, workloadSpread.Name)
+		_, err := t.kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Create(context.TODO(), workloadSpread, metav1.CreateOptions{})
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		t.WaitForWorkloadSpreadRunning(workloadSpread)
+		Logf("create workloadSpread (%s/%s) success", workloadSpread.Namespace, workloadSpread.Name)
+		workloadSpread, _ = t.kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+	}).WithTimeout(20 * time.Second).WithPolling(time.Second).Should(gomega.Succeed())
 	return workloadSpread
 }
 
@@ -327,6 +392,71 @@ func (t *WorkloadSpreadTester) CreateJob(job *batchv1.Job) *batchv1.Job {
 	Logf("create job (%s/%s) success", job.Namespace, job.Name)
 	job, _ = t.C.BatchV1().Jobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
 	return job
+}
+
+func (t *WorkloadSpreadTester) CreateTFJob(obj *unstructured.Unstructured, ps, master, worker int) {
+	Logf("create TFJob (%s/%s)", obj.GetNamespace(), obj.GetName())
+	// create unstructured with dynamic client
+	obj, err := t.dc.Resource(schema.GroupVersionResource{
+		Group:    "kubeflow.org",
+		Version:  "v1",
+		Resource: "tfjobs",
+	}).Namespace(obj.GetNamespace()).Create(context.Background(), obj, metav1.CreateOptions{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	// ger PS, MASTER and Worker replicas from obj
+	Logf("creating fake pods: PS %d, MASTER %d, Worker: %d", ps, master, worker)
+	createPod := func(name string, labels map[string]string) {
+		fakePod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels:    labels,
+				Name:      name,
+				Namespace: obj.GetNamespace(),
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion:         "kubeflow.org/v1",
+						BlockOwnerDeletion: ptr.To(true),
+						Controller:         ptr.To(true),
+						Kind:               "TFJob",
+						Name:               obj.GetName(),
+						UID:                obj.GetUID(),
+					},
+				},
+			},
+			Spec: corev1.PodSpec{
+				TerminationGracePeriodSeconds: ptr.To(int64(0)),
+				Containers: []corev1.Container{
+					{
+						Name:    "main",
+						Image:   imageutils.GetE2EImage(imageutils.Httpd),
+						Command: []string{"/bin/sh", "-c", "sleep 10000000"},
+					},
+				},
+			},
+		}
+		_, err = t.C.CoreV1().Pods(obj.GetNamespace()).Create(context.Background(), fakePod, metav1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	}
+	for i := 0; i < ps; i++ {
+		createPod(fmt.Sprintf("tfjob-%s-ps-%d", obj.GetName(), i), map[string]string{"app": "tfjob", "role": "ps"})
+	}
+	for i := 0; i < master; i++ {
+		createPod(fmt.Sprintf("tfjob-%s-master-%d", obj.GetName(), i), map[string]string{"app": "tfjob", "role": "master"})
+	}
+	for i := 0; i < worker; i++ {
+		createPod(fmt.Sprintf("fake-tfjob-worker-%d", i), map[string]string{"app": "tfjob", "role": "worker"})
+	}
+}
+
+func (t *WorkloadSpreadTester) CreateDaemonSet(ads *appsv1alpha1.DaemonSet) *appsv1alpha1.DaemonSet {
+	Logf("create DaemonSet (%s/%s)", ads.Namespace, ads.Name)
+	_, err := t.kc.AppsV1alpha1().DaemonSets(ads.Namespace).Create(context.Background(), ads, metav1.CreateOptions{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	gomega.Eventually(func(g gomega.Gomega) {
+		ads, err = t.kc.AppsV1alpha1().DaemonSets(ads.Namespace).Get(context.Background(), ads.Name, metav1.GetOptions{})
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		g.Expect(ads.Status.NumberReady).To(gomega.BeEquivalentTo(3))
+	}).WithTimeout(time.Minute).WithPolling(time.Second).Should(gomega.Succeed())
+	return ads
 }
 
 func (t *WorkloadSpreadTester) WaitForCloneSetRunning(cloneSet *appsv1alpha1.CloneSet) {

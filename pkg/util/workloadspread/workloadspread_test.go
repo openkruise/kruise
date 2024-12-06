@@ -26,7 +26,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openkruise/kruise/pkg/util/configuration"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -440,6 +442,7 @@ func init() {
 	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(appsv1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(batchv1.AddToScheme(scheme))
 }
 
 func TestWorkloadSpreadCreatePodWithoutFullName(t *testing.T) {
@@ -1167,6 +1170,139 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 	}
 }
 
+func TestGetWorkloadReplicas(t *testing.T) {
+	cases := []struct {
+		name            string
+		targetReference *appsv1alpha1.TargetReference
+		targetFilter    *appsv1alpha1.TargetFilter
+		replicas        int32
+		wantErr         bool
+	}{
+		{
+			name: "without target reference",
+		},
+		{
+			name: "deployment",
+			targetReference: &appsv1alpha1.TargetReference{
+				APIVersion: "apps/v1",
+				Kind:       "Deployment",
+				Name:       "test",
+			},
+			replicas: 5,
+		},
+		{
+			name: "Advanced StatefulSet",
+			targetReference: &appsv1alpha1.TargetReference{
+				APIVersion: "apps.kruise.io/v1alpha1",
+				Kind:       "StatefulSet",
+				Name:       "test",
+			},
+			replicas: 5,
+		},
+		{
+			name: "custom workload",
+			targetReference: &appsv1alpha1.TargetReference{
+				APIVersion: "apps.kruise.io/v1alpha1",
+				Kind:       "DaemonSet",
+				Name:       "test",
+			},
+			replicas: 1,
+		},
+		{
+			name: "filter assigned replicas path",
+			targetReference: &appsv1alpha1.TargetReference{
+				APIVersion: "apps.kruise.io/v1alpha1",
+				Kind:       "DaemonSet",
+				Name:       "test",
+			},
+			targetFilter: &appsv1alpha1.TargetFilter{
+				ReplicasPathList: []string{"spec.revisionHistoryLimit"},
+			},
+			replicas: 2,
+		},
+		{
+			name: "filter default path",
+			targetReference: &appsv1alpha1.TargetReference{
+				APIVersion: "apps.kruise.io/v1alpha1",
+				Kind:       "DaemonSet",
+				Name:       "test",
+			},
+			targetFilter: &appsv1alpha1.TargetFilter{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
+				"foo": "bar",
+			}}},
+			replicas: 1, // default path value is 1, even no pods selected
+		},
+		{
+			name: "job",
+			targetReference: &appsv1alpha1.TargetReference{
+				APIVersion: "batch/v1",
+				Kind:       "Job",
+				Name:       "test",
+			},
+			replicas: 3,
+		},
+	}
+	whiteList := &configuration.WSCustomWorkloadWhiteList{
+		Workloads: []configuration.CustomWorkload{
+			{
+				GroupVersionKind: schema.GroupVersionKind{
+					Group:   "apps.kruise.io",
+					Version: "v1alpha1",
+					Kind:    "DaemonSet",
+				},
+				ReplicasPath: "spec.minReadySeconds",
+			},
+		},
+	}
+	whiteListJson, _ := json.Marshal(whiteList)
+	h := Handler{fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(
+			&appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
+				Spec:       appsv1.DeploymentSpec{Replicas: ptr.To(int32(5))},
+			},
+			&appsv1beta1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
+				Spec:       appsv1beta1.StatefulSetSpec{Replicas: ptr.To(int32(5))},
+			},
+			&appsv1alpha1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
+				Spec:       appsv1alpha1.DaemonSetSpec{MinReadySeconds: 1, RevisionHistoryLimit: ptr.To(int32(2))},
+			},
+			&batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
+				Spec:       batchv1.JobSpec{Parallelism: ptr.To(int32(3))},
+			},
+			&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      configuration.KruiseConfigurationName,
+					Namespace: util.GetKruiseNamespace(),
+				},
+				Data: map[string]string{
+					configuration.WSWatchCustomWorkloadWhiteList: string(whiteListJson),
+				},
+			},
+		).Build()}
+	percent := intstr.FromString("30%")
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			ws := workloadSpreadDemo.DeepCopy()
+			ws.Namespace = "test"
+			ws.Spec.TargetFilter = cs.targetFilter
+			ws.Spec.TargetReference = cs.targetReference
+			ws.Spec.Subsets = append(ws.Spec.Subsets, appsv1alpha1.WorkloadSpreadSubset{
+				MaxReplicas: &percent,
+			})
+			replicas, err := h.getWorkloadReplicas(ws)
+			if cs.wantErr != (err != nil) {
+				t.Fatalf("wantErr: %v, but got: %v", cs.wantErr, err)
+			}
+			if replicas != cs.replicas {
+				t.Fatalf("want replicas: %v, but got: %v", cs.replicas, replicas)
+			}
+		})
+	}
+}
 func compareVersionedSubsetStatuses(actual, expect map[string][]appsv1alpha1.WorkloadSpreadSubsetStatus) bool {
 	if len(actual) != len(expect) {
 		return false
@@ -2085,4 +2221,116 @@ func getLatestWorkloadSpread(client client.Client, workloadSpread *appsv1alpha1.
 	}
 	err := client.Get(context.TODO(), Key, newWS)
 	return newWS, err
+}
+
+func TestGetReplicasFromObject(t *testing.T) {
+	object := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"spec": map[string]interface{}{
+				"replicas":     int64(5),
+				"replicaSlice": []any{int64(1), int64(2)},
+				"stringField":  "5",
+			},
+		},
+	}
+	tests := []struct {
+		name         string
+		replicasPath string
+		want         int32
+		wantErr      string
+	}{
+		{
+			name:         "empty path",
+			replicasPath: "",
+			want:         0,
+		},
+		{
+			name:         "not exist",
+			replicasPath: "spec.not.exist",
+			want:         0,
+			wantErr:      "path \"not\" not exists",
+		},
+		{
+			name:         "error e.g. string field",
+			replicasPath: "spec.stringField",
+			want:         0,
+			wantErr:      "object type error",
+		},
+		{
+			name:         "success",
+			replicasPath: "spec.replicas",
+			want:         5,
+		},
+		{
+			name:         "success in slice",
+			replicasPath: "spec.replicaSlice.1",
+			want:         2,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetReplicasFromObject(object, tt.replicasPath)
+			if err != nil && err.Error() != tt.wantErr {
+				t.Errorf("GetReplicasFromObject() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("GetReplicasFromObject() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetReplicasFromWorkloadWithTargetFilter(t *testing.T) {
+	object := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"spec": map[string]interface{}{
+				"replicas":     int64(5),
+				"replicaSlice": []any{int64(1), int64(2)},
+			},
+		},
+	}
+	tests := []struct {
+		name         string
+		targetFilter *appsv1alpha1.TargetFilter
+		want         int32
+		wantErr      bool
+	}{
+		{
+			name:         "empty filter",
+			targetFilter: &appsv1alpha1.TargetFilter{},
+		},
+		{
+			name: "all",
+			targetFilter: &appsv1alpha1.TargetFilter{
+				ReplicasPathList: []string{
+					"spec.replicas",
+					"spec.replicaSlice.0",
+					"spec.replicaSlice.1",
+				},
+			},
+			want: 8,
+		},
+		{
+			name: "with error",
+			targetFilter: &appsv1alpha1.TargetFilter{
+				ReplicasPathList: []string{
+					"spec.not.exist",
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetReplicasFromWorkloadWithTargetFilter(object, tt.targetFilter)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetReplicasFromWorkloadWithTargetFilter() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("GetReplicasFromWorkloadWithTargetFilter() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
