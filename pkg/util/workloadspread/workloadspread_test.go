@@ -1230,7 +1230,7 @@ func TestGetWorkloadReplicas(t *testing.T) {
 			targetFilter: &appsv1alpha1.TargetFilter{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
 				"foo": "bar",
 			}}},
-			replicas: 0,
+			replicas: 1, // default path value is 1, even no pods selected
 		},
 		{
 			name: "job",
