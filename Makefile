@@ -186,4 +186,4 @@ kruise-e2e-test: $(tools/kind) delete-cluster create-cluster install-csi docker-
 
 .PHONY: docker-build-hook
 docker-build-hook:
-	docker build -f ./Dockerfile_helm_hook . -t ${HOOK_IMG}
+	docker buildx build -f ./Dockerfile_helm_hook --pull --no-cache --platform=$(PLATFORMS) --push . -t $(HOOK_IMG)

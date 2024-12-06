@@ -26,4 +26,3 @@ jobs:
           docker buildx create --use --platform=linux/amd64,linux/arm64,linux/ppc64le --name multi-platform-builder
           docker buildx ls
           IMG=openkruise/kruise-manager:${{ github.ref_name }} make docker-multiarch
-          HOOK_IMG=openkruise/kruise-helm-hook:${{ github.ref_name }} make docker-build-hook
