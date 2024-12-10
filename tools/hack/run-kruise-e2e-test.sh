@@ -18,6 +18,8 @@ set -ex
 export KUBECONFIG=${HOME}/.kube/config
 make ginkgo
 set +e
+echo "installing tfjobs crds"
+kubectl apply -f https://raw.githubusercontent.com/kubeflow/training-operator/refs/heads/v1.8-branch/manifests/base/crds/kubeflow.org_tfjobs.yaml
 ./bin/ginkgo -timeout 60m -v --focus='\[apps\] StatefulSet' test/e2e
 retVal=$?
 restartCount=$(kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
