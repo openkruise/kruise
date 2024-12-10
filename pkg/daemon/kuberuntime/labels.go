@@ -33,6 +33,7 @@ const (
 	podTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
 
 	containerHashLabel                     = "io.kubernetes.container.hash"
+	containerHashWithoutResourcesLabel     = "io.kubernetes.container.hashWithoutResources"
 	containerRestartCountLabel             = "io.kubernetes.container.restartCount"
 	containerTerminationMessagePathLabel   = "io.kubernetes.container.terminationMessagePath"
 	containerTerminationMessagePolicyLabel = "io.kubernetes.container.terminationMessagePolicy"
@@ -49,6 +50,7 @@ type labeledContainerInfo struct {
 
 type annotatedContainerInfo struct {
 	Hash                      uint64
+	HashWithoutResources      uint64
 	RestartCount              int
 	PodDeletionGracePeriod    *int64
 	PodTerminationGracePeriod *int64
@@ -78,6 +80,9 @@ func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedCo
 
 	if containerInfo.Hash, err = getUint64ValueFromLabel(annotations, containerHashLabel); err != nil {
 		klog.ErrorS(err, "Unable to get label from annotations", "label", containerHashLabel, "annotations", annotations)
+	}
+	if containerInfo.HashWithoutResources, err = getUint64ValueFromLabel(annotations, containerHashWithoutResourcesLabel); err != nil {
+		klog.ErrorS(err, "Unable to get label from annotations", "label", containerHashWithoutResourcesLabel, "annotations", annotations)
 	}
 	if containerInfo.RestartCount, err = getIntValueFromLabel(annotations, containerRestartCountLabel); err != nil {
 		klog.ErrorS(err, "Unable to get label from annotations", "label", containerRestartCountLabel, "annotations", annotations)
