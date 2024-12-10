@@ -66,8 +66,14 @@ type SidecarControl interface {
 	// consistent indicates pod.spec and pod.status is consistent,
 	// when pod.spec.image is v2 and pod.status.image is v1, then it is inconsistent.
 	IsSidecarSetUpgradable(pod *v1.Pod) (canUpgrade, consistent bool)
+	// IsSupportInitContainerInPlace indicates whether the sidecarSet supports in-place upgrade of initContainer
+	IsSupportInitContainerInPlace() bool
 }
 
-func New(cs *appsv1alpha1.SidecarSet) SidecarControl {
-	return &commonControl{SidecarSet: cs}
+func New(cs *appsv1alpha1.SidecarSet, opts ...Option) SidecarControl {
+	control := &commonControl{SidecarSet: cs}
+	for _, opt := range opts {
+		opt(control)
+	}
+	return control
 }
