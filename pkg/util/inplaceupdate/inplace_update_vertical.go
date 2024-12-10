@@ -35,23 +35,12 @@ type VerticalUpdateInterface interface {
 	// ParseResourcePatch validates and applies the resource patch to the UpdateSpec.
 	ParseResourcePatch(op *jsonpatch.Operation, oldTemp *v1.PodTemplateSpec, updateSpec *UpdateSpec) error
 
-	// interface for container level vertical scaling api, such as k8s 1.27+
-
-	// SyncContainerResource Get the expected resource values of the container and its current status
-	SyncContainerResource(container *v1.ContainerStatus, state *appspub.InPlaceUpdateState)
-	// UpdateContainerResource Pass in the container to be modified and the expected resource values.
-	UpdateContainerResource(container *v1.Container, resource *v1.ResourceRequirements)
-	// IsContainerUpdateCompleted To determine whether the container has been successfully vertical updated
-	IsContainerUpdateCompleted(container *v1.Container, containerStatus *v1.ContainerStatus) bool
-
-	// interface for pod level vertical scaling api
-
-	// SyncPodResource Get the expected resource values of all containers in the pod and their current status
-	SyncPodResource(pod *v1.Pod, state *appspub.InPlaceUpdateState)
-	// UpdatePodResource All containers of a pod can be updated at once within this interface.
-	UpdatePodResource(pod *v1.Pod)
-	// IsPodUpdateCompleted To determine whether the pod has been successfully vertical updated
-	IsPodUpdateCompleted(pod *v1.Pod) bool
+	// SyncResource Get the expected resource values of all/specified containers in the pod and their current status
+	SyncResource(pod *v1.Pod, state *appspub.InPlaceUpdateState, specifiedContainers []string)
+	// UpdateResource All containers of a pod can be updated at once within this interface.
+	UpdateResource(pod *v1.Pod, expectedResources map[string]*v1.ResourceRequirements)
+	// IsUpdateCompleted To determine whether the pod has been successfully vertical updated
+	IsUpdateCompleted(pod *v1.Pod) (bool, error)
 }
 
 var verticalUpdateImpl VerticalUpdateInterface = nil
@@ -116,12 +105,12 @@ func (v *NativeVerticalUpdate) ParseResourcePatch(op *jsonpatch.Operation, oldTe
 	return nil
 }
 
-// Get the resource status from the container and synchronize it to state
+// SyncContainerResource Get the resource status from the container and synchronize it to state
 func (v *NativeVerticalUpdate) SyncContainerResource(container *v1.ContainerStatus, state *appspub.InPlaceUpdateState) {
 	return
 }
 
-// UpdateResource implements vertical updates by directly modifying the container's resources,
+// UpdateContainerResource implements vertical updates by directly modifying the container's resources,
 // conforming to the k8s community standard
 func (v *NativeVerticalUpdate) UpdateContainerResource(container *v1.Container, newResource *v1.ResourceRequirements) {
 	if container == nil || newResource == nil {
@@ -155,19 +144,41 @@ func (v *NativeVerticalUpdate) IsContainerUpdateCompleted(container *v1.Containe
 }
 
 // Get the resource status from the pod and synchronize it to state
-func (v *NativeVerticalUpdate) SyncPodResource(pod *v1.Pod, state *appspub.InPlaceUpdateState) {
-}
-
-// For the community-standard vertical scale-down implementation,
-// there is no need to do anything here because the container has already been updated in the UpdateContainerResource interface
-func (v *NativeVerticalUpdate) UpdatePodResource(pod *v1.Pod) {
+func (v *NativeVerticalUpdate) SyncResource(pod *v1.Pod, state *appspub.InPlaceUpdateState, specifiedContainers []string) {
 	return
 }
 
-// IsUpdateCompleted directly determines whether the current pod is vertically updated by the spec and status of the container,
-// which conforms to the k8s community standard
-func (v *NativeVerticalUpdate) IsPodUpdateCompleted(pod *v1.Pod) bool {
-	return true
+func (v *NativeVerticalUpdate) UpdateResource(pod *v1.Pod, expectedResources map[string]*v1.ResourceRequirements) {
+	if len(expectedResources) == 0 {
+		// pod level hook, ignore in native implementation
+		return
+	}
+	for i := range pod.Spec.Containers {
+		c := &pod.Spec.Containers[i]
+		newResource, resourceExists := expectedResources[c.Name]
+		if !resourceExists {
+			continue
+		}
+		v.UpdateContainerResource(c, newResource)
+	}
+	return
+}
+
+func (v *NativeVerticalUpdate) IsUpdateCompleted(pod *v1.Pod) (bool, error) {
+	containers := make(map[string]*v1.Container, len(pod.Spec.Containers))
+	for i := range pod.Spec.Containers {
+		c := &pod.Spec.Containers[i]
+		containers[c.Name] = c
+	}
+	if len(pod.Status.ContainerStatuses) != len(containers) {
+		return false, fmt.Errorf("some container status is not reported")
+	}
+	for _, cs := range pod.Status.ContainerStatuses {
+		if !v.IsContainerUpdateCompleted(containers[cs.Name], &cs) {
+			return false, fmt.Errorf("container %s resources not changed", cs.Name)
+		}
+	}
+	return true, nil
 }
 
 // only cpu and memory are allowed to be inplace updated

@@ -150,7 +150,7 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 			continue
 		}
 		if containersToUpdate.Has(c.Name) {
-			verticalUpdateImpl.UpdateContainerResource(c, &newResource)
+			verticalUpdateImpl.UpdateResource(pod, map[string]*v1.ResourceRequirements{c.Name: &newResource})
 			containersResourceChanged.Insert(c.Name)
 		} else {
 			state.NextContainerResources[c.Name] = newResource
@@ -170,7 +170,7 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 			}
 		}
 		if containersResourceChanged.Has(c.Name) && utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) {
-			verticalUpdateImpl.SyncContainerResource(&c, state)
+			verticalUpdateImpl.SyncResource(pod, state, []string{c.Name})
 		}
 	}
 
@@ -180,8 +180,8 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 	// This provides a hook for vertical updates
 	// so that internal enterprise implementations can update+sync pod resources here at once
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) {
-		verticalUpdateImpl.UpdatePodResource(pod)
-		verticalUpdateImpl.SyncPodResource(pod, state)
+		verticalUpdateImpl.UpdateResource(pod, nil)
+		verticalUpdateImpl.SyncResource(pod, state, nil)
 	}
 
 	// update annotations and labels for the containers to update
@@ -423,13 +423,6 @@ func DefaultCheckInPlaceUpdateCompleted(pod *v1.Pod) error {
 	if len(inPlaceUpdateState.NextContainerImages) > 0 || len(inPlaceUpdateState.NextContainerRefMetadata) > 0 || len(inPlaceUpdateState.NextContainerResources) > 0 {
 		return fmt.Errorf("existing containers to in-place update in next batches")
 	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) {
-		if ok := verticalUpdateImpl.IsPodUpdateCompleted(pod); !ok {
-			return fmt.Errorf("waiting for pod vertical update")
-		}
-	}
-
 	return defaultCheckContainersInPlaceUpdateCompleted(pod, &inPlaceUpdateState)
 }
 
@@ -450,15 +443,8 @@ func defaultCheckContainersInPlaceUpdateCompleted(pod *v1.Pod, inPlaceUpdateStat
 
 	// only UpdateResources, we check resources in status updated
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) && inPlaceUpdateState.UpdateResources {
-		containers := make(map[string]*v1.Container, len(pod.Spec.Containers))
-		for i := range pod.Spec.Containers {
-			c := &pod.Spec.Containers[i]
-			containers[c.Name] = c
-		}
-		for _, cs := range pod.Status.ContainerStatuses {
-			if !verticalUpdateImpl.IsContainerUpdateCompleted(containers[cs.Name], &cs) {
-				return fmt.Errorf("container %s resources not changed", cs.Name)
-			}
+		if completed, err := verticalUpdateImpl.IsUpdateCompleted(pod); !completed {
+			return err
 		}
 	}
 
