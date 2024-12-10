@@ -37,14 +37,17 @@ func SidecarSetHash(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
 }
 
 // SidecarSetHashWithoutImage calculates sidecars's container hash without its image
+// also ignore ImagePullPolicy, because if change image tag to `latest`, the ImagePullPolicy will be set to `Always` as default.
 // we use this to determine if the sidecar reconcile needs to update a pod image
 func SidecarSetHashWithoutImage(sidecarSet *appsv1alpha1.SidecarSet) (string, error) {
 	ss := sidecarSet.DeepCopy()
 	for i := range ss.Spec.Containers {
 		ss.Spec.Containers[i].Image = ""
+		ss.Spec.Containers[i].ImagePullPolicy = ""
 	}
 	for i := range ss.Spec.InitContainers {
 		ss.Spec.InitContainers[i].Image = ""
+		ss.Spec.InitContainers[i].ImagePullPolicy = ""
 	}
 	encoded, err := encodeSidecarSet(ss)
 	if err != nil {
