@@ -134,6 +134,10 @@ const (
 
 	// ForceDeleteTimeoutExpectationFeatureGate enable delete timeout expectation, for example: cloneSet ScaleExpectation
 	ForceDeleteTimeoutExpectationFeatureGate = "ForceDeleteTimeoutExpectationGate"
+
+	// InPlaceWorkloadVerticalScaling enable CloneSet/Advanced StatefulSet controller to support vertical scaling
+	// of managed Pods.
+	InPlaceWorkloadVerticalScaling featuregate.Feature = "InPlaceWorkloadVerticalScaling"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -170,6 +174,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	EnableExternalCerts:                      {Default: false, PreRelease: featuregate.Alpha},
 	StatefulSetAutoResizePVCGate:             {Default: false, PreRelease: featuregate.Alpha},
 	ForceDeleteTimeoutExpectationFeatureGate: {Default: false, PreRelease: featuregate.Alpha},
+	InPlaceWorkloadVerticalScaling:           {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

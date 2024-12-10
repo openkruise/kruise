@@ -344,7 +344,10 @@ func (c *Controller) manageContainerMetaSet(pod *v1.Pod, kubePodStatus *kubeletc
 				Name:         status.Name,
 				ContainerID:  status.ID.String(),
 				RestartCount: int32(status.RestartCount),
-				Hashes:       appspub.RuntimeContainerHashes{PlainHash: status.Hash},
+				Hashes: appspub.RuntimeContainerHashes{
+					PlainHash:                 status.Hash,
+					PlainHashWithoutResources: status.HashWithoutResources,
+				},
 			}
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceUpdateEnvFromMetadata) {
