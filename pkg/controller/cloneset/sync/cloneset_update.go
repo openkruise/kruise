@@ -50,7 +50,6 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 
 	key := clonesetutils.GetControllerKey(cs)
 	coreControl := clonesetcore.New(cs)
-
 	// 1. refresh states for all pods
 	var modified bool
 	for _, pod := range pods {
