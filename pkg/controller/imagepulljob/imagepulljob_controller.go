@@ -232,6 +232,13 @@ func (r *ReconcileImagePullJob) Reconcile(_ context.Context, request reconcile.R
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to get NodeImages: %v", err)
 	}
+	// Filter nodeImage by Tolerations when featureGate is true.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ImagePullJobTolerationGate) {
+		nodeImages, err = utilimagejob.TolerationNodeImages(r.Client, nodeImages, job)
+		if err != nil {
+			return reconcile.Result{}, fmt.Errorf("failed to get NodeImages for Toleration: %v", err)
+		}
+	}
 
 	// If resourceVersion expectations have not satisfied yet, just skip this reconcile
 	for _, nodeImage := range nodeImages {
