@@ -35,11 +35,14 @@ see-also:
 ## Summary
 
 镜像拉取作为加速pod启动的重要一环，我们之前已经支持了基于 kruise-daemon 调用 CRI 接口进行镜像预热的方案。但这种方案无法实现 virtual kubelet 场景下的镜像预热。
-我们注意到如 ACK 平台上 ECI 上已经支持了部分[预热的方案](https://help.aliyun.com/zh/eci/user-guide/overview-of-image-caches-2)，即对预热镜像的容器数据盘进行打快照来实现镜像加速。该提案旨在利用该机制实现 vk 场景下的镜像预热，并尽可能复用已有的 CR。
+
+我们注意到如 ACK 平台上 ECI 上已经支持了部分[预热的方案](https://help.aliyun.com/zh/eci/user-guide/overview-of-image-caches-2)，即对预热镜像的容器数据盘进行打快照来实现镜像加速。
+
+该提案旨在利用该机制实现 vk 场景下的镜像预热，并尽可能复用已有的 CR。
 
 ## Motivation
 
-弹性节点或者 serverless 作为使用云的最大优势之一，其最大的优势在于弹性，如果能够将预热镜像的机制与弹性池的机制结合起来，将能够显著提升弹性池的弹性。
+弹性节点或者 serverless 作为使用云的最大优势之一，其最大的优势在于高效快速地使用云上近乎无限的资源，如果能够将预热镜像的机制与弹性池的机制结合起来，将能够显著提升弹性场景下的pod创建速度。
 
 ### Goals
 
