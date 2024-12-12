@@ -19,6 +19,7 @@ package util
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"testing"
 
@@ -323,7 +324,7 @@ func TestGetScaledValueFromIntOrPercent(t *testing.T) {
 		expectVal int
 	}{
 		{
-			input:     intstr.FromInt(123),
+			input:     intstr.FromInt32(123),
 			expectErr: false,
 			expectVal: 123,
 		},
@@ -408,5 +409,38 @@ func TestGetScaledValueFromIntOrPercent(t *testing.T) {
 		if test.expectVal != value {
 			t.Errorf("expected %v, but got %v", test.expectVal, value)
 		}
+	}
+}
+
+func TestParsePercentageAsFloat64(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected float64
+		err      error
+	}{
+		{"100%", 1.0, nil},
+		{"50%", 0.5, nil},
+		{"25%", 0.25, nil},
+		{"10%", 0.10, nil},
+		{"1%", 0.01, nil},
+		{"0%", 0.00, nil},
+		{"invalid", 0, fmt.Errorf("invalid type: string is not a percentage")},
+		{"100", 0, fmt.Errorf("invalid type: string is not a percentage")},
+		{"", 0, fmt.Errorf("invalid type: string is not a percentage")},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.input, func(t *testing.T) {
+			got, err := ParsePercentageAsFloat64(tc.input)
+			if err != nil && tc.err == nil {
+				t.Errorf("expected no error, but got: %v", err)
+			}
+			if err == nil && tc.err != nil {
+				t.Errorf("expected error: %v, but got none", tc.err)
+			}
+			if math.Abs(got-tc.expected) > 1e-9 {
+				t.Errorf("expected %v, but got %v", tc.expected, got)
+			}
+		})
 	}
 }
