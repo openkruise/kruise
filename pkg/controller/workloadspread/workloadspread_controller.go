@@ -281,7 +281,6 @@ func (r *ReconcileWorkloadSpread) getReplicasPathList(ws *appsv1alpha1.WorkloadS
 		return nil, nil
 	}
 	if ws.Spec.TargetFilter != nil && len(ws.Spec.TargetFilter.ReplicasPathList) > 0 {
-		klog.V(5).InfoS("found replicas path list in target filter", "replicasPathList", ws.Spec.TargetFilter.ReplicasPathList, "workloadSpread", klog.KObj(ws))
 		return ws.Spec.TargetFilter.ReplicasPathList, nil
 	}
 	whiteList, err := configuration.GetWSWatchCustomWorkloadWhiteList(r.Client)
@@ -335,7 +334,7 @@ func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.Work
 }
 
 func (r *ReconcileWorkloadSpread) filterWorkload(ws *appsv1alpha1.WorkloadSpread, pods []*corev1.Pod, replicas int32) (int32, []*corev1.Pod, error) {
-	klog.V(5).InfoS("before workload filtering", "pods", len(pods), "replicas", replicas)
+	klog.V(5).InfoS("before workload filtering", "pods", len(pods), "replicas", replicas, "workloadSpread", klog.KObj(ws))
 	replicasPathList, err := r.getReplicasPathList(ws)
 	if err != nil {
 		return replicas, pods, err
@@ -359,10 +358,11 @@ func (r *ReconcileWorkloadSpread) filterWorkload(ws *appsv1alpha1.WorkloadSpread
 			}
 			filteredReplicas += n
 		}
-		klog.V(4).InfoS("replicas after filtering", "replicas", filteredReplicas, "replicasPathList", replicasPathList)
+		klog.V(4).InfoS("replicas after filtering", "replicas", filteredReplicas,
+			"replicasPathList", replicasPathList, "workloadSpread", klog.KObj(ws))
 	} else {
 		filteredReplicas = replicas
-		klog.V(4).InfoS("replicas not filtered")
+		klog.V(4).InfoS("replicas not filtered", "workloadSpread", klog.KObj(ws))
 	}
 	var filteredPods []*corev1.Pod
 	if ws.Spec.TargetFilter != nil && ws.Spec.TargetFilter.Selector != nil {
@@ -378,7 +378,6 @@ func (r *ReconcileWorkloadSpread) filterWorkload(ws *appsv1alpha1.WorkloadSpread
 		klog.V(4).InfoS("pods after filtering", "pods", len(filteredPods), "selector", ws.Spec.TargetFilter.Selector)
 	} else {
 		filteredPods = pods
-		klog.V(4).InfoS("pods not filtered")
 	}
 	return filteredReplicas, filteredPods, nil
 }
@@ -391,7 +390,7 @@ func (r *ReconcileWorkloadSpread) filterWorkload(ws *appsv1alpha1.WorkloadSpread
 // mainly counts missingReplicas and records the creation or deletion entry of Pod into map.
 func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1alpha1.WorkloadSpread) error {
 	if ws.Spec.TargetReference == nil {
-		klog.InfoS("WorkloadSpread has no target reference")
+		klog.InfoS("WorkloadSpread has no target reference", "workloadSpread", klog.KObj(ws))
 		return nil
 	}
 	pods, workloadReplicas, err := r.getPodsForWorkloadSpread(ws)

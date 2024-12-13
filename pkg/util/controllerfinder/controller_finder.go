@@ -37,7 +37,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -516,7 +515,6 @@ func (r *ControllerFinder) getRefUID(ref ControllerReference, namespace string) 
 	if err != nil {
 		return nil, client.IgnoreNotFound(err)
 	}
-	klog.V(5).InfoS("get ref UID success", "uid", un.GetUID(), "ref", klog.KObj(un))
 	return &ScaleAndSelector{
 		Scale: ReplicasUnknown,
 		ControllerReference: ControllerReference{
