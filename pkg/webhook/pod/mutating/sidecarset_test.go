@@ -702,7 +702,7 @@ func TestCanarySidecarSetInjection(t *testing.T) {
 			InjectionStrategy: appsv1alpha1.SidecarSetInjectionStrategy{
 				Revision: &appsv1alpha1.SidecarSetInjectRevision{
 					CustomVersion: &revisionID,
-					Policy:        appsv1alpha1.TODOSidecarSetInjectRevisionPolicy,
+					Policy:        appsv1alpha1.PartialSidecarSetInjectRevisionPolicy,
 				},
 			},
 		},

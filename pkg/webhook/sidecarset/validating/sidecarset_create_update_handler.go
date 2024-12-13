@@ -204,10 +204,10 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSetInjectionStrategy(obj 
 		}
 
 		switch revisionInfo.Policy {
-		case "", appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy, appsv1alpha1.TODOSidecarSetInjectRevisionPolicy:
+		case "", appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy, appsv1alpha1.PartialSidecarSetInjectRevisionPolicy:
 		default:
 			errList = append(errList, field.Invalid(field.NewPath("revision").Child("policy"), revisionInfo, fmt.Sprintf("Invalid policy %v, supported: [%s, %s]",
-				revisionInfo.Policy, appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy, appsv1alpha1.TODOSidecarSetInjectRevisionPolicy)))
+				revisionInfo.Policy, appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy, appsv1alpha1.PartialSidecarSetInjectRevisionPolicy)))
 		}
 
 	}

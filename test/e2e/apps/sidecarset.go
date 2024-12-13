@@ -1663,7 +1663,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			}
 			sidecarSetIn.Spec.InjectionStrategy.Revision = &appsv1alpha1.SidecarSetInjectRevision{
 				CustomVersion: ptr.To("0"),
-				Policy:        appsv1alpha1.TODOSidecarSetInjectRevisionPolicy,
+				Policy:        appsv1alpha1.PartialSidecarSetInjectRevisionPolicy,
 			}
 			sidecarSetIn.Labels = map[string]string{
 				appsv1alpha1.SidecarSetCustomVersionLabel: "1",

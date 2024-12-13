@@ -216,7 +216,7 @@ type SidecarSetInjectRevision struct {
 	// + optional
 	RevisionName *string `json:"revisionName,omitempty"`
 	// Policy describes the behavior of revision injection.
-	// +kubebuilder:validation:Enum=Always;TODO
+	// +kubebuilder:validation:Enum=Always;Partial;
 	// +kubebuilder:default=Always
 	Policy SidecarSetInjectRevisionPolicy `json:"policy,omitempty"`
 }
@@ -228,15 +228,14 @@ const (
 	// the specific revision to Pods when pod creating, except matching UpdateStrategy.Selector.
 	AlwaysSidecarSetInjectRevisionPolicy SidecarSetInjectRevisionPolicy = "Always"
 
-	// TODOSidecarSetInjectRevisionPolicy means the SidecarSet will inject the specific or the latest revision according to UpdateStrategy.
+	// PartialSidecarSetInjectRevisionPolicy means the SidecarSet will inject the specific or the latest revision according to UpdateStrategy.
 	//
 	// If UpdateStrategy.Pause is not true, only when a newly created Pod is **not** selected by the Selector explicitly
 	// configured in `UpdateStrategy` will it be injected with the specified version of the Sidecar.
 	// Under all other conditions, newly created Pods have a probability of being injected with the latest Sidecar,
 	// where the probability is `1 - UpdateStrategy.Partition`.
 	// If `Partition` is not a percentage or is not configured, its value is considered to be 0%.
-	// TODO: rename me
-	TODOSidecarSetInjectRevisionPolicy SidecarSetInjectRevisionPolicy = "TODO"
+	PartialSidecarSetInjectRevisionPolicy SidecarSetInjectRevisionPolicy = "Partial"
 )
 
 // SidecarSetUpdateStrategy indicates the strategy that the SidecarSet

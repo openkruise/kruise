@@ -219,8 +219,8 @@ func (h *PodCreateHandler) getSuitableRevisionSidecarSet(sidecarSet *appsv1alpha
 		}
 
 		switch sidecarSet.Spec.InjectionStrategy.Revision.Policy {
-		case appsv1alpha1.TODOSidecarSetInjectRevisionPolicy:
-			if updateStrategy := sidecarSet.Spec.UpdateStrategy; !updateStrategy.Paused && updateStrategy.Selector != nil {
+		case appsv1alpha1.PartialSidecarSetInjectRevisionPolicy:
+			if updateStrategy := sidecarSet.Spec.UpdateStrategy; updateStrategy.Selector != nil {
 				selector, err := util.ValidatedLabelSelectorAsSelector(updateStrategy.Selector)
 				if err != nil {
 					klog.ErrorS(err, "Failed to parse SidecarSet update strategy selector", "sidecarSet", klog.KObj(sidecarSet))

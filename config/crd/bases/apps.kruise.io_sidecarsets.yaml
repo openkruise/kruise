@@ -262,7 +262,7 @@ spec:
                         description: Policy describes the behavior of revision injection.
                         enum:
                         - Always
-                        - TODO
+                        - Partial
                         type: string
                       revisionName:
                         description: RevisionName corresponds to a specific ControllerRevision
