@@ -216,7 +216,8 @@ type SidecarSetInjectRevision struct {
 	// + optional
 	RevisionName *string `json:"revisionName,omitempty"`
 	// Policy describes the behavior of revision injection.
-	// Defaults to Always.
+	// +kubebuilder:validation:Enum=Always;TODO
+	// +kubebuilder:default=Always
 	Policy SidecarSetInjectRevisionPolicy `json:"policy,omitempty"`
 }
 
@@ -229,8 +230,10 @@ const (
 
 	// TODOSidecarSetInjectRevisionPolicy means the SidecarSet will inject the specific or the latest revision according to UpdateStrategy.
 	//
-	// Only when a newly created Pod is **not** selected by the Selector explicitly configured in `UpdateStrategy` will it be injected with the specified version of the Sidecar.
-	// Under all other conditions, newly created Pods have a probability of being injected with the latest Sidecar, where the probability is `1 - UpdateStrategy.Partition`.
+	// If UpdateStrategy.Pause is not true, only when a newly created Pod is **not** selected by the Selector explicitly
+	// configured in `UpdateStrategy` will it be injected with the specified version of the Sidecar.
+	// Under all other conditions, newly created Pods have a probability of being injected with the latest Sidecar,
+	// where the probability is `1 - UpdateStrategy.Partition`.
 	// If `Partition` is not a percentage or is not configured, its value is considered to be 0%.
 	// TODO: rename me
 	TODOSidecarSetInjectRevisionPolicy SidecarSetInjectRevisionPolicy = "TODO"
@@ -256,9 +259,6 @@ type SidecarSetUpdateStrategy struct {
 	// injected into newly created Pods by a SidecarSet configured with an injectionStrategy.
 	// In most cases, all newly created Pods are injected with the specified Sidecar version as configured in injectionStrategy.revision,
 	// which is consistent with previous versions.
-	//
-	// Now, if updateStrategy.Selector is also configured and the updateStrategy.paused field is set to false,
-	// then Pods matching the selector will be injected with the latest version of the Sidecar container.
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
 	// Partition is the desired number of pods in old revisions. It means when partition

@@ -73,7 +73,7 @@ type SidecarSetCreateUpdateHandler struct {
 	Decoder *admission.Decoder
 }
 
-func (h *SidecarSetCreateUpdateHandler) validatingSidecarSetFn(ctx context.Context, obj *appsv1alpha1.SidecarSet, older *appsv1alpha1.SidecarSet) (bool, string, error) {
+func (h *SidecarSetCreateUpdateHandler) validatingSidecarSetFn(_ context.Context, obj *appsv1alpha1.SidecarSet, older *appsv1alpha1.SidecarSet) (bool, string, error) {
 	allErrs := h.validateSidecarSet(obj, older)
 	if len(allErrs) != 0 {
 		return false, "", allErrs.ToAggregate()
@@ -102,7 +102,7 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1alpha1.Sid
 	return allErrs
 }
 
-func validateSidecarSetName(name string, prefix bool) (allErrs []string) {
+func validateSidecarSetName(name string, _ bool) (allErrs []string) {
 	if !validateSidecarSetNameRegex.MatchString(name) {
 		allErrs = append(allErrs, validationutil.RegexError(validateSidecarSetNameMsg, validSidecarSetNameFmt, "example-com"))
 	}
@@ -188,7 +188,7 @@ func validateSelector(selector *metav1.LabelSelector, fldPath *field.Path) field
 	return allErrs
 }
 
-func (h *SidecarSetCreateUpdateHandler) validateSidecarSetInjectionStrategy(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) field.ErrorList {
+func (h *SidecarSetCreateUpdateHandler) validateSidecarSetInjectionStrategy(obj *appsv1alpha1.SidecarSet, _ *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
 	revisionInfo := obj.Spec.InjectionStrategy.Revision
 
@@ -204,9 +204,10 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSetInjectionStrategy(obj 
 		}
 
 		switch revisionInfo.Policy {
-		case "", appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy:
+		case "", appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy, appsv1alpha1.TODOSidecarSetInjectRevisionPolicy:
 		default:
-			errList = append(errList, field.Invalid(field.NewPath("revision").Child("policy"), revisionInfo, fmt.Sprintf("Invalid policy %v, only support 'Always' currently", revisionInfo.Policy)))
+			errList = append(errList, field.Invalid(field.NewPath("revision").Child("policy"), revisionInfo, fmt.Sprintf("Invalid policy %v, supported: [%s, %s]",
+				revisionInfo.Policy, appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy, appsv1alpha1.TODOSidecarSetInjectRevisionPolicy)))
 		}
 
 	}

@@ -213,12 +213,17 @@ func (h *PodCreateHandler) getSuitableRevisionSidecarSet(sidecarSet *appsv1alpha
 			return nil, err
 		}
 
+		if sidecarSet.Spec.UpdateStrategy.Paused {
+			klog.V(3).InfoS("sidecarset upgrade is paused, will inject specified revision", "sidecarSet", klog.KObj(sidecarSet))
+			return specificHistory, nil
+		}
+
 		switch sidecarSet.Spec.InjectionStrategy.Revision.Policy {
 		case appsv1alpha1.TODOSidecarSetInjectRevisionPolicy:
 			if updateStrategy := sidecarSet.Spec.UpdateStrategy; !updateStrategy.Paused && updateStrategy.Selector != nil {
 				selector, err := util.ValidatedLabelSelectorAsSelector(updateStrategy.Selector)
 				if err != nil {
-					klog.ErrorS(err, "Failed to parse SidecarSet update strategy selector", "name", sidecarSet.Name)
+					klog.ErrorS(err, "Failed to parse SidecarSet update strategy selector", "sidecarSet", klog.KObj(sidecarSet))
 					return nil, err
 				}
 				if !selector.Matches(labels.Set(newPod.Labels)) {
@@ -228,7 +233,7 @@ func (h *PodCreateHandler) getSuitableRevisionSidecarSet(sidecarSet *appsv1alpha
 					return specificHistory, nil
 				}
 			}
-			klog.V(3).InfoS("New pod is updated, which has a probility to be injected with the latest sidecar",
+			klog.V(3).InfoS("New pod is updated, which has a probability to be injected with the latest sidecar",
 				"pod", klog.KObj(newPod), "sidecarSet", klog.KObj(sidecarSet), "partition", sidecarSet.Spec.UpdateStrategy.Partition)
 			return h.selectRevisionRandomly(specificHistory, sidecarSet.DeepCopy(), sidecarSet.Spec.UpdateStrategy.Partition)
 		default: // Always strategy

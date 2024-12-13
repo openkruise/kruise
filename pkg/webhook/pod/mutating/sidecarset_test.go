@@ -848,6 +848,18 @@ func TestCanarySidecarSetInjection(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			name:   "canary paused",
+			getPod: canaryPod.DeepCopy,
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				ss := sidecarSet.DeepCopy()
+				percent := intstrutil.FromString("0%")
+				ss.Spec.UpdateStrategy.Partition = &percent
+				ss.Spec.UpdateStrategy.Paused = true
+				return ss
+			},
+			expectImage: stableImage,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
