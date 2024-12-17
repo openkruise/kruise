@@ -209,7 +209,9 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSetInjectionStrategy(obj 
 			errList = append(errList, field.Invalid(field.NewPath("revision").Child("policy"), revisionInfo, fmt.Sprintf("Invalid policy %v, supported: [%s, %s]",
 				revisionInfo.Policy, appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy, appsv1alpha1.PartialSidecarSetInjectRevisionPolicy)))
 		}
-
+		if obj.Spec.UpdateStrategy.Partition != nil && obj.Spec.UpdateStrategy.Selector != nil {
+			errList = append(errList, field.Invalid(field.NewPath("updateStrategy"), obj.Spec.UpdateStrategy, "Partition and Selector cannot be used together"))
+		}
 	}
 	return errList
 }
