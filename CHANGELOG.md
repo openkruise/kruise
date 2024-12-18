@@ -1,4 +1,11 @@
 # Change Log
+
+## v1.7.3
+> Change log since v1.7.2
+
+### Bug fixes
+- Fix kubeflow PyTorchJob create pod failure due to pod webhook. ([#1734](https://github.com/openkruise/kruise/pull/1864), [@zmberg](https://github.com/zmberg))
+
 ## v1.7.2
 > Change log since v1.7.1
 
