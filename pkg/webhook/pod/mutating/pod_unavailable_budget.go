@@ -36,7 +36,8 @@ func (h *PodCreateHandler) pubMutatingPod(ctx context.Context, req admission.Req
 	}
 	pub, err := podunavailablebudget.GetPubForPod(h.Client, pod)
 	if err != nil {
-		return false, err
+		klog.ErrorS(err, "Failed to get pub for pod", "pod", klog.KObj(pod))
+		return false, nil
 	} else if pub == nil {
 		return true, nil
 	}
