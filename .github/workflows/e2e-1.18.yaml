@@ -557,6 +557,8 @@ jobs:
       - name: Install Kruise
         run: |
           set -ex
+          kubectl create ns kruise-system
+          kubectl apply -f test/kruise-e2e-config.yaml
           kubectl cluster-info
           IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} ./scripts/deploy_kind.sh
           NODES=$(kubectl get node | wc -l)
@@ -588,6 +590,7 @@ jobs:
           export KUBECONFIG=/home/runner/.kube/config
           make ginkgo
           set +e
+          kubectl apply -f https://raw.githubusercontent.com/kubeflow/training-operator/refs/tags/v1.3.0/manifests/base/crds/kubeflow.org_tfjobs.yaml
           ./bin/ginkgo -timeout 90m -v --skip='\[apps\] (AppStatefulSetStorage|StatefulSet|PullImage|PullImages|ContainerRecreateRequest|DaemonSet|SidecarSet|EphemeralJob)' --skip='\[policy\] PodUnavailableBudget' test/e2e
           retVal=$?
           restartCount=$(kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
