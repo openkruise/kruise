@@ -452,6 +452,10 @@ func TestRefresh(t *testing.T) {
 							LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "img01"}},
 							ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: aHourAgo, Containers: []string{"main"}}},
 						}),
+						appspub.InPlaceUpdatePodRestartKey: "1",
+						appspub.InPlaceUpdateContainersRestartKey: util.DumpJSON(map[string]appspub.InPlaceUpdateContainerRestartCount{
+							"main": {RestartCount: 1, Revision: "new-revision", Timestamp: aHourAgo},
+						}),
 					},
 					ResourceVersion: "1",
 				},
@@ -588,6 +592,10 @@ func TestRefresh(t *testing.T) {
 							UpdateTimestamp:        aHourAgo,
 							LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "c1-img1-ID"}, "c2": {ImageID: "c2-img1-ID"}},
 							ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: aHourAgo, Containers: []string{"c1"}}, {Timestamp: aHourAgo, Containers: []string{"c2"}}},
+						}),
+						appspub.InPlaceUpdatePodRestartKey: "1",
+						appspub.InPlaceUpdateContainersRestartKey: util.DumpJSON(map[string]appspub.InPlaceUpdateContainerRestartCount{
+							"c2": {RestartCount: 1, Revision: "new-revision", Timestamp: aHourAgo},
 						}),
 					},
 				},
