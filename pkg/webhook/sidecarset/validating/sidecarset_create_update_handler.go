@@ -28,6 +28,7 @@ import (
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"
@@ -209,17 +210,28 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSetInjectionStrategy(obj 
 			errList = append(errList, field.Invalid(field.NewPath("revision").Child("policy"), revisionInfo, fmt.Sprintf("Invalid policy %v, supported: [%s, %s]",
 				revisionInfo.Policy, appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy, appsv1alpha1.PartialSidecarSetInjectRevisionPolicy)))
 		}
-		if obj.Spec.UpdateStrategy.Partition != nil && obj.Spec.UpdateStrategy.Selector != nil {
-			errList = append(errList, field.Invalid(field.NewPath("updateStrategy"), obj.Spec.UpdateStrategy, "Partition and Selector cannot be used together"))
-		}
 	}
 	return errList
+}
+
+// intStrIsSet returns true when the intstr is not nil and not the default 0 value.
+func intStrIsSet(i *intstr.IntOrString) bool {
+	if i == nil {
+		return false
+	}
+	if i.Type == intstr.String {
+		return true
+	}
+	return i.IntVal != 0
 }
 
 func validateSidecarSetUpdateStrategy(strategy *appsv1alpha1.SidecarSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// if SidecarSet update strategy is RollingUpdate
 	if strategy.Type == appsv1alpha1.RollingUpdateSidecarSetStrategyType {
+		if intStrIsSet(strategy.Partition) && strategy.Selector != nil {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("updateStrategy"), fmt.Sprintf("%++v", strategy), "Partition and Selector cannot be used together"))
+		}
 		if strategy.Selector != nil {
 			allErrs = append(allErrs, validateSelector(strategy.Selector, fldPath.Child("selector"))...)
 		}
