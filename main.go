@@ -247,17 +247,23 @@ func main() {
 			setupLog.Error(err, "unable to wait webhook ready")
 			os.Exit(1)
 		}
-
-		setupLog.Info("setup controllers")
-		if err = controller.SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to setup controllers")
-			os.Exit(1)
-		}
 	}()
+
+	setupLog.Info("setup controllers")
+	if err = controller.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to setup controllers")
+		os.Exit(1)
+	}
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
+		os.Exit(1)
+	}
+
+	setupLog.Info("setup controllers that need manager started")
+	if err = controller.SetupAfterStart(mgr); err != nil {
+		setupLog.Error(err, "unable to setup controllers after manager start")
 		os.Exit(1)
 	}
 }

@@ -40,7 +40,6 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
@@ -66,6 +65,7 @@ import (
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/client/clientset/versioned/scheme"
 	kruiseappslisters "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	controllerutil "github.com/openkruise/kruise/pkg/controller/util"
 	"github.com/openkruise/kruise/pkg/features"
 	kruiseutil "github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -172,10 +172,10 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		return nil, err
 	}
 
-	dsLister := kruiseappslisters.NewDaemonSetLister(dsInformer.(cache.SharedIndexInformer).GetIndexer())
-	historyLister := appslisters.NewControllerRevisionLister(revInformer.(cache.SharedIndexInformer).GetIndexer())
-	podLister := corelisters.NewPodLister(podInformer.(cache.SharedIndexInformer).GetIndexer())
-	nodeLister := corelisters.NewNodeLister(nodeInformer.(cache.SharedIndexInformer).GetIndexer())
+	dsLister := kruiseappslisters.NewDaemonSetLister(controllerutil.GetCacheIndexer(dsInformer))
+	historyLister := appslisters.NewControllerRevisionLister(controllerutil.GetCacheIndexer(revInformer))
+	podLister := corelisters.NewPodLister(controllerutil.GetCacheIndexer(podInformer))
+	nodeLister := corelisters.NewNodeLister(controllerutil.GetCacheIndexer(nodeInformer))
 	failedPodsBackoff := flowcontrol.NewBackOff(1*time.Second, 15*time.Minute)
 	revisionAdapter := revisionadapter.NewDefaultImpl()
 
