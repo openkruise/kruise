@@ -25,7 +25,6 @@ import (
 	"sync"
 
 	"github.com/docker/distribution/reference"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -33,6 +32,8 @@ import (
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/integer"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 // SlowStartBatch tries to call the provided function a total of 'count' times,
@@ -234,4 +235,10 @@ func EqualIgnoreHash(template1, template2 *corev1.PodTemplateSpec) bool {
 	delete(t1Copy.Labels, appsv1.DefaultDeploymentUniqueLabelKey)
 	delete(t2Copy.Labels, appsv1.DefaultDeploymentUniqueLabelKey)
 	return apiequality.Semantic.DeepEqual(t1Copy, t2Copy)
+
+}
+
+func GetInt32Pointer(i int32) *int32 {
+	return &i
+
 }
