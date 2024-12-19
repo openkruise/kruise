@@ -306,6 +306,7 @@ func TestUpdate(t *testing.T) {
 						Annotations: map[string]string{appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
 							Revision:               "rev_new",
 							UpdateTimestamp:        now,
+							UpdateImages:           true,
 							LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 							ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: now, Containers: []string{"c1"}}},
 						})},
@@ -386,6 +387,7 @@ func TestUpdate(t *testing.T) {
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
 								Revision:        "rev_new",
 								UpdateTimestamp: now,
+								UpdateImages:    true,
 							}),
 							appspub.InPlaceUpdateGraceKey: `{"revision":"rev_new","containerImages":{"c1":"foo2"},"graceSeconds":3630}`,
 						},
@@ -782,6 +784,7 @@ func TestUpdate(t *testing.T) {
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
 								Revision:               "rev_new",
+								UpdateImages:           true,
 								UpdateTimestamp:        metav1.NewTime(now.Time),
 								LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "image-id-xyz"}},
 								ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: now, Containers: []string{"c1"}}},

@@ -21,6 +21,7 @@ limitations under the License.
 package pub
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -101,6 +102,13 @@ func (in *InPlaceUpdateState) DeepCopyInto(out *InPlaceUpdateState) {
 	if in.NextContainerRefMetadata != nil {
 		in, out := &in.NextContainerRefMetadata, &out.NextContainerRefMetadata
 		*out = make(map[string]v1.ObjectMeta, len(*in))
+		for key, val := range *in {
+			(*out)[key] = *val.DeepCopy()
+		}
+	}
+	if in.NextContainerResources != nil {
+		in, out := &in.NextContainerResources, &out.NextContainerResources
+		*out = make(map[string]corev1.ResourceRequirements, len(*in))
 		for key, val := range *in {
 			(*out)[key] = *val.DeepCopy()
 		}

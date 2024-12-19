@@ -62,16 +62,20 @@ func SetOptionsDefaults(opts *UpdateOptions) *UpdateOptions {
 		opts.CheckContainersUpdateCompleted = defaultCheckContainersInPlaceUpdateCompleted
 	}
 
+	if opts.CheckPodNeedsBeUnready == nil {
+		opts.CheckPodNeedsBeUnready = defaultCheckPodNeedsBeUnready
+	}
+
 	return opts
 }
 
 // defaultPatchUpdateSpecToPod returns new pod that merges spec into old pod
 func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.InPlaceUpdateState) (*v1.Pod, error) {
-
 	klog.V(5).InfoS("Begin to in-place update pod", "namespace", pod.Namespace, "name", pod.Name, "spec", util.DumpJSON(spec), "state", util.DumpJSON(state))
 
 	state.NextContainerImages = make(map[string]string)
 	state.NextContainerRefMetadata = make(map[string]metav1.ObjectMeta)
+	state.NextContainerResources = make(map[string]v1.ResourceRequirements)
 
 	if spec.MetaDataPatch != nil {
 		cloneBytes, _ := json.Marshal(pod)
@@ -100,7 +104,8 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 		c := &pod.Spec.Containers[i]
 		_, existImage := spec.ContainerImages[c.Name]
 		_, existMetadata := spec.ContainerRefMetadata[c.Name]
-		if !existImage && !existMetadata {
+		_, existResource := spec.ContainerResources[c.Name]
+		if !existImage && !existMetadata && !existResource {
 			continue
 		}
 		priority := utilcontainerlaunchpriority.GetContainerPriority(c)
@@ -140,8 +145,35 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 			if state.LastContainerStatuses == nil {
 				state.LastContainerStatuses = map[string]appspub.InPlaceUpdateContainerStatus{}
 			}
-			state.LastContainerStatuses[c.Name] = appspub.InPlaceUpdateContainerStatus{ImageID: c.ImageID}
+			if cs, ok := state.LastContainerStatuses[c.Name]; !ok {
+				state.LastContainerStatuses[c.Name] = appspub.InPlaceUpdateContainerStatus{ImageID: c.ImageID}
+			} else {
+				// now just update imageID
+				cs.ImageID = c.ImageID
+			}
 		}
+	}
+
+	// update resources
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) {
+		expectedResources := map[string]*v1.ResourceRequirements{}
+		for i := range pod.Spec.Containers {
+			c := &pod.Spec.Containers[i]
+			newResource, resourceExists := spec.ContainerResources[c.Name]
+			if !resourceExists {
+				continue
+			}
+
+			if containersToUpdate.Has(c.Name) {
+				expectedResources[c.Name] = &newResource
+			} else {
+				state.NextContainerResources[c.Name] = newResource
+			}
+		}
+
+		// vertical update containers in a batch,
+		// or internal enterprise implementations can update+sync pod resources here at once
+		verticalUpdateImpl.UpdateResource(pod, expectedResources)
 	}
 
 	// update annotations and labels for the containers to update
@@ -161,7 +193,7 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 	// add the containers that update this time into PreCheckBeforeNext, so that next containers can only
 	// start to update when these containers have updated ready
 	// TODO: currently we only support ContainersRequiredReady, not sure if we have to add ContainersPreferredReady in future
-	if len(state.NextContainerImages) > 0 || len(state.NextContainerRefMetadata) > 0 {
+	if len(state.NextContainerImages) > 0 || len(state.NextContainerRefMetadata) > 0 || len(state.NextContainerResources) > 0 {
 		state.PreCheckBeforeNext = &appspub.InPlaceUpdatePreCheckBeforeNext{ContainersRequiredReady: containersToUpdate.List()}
 	} else {
 		state.PreCheckBeforeNext = nil
@@ -259,6 +291,7 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 	updateSpec := &UpdateSpec{
 		Revision:             newRevision.Name,
 		ContainerImages:      make(map[string]string),
+		ContainerResources:   make(map[string]v1.ResourceRequirements),
 		ContainerRefMetadata: make(map[string]metav1.ObjectMeta),
 		GraceSeconds:         opts.GracePeriodSeconds,
 	}
@@ -278,16 +311,33 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 			}
 			return nil
 		}
-		if op.Operation != "replace" || !containerImagePatchRexp.MatchString(op.Path) {
+
+		if op.Operation != "replace" {
 			return nil
 		}
-		// for example: /spec/containers/0/image
-		words := strings.Split(op.Path, "/")
-		idx, _ := strconv.Atoi(words[3])
-		if len(oldTemp.Spec.Containers) <= idx {
-			return nil
+		if containerImagePatchRexp.MatchString(op.Path) {
+			// for example: /spec/containers/0/image
+			words := strings.Split(op.Path, "/")
+			idx, _ := strconv.Atoi(words[3])
+			if len(oldTemp.Spec.Containers) <= idx {
+				return nil
+			}
+			updateSpec.ContainerImages[oldTemp.Spec.Containers[idx].Name] = op.Value.(string)
+			continue
 		}
-		updateSpec.ContainerImages[oldTemp.Spec.Containers[idx].Name] = op.Value.(string)
+
+		// TODO(Abner-1): if pod qos changed, we should recreate the pod.
+		// I will resolve it in another PR
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) &&
+			containerResourcesPatchRexp.MatchString(op.Path) {
+			err = verticalUpdateImpl.UpdateInplaceUpdateMetadata(&op, oldTemp, updateSpec)
+			if err != nil {
+				klog.InfoS("UpdateInplaceUpdateMetadata error", "err", err)
+				return nil
+			}
+			continue
+		}
+		return nil
 	}
 
 	if len(metadataPatches) > 0 {
@@ -344,6 +394,7 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 		}
 		updateSpec.MetaDataPatch = patchBytes
 	}
+
 	return updateSpec
 }
 
@@ -361,10 +412,9 @@ func DefaultCheckInPlaceUpdateCompleted(pod *v1.Pod) error {
 	} else if err := json.Unmarshal([]byte(stateStr), &inPlaceUpdateState); err != nil {
 		return err
 	}
-	if len(inPlaceUpdateState.NextContainerImages) > 0 || len(inPlaceUpdateState.NextContainerRefMetadata) > 0 {
+	if len(inPlaceUpdateState.NextContainerImages) > 0 || len(inPlaceUpdateState.NextContainerRefMetadata) > 0 || len(inPlaceUpdateState.NextContainerResources) > 0 {
 		return fmt.Errorf("existing containers to in-place update in next batches")
 	}
-
 	return defaultCheckContainersInPlaceUpdateCompleted(pod, &inPlaceUpdateState)
 }
 
@@ -383,8 +433,20 @@ func defaultCheckContainersInPlaceUpdateCompleted(pod *v1.Pod, inPlaceUpdateStat
 		}
 	}
 
+	// only UpdateResources, we check resources in status updated
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) && inPlaceUpdateState.UpdateResources {
+		if completed, err := verticalUpdateImpl.IsUpdateCompleted(pod); !completed {
+			return err
+		}
+	}
+
 	if runtimeContainerMetaSet != nil {
-		if checkAllContainersHashConsistent(pod, runtimeContainerMetaSet, plainHash) {
+		metaHashType := plainHash
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) && inPlaceUpdateState.UpdateResources {
+			// if vertical scaling is enabled and update resources, we should compare plainHashWithoutResources
+			metaHashType = plainHashWithoutResources
+		}
+		if checkAllContainersHashConsistent(pod, runtimeContainerMetaSet, metaHashType) {
 			klog.V(5).InfoS("Check Pod in-place update completed for all container hash consistent", "namespace", pod.Namespace, "name", pod.Name)
 			return nil
 		}
@@ -424,6 +486,7 @@ type hashType string
 
 const (
 	plainHash                    hashType = "PlainHash"
+	plainHashWithoutResources    hashType = "PlainHashWithoutResources"
 	extractedEnvFromMetadataHash hashType = "ExtractedEnvFromMetadataHash"
 )
 
@@ -474,6 +537,15 @@ func checkAllContainersHashConsistent(pod *v1.Pod, runtimeContainerMetaSet *apps
 					"metaHash", containerMeta.Hashes.PlainHash, "expectedHash", expectedHash)
 				return false
 			}
+		case plainHashWithoutResources:
+			containerSpecCopy := containerSpec.DeepCopy()
+			containerSpecCopy.Resources = v1.ResourceRequirements{}
+			if expectedHash := kubeletcontainer.HashContainer(containerSpecCopy); containerMeta.Hashes.PlainHashWithoutResources != expectedHash {
+				klog.InfoS("Find container in runtime-container-meta for Pod has different plain hash with spec(except resources)",
+					"containerName", containerSpecCopy.Name, "namespace", pod.Namespace, "podName", pod.Name,
+					"metaHash", containerMeta.Hashes.PlainHashWithoutResources, "expectedHash", expectedHash)
+				return false
+			}
 		case extractedEnvFromMetadataHash:
 			hasher := utilcontainermeta.NewEnvFromMetadataHasher()
 			if expectedHash := hasher.GetExpectHash(containerSpec, pod); containerMeta.Hashes.ExtractedEnvFromMetadataHash != expectedHash {
@@ -486,4 +558,58 @@ func checkAllContainersHashConsistent(pod *v1.Pod, runtimeContainerMetaSet *apps
 	}
 
 	return true
+}
+
+const (
+	cpuMask = 1
+	memMask = 2
+)
+
+func defaultCheckPodNeedsBeUnready(pod *v1.Pod, spec *UpdateSpec) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) || !spec.VerticalUpdateOnly() {
+		return containsReadinessGate(pod)
+	}
+
+	// flag represents whether cpu or memory resource changed
+	resourceFlag := make(map[string]int)
+	for c, resizeResources := range spec.ContainerResources {
+		flag := 0
+		_, limitExist := resizeResources.Limits[v1.ResourceCPU]
+		_, reqExist := resizeResources.Requests[v1.ResourceCPU]
+		if limitExist || reqExist {
+			flag |= cpuMask
+		}
+		_, limitExist = resizeResources.Limits[v1.ResourceMemory]
+		_, reqExist = resizeResources.Requests[v1.ResourceMemory]
+		if limitExist || reqExist {
+			flag |= memMask
+		}
+		resourceFlag[c] = flag
+	}
+
+	// only changed resources and restart policy are considered
+	// For example:
+	// 		we should not restart the container
+	//		when only resize cpu in container with memory RestartContainer RestartPolicy,
+	needRestart := false
+OuterLoop:
+	for _, container := range pod.Spec.Containers {
+		if flag, exist := resourceFlag[container.Name]; exist {
+			for _, resizePolicy := range container.ResizePolicy {
+				if resizePolicy.RestartPolicy != v1.RestartContainer {
+					continue
+				}
+				if (resizePolicy.ResourceName == v1.ResourceCPU && (flag&cpuMask) != 0) ||
+					(resizePolicy.ResourceName == v1.ResourceMemory && (flag&memMask) != 0) {
+					needRestart = true
+					break OuterLoop
+				}
+			}
+		}
+	}
+	if !needRestart {
+		return false
+	}
+
+	return containsReadinessGate(pod)
 }

@@ -874,6 +874,16 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 							Image:           imageutils.GetE2EImage(imageutils.Nginx),
 							VolumeMounts:    mounts,
 							ImagePullPolicy: v1.PullIfNotPresent,
+							Resources: v1.ResourceRequirements{
+								Requests: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceCPU:    resource.MustParse("200m"),
+									v1.ResourceMemory: resource.MustParse("200Mi"),
+								},
+								Limits: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceCPU:    resource.MustParse("1"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
 						},
 					},
 					Volumes: vols,

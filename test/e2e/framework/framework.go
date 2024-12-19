@@ -315,6 +315,11 @@ func KruiseDescribe(text string, body func()) bool {
 	return ginkgo.Describe("[kruise.io] "+text, body)
 }
 
+// KruisePDescribe is a wrapper function for ginkgo describe.  Adds namespacing.
+func KruisePDescribe(text string, body func()) bool {
+	return ginkgo.PDescribe("[kruise.io] "+text, body)
+}
+
 // ConformanceIt is a wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
 func ConformanceIt(text string, body interface{}, timeout ...float64) bool {
 	return ginkgo.It(text+" [Conformance]", body, timeout...)
