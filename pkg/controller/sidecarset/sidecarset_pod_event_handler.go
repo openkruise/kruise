@@ -140,22 +140,6 @@ func (p *enqueueRequestForPod) getPodMatchedSidecarSets(pod *corev1.Pod) ([]*app
 		return matchedSidecarSets, nil
 	}
 
-	// This code will trigger an invalid reconcile, where the Pod matches the sidecarSet selector but does not inject the sidecar container.
-	// Comment out this code to reduce some invalid reconcile.
-	/*sidecarSets := appsv1alpha1.SidecarSetList{}
-	if err := p.reader.List(context.TODO(), &sidecarSets); err != nil {
-		return nil, err
-	}
-
-	for _, sidecarSet := range sidecarSets.Items {
-		matched, err := sidecarcontrol.PodMatchedSidecarSet(pod, sidecarSet)
-		if err != nil {
-			return nil, err
-		}
-		if matched {
-			matchedSidecarSets = append(matchedSidecarSets, &sidecarSet)
-		}
-	}*/
 	return matchedSidecarSets, nil
 }
 
