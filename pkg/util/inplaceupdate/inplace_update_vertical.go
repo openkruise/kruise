@@ -26,12 +26,16 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 )
 
 // interface for In-place workload vertical scaling
 type VerticalUpdateInterface interface {
 	// UpdateInplaceUpdateMetadata validates and applies the resource patch to the UpdateSpec.
 	UpdateInplaceUpdateMetadata(op *jsonpatch.Operation, oldTemp *v1.PodTemplateSpec, updateSpec *UpdateSpec) error
+
+	// IsPodQoSChanged check whether the pod qos has changed
+	IsPodQoSChanged(oldTemp, newTemp *v1.PodTemplateSpec) bool
 
 	// UpdateResource some or all containers of a pod can be updated at once within this interface.
 	// container or pod level resources can be updated by this interface
@@ -100,6 +104,19 @@ func (v *NativeVerticalUpdate) UpdateInplaceUpdateMetadata(op *jsonpatch.Operati
 		updateSpec.ContainerResources[cName].Requests[v1.ResourceName(words[6])] = quantity
 	}
 	return nil
+}
+
+func (v *NativeVerticalUpdate) IsPodQoSChanged(oldTemp, newTemp *v1.PodTemplateSpec) bool {
+	oldPod := &v1.Pod{
+		Spec: oldTemp.Spec,
+	}
+	newPod := &v1.Pod{
+		Spec: newTemp.Spec,
+	}
+	if qos.GetPodQOS(oldPod) != qos.GetPodQOS(newPod) {
+		return true
+	}
+	return false
 }
 
 // updateContainerResource implements vertical updates by directly modifying the container's resources,
