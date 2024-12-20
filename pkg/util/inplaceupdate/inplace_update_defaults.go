@@ -326,8 +326,6 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 			continue
 		}
 
-		// TODO(Abner-1): if pod qos changed, we should recreate the pod.
-		// I will resolve it in another PR
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) &&
 			containerResourcesPatchRexp.MatchString(op.Path) {
 			err = verticalUpdateImpl.UpdateInplaceUpdateMetadata(&op, oldTemp, updateSpec)
@@ -338,6 +336,14 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 			continue
 		}
 		return nil
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) &&
+		len(updateSpec.ContainerResources) != 0 {
+		// when container resources changes exist, we should check pod qos
+		if changed := verticalUpdateImpl.IsPodQoSChanged(oldTemp, newTemp); changed {
+			klog.InfoS("can not inplace update when qos changed")
+			return nil
+		}
 	}
 
 	if len(metadataPatches) > 0 {

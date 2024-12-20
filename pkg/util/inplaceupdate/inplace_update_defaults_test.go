@@ -1036,6 +1036,30 @@ func TestDefaultCalculateInPlaceUpdateSpec(t *testing.T) {
 			},
 		}
 	}
+	qosRevisionGetter := func(imageChanged, resourceChanged, qosChanged, otherChanged bool, updateContainerNum int) *apps.ControllerRevision {
+		base := getFakeControllerRevisionData()
+		if imageChanged {
+			base = strings.Replace(base, `"image": "nginx:stable-alpine22"`, `"image": "nginx:stable-alpine23"`, updateContainerNum)
+		}
+		if resourceChanged {
+			base = strings.Replace(base, `"cpu": "1",`, `"cpu": "2",`, updateContainerNum)
+			if qosChanged {
+				base = strings.Replace(base, `"memory": "2Gi",`, `"memory": "4Gi",`, updateContainerNum)
+			}
+		}
+		if otherChanged {
+			base = strings.Replace(base, `"imagePullPolicy": "Always",`, `"imagePullPolicy": "222",`, updateContainerNum)
+		}
+		return &apps.ControllerRevision{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "new-revision",
+				Annotations: map[string]string{},
+			},
+			Data: runtime.RawExtension{
+				Raw: []byte(base),
+			},
+		}
+	}
 	// Define your test cases
 	tests := []struct {
 		name           string
@@ -1160,6 +1184,63 @@ func TestDefaultCalculateInPlaceUpdateSpec(t *testing.T) {
 			name:           "change all of two containers",
 			oldRevision:    baseRevision,
 			newRevision:    revisionGetter(true, true, true, 2),
+			opts:           &UpdateOptions{},
+			expectedResult: nil,
+		},
+
+		// change qos
+		{
+			vpaEnabled:     true,
+			name:           "change qos of two containers",
+			oldRevision:    baseRevision,
+			newRevision:    qosRevisionGetter(false, true, true, false, 2),
+			opts:           &UpdateOptions{},
+			expectedResult: nil,
+		},
+		{
+			vpaEnabled:  true,
+			name:        "change qos of one containers(Burstable->Burstable)",
+			oldRevision: baseRevision,
+			newRevision: qosRevisionGetter(false, true, true, false, 1),
+			opts:        &UpdateOptions{},
+			expectedResult: &UpdateSpec{
+				Revision: "new-revision",
+				ContainerResources: map[string]v1.ResourceRequirements{
+					"nginx": {
+						Requests: v1.ResourceList{
+							"cpu":    resource.MustParse("2"),
+							"memory": resource.MustParse("4Gi"),
+						},
+					},
+				},
+			},
+		},
+		{
+			vpaEnabled:  true,
+			name:        "change qos and image of one containers(Burstable->Burstable)",
+			oldRevision: baseRevision,
+			newRevision: qosRevisionGetter(true, true, true, false, 1),
+			opts:        &UpdateOptions{},
+			expectedResult: &UpdateSpec{
+				Revision: "new-revision",
+				ContainerImages: map[string]string{
+					"nginx": "nginx:stable-alpine23",
+				},
+				ContainerResources: map[string]v1.ResourceRequirements{
+					"nginx": {
+						Requests: v1.ResourceList{
+							"cpu":    resource.MustParse("2"),
+							"memory": resource.MustParse("4Gi"),
+						},
+					},
+				},
+			},
+		},
+		{
+			vpaEnabled:     true,
+			name:           "change qos and other fields of one containers",
+			oldRevision:    baseRevision,
+			newRevision:    qosRevisionGetter(true, true, true, true, 1),
 			opts:           &UpdateOptions{},
 			expectedResult: nil,
 		},
