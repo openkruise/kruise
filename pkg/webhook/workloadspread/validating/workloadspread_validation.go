@@ -23,6 +23,7 @@ import (
 	"math"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
@@ -161,6 +162,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 				whiteList, err := configuration.GetWSWatchCustomWorkloadWhiteList(h.Client)
 				if err != nil {
 					allErrs = append(allErrs, field.InternalError(fldPath.Child("targetRef"), err))
+					break
 				}
 				matched := false
 				for _, wl := range whiteList.Workloads {
@@ -209,6 +211,13 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 			(*spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds < 0 || *spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds > allowedMaxSeconds) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("scheduleStrategy").Child("adaptive").Child("rescheduleCriticalSeconds"),
 				spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, fmt.Sprintf("rescheduleCriticalSeconds < 0 or rescheduleCriticalSeconds > %d is not permitted", allowedMaxSeconds)))
+		}
+	}
+
+	// validate targetFilter
+	if spec.TargetFilter != nil {
+		if _, err := metav1.LabelSelectorAsSelector(spec.TargetFilter.Selector); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("targetFilter"), spec.TargetFilter, err.Error()))
 		}
 	}
 

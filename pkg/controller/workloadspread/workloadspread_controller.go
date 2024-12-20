@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
@@ -237,7 +238,7 @@ func (r *ReconcileWorkloadSpread) Reconcile(_ context.Context, req reconcile.Req
 func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, namespace string) ([]*corev1.Pod, int32, error) {
 	ok, err := wsutil.VerifyGroupKind(ref, controllerKindJob.Kind, []string{controllerKindJob.Group})
 	if err != nil || !ok {
-		return nil, -1, err
+		return nil, 0, err
 	}
 
 	job := &batchv1.Job{}
@@ -248,13 +249,13 @@ func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, n
 			klog.V(3).InfoS("Could not find Job", "job", klog.KRef(namespace, ref.Name))
 			return nil, 0, nil
 		}
-		return nil, -1, err
+		return nil, 0, err
 	}
 
 	labelSelector, err := util.ValidatedLabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get labelSelector")
-		return nil, -1, nil
+		return nil, 0, err
 	}
 
 	podList := &corev1.PodList{}
@@ -265,7 +266,7 @@ func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, n
 	}
 	err = r.List(context.TODO(), podList, listOption)
 	if err != nil {
-		return nil, -1, err
+		return nil, 0, err
 	}
 
 	matchedPods := make([]*corev1.Pod, 0, len(podList.Items))
@@ -275,15 +276,39 @@ func (r *ReconcileWorkloadSpread) getPodJob(ref *appsv1alpha1.TargetReference, n
 	return matchedPods, *(job.Spec.Parallelism), nil
 }
 
+func (r *ReconcileWorkloadSpread) getReplicasPathList(ws *appsv1alpha1.WorkloadSpread) ([]string, error) {
+	if ws.Spec.TargetReference == nil {
+		return nil, nil
+	}
+	if ws.Spec.TargetFilter != nil && len(ws.Spec.TargetFilter.ReplicasPathList) > 0 {
+		return ws.Spec.TargetFilter.ReplicasPathList, nil
+	}
+	whiteList, err := configuration.GetWSWatchCustomWorkloadWhiteList(r.Client)
+	if err != nil {
+		return nil, err
+	}
+	gv, err := schema.ParseGroupVersion(ws.Spec.TargetReference.APIVersion)
+	if err != nil {
+		return nil, err
+	}
+	for _, wl := range whiteList.Workloads {
+		if wl.GroupVersion() != gv || wl.GroupVersionKind.Kind != ws.Spec.TargetReference.Kind {
+			continue
+		}
+		klog.V(5).InfoS("found replicas path in whitelist", "path", wl.ReplicasPath, "workloadSpread", klog.KObj(ws))
+		return []string{wl.ReplicasPath}, nil
+	}
+	return nil, nil
+}
+
 // getPodsForWorkloadSpread returns Pods managed by the WorkloadSpread object.
 // return two parameters
 // 1. podList for workloadSpread
 // 2. workloadReplicas
 func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.WorkloadSpread) ([]*corev1.Pod, int32, error) {
 	if ws.Spec.TargetReference == nil {
-		return nil, -1, nil
+		return nil, 0, nil
 	}
-
 	var pods []*corev1.Pod
 	var workloadReplicas int32
 	var err error
@@ -295,13 +320,66 @@ func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.Work
 	default:
 		pods, workloadReplicas, err = r.controllerFinder.GetPodsForRef(targetRef.APIVersion, targetRef.Kind, ws.Namespace, targetRef.Name, false)
 	}
-
 	if err != nil {
 		klog.ErrorS(err, "WorkloadSpread handled targetReference failed", "workloadSpread", klog.KObj(ws))
-		return nil, -1, err
+		return nil, 0, err
 	}
 
+	workloadReplicas, pods, err = r.filterWorkload(ws, pods, workloadReplicas)
+	if err != nil {
+		klog.ErrorS(err, "Filter workload failed", "workloadSpread", klog.KObj(ws))
+		return nil, 0, err
+	}
 	return pods, workloadReplicas, err
+}
+
+func (r *ReconcileWorkloadSpread) filterWorkload(ws *appsv1alpha1.WorkloadSpread, pods []*corev1.Pod, replicas int32) (int32, []*corev1.Pod, error) {
+	klog.V(5).InfoS("before workload filtering", "pods", len(pods), "replicas", replicas, "workloadSpread", klog.KObj(ws))
+	replicasPathList, err := r.getReplicasPathList(ws)
+	if err != nil {
+		return replicas, pods, err
+	}
+	var filteredReplicas int32
+	if len(replicasPathList) > 0 {
+		// replicas path list configured in someplace, should overwrite replicas value
+		targetRef := ws.Spec.TargetReference
+		wl, err := r.controllerFinder.GetControllerAsUnstructured(controllerfinder.ControllerReference{
+			APIVersion: targetRef.APIVersion,
+			Kind:       targetRef.Kind,
+			Name:       targetRef.Name,
+		}, ws.Namespace)
+		if err != nil {
+			return replicas, pods, client.IgnoreNotFound(err)
+		}
+		for _, replicasPath := range replicasPathList {
+			n, err := wsutil.GetReplicasFromObject(wl, replicasPath)
+			if err != nil {
+				return replicas, pods, err
+			}
+			filteredReplicas += n
+		}
+		klog.V(4).InfoS("replicas after filtering", "replicas", filteredReplicas,
+			"replicasPathList", replicasPathList, "workloadSpread", klog.KObj(ws))
+	} else {
+		filteredReplicas = replicas
+		klog.V(4).InfoS("replicas not filtered", "workloadSpread", klog.KObj(ws))
+	}
+	var filteredPods []*corev1.Pod
+	if ws.Spec.TargetFilter != nil && ws.Spec.TargetFilter.Selector != nil {
+		for _, pod := range pods {
+			selected, err := wsutil.IsPodSelected(ws.Spec.TargetFilter, pod.Labels)
+			if err != nil {
+				return replicas, pods, err
+			}
+			if selected {
+				filteredPods = append(filteredPods, pod)
+			}
+		}
+		klog.V(4).InfoS("pods after filtering", "pods", len(filteredPods), "selector", ws.Spec.TargetFilter.Selector)
+	} else {
+		filteredPods = pods
+	}
+	return filteredReplicas, filteredPods, nil
 }
 
 // syncWorkloadSpread is the main logic of the WorkloadSpread controller. Firstly, we get Pods from workload managed by
@@ -311,11 +389,13 @@ func (r *ReconcileWorkloadSpread) getPodsForWorkloadSpread(ws *appsv1alpha1.Work
 // to maintain WorkloadSpread status together. The controller is responsible for calculating the real status, and the webhook
 // mainly counts missingReplicas and records the creation or deletion entry of Pod into map.
 func (r *ReconcileWorkloadSpread) syncWorkloadSpread(ws *appsv1alpha1.WorkloadSpread) error {
+	if ws.Spec.TargetReference == nil {
+		klog.InfoS("WorkloadSpread has no target reference", "workloadSpread", klog.KObj(ws))
+		return nil
+	}
 	pods, workloadReplicas, err := r.getPodsForWorkloadSpread(ws)
-	if err != nil || workloadReplicas == -1 {
-		if err != nil {
-			klog.ErrorS(err, "WorkloadSpread got matched pods failed", "workloadSpread", klog.KObj(ws))
-		}
+	if err != nil {
+		klog.ErrorS(err, "WorkloadSpread got matched pods failed", "workloadSpread", klog.KObj(ws))
 		return err
 	}
 	if len(pods) == 0 {
@@ -398,7 +478,7 @@ func (r *ReconcileWorkloadSpread) groupPodBySubset(ws *appsv1alpha1.WorkloadSpre
 	for _, subset := range ws.Spec.Subsets {
 		podMap[subset.Name] = []*corev1.Pod{}
 		subsetMissingReplicas[subset.Name], _ = intstr.GetScaledValueFromIntOrPercent(
-			intstr.ValueOrDefault(subset.MaxReplicas, intstr.FromInt(math.MaxInt32)), int(replicas), true)
+			intstr.ValueOrDefault(subset.MaxReplicas, intstr.FromInt32(math.MaxInt32)), int(replicas), true)
 	}
 
 	// count managed pods for each subset
@@ -649,7 +729,7 @@ func (r *ReconcileWorkloadSpread) calculateWorkloadSpreadSubsetStatus(ws *appsv1
 		// MaxReplicas is nil, which means there is no limit for subset replicas, using -1 to represent it.
 		subsetMaxReplicas = -1
 	} else {
-		subsetMaxReplicas, err = intstr.GetValueFromIntOrPercent(subset.MaxReplicas, int(workloadReplicas), true)
+		subsetMaxReplicas, err = intstr.GetScaledValueFromIntOrPercent(subset.MaxReplicas, int(workloadReplicas), true)
 		if err != nil || subsetMaxReplicas < 0 {
 			klog.ErrorS(err, "Failed to get maxReplicas value from subset of WorkloadSpread", "subsetName", subset.Name, "workloadSpread", klog.KObj(ws))
 			return nil

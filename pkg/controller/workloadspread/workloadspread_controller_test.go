@@ -25,16 +25,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/configuration"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -71,9 +76,9 @@ var (
 					APIVersion:         "apps.kruise.io/v1alpha1",
 					Kind:               "CloneSet",
 					Name:               "cloneset-test",
-					Controller:         utilpointer.BoolPtr(true),
+					Controller:         ptr.To(true),
 					UID:                types.UID("a03eb001-27eb-4713-b634-7c46f6861758"),
-					BlockOwnerDeletion: utilpointer.BoolPtr(true),
+					BlockOwnerDeletion: ptr.To(true),
 				},
 			},
 		},
@@ -100,7 +105,7 @@ var (
 			UID:        types.UID("a03eb001-27eb-4713-b634-7c46f6861758"),
 		},
 		Spec: appsv1alpha1.CloneSetSpec{
-			Replicas: utilpointer.Int32Ptr(10),
+			Replicas: ptr.To(int32(10)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "nginx",
@@ -152,6 +157,21 @@ var (
 	subsetDemo = appsv1alpha1.WorkloadSpreadSubset{
 		Name:        "subset-a",
 		MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 5},
+	}
+
+	getWhiteListDemoCopy = func() configuration.WSCustomWorkloadWhiteList {
+		return configuration.WSCustomWorkloadWhiteList{
+			Workloads: []configuration.CustomWorkload{
+				{
+					GroupVersionKind: schema.GroupVersionKind{
+						Group:   "mock.kruise.io",
+						Version: "v1",
+						Kind:    "GameServerSet",
+					},
+					ReplicasPath: "spec.replicas",
+				},
+			},
+		}
 	}
 )
 
@@ -731,11 +751,73 @@ func TestSubsetPodDeletionCost(t *testing.T) {
 }
 
 func TestWorkloadSpreadReconcile(t *testing.T) {
+	getTwoPodsWithDifferentLabels := func() []*corev1.Pod {
+		pod1 := podDemo.DeepCopy()
+		pod1.Annotations = map[string]string{
+			wsutil.MatchedWorkloadSpreadSubsetAnnotations: `{"Name":"test-workloadSpread","Subset":"subset-a"}`,
+		}
+		pod1.OwnerReferences = []metav1.OwnerReference{
+			{
+				APIVersion: "mock.kruise.io/v1",
+				Kind:       "GameServerSet",
+				Name:       "workload",
+				UID:        "12345",
+			},
+		}
+		pod1.Labels["selected"] = "true"
+		pod2 := pod1.DeepCopy()
+		pod2.Name = "another"
+		pod2.Labels["selected"] = "false"
+		pod2.Labels["app"] = "not-nginx" // preventing being selected by func getLatestPods
+		return []*corev1.Pod{pod1, pod2}
+	}
+
+	getWorkloadSpreadWithPercentSubsetB := func() *appsv1alpha1.WorkloadSpread {
+		workloadSpread := workloadSpreadDemo.DeepCopy()
+		workloadSpread.Spec.Subsets = append(workloadSpread.Spec.Subsets, appsv1alpha1.WorkloadSpreadSubset{
+			Name:        "subset-b",
+			MaxReplicas: &intstr.IntOrString{Type: intstr.String, StrVal: "50%"},
+		})
+		workloadSpread.Spec.TargetReference = &appsv1alpha1.TargetReference{
+			APIVersion: "mock.kruise.io/v1",
+			Kind:       "GameServerSet",
+			Name:       "workload",
+		}
+		workloadSpread.Spec.TargetFilter = &appsv1alpha1.TargetFilter{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"selected": "true",
+				},
+			},
+		}
+		return workloadSpread
+	}
+	expectWorkloadSpreadWithPercentSubsetB := func() *appsv1alpha1.WorkloadSpread {
+		workloadSpread := workloadSpreadDemo.DeepCopy()
+		workloadSpread.Spec.TargetReference = &appsv1alpha1.TargetReference{
+			APIVersion: "mock.kruise.io/v1",
+			Kind:       "GameServerSet",
+			Name:       "workload",
+		}
+		workloadSpread.Status.SubsetStatuses = append(workloadSpread.Status.SubsetStatuses, appsv1alpha1.WorkloadSpreadSubsetStatus{})
+		workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
+		workloadSpread.Status.SubsetStatuses[0].Replicas = 1
+		workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
+		workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
+		workloadSpread.Status.SubsetStatuses[1].Name = "subset-b"
+		workloadSpread.Status.SubsetStatuses[1].MissingReplicas = 0
+		workloadSpread.Status.SubsetStatuses[1].Replicas = 0
+		workloadSpread.Status.SubsetStatuses[1].CreatingPods = map[string]metav1.Time{}
+		workloadSpread.Status.SubsetStatuses[1].DeletingPods = map[string]metav1.Time{}
+		return workloadSpread
+	}
 	cases := []struct {
 		name                 string
 		getPods              func() []*corev1.Pod
 		getWorkloadSpread    func() *appsv1alpha1.WorkloadSpread
 		getCloneSet          func() *appsv1alpha1.CloneSet
+		getWorkloads         func() []client.Object
+		getWhiteList         func() configuration.WSCustomWorkloadWhiteList
 		expectPods           func() []*corev1.Pod
 		expectWorkloadSpread func() *appsv1alpha1.WorkloadSpread
 	}{
@@ -746,9 +828,6 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				return workloadSpreadDemo.DeepCopy()
-			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
-				return nil
 			},
 			expectPods: func() []*corev1.Pod {
 				return []*corev1.Pod{}
@@ -905,7 +984,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			getCloneSet: func() *appsv1alpha1.CloneSet {
 				cloneSet := cloneSetDemo.DeepCopy()
-				cloneSet.Spec.Replicas = utilpointer.Int32Ptr(5)
+				cloneSet.Spec.Replicas = ptr.To(int32(5))
 				return cloneSet
 			},
 			expectPods: func() []*corev1.Pod {
@@ -942,7 +1021,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			getCloneSet: func() *appsv1alpha1.CloneSet {
 				cloneSet := cloneSetDemo.DeepCopy()
-				cloneSet.Spec.Replicas = utilpointer.Int32Ptr(5)
+				cloneSet.Spec.Replicas = ptr.To(int32(5))
 				return cloneSet
 			},
 			expectPods: func() []*corev1.Pod {
@@ -1523,8 +1602,128 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				return workloadSpread
 			},
 		},
+		{
+			name: "custom workload with replica path in whitelist",
+			getWorkloads: func() []client.Object {
+				clone := cloneSetDemo.DeepCopy()
+				clone.Name = "workload"
+				clone.Kind = "GameServerSet"
+				clone.APIVersion = "mock.kruise.io/v1"
+				clone.UID = "12345"
+				clone.Spec.Replicas = utilpointer.Int32(14)
+				unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(clone)
+				if err != nil {
+					panic("err when convert to unstructured object")
+				}
+				return []client.Object{&unstructured.Unstructured{Object: unstructuredMap}}
+			},
+			getPods: getTwoPodsWithDifferentLabels,
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := getWorkloadSpreadWithPercentSubsetB()
+				workloadSpread.Spec.TargetFilter = nil
+				return workloadSpread
+			},
+			getWhiteList: getWhiteListDemoCopy,
+			expectPods: func() []*corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.Annotations = map[string]string{
+					wsutil.MatchedWorkloadSpreadSubsetAnnotations: `{"Name":"test-workloadSpread","Subset":"subset-a"}`,
+				}
+				return []*corev1.Pod{pod}
+			},
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := expectWorkloadSpreadWithPercentSubsetB()
+				workloadSpread.Status.SubsetStatuses[0].Replicas = 2
+				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 3
+				workloadSpread.Status.SubsetStatuses[1].Replicas = 0
+				workloadSpread.Status.SubsetStatuses[1].MissingReplicas = 7
+				return workloadSpread
+			},
+		},
+		{
+			name: "custom workload with target filter",
+			getWorkloads: func() []client.Object {
+				clone := cloneSetDemo.DeepCopy()
+				clone.Name = "workload"
+				clone.Kind = "GameServerSet"
+				clone.APIVersion = "mock.kruise.io/v1"
+				clone.UID = "12345"
+				clone.Spec.RevisionHistoryLimit = utilpointer.Int32(18) // as replicas
+				unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(clone)
+				if err != nil {
+					panic("err when convert to unstructured object")
+				}
+				return []client.Object{&unstructured.Unstructured{Object: unstructuredMap}}
+			},
+			getPods: func() []*corev1.Pod {
+				pod1 := podDemo.DeepCopy()
+				pod1.OwnerReferences = []metav1.OwnerReference{
+					{
+						APIVersion: "mock.kruise.io/v1",
+						Kind:       "GameServerSet",
+						Name:       "workload",
+						UID:        "12345",
+					},
+				}
+				pod1.Annotations = map[string]string{
+					wsutil.MatchedWorkloadSpreadSubsetAnnotations: `{"Name":"test-workloadSpread","Subset":"subset-a"}`,
+				}
+				pod2 := pod1.DeepCopy()
+				pod1.Labels["selected"] = "true"
+				pod2.Labels["selected"] = "false"
+				return []*corev1.Pod{pod1}
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := getWorkloadSpreadWithPercentSubsetB()
+				workloadSpread.Spec.TargetFilter.ReplicasPathList = []string{"spec.revisionHistoryLimit"}
+				return workloadSpread
+			},
+			getWhiteList: getWhiteListDemoCopy,
+			expectPods: func() []*corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.Annotations = map[string]string{
+					wsutil.MatchedWorkloadSpreadSubsetAnnotations: `{"Name":"test-workloadSpread","Subset":"subset-a"}`,
+				}
+				return []*corev1.Pod{pod}
+			},
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				workloadSpread := expectWorkloadSpreadWithPercentSubsetB()
+				workloadSpread.Status.SubsetStatuses[1].MissingReplicas = 9
+				return workloadSpread
+			},
+		},
+		{
+			name: "custom workload without replicas",
+			getWorkloads: func() []client.Object {
+				clone := cloneSetDemo.DeepCopy()
+				clone.Name = "workload"
+				clone.Kind = "GameServerSet"
+				clone.APIVersion = "mock.kruise.io/v1"
+				clone.UID = "12345"
+				// with no any replicas
+				unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(clone)
+				if err != nil {
+					panic("err when convert to unstructured object")
+				}
+				return []client.Object{&unstructured.Unstructured{Object: unstructuredMap}}
+			},
+			getPods:           getTwoPodsWithDifferentLabels,
+			getWorkloadSpread: getWorkloadSpreadWithPercentSubsetB,
+			getWhiteList: func() configuration.WSCustomWorkloadWhiteList {
+				whiteList := getWhiteListDemoCopy()
+				whiteList.Workloads[0].ReplicasPath = "" // not configured
+				return whiteList
+			},
+			expectPods: func() []*corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.Annotations = map[string]string{
+					wsutil.MatchedWorkloadSpreadSubsetAnnotations: `{"Name":"test-workloadSpread","Subset":"subset-a"}`,
+				}
+				return []*corev1.Pod{pod}
+			},
+			expectWorkloadSpread: expectWorkloadSpreadWithPercentSubsetB,
+		},
 	}
-
 	if !wsutil.EnabledWorkloadSetForVersionedStatus.Has("cloneset") {
 		wsutil.EnabledWorkloadSetForVersionedStatus.Insert("cloneset")
 		defer wsutil.EnabledWorkloadSetForVersionedStatus.Delete("cloneset")
@@ -1542,8 +1741,24 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 					}
 					return owners
 				}).WithStatusSubresource(&appsv1alpha1.WorkloadSpread{})
-			if cs.getCloneSet() != nil {
+			if cs.getCloneSet != nil {
 				builder.WithObjects(cs.getCloneSet())
+			}
+			if cs.getWorkloads != nil {
+				builder.WithObjects(cs.getWorkloads()...)
+			}
+			if cs.getWhiteList != nil {
+				whiteList := cs.getWhiteList()
+				marshaled, _ := json.Marshal(whiteList)
+				builder.WithObjects(&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      configuration.KruiseConfigurationName,
+						Namespace: util.GetKruiseNamespace(),
+					},
+					Data: map[string]string{
+						configuration.WSWatchCustomWorkloadWhiteList: string(marshaled),
+					},
+				})
 			}
 			for _, pod := range cs.getPods() {
 				podIn := pod.DeepCopy()
@@ -1935,7 +2150,7 @@ func TestManagerExistingPods(t *testing.T) {
 			},
 			getCloneSet: func() *appsv1alpha1.CloneSet {
 				cloneSet := cloneSetDemo.DeepCopy()
-				cloneSet.Spec.Replicas = utilpointer.Int32Ptr(10)
+				cloneSet.Spec.Replicas = ptr.To(int32(10))
 				return cloneSet
 			},
 			getNodes: func() []*corev1.Node {
@@ -2108,7 +2323,7 @@ func TestManagerExistingPods(t *testing.T) {
 			},
 			getCloneSet: func() *appsv1alpha1.CloneSet {
 				cloneSet := cloneSetDemo.DeepCopy()
-				cloneSet.Spec.Replicas = utilpointer.Int32Ptr(3)
+				cloneSet.Spec.Replicas = ptr.To(int32(3))
 				return cloneSet
 			},
 			getNodes: func() []*corev1.Node {

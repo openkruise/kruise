@@ -310,6 +310,69 @@ spec:
                   - name
                   type: object
                 type: array
+              targetFilter:
+                description: |-
+                  TargetFilter allows WorkloadSpread to manage only a portion of the Pods in the TargetReference:
+                  by specifying the criteria for the Pods to be managed through a label selector,
+                  and by specifying how to obtain the total number of these selected Pods from the workload using replicasPaths.
+                properties:
+                  replicasPathList:
+                    description: |-
+                      ReplicasPathList is a list of resource paths used to specify how to determine the total number of replicas of
+                      the target workload after filtering. If this list is not empty, WorkloadSpread will look for the corresponding
+                      values in the target resource according to each path, and treat the sum of these values as the total number of replicas after filtering.
+
+
+                      The replicas path is a dot-separated path, similar to "spec.replicas". If there are arrays, you can use numbers to denote indexes, like "subsets.1.replicas".
+                      The real values of these paths must be integers.
+                    items:
+                      type: string
+                    type: array
+                  selector:
+                    description: Selector is used to filter the Pods to be managed.
+                    properties:
+                      matchExpressions:
+                        description: matchExpressions is a list of label selector
+                          requirements. The requirements are ANDed.
+                        items:
+                          description: |-
+                            A label selector requirement is a selector that contains values, a key, and an operator that
+                            relates the key and values.
+                          properties:
+                            key:
+                              description: key is the label key that the selector
+                                applies to.
+                              type: string
+                            operator:
+                              description: |-
+                                operator represents a key's relationship to a set of values.
+                                Valid operators are In, NotIn, Exists and DoesNotExist.
+                              type: string
+                            values:
+                              description: |-
+                                values is an array of string values. If the operator is In or NotIn,
+                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced during a strategic
+                                merge patch.
+                              items:
+                                type: string
+                              type: array
+                          required:
+                          - key
+                          - operator
+                          type: object
+                        type: array
+                      matchLabels:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                          map is equivalent to an element of matchExpressions, whose key field is "key", the
+                          operator is "In", and the values array contains only "value". The requirements are ANDed.
+                        type: object
+                    type: object
+                    x-kubernetes-map-type: atomic
+                type: object
               targetRef:
                 description: TargetReference is the target workload that WorkloadSpread
                   want to control.
