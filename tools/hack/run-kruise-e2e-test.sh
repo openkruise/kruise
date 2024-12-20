@@ -18,8 +18,9 @@ set -ex
 export KUBECONFIG=${HOME}/.kube/config
 make ginkgo
 set +e
-./bin/ginkgo -p -timeout 60m -v --focus='\[apps\] InplaceVPA' test/e2e
+#./bin/ginkgo -p -timeout 60m -v --focus='\[apps\] InplaceVPA' test/e2e
 #./bin/ginkgo -p -timeout 60m -v --focus='\[apps\] CloneSet' test/e2e
+./bin/ginkgo -p -timeout 60m -v --focus='\[apps\] StatefulSet' test/e2e
 #./bin/ginkgo -p -timeout 60m -v --focus='\[apps\] (CloneSet|InplaceVPA)' test/e2e
 
 retVal=$?

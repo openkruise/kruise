@@ -26,12 +26,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/pkg/controller/cloneset/utils"
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -44,6 +38,13 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
 var _ = SIGDescribe("CloneSet", func() {
@@ -1071,6 +1072,10 @@ var _ = SIGDescribe("CloneSet", func() {
 			testUpdateVolumeClaimTemplates(tester, randStr, c)
 		})
 
+		ginkgo.It(`change resource and qos -> succeed to recreate`, func() {
+			testChangePodQOS(tester, randStr, c)
+		})
+
 	})
 
 	framework.KruiseDescribe("CloneSet pre-download images", func() {
@@ -1118,6 +1123,75 @@ var _ = SIGDescribe("CloneSet", func() {
 		})
 	})
 })
+
+func testChangePodQOS(tester *framework.CloneSetTester, randStr string, c clientset.Interface) {
+	cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+	cs.Spec.Template.Spec.Containers[0].Image = NginxImage
+	cs.Spec.Template.ObjectMeta.Labels["test-env"] = "foo"
+	cs.Spec.Template.Spec.Containers[0].Env = append(cs.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
+		Name:      "TEST_ENV",
+		ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.labels['test-env']"}},
+	})
+	cs, err := tester.CreateCloneSet(cs)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+
+	ginkgo.By("Wait for replicas satisfied")
+	gomega.Eventually(func() int32 {
+		cs, err = tester.GetCloneSet(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		return cs.Status.Replicas
+	}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
+
+	ginkgo.By("Wait for all pods ready")
+	gomega.Eventually(func() int32 {
+		cs, err = tester.GetCloneSet(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		return cs.Status.ReadyReplicas
+	}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+	pods, err := tester.ListPodsForCloneSet(cs.Name)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	gomega.Expect(len(pods)).Should(gomega.Equal(1))
+	oldPodUID := pods[0].UID
+
+	ginkgo.By("Update resource and qos")
+	err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+		cs.Spec.Template.Spec.Containers[0].Resources = v1.ResourceRequirements{
+			Requests: map[v1.ResourceName]resource.Quantity{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			Limits: map[v1.ResourceName]resource.Quantity{
+				v1.ResourceCPU:    resource.MustParse("1"),
+				v1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		}
+	})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	ginkgo.By("Wait for CloneSet generation consistent")
+	gomega.Eventually(func() bool {
+		cs, err = tester.GetCloneSet(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		return cs.Generation == cs.Status.ObservedGeneration
+	}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
+
+	ginkgo.By("Wait for all pods updated and ready")
+	gomega.Eventually(func() int32 {
+		cs, err = tester.GetCloneSet(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		return cs.Status.UpdatedReadyReplicas
+	}, 180*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+	ginkgo.By("Verify the podID changed")
+	pods, err = tester.ListPodsForCloneSet(cs.Name)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	gomega.Expect(len(pods)).Should(gomega.Equal(1))
+	newPodUID := pods[0].UID
+
+	gomega.Expect(oldPodUID).ShouldNot(gomega.Equal(newPodUID))
+}
 
 func checkPVCsDoRecreate(numsOfPVCs int, recreate bool) func(instanceIds, newInstanceIds, pvcIds sets.String, pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim) {
 	return func(instanceIds, newInstanceIds, pvcIds sets.String, pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim) {
