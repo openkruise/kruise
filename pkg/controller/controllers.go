@@ -44,6 +44,7 @@ import (
 )
 
 var controllerAddFuncs []func(manager.Manager) error
+var controllerAddAfterStarts []func(manager.Manager) error
 
 func init() {
 	controllerAddFuncs = append(controllerAddFuncs, advancedcronjob.Add)
@@ -58,19 +59,33 @@ func init() {
 	controllerAddFuncs = append(controllerAddFuncs, statefulset.Add)
 	controllerAddFuncs = append(controllerAddFuncs, uniteddeployment.Add)
 	controllerAddFuncs = append(controllerAddFuncs, podunavailablebudget.Add)
-	controllerAddFuncs = append(controllerAddFuncs, workloadspread.Add)
 	controllerAddFuncs = append(controllerAddFuncs, resourcedistribution.Add)
 	controllerAddFuncs = append(controllerAddFuncs, ephemeraljob.Add)
 	controllerAddFuncs = append(controllerAddFuncs, containerlauchpriority.Add)
-	controllerAddFuncs = append(controllerAddFuncs, persistentpodstate.Add)
 	controllerAddFuncs = append(controllerAddFuncs, sidecarterminator.Add)
 	controllerAddFuncs = append(controllerAddFuncs, podprobemarker.Add)
 	controllerAddFuncs = append(controllerAddFuncs, nodepodprobe.Add)
 	controllerAddFuncs = append(controllerAddFuncs, imagelistpulljob.Add)
+
+	controllerAddAfterStarts = append(controllerAddAfterStarts, workloadspread.Add)
+	controllerAddAfterStarts = append(controllerAddAfterStarts, persistentpodstate.Add)
 }
 
 func SetupWithManager(m manager.Manager) error {
 	for _, f := range controllerAddFuncs {
+		if err := f(m); err != nil {
+			if kindMatchErr, ok := err.(*meta.NoKindMatchError); ok {
+				klog.InfoS("CRD is not installed, its controller will perform noops!", "CRD", kindMatchErr.GroupKind)
+				continue
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func SetupAfterStart(m manager.Manager) error {
+	for _, f := range controllerAddAfterStarts {
 		if err := f(m); err != nil {
 			if kindMatchErr, ok := err.(*meta.NoKindMatchError); ok {
 				klog.InfoS("CRD is not installed, its controller will perform noops!", "CRD", kindMatchErr.GroupKind)
