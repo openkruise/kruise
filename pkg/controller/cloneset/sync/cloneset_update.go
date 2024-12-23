@@ -19,6 +19,7 @@ package sync
 import (
 	"context"
 	"fmt"
+	"github.com/openkruise/kruise/pkg/util/hotstandby"
 	"sort"
 	"time"
 
@@ -78,58 +79,78 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	}
 
 	// 2. calculate update diff and the revision to update
-	diffRes := calculateDiffsWithExpectation(cs, pods, currentRevision.Name, updateRevision.Name, nil)
-	if diffRes.updateNum == 0 {
+	diffRes, _ := calculateDiffsWithExpectation(cs, pods, currentRevision.Name, updateRevision.Name, nil)
+	if diffRes.updateNum == 0 && diffRes.hotStandbyUpdateNum == 0 {
 		return nil
 	}
 
 	// 3. find all matched pods can update
+	canUpdateIndexesFunc := func(pods []*v1.Pod) []int {
+		var waitUpdateIndexes []int
+		for i, pod := range pods {
+			if coreControl.IsPodUpdatePaused(pod) {
+				continue
+			}
+
+			var waitUpdate, canUpdate bool
+			if diffRes.updateNum > 0 || diffRes.hotStandbyUpdateNum > 0 {
+				waitUpdate = !clonesetutils.EqualToRevisionHash("", pod, updateRevision.Name)
+			} else {
+				waitUpdate = clonesetutils.EqualToRevisionHash("", pod, updateRevision.Name)
+			}
+			if waitUpdate {
+				switch lifecycle.GetPodLifecycleState(pod) {
+				case appspub.LifecycleStatePreparingDelete:
+					klog.V(3).InfoS("CloneSet found pod in PreparingDelete state, so skipped updating it",
+						"cloneSet", klog.KObj(cs), "pod", klog.KObj(pod))
+				case appspub.LifecycleStateUpdated:
+					klog.V(3).InfoS("CloneSet found pod in Updated state but not in updated revision",
+						"cloneSet", klog.KObj(cs), "pod", klog.KObj(pod))
+					canUpdate = true
+				default:
+					if gracePeriod, _ := appspub.GetInPlaceUpdateGrace(pod); gracePeriod != "" {
+						klog.V(3).InfoS("CloneSet found pod still in grace period, so skipped updating it",
+							"cloneSet", klog.KObj(cs), "pod", klog.KObj(pod), "gracePeriod", gracePeriod)
+					} else {
+						canUpdate = true
+					}
+				}
+			}
+			if canUpdate {
+				waitUpdateIndexes = append(waitUpdateIndexes, i)
+			}
+		}
+		return waitUpdateIndexes
+	}
+
 	targetRevision := updateRevision
 	if diffRes.updateNum < 0 {
 		targetRevision = currentRevision
 	}
-	var waitUpdateIndexes []int
-	for i, pod := range pods {
-		if coreControl.IsPodUpdatePaused(pod) {
-			continue
-		}
 
-		var waitUpdate, canUpdate bool
-		if diffRes.updateNum > 0 {
-			waitUpdate = !clonesetutils.EqualToRevisionHash("", pod, updateRevision.Name)
-		} else {
-			waitUpdate = clonesetutils.EqualToRevisionHash("", pod, updateRevision.Name)
-		}
-		if waitUpdate {
-			switch lifecycle.GetPodLifecycleState(pod) {
-			case appspub.LifecycleStatePreparingDelete:
-				klog.V(3).InfoS("CloneSet found pod in PreparingDelete state, so skipped updating it",
-					"cloneSet", klog.KObj(cs), "pod", klog.KObj(pod))
-			case appspub.LifecycleStateUpdated:
-				klog.V(3).InfoS("CloneSet found pod in Updated state but not in updated revision",
-					"cloneSet", klog.KObj(cs), "pod", klog.KObj(pod))
-				canUpdate = true
-			default:
-				if gracePeriod, _ := appspub.GetInPlaceUpdateGrace(pod); gracePeriod != "" {
-					klog.V(3).InfoS("CloneSet found pod still in grace period, so skipped updating it",
-						"cloneSet", klog.KObj(cs), "pod", klog.KObj(pod), "gracePeriod", gracePeriod)
-				} else {
-					canUpdate = true
-				}
-			}
-		}
-		if canUpdate {
-			waitUpdateIndexes = append(waitUpdateIndexes, i)
-		}
-	}
+	normalPods := hotstandby.FilterOutNormalPods(pods)
+	hotStandbyPods := hotstandby.FilterOutHotStandbyPods(pods)
+	waitUpdateIndexes := canUpdateIndexesFunc(normalPods)
+	waitUpdateHotStandbyIndexes := canUpdateIndexesFunc(hotStandbyPods)
 
-	// 4. sort all pods waiting to update
-	waitUpdateIndexes = SortUpdateIndexes(coreControl, cs.Spec.UpdateStrategy, pods, waitUpdateIndexes)
+	// 4. sort all normal pods waiting to update
+	waitUpdateIndexes = SortUpdateIndexes(coreControl, cs.Spec.UpdateStrategy, normalPods, waitUpdateIndexes)
 
-	// 5. limit max count of pods can update
+	// 5. limit max count of normal pods can update
 	waitUpdateIndexes = limitUpdateIndexes(coreControl, cs.Spec.MinReadySeconds, diffRes, waitUpdateIndexes, pods, targetRevision.Name)
 
-	// 6. update pods
+	// 6. add hot-standby pod indexes
+	waitUpdateHotStandbyIndexes = hotstandby.GetHotStandbyPodIndexes(util.IntAbs(diffRes.hotStandbyUpdateNum), waitUpdateHotStandbyIndexes)
+
+	// 7. update pods
+	var waitUpdatePods []*v1.Pod
+	for _, idx := range waitUpdateIndexes {
+		waitUpdatePods = append(waitUpdatePods, normalPods[idx])
+	}
+	for _, idx := range waitUpdateHotStandbyIndexes {
+		waitUpdatePods = append(waitUpdatePods, hotStandbyPods[idx])
+	}
+
 	for _, idx := range waitUpdateIndexes {
 		pod := pods[idx]
 		// Determine the pub before updating the pod
@@ -382,4 +403,40 @@ func limitUpdateIndexes(coreControl clonesetcore.Control, minReadySeconds int32,
 		waitUpdateIndexes = waitUpdateIndexes[:canUpdateCount]
 	}
 	return waitUpdateIndexes
+}
+
+func (r *realControl) PatchHotStandbyPodToNormal(cs *appsv1alpha1.CloneSet, pod *v1.Pod) error {
+	if pod == nil || !hotstandby.IsHotStandbyPod(pod) {
+		return fmt.Errorf("bad request for updating a non-hot-standby pod to normal, pod: %s", pod.Name)
+	}
+
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string)
+	}
+
+	if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.InPlaceUpdate, pod) {
+		labels := make(map[string]string)
+		labels[hotstandby.PodHotStandbyRecoveryKey] = hotstandby.True
+		labels[hotstandby.PodHotStandbyEnableKey] = hotstandby.False
+
+		if updated, gotPod, err := r.lifecycleControl.UpdatePodLifecycleWithHandlerAndLabels(pod, appspub.LifecycleStatePreparingUpdate, cs.Spec.Lifecycle.InPlaceUpdate, labels); err == nil && updated {
+			clonesetutils.ResourceVersionExpectations.Expect(gotPod)
+			klog.V(3).Infof("CloneSet %s update pod %s lifecycle to PreparingUpdate",
+				clonesetutils.GetControllerKey(cs), pod.Name)
+			r.recorder.Eventf(cs, v1.EventTypeNormal, "SuccessfulUpdate", "succeed to convert pod from host-standby to normal, pod: %s", pod.Name)
+			return nil
+		} else {
+			r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedUpdate", "failed to update pod from host-standby to normal: %v, pod: %v", err, util.DumpJSON(pod))
+			return err
+		}
+	} else {
+		body := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s","%s":"%s"}}}`,
+			hotstandby.PodHotStandbyRecoveryKey, hotstandby.True, hotstandby.PodHotStandbyEnableKey, hotstandby.False)
+		if err := r.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, []byte(body))); err != nil {
+			r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedPatch", "failed to patch pod from host-standby to normal: %v, pod: %v", err, util.DumpJSON(pod))
+			return err
+		}
+		r.recorder.Eventf(cs, v1.EventTypeNormal, "SuccessfulPatch", "succeed to convert pod from host-standby to normal, pod: %s", pod.Name)
+		return nil
+	}
 }
