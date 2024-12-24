@@ -17,6 +17,7 @@ limitations under the License.
 package cloneset
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -36,7 +37,6 @@ import (
 	"github.com/openkruise/kruise/pkg/util/volumeclaimtemplate"
 
 	"github.com/onsi/gomega"
-	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"

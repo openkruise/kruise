@@ -1,10 +1,13 @@
 package uniteddeployment
 
 import (
+	"encoding/hex"
 	"reflect"
 	"testing"
+	"time"
 
-	"github.com/alibaba/pouch/pkg/randomid"
+	"math/rand"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
@@ -16,6 +19,19 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+func generateRandomId() string {
+	b := make([]byte, 32)
+	_, err := rand.Read(b)
+	if err != nil {
+		panic(err) // This shouldn't happen
+	}
+	return hex.EncodeToString(b)
+}
 
 func TestSubsetControl_convertToSubset(t *testing.T) {
 	v1, v2 := "v1", "v2"
@@ -29,7 +45,7 @@ func TestSubsetControl_convertToSubset(t *testing.T) {
 	getPod := func(revision string) *corev1.Pod {
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   randomid.Generate(),
+				Name:   generateRandomId(),
 				Labels: selectorLabels,
 			},
 			Status: corev1.PodStatus{

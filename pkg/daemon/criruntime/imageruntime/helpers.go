@@ -23,7 +23,6 @@ import (
 	"io"
 	"time"
 
-	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	"google.golang.org/grpc"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
@@ -91,8 +90,40 @@ import (
 // }
 
 type layerProgress struct {
-	*dockermessage.JSONProgress
+	*JSONProgress
 	Status string `json:"status,omitempty"` // Extracting,Pull complete,Pulling fs layer,Verifying Checksum,Downloading
+}
+
+type JSONProgress struct {
+	// Current is the current status and value of the progress made towards Total.
+	Current int64 `json:"current,omitempty"`
+	// Total is the end value describing when we made 100% progress for an operation.
+	Total int64 `json:"total,omitempty"`
+	// Start is the initial value for the operation.
+	Start int64 `json:"start,omitempty"`
+	// HideCounts. if true, hides the progress count indicator (xB/yB).
+	HideCounts bool `json:"hidecounts,omitempty"`
+	// Units is the unit to print for progress. It defaults to "bytes" if empty.
+	Units string `json:"units,omitempty"`
+}
+
+type JSONMessage struct {
+	Stream   string        `json:"stream,omitempty"`
+	Status   string        `json:"status,omitempty"`
+	ID       string        `json:"id,omitempty"`
+	Progress *JSONProgress `json:"progressDetail,omitempty"`
+	Error    *JSONError    `json:"errorDetail,omitempty"`
+}
+
+// JSONError wraps a concrete Code and Message, Code is
+// an integer error code, Message is the error message.
+type JSONError struct {
+	Code    int    `json:"code,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
+func (e *JSONError) Error() string {
+	return e.Message
 }
 
 type pullingProgress struct {
@@ -174,7 +205,7 @@ func (r *imagePullStatusReader) mainloop() {
 		case <-r.done:
 			return
 		default:
-			var jm dockermessage.JSONMessage
+			var jm JSONMessage
 			err := decoder.Decode(&jm)
 			if err == io.EOF {
 				klog.V(5).Info("runtime read eof")

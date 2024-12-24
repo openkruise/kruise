@@ -17,13 +17,13 @@ limitations under the License.
 package uniteddeployment
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	"golang.org/x/net/context"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
