@@ -770,11 +770,8 @@ func (ssc *defaultStatefulSetControl) deletePod(set *appsv1beta1.StatefulSet, po
 }
 
 func (ssc *defaultStatefulSetControl) refreshPodState(set *appsv1beta1.StatefulSet, pod *v1.Pod, updateRevision string) (bool, time.Duration, error) {
-	if set.Spec.UpdateStrategy.RollingUpdate == nil {
-		return false, 0, nil
-	}
 	opts := &inplaceupdate.UpdateOptions{}
-	if set.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy != nil {
+	if set.Spec.UpdateStrategy.RollingUpdate != nil && set.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy != nil {
 		opts.GracePeriodSeconds = set.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy.GracePeriodSeconds
 	}
 	opts = inplaceupdate.SetOptionsDefaults(opts)
@@ -788,6 +785,12 @@ func (ssc *defaultStatefulSetControl) refreshPodState(set *appsv1beta1.StatefulS
 
 	var state appspub.LifecycleStateType
 	switch lifecycle.GetPodLifecycleState(pod) {
+	case appspub.LifecycleStatePreparingNormal:
+		if set.Spec.Lifecycle == nil ||
+			set.Spec.Lifecycle.PreNormal == nil ||
+			lifecycle.IsPodAllHooked(set.Spec.Lifecycle.PreNormal, pod) {
+			state = appspub.LifecycleStateNormal
+		}
 	case appspub.LifecycleStatePreparingUpdate:
 		// when pod updated to PreparingUpdate state to wait lifecycle blocker to remove,
 		// then rollback, do not need update pod inplace since it is the update revision,
@@ -859,7 +862,7 @@ func (ssc *defaultStatefulSetControl) inPlaceUpdatePod(
 	if ssc.inplaceControl.CanUpdateInPlace(oldRevision, updateRevision, opts) {
 		state := lifecycle.GetPodLifecycleState(pod)
 		switch state {
-		case "", appspub.LifecycleStateNormal:
+		case "", appspub.LifecycleStatePreparingNormal, appspub.LifecycleStateNormal:
 			var err error
 			var updated bool
 			if set.Spec.Lifecycle != nil && lifecycle.IsPodHooked(set.Spec.Lifecycle.InPlaceUpdate, pod) {
@@ -1112,7 +1115,15 @@ func (ssc *defaultStatefulSetControl) processReplica(
 				return true, false, err
 			}
 		}
-		lifecycle.SetPodLifecycle(appspub.LifecycleStateNormal)(replicas[i])
+		// asts ut invoke updateStatefulset once by once,
+		// so we can update pod into normal state to avoid changing so many ut cases
+		state := appspub.LifecycleStatePreparingNormal
+		if set.Spec.Lifecycle == nil ||
+			set.Spec.Lifecycle.PreNormal == nil ||
+			lifecycle.IsPodAllHooked(set.Spec.Lifecycle.PreNormal, replicas[i]) {
+			state = appspub.LifecycleStateNormal
+		}
+		lifecycle.SetPodLifecycle(state)(replicas[i])
 		if err := ssc.podControl.CreateStatefulPod(ctx, set, replicas[i]); err != nil {
 			msg := fmt.Sprintf("StatefulPodControl failed to create Pod error: %s", err)
 			condition := NewStatefulsetCondition(appsv1beta1.FailedCreatePod, v1.ConditionTrue, "", msg)
@@ -1156,12 +1167,13 @@ func (ssc *defaultStatefulSetControl) processReplica(
 	}
 
 	// Update InPlaceUpdateReady condition for pod
-	if res := ssc.inplaceControl.Refresh(replicas[i], nil); res.RefreshErr != nil {
-		logger.Error(res.RefreshErr, "StatefulSet failed to update pod condition for inplace",
+	_, duration, err := ssc.refreshPodState(set, replicas[i], status.UpdateRevision)
+	if err != nil {
+		logger.Error(err, "StatefulSet failed to update pod condition for inplace",
 			"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[i]))
-		return true, false, res.RefreshErr
-	} else if res.DelayDuration > 0 {
-		durationStore.Push(getStatefulSetKey(set), res.DelayDuration)
+		return true, false, err
+	} else if duration > 0 {
+		durationStore.Push(getStatefulSetKey(set), duration)
 	}
 
 	// If we have a Pod that has been created but is not running and available we can not make progress.
