@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"sort"
 	"strings"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	"github.com/openkruise/kruise/pkg/util/history"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	apps "k8s.io/api/apps/v1"
@@ -206,28 +208,53 @@ func (h *PodCreateHandler) getSuitableRevisionSidecarSet(sidecarSet *appsv1alpha
 			return sidecarSet.DeepCopy(), nil
 		}
 
-		// On pod creation, if a new pod matches the SidecarSet update strategy selector,
-		// the latest revision rather than that specified in the sidecarset.spec.injectionStrategy will be injected.
-		if updateStrategy := sidecarSet.Spec.UpdateStrategy; !updateStrategy.Paused && updateStrategy.Selector != nil {
-			selector, err := util.ValidatedLabelSelectorAsSelector(updateStrategy.Selector)
-			if err != nil {
-				klog.ErrorS(err, "Failed to parse SidecarSet update strategy selector", "name", sidecarSet.Name)
-				return nil, err
-			}
-			if selector.Matches(labels.Set(newPod.Labels)) {
-				klog.InfoS("New pod matches SidecarSet update strategy selector, latest revision will be injected",
-					"namespace", newPod.Namespace, "podName", newPod.Name, "sidecarSet", sidecarSet.Name)
-				return sidecarSet.DeepCopy(), nil
-			}
+		specificHistory, err := h.getSpecificHistorySidecarSet(sidecarSet, revisionInfo)
+		if err != nil {
+			return nil, err
 		}
 
-		// TODO: support 'PartitionBased' policy to inject old/new revision according to Partition
+		if sidecarSet.Spec.UpdateStrategy.Paused {
+			klog.V(3).InfoS("sidecarset upgrade is paused, will inject specified revision", "sidecarSet", klog.KObj(sidecarSet))
+			return specificHistory, nil
+		}
+
 		switch sidecarSet.Spec.InjectionStrategy.Revision.Policy {
-		case "", appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy:
-			return h.getSpecificHistorySidecarSet(sidecarSet, revisionInfo)
+		case appsv1alpha1.PartialSidecarSetInjectRevisionPolicy:
+			if updateStrategy := sidecarSet.Spec.UpdateStrategy; updateStrategy.Selector != nil {
+				selector, err := util.ValidatedLabelSelectorAsSelector(updateStrategy.Selector)
+				if err != nil {
+					klog.ErrorS(err, "Failed to parse SidecarSet update strategy selector", "sidecarSet", klog.KObj(sidecarSet))
+					return nil, err
+				}
+				if !selector.Matches(labels.Set(newPod.Labels)) {
+					// Only the Pods that are not selected by the selector will definitely be injected with the specified version of the Sidecar.
+					klog.V(3).InfoS("New pod is not updated, specified revision will be injected",
+						"pod", klog.KObj(newPod), "sidecarSet", klog.KObj(sidecarSet), "revisionInfo", revisionInfo)
+					return specificHistory, nil
+				}
+			}
+			klog.V(3).InfoS("New pod is updated, which has a probability to be injected with the latest sidecar",
+				"pod", klog.KObj(newPod), "sidecarSet", klog.KObj(sidecarSet), "partition", sidecarSet.Spec.UpdateStrategy.Partition)
+			return h.selectRevisionRandomly(specificHistory, sidecarSet.DeepCopy(), sidecarSet.Spec.UpdateStrategy.Partition)
+		default: // Always strategy
+			return specificHistory, nil
 		}
+	}
+}
 
-		return h.getSpecificHistorySidecarSet(sidecarSet, revisionInfo)
+// selectRevisionRandomly selects 'old' according to the probabilities specified by the partition.
+func (h *PodCreateHandler) selectRevisionRandomly(old, new *appsv1alpha1.SidecarSet, partition *intstr.IntOrString) (*appsv1alpha1.SidecarSet, error) {
+	if partition == nil || partition.Type == intstr.Int {
+		return new, nil
+	}
+	probability, err := util.ParsePercentageAsFloat64(partition.StrVal)
+	if err != nil {
+		return nil, err
+	}
+	if rand.Float64() <= probability {
+		return old, nil
+	} else {
+		return new, nil
 	}
 }
 

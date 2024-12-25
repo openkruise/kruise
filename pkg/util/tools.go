@@ -228,6 +228,20 @@ func GetScaledValueFromIntOrPercent(intOrPercent *intstrutil.IntOrString, total 
 	return 0, fmt.Errorf("invalid type: neither int nor percentage")
 }
 
+// ParsePercentageAsFloat64 parses a string as a percentage and returns the value as a float64.
+func ParsePercentageAsFloat64(s string) (float64, error) {
+	if strings.HasSuffix(s, "%") {
+		s = strings.TrimSuffix(s, "%")
+	} else {
+		return 0, fmt.Errorf("invalid type: string is not a percentage")
+	}
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, err
+	}
+	return v / 100, nil
+}
+
 func EqualIgnoreHash(template1, template2 *corev1.PodTemplateSpec) bool {
 	t1Copy := template1.DeepCopy()
 	t2Copy := template2.DeepCopy()

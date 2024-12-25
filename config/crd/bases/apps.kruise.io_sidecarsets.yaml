@@ -258,9 +258,11 @@ spec:
                           history SidecarSet to inject specific version of the sidecar to pods.
                         type: string
                       policy:
-                        description: |-
-                          Policy describes the behavior of revision injection.
-                          Defaults to Always.
+                        default: Always
+                        description: Policy describes the behavior of revision injection.
+                        enum:
+                        - Always
+                        - Partial
                         type: string
                       revisionName:
                         description: RevisionName corresponds to a specific ControllerRevision
@@ -534,8 +536,6 @@ spec:
                       injected into newly created Pods by a SidecarSet configured with an injectionStrategy.
                       In most cases, all newly created Pods are injected with the specified Sidecar version as configured in injectionStrategy.revision,
                       which is consistent with previous versions.
-                      Now, if updateStrategy.Selector is  also configured and the updateStrategy.paused field is set to false,
-                      then Pods matching the selector will be injected with the latest version of the Sidecar container.
                     properties:
                       matchExpressions:
                         description: matchExpressions is a list of label selector

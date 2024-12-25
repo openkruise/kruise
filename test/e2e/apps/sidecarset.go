@@ -30,6 +30,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 	"github.com/openkruise/kruise/test/e2e/framework"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -74,7 +75,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			// sidecarSet no matched pods
 			sidecarSet.Spec.Selector.MatchLabels["app"] = "nomatched"
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSet.Name))
-			tester.CreateSidecarSet(sidecarSet)
+			_, _ = tester.CreateSidecarSet(sidecarSet)
 			time.Sleep(time.Second)
 
 			// create deployment
@@ -124,14 +125,14 @@ var _ = SIGDescribe("SidecarSet", func() {
 				},
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s with volumes.downwardAPI", sidecarSet.Name))
-			tester.CreateSidecarSet(sidecarSet)
+			_, _ = tester.CreateSidecarSet(sidecarSet)
 		})
 
 		framework.ConformanceIt("sidecarSet inject pod sidecar container", func() {
 			// create sidecarSet
 			sidecarSet := tester.NewBaseSidecarSet(ns)
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSet.Name))
-			tester.CreateSidecarSet(sidecarSet)
+			_, _ = tester.CreateSidecarSet(sidecarSet)
 			time.Sleep(time.Second)
 
 			// create deployment
@@ -214,7 +215,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				ginkgo.By(cs.name)
 				sidecarSetIn := cs.getSidecarSets()
 				ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
-				tester.CreateSidecarSet(sidecarSetIn)
+				_, _ = tester.CreateSidecarSet(sidecarSetIn)
 				time.Sleep(time.Second)
 
 				deploymentIn := cs.getDeployment()
@@ -317,7 +318,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				ginkgo.By(cs.name)
 				sidecarSetIn := cs.getSidecarSets()
 				ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
-				tester.CreateSidecarSet(sidecarSetIn)
+				_, _ = tester.CreateSidecarSet(sidecarSetIn)
 				time.Sleep(time.Second)
 
 				deploymentIn := cs.getDeployment()
@@ -375,7 +376,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				},
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
-			tester.CreateSidecarSet(sidecarSetIn)
+			_, _ = tester.CreateSidecarSet(sidecarSetIn)
 			time.Sleep(time.Second)
 
 			// create deployment
@@ -447,7 +448,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				},
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
-			tester.CreateSidecarSet(sidecarSetIn)
+			_, _ = tester.CreateSidecarSet(sidecarSetIn)
 			time.Sleep(time.Second)
 
 			// create deployment
@@ -522,7 +523,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				},
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
-			tester.CreateSidecarSet(sidecarSetIn)
+			_, _ = tester.CreateSidecarSet(sidecarSetIn)
 			time.Sleep(time.Second)
 
 			// create deployment
@@ -688,7 +689,9 @@ var _ = SIGDescribe("SidecarSet", func() {
 			_, err := c.CoreV1().ConfigMaps(cm.Namespace).Create(context.TODO(), cm, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			time.Sleep(time.Second)
-			defer c.CoreV1().ConfigMaps(cm.Namespace).Delete(context.TODO(), cm.Name, metav1.DeleteOptions{})
+			defer func(maps v1core.ConfigMapInterface, ctx context.Context, name string, opts metav1.DeleteOptions) {
+				_ = maps.Delete(ctx, name, opts)
+			}(c.CoreV1().ConfigMaps(cm.Namespace), context.TODO(), cm.Name, metav1.DeleteOptions{})
 
 			// create sidecarSet again
 			sidecarSetIn, err = tester.CreateSidecarSet(sidecarSetIn)
@@ -697,7 +700,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
+			deploymentIn.Spec.Replicas = ptr.To(int32(2))
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 			// check pods
@@ -776,7 +779,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
+			deploymentIn.Spec.Replicas = ptr.To(int32(2))
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
@@ -843,7 +846,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
+			deploymentIn.Spec.Replicas = ptr.To(int32(2))
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
@@ -944,7 +947,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(1)
+			deploymentIn.Spec.Replicas = ptr.To(int32(1))
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
@@ -1002,7 +1005,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			}
 
 			// scale deployment replicas=2
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
+			deploymentIn.Spec.Replicas = ptr.To(int32(2))
 			tester.UpdateDeployment(deploymentIn)
 			time.Sleep(time.Second)
 
@@ -1046,7 +1049,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
+			deploymentIn.Spec.Replicas = ptr.To(int32(2))
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
@@ -1122,7 +1125,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
+			deploymentIn.Spec.Replicas = ptr.To(int32(2))
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 			// update sidecarSet sidecar container
@@ -1166,7 +1169,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
+			deploymentIn.Spec.Replicas = ptr.To(int32(2))
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 			// update pod[0] labels[canary.release] = true
@@ -1239,7 +1242,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
+			deploymentIn.Spec.Replicas = ptr.To(int32(2))
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
@@ -1294,7 +1297,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(4)
+			deploymentIn.Spec.Replicas = ptr.To(int32(4))
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
@@ -1344,7 +1347,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(1)
+			deploymentIn.Spec.Replicas = ptr.To(int32(1))
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
@@ -1547,7 +1550,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(1)
+			deploymentIn.Spec.Replicas = ptr.To(int32(1))
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s.%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 
@@ -1602,7 +1605,6 @@ var _ = SIGDescribe("SidecarSet", func() {
 			sidecarSetIn.Spec.UpdateStrategy.Type = appsv1alpha1.RollingUpdateSidecarSetStrategyType
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
 			sidecarSetIn, _ = tester.CreateSidecarSet(sidecarSetIn)
-			time.Sleep(time.Second)
 
 			// create deployment
 			deploymentStable, deploymentCanary := tester.NewBaseDeployment(ns), tester.NewBaseDeployment(ns)
@@ -1659,7 +1661,10 @@ var _ = SIGDescribe("SidecarSet", func() {
 			sidecarSetIn.Spec.UpdateStrategy.Selector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{"version": "canary"},
 			}
-			sidecarSetIn.Spec.InjectionStrategy.Revision = &appsv1alpha1.SidecarSetInjectRevision{CustomVersion: ptr.To("0")}
+			sidecarSetIn.Spec.InjectionStrategy.Revision = &appsv1alpha1.SidecarSetInjectRevision{
+				CustomVersion: ptr.To("0"),
+				Policy:        appsv1alpha1.PartialSidecarSetInjectRevisionPolicy,
+			}
 			sidecarSetIn.Labels = map[string]string{
 				appsv1alpha1.SidecarSetCustomVersionLabel: "1",
 			}
