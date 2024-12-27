@@ -93,16 +93,15 @@ func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj run
 }
 
 func GetPubForPod(c client.Client, pod *corev1.Pod) (*policyv1alpha1.PodUnavailableBudget, error) {
-	ref := metav1.GetControllerOf(pod)
-	if ref == nil {
-		return nil, nil
+	var workload *controllerfinder.ScaleAndSelector
+	var err error
+	if ref := metav1.GetControllerOf(pod); ref != nil {
+		workload, err = controllerfinder.Finder.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, pod.Namespace, ref.Name, "")
+		if err != nil {
+			klog.ErrorS(err, "Failed to find workload for pod", "pod", klog.KObj(pod))
+		}
 	}
-	workload, err := controllerfinder.Finder.GetScaleAndSelectorForRef(ref.APIVersion, ref.Kind, pod.Namespace, ref.Name, "")
-	if err != nil {
-		return nil, err
-	} else if workload == nil {
-		return nil, nil
-	}
+
 	pubList := &policyv1alpha1.PodUnavailableBudgetList{}
 	if err = c.List(context.TODO(), pubList, &client.ListOptions{Namespace: pod.Namespace}, utilclient.DisableDeepCopy); err != nil {
 		return nil, err
@@ -110,7 +109,7 @@ func GetPubForPod(c client.Client, pod *corev1.Pod) (*policyv1alpha1.PodUnavaila
 	for i := range pubList.Items {
 		pub := &pubList.Items[i]
 		// if targetReference isn't nil, priority to take effect
-		if pub.Spec.TargetReference != nil {
+		if pub.Spec.TargetReference != nil && workload != nil {
 			// belongs the same workload
 			if pubcontrol.IsReferenceEqual(&policyv1alpha1.TargetReference{
 				APIVersion: workload.APIVersion,
