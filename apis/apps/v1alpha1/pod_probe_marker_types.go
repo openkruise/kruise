@@ -21,6 +21,30 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// PodProbeMarkerAnnotationKey records the Probe Spec, mainly used for serverless Pod scenarios, as follows:
+	//  annotations:
+	//    kruise.io/podprobe: |
+	//      [
+	//          {
+	//              "containerName": "minecraft",
+	//              "name": "healthy",
+	//              "podConditionType": "game.kruise.io/healthy",
+	//              "probe": {
+	//                  "exec": {
+	//                      "command": [
+	//                          "bash",
+	//                          "/data/probe.sh"
+	//                      ]
+	//                  }
+	//              }
+	//          }
+	//      ]
+	PodProbeMarkerAnnotationKey = "kruise.io/podprobe"
+	// PodProbeMarkerListAnnotationKey records the injected PodProbeMarker Name List
+	PodProbeMarkerListAnnotationKey = "kruise.io/podprobemarker-list"
+)
+
 // PodProbeMarkerSpec defines the desired state of PodProbeMarker
 type PodProbeMarkerSpec struct {
 	// Selector is a label query over pods that should exec custom probe
