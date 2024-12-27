@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kruise-configuration
+  namespace: kruise-system
+data:
+  "WorkloadSpread_Watch_Custom_Workload_WhiteList": |
+    {
+      "workloads": [
+        {
+          "Group": "kubeflow.org",
+          "Version": "v1",
+          "Kind": "TFJob",
+          "ReplicasPath": "spec.tfReplicaSpecs.MASTER.replicas"
+        },
+        {
+          "Group": "apps.kruise.io",
+          "Kind": "DaemonSet"
+        }
+      ]
+    }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kruise-e2e-access
+rules:
+  - apiGroups: [ "kubeflow.org" ]
+    resources: [ "tfjobs" ]
+    verbs: [ "get" ]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kruise-e2e-access-binding
+subjects:
+  - kind: ServiceAccount
+    name: kruise-manager
+    namespace: kruise-system
+roleRef:
+  kind: ClusterRole
+  name: kruise-e2e-access
+  apiGroup: rbac.authorization.k8s.io

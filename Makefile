@@ -175,6 +175,8 @@ kube-load-image: $(tools/kind)
 # install-kruise install kruise with local build image to kube cluster.
 .PHONY: install-kruise
 install-kruise:
+	kubectl create ns kruise-system
+	kubectl apply -f test/kruise-e2e-config.yaml
 	tools/hack/install-kruise.sh $(IMG)
 
 # run-kruise-e2e-test starts to run kruise e2e tests.

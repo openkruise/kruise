@@ -43,6 +43,8 @@ import (
 
 var Finder *ControllerFinder
 
+const ReplicasUnknown int32 = -1
+
 func InitControllerFinder(mgr manager.Manager) error {
 	Finder = &ControllerFinder{
 		Client: mgr.GetClient(),
@@ -72,7 +74,7 @@ func InitControllerFinder(mgr manager.Manager) error {
 // controller finder functions.
 type ScaleAndSelector struct {
 	ControllerReference
-	// controller.spec.Replicas
+	// controller.spec.Replicas; the value -1 means it is uncertain currently
 	Scale int32
 	// kruise statefulSet.spec.ReserveOrdinals
 	ReserveOrdinals []int
@@ -155,7 +157,7 @@ func (r *ControllerFinder) GetScaleAndSelectorForRef(apiVersion, kind, ns, name 
 
 func (r *ControllerFinder) Finders() []PodControllerFinder {
 	return []PodControllerFinder{r.getPodReplicationController, r.getPodDeployment, r.getPodReplicaSet,
-		r.getPodStatefulSet, r.getPodKruiseCloneSet, r.getPodKruiseStatefulSet, r.getPodStatefulSetLike, r.getScaleController}
+		r.getPodStatefulSet, r.getPodKruiseCloneSet, r.getPodKruiseStatefulSet, r.getPodStatefulSetLike, r.getScaleController, r.getRefUID}
 }
 
 var (
@@ -465,7 +467,9 @@ func (r *ControllerFinder) getScaleController(ref ControllerReference, namespace
 		Group: gv.Group,
 		Kind:  ref.Kind,
 	}
-
+	if r.mapper == nil {
+		return nil, nil // only happens in test scenarios, preventing panic
+	}
 	mapping, err := r.mapper.RESTMapping(gk, gv.Version)
 	if err != nil {
 		return nil, err
@@ -496,6 +500,38 @@ func (r *ControllerFinder) getScaleController(ref ControllerReference, namespace
 		},
 		Metadata: scale.ObjectMeta,
 		Selector: selector,
+	}, nil
+}
+
+func (r *ControllerFinder) GetControllerAsUnstructured(ref ControllerReference, namespace string) (*unstructured.Unstructured, error) {
+	un := unstructured.Unstructured{}
+	un.SetAPIVersion(ref.APIVersion)
+	un.SetKind(ref.Kind)
+	return &un, r.Get(context.Background(), client.ObjectKey{Namespace: namespace, Name: ref.Name}, &un)
+}
+
+func (r *ControllerFinder) getRefUID(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
+	un, err := r.GetControllerAsUnstructured(ref, namespace)
+	if err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+	return &ScaleAndSelector{
+		Scale: ReplicasUnknown,
+		ControllerReference: ControllerReference{
+			APIVersion: ref.APIVersion,
+			Kind:       ref.Kind,
+			Name:       ref.Name,
+			UID:        un.GetUID(),
+		},
+		Metadata: metav1.ObjectMeta{
+			Namespace:       un.GetNamespace(),
+			Name:            un.GetName(),
+			Annotations:     un.GetAnnotations(),
+			UID:             un.GetUID(),
+			OwnerReferences: un.GetOwnerReferences(),
+			Labels:          un.GetLabels(),
+			ResourceVersion: un.GetResourceVersion(),
+		},
 	}, nil
 }
 

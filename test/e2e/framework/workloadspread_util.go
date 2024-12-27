@@ -18,36 +18,41 @@ package framework
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/onsi/gomega"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/util"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/ptr"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/pkg/util"
 )
 
 type WorkloadSpreadTester struct {
 	C  clientset.Interface
-	kc kruiseclientset.Interface
+	KC kruiseclientset.Interface
+	dc dynamic.Interface
 }
 
-func NewWorkloadSpreadTester(c clientset.Interface, kc kruiseclientset.Interface) *WorkloadSpreadTester {
+func NewWorkloadSpreadTester(c clientset.Interface, kc kruiseclientset.Interface, dc dynamic.Interface) *WorkloadSpreadTester {
 	return &WorkloadSpreadTester{
 		C:  c,
-		kc: kc,
+		KC: kc,
+		dc: dc,
 	}
 }
 
@@ -231,6 +236,64 @@ func (t *WorkloadSpreadTester) NewBaseDeployment(namespace string) *appsv1.Deplo
 	}
 }
 
+func (t *WorkloadSpreadTester) NewTFJob(name, namespace string, ps, master, worker int64) *unstructured.Unstructured {
+	un := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"spec": map[string]interface{}{
+				"tfReplicaSpecs": map[string]interface{}{
+					"PS": map[string]interface{}{
+						"replicas": ps,
+					},
+					"MASTER": map[string]interface{}{
+						"replicas": master,
+					},
+					"Worker": map[string]interface{}{
+						"replicas": worker,
+					},
+				},
+			},
+		},
+	}
+	un.SetAPIVersion("kubeflow.org/v1")
+	un.SetKind("TFJob")
+	un.SetNamespace(namespace)
+	un.SetName(name)
+	return un
+}
+
+func (t *WorkloadSpreadTester) NewBaseDaemonSet(name, namespace string) *appsv1alpha1.DaemonSet {
+	return &appsv1alpha1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: appsv1alpha1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": name,
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": name,
+					},
+				},
+				Spec: corev1.PodSpec{
+					TerminationGracePeriodSeconds: ptr.To(int64(0)),
+					Containers: []corev1.Container{
+						{
+							Name:    "main",
+							Image:   imageutils.GetE2EImage(imageutils.Httpd),
+							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func (t *WorkloadSpreadTester) SetNodeLabel(c clientset.Interface, node *corev1.Node, key, value string) {
 	labels := node.GetLabels()
 	if labels == nil {
@@ -251,29 +314,31 @@ func (t *WorkloadSpreadTester) SetNodeLabel(c clientset.Interface, node *corev1.
 }
 
 func (t *WorkloadSpreadTester) CreateWorkloadSpread(workloadSpread *appsv1alpha1.WorkloadSpread) *appsv1alpha1.WorkloadSpread {
-	Logf("create WorkloadSpread (%s/%s)", workloadSpread.Namespace, workloadSpread.Name)
-	_, err := t.kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Create(context.TODO(), workloadSpread, metav1.CreateOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	t.WaitForWorkloadSpreadRunning(workloadSpread)
-	Logf("create workloadSpread (%s/%s) success", workloadSpread.Namespace, workloadSpread.Name)
-	workloadSpread, _ = t.kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+	gomega.Eventually(func(g gomega.Gomega) {
+		Logf("create WorkloadSpread (%s/%s)", workloadSpread.Namespace, workloadSpread.Name)
+		_, err := t.KC.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Create(context.TODO(), workloadSpread, metav1.CreateOptions{})
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		t.WaitForWorkloadSpreadRunning(workloadSpread)
+		Logf("create workloadSpread (%s/%s) success", workloadSpread.Namespace, workloadSpread.Name)
+		workloadSpread, _ = t.KC.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+	}).WithTimeout(20 * time.Second).WithPolling(time.Second).Should(gomega.Succeed())
 	return workloadSpread
 }
 
 func (t *WorkloadSpreadTester) GetWorkloadSpread(namespace, name string) (*appsv1alpha1.WorkloadSpread, error) {
 	Logf("Get WorkloadSpread (%s/%s)", namespace, name)
-	return t.kc.AppsV1alpha1().WorkloadSpreads(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	return t.KC.AppsV1alpha1().WorkloadSpreads(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (t *WorkloadSpreadTester) GetCloneSet(namespace, name string) (*appsv1alpha1.CloneSet, error) {
 	Logf("Get CloneSet (%s/%s)", namespace, name)
-	return t.kc.AppsV1alpha1().CloneSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	return t.KC.AppsV1alpha1().CloneSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 func (t *WorkloadSpreadTester) WaitForWorkloadSpreadRunning(ws *appsv1alpha1.WorkloadSpread) {
 	pollErr := wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute*5, true,
 		func(ctx context.Context) (bool, error) {
-			inner, err := t.kc.AppsV1alpha1().WorkloadSpreads(ws.Namespace).Get(context.TODO(), ws.Name, metav1.GetOptions{})
+			inner, err := t.KC.AppsV1alpha1().WorkloadSpreads(ws.Namespace).Get(context.TODO(), ws.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -289,19 +354,19 @@ func (t *WorkloadSpreadTester) WaitForWorkloadSpreadRunning(ws *appsv1alpha1.Wor
 
 func (t *WorkloadSpreadTester) CreateCloneSet(cloneSet *appsv1alpha1.CloneSet) *appsv1alpha1.CloneSet {
 	Logf("create CloneSet (%s/%s)", cloneSet.Namespace, cloneSet.Name)
-	_, err := t.kc.AppsV1alpha1().CloneSets(cloneSet.Namespace).Create(context.TODO(), cloneSet, metav1.CreateOptions{})
+	_, err := t.KC.AppsV1alpha1().CloneSets(cloneSet.Namespace).Create(context.TODO(), cloneSet, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	Logf("create cloneSet (%s/%s) success", cloneSet.Namespace, cloneSet.Name)
-	cloneSet, _ = t.kc.AppsV1alpha1().CloneSets(cloneSet.Namespace).Get(context.TODO(), cloneSet.Name, metav1.GetOptions{})
+	cloneSet, _ = t.KC.AppsV1alpha1().CloneSets(cloneSet.Namespace).Get(context.TODO(), cloneSet.Name, metav1.GetOptions{})
 	return cloneSet
 }
 
 func (t *WorkloadSpreadTester) CreateStatefulSet(statefulSet *appsv1alpha1.StatefulSet) *appsv1beta1.StatefulSet {
 	Logf("create statefulSet (%s/%s)", statefulSet.Namespace, statefulSet.Name)
-	_, err := t.kc.AppsV1alpha1().StatefulSets(statefulSet.Namespace).Create(context.TODO(), statefulSet, metav1.CreateOptions{})
+	_, err := t.KC.AppsV1alpha1().StatefulSets(statefulSet.Namespace).Create(context.TODO(), statefulSet, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	Logf("create statefulSet (%s/%s) success", statefulSet.Namespace, statefulSet.Name)
-	asts, _ := t.kc.AppsV1beta1().StatefulSets(statefulSet.Namespace).Get(context.TODO(), statefulSet.Name, metav1.GetOptions{})
+	asts, _ := t.KC.AppsV1beta1().StatefulSets(statefulSet.Namespace).Get(context.TODO(), statefulSet.Name, metav1.GetOptions{})
 	return asts
 }
 
@@ -329,10 +394,75 @@ func (t *WorkloadSpreadTester) CreateJob(job *batchv1.Job) *batchv1.Job {
 	return job
 }
 
+func (t *WorkloadSpreadTester) CreateTFJob(obj *unstructured.Unstructured, ps, master, worker int) {
+	Logf("create TFJob (%s/%s)", obj.GetNamespace(), obj.GetName())
+	// create unstructured with dynamic client
+	obj, err := t.dc.Resource(schema.GroupVersionResource{
+		Group:    "kubeflow.org",
+		Version:  "v1",
+		Resource: "tfjobs",
+	}).Namespace(obj.GetNamespace()).Create(context.Background(), obj, metav1.CreateOptions{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	// ger PS, MASTER and Worker replicas from obj
+	Logf("creating fake pods: PS %d, MASTER %d, Worker: %d", ps, master, worker)
+	createPod := func(name string, labels map[string]string) {
+		fakePod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels:    labels,
+				Name:      name,
+				Namespace: obj.GetNamespace(),
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						APIVersion:         "kubeflow.org/v1",
+						BlockOwnerDeletion: ptr.To(true),
+						Controller:         ptr.To(true),
+						Kind:               "TFJob",
+						Name:               obj.GetName(),
+						UID:                obj.GetUID(),
+					},
+				},
+			},
+			Spec: corev1.PodSpec{
+				TerminationGracePeriodSeconds: ptr.To(int64(0)),
+				Containers: []corev1.Container{
+					{
+						Name:    "main",
+						Image:   imageutils.GetE2EImage(imageutils.Httpd),
+						Command: []string{"/bin/sh", "-c", "sleep 10000000"},
+					},
+				},
+			},
+		}
+		_, err = t.C.CoreV1().Pods(obj.GetNamespace()).Create(context.Background(), fakePod, metav1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	}
+	for i := 0; i < ps; i++ {
+		createPod(fmt.Sprintf("tfjob-%s-ps-%d", obj.GetName(), i), map[string]string{"app": "tfjob", "role": "ps"})
+	}
+	for i := 0; i < master; i++ {
+		createPod(fmt.Sprintf("tfjob-%s-master-%d", obj.GetName(), i), map[string]string{"app": "tfjob", "role": "master"})
+	}
+	for i := 0; i < worker; i++ {
+		createPod(fmt.Sprintf("fake-tfjob-worker-%d", i), map[string]string{"app": "tfjob", "role": "worker"})
+	}
+}
+
+func (t *WorkloadSpreadTester) CreateDaemonSet(ads *appsv1alpha1.DaemonSet) *appsv1alpha1.DaemonSet {
+	Logf("create DaemonSet (%s/%s)", ads.Namespace, ads.Name)
+	_, err := t.KC.AppsV1alpha1().DaemonSets(ads.Namespace).Create(context.Background(), ads, metav1.CreateOptions{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	gomega.Eventually(func(g gomega.Gomega) {
+		ads, err = t.KC.AppsV1alpha1().DaemonSets(ads.Namespace).Get(context.Background(), ads.Name, metav1.GetOptions{})
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		g.Expect(ads.Status.NumberReady).To(gomega.BeEquivalentTo(3))
+	}).WithTimeout(time.Minute).WithPolling(time.Second).Should(gomega.Succeed())
+	return ads
+}
+
 func (t *WorkloadSpreadTester) WaitForCloneSetRunning(cloneSet *appsv1alpha1.CloneSet) {
 	pollErr := wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute*10, true,
 		func(ctx context.Context) (bool, error) {
-			inner, err := t.kc.AppsV1alpha1().CloneSets(cloneSet.Namespace).Get(context.TODO(), cloneSet.Name, metav1.GetOptions{})
+			inner, err := t.KC.AppsV1alpha1().CloneSets(cloneSet.Namespace).Get(context.TODO(), cloneSet.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -351,7 +481,7 @@ func (t *WorkloadSpreadTester) WaitForCloneSetRunning(cloneSet *appsv1alpha1.Clo
 func (t *WorkloadSpreadTester) WaitForStatefulSetRunning(statefulSet *appsv1beta1.StatefulSet) {
 	pollErr := wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute*10, true,
 		func(ctx context.Context) (bool, error) {
-			inner, err := t.kc.AppsV1beta1().StatefulSets(statefulSet.Namespace).Get(context.TODO(), statefulSet.Name, metav1.GetOptions{})
+			inner, err := t.KC.AppsV1beta1().StatefulSets(statefulSet.Namespace).Get(context.TODO(), statefulSet.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -370,7 +500,7 @@ func (t *WorkloadSpreadTester) WaitForStatefulSetRunning(statefulSet *appsv1beta
 func (t *WorkloadSpreadTester) WaitForCloneSetRunReplicas(cloneSet *appsv1alpha1.CloneSet, replicas int32) {
 	pollErr := wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute*5, true,
 		func(ctx context.Context) (bool, error) {
-			inner, err := t.kc.AppsV1alpha1().CloneSets(cloneSet.Namespace).Get(context.TODO(), cloneSet.Name, metav1.GetOptions{})
+			inner, err := t.KC.AppsV1alpha1().CloneSets(cloneSet.Namespace).Get(context.TODO(), cloneSet.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -442,10 +572,10 @@ func (t *WorkloadSpreadTester) GetSelectorPods(namespace string, selector *metav
 func (t *WorkloadSpreadTester) UpdateCloneSet(cloneSet *appsv1alpha1.CloneSet) {
 	//goland:noinspection SqlNoDataSourceInspection
 	Logf("update cloneSet (%s/%s)", cloneSet.Namespace, cloneSet.Name)
-	clone, _ := t.kc.AppsV1alpha1().CloneSets(cloneSet.Namespace).Get(context.TODO(), cloneSet.Name, metav1.GetOptions{})
+	clone, _ := t.KC.AppsV1alpha1().CloneSets(cloneSet.Namespace).Get(context.TODO(), cloneSet.Name, metav1.GetOptions{})
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		clone.Spec = cloneSet.Spec
-		_, updateErr := t.kc.AppsV1alpha1().CloneSets(clone.Namespace).Update(context.TODO(), clone, metav1.UpdateOptions{})
+		_, updateErr := t.KC.AppsV1alpha1().CloneSets(clone.Namespace).Update(context.TODO(), clone, metav1.UpdateOptions{})
 		if updateErr == nil {
 			return nil
 		}
@@ -472,7 +602,7 @@ func (t *WorkloadSpreadTester) UpdateDeployment(deployment *appsv1.Deployment) {
 func (t *WorkloadSpreadTester) WaiteCloneSetUpdate(cloneSet *appsv1alpha1.CloneSet) {
 	pollErr := wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute*5, true,
 		func(ctx context.Context) (bool, error) {
-			inner, err := t.kc.AppsV1alpha1().CloneSets(cloneSet.Namespace).Get(context.TODO(), cloneSet.Name, metav1.GetOptions{})
+			inner, err := t.KC.AppsV1alpha1().CloneSets(cloneSet.Namespace).Get(context.TODO(), cloneSet.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -513,19 +643,19 @@ func (t *WorkloadSpreadTester) WaiteDeploymentUpdate(deployment *appsv1.Deployme
 
 func (t *WorkloadSpreadTester) UpdateWorkloadSpread(workloadSpread *appsv1alpha1.WorkloadSpread) {
 	Logf("update workloadSpread (%s/%s)", workloadSpread.Namespace, workloadSpread.Name)
-	clone, _ := t.kc.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+	clone, _ := t.KC.AppsV1alpha1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		clone.Spec = workloadSpread.Spec
-		_, updateErr := t.kc.AppsV1alpha1().WorkloadSpreads(clone.Namespace).Update(context.TODO(), clone, metav1.UpdateOptions{})
+		_, updateErr := t.KC.AppsV1alpha1().WorkloadSpreads(clone.Namespace).Update(context.TODO(), clone, metav1.UpdateOptions{})
 		if updateErr == nil {
 			return nil
 		}
-		clone, _ = t.kc.AppsV1alpha1().WorkloadSpreads(clone.Namespace).Get(context.TODO(), clone.Name, metav1.GetOptions{})
+		clone, _ = t.KC.AppsV1alpha1().WorkloadSpreads(clone.Namespace).Get(context.TODO(), clone.Name, metav1.GetOptions{})
 		return updateErr
 	})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	pollErr := wait.PollUntilContextTimeout(context.Background(), time.Second, time.Minute*2, true, func(ctx context.Context) (bool, error) {
-		clone, err = t.kc.AppsV1alpha1().WorkloadSpreads(clone.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+		clone, err = t.KC.AppsV1alpha1().WorkloadSpreads(clone.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
 		if clone.Generation == clone.Status.ObservedGeneration {
 			return true, nil
 		}
