@@ -402,3 +402,13 @@ func GetPodContainerByName(cName string, pod *v1.Pod) *v1.Container {
 
 	return nil
 }
+
+// IsRestartableInitContainer returns true if the initContainer has
+// ContainerRestartPolicyAlways.
+func IsRestartableInitContainer(initContainer *v1.Container) bool {
+	if initContainer.RestartPolicy == nil {
+		return false
+	}
+
+	return *initContainer.RestartPolicy == v1.ContainerRestartPolicyAlways
+}

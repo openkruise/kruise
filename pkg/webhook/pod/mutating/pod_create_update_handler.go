@@ -109,6 +109,14 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 		}
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnablePodProbeMarkerOnServerless) {
+		if skip, err := h.podProbeMarkerMutatingPod(ctx, req, obj); err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		} else if !skip {
+			changed = true
+		}
+	}
+
 	if !changed {
 		return admission.Allowed("")
 	}

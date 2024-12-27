@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -86,6 +87,17 @@ const (
 	ProbeFailed    ProbeState = "Failed"
 	ProbeUnknown   ProbeState = "Unknown"
 )
+
+func (p ProbeState) IsEqualPodConditionStatus(status corev1.ConditionStatus) bool {
+	switch status {
+	case corev1.ConditionTrue:
+		return p == ProbeSucceeded
+	case corev1.ConditionFalse:
+		return p == ProbeFailed
+	default:
+		return p == ProbeUnknown
+	}
+}
 
 // +genclient
 // +genclient:nonNamespaced
