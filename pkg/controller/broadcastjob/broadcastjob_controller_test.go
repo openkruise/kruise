@@ -17,6 +17,7 @@ limitations under the License.
 package broadcastjob
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"reflect"
@@ -25,7 +26,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
