@@ -94,7 +94,7 @@ func getImagePullPolicy(job *appsv1alpha1.ImagePullJob) *appsv1alpha1.ImageTagPu
 	}
 	if job.Spec.CompletionPolicy.Type == appsv1alpha1.Never {
 		pullPolicy.TTLSecondsAfterFinished = getTTLSecondsForNever()
-		pullPolicy.ActiveDeadlineSeconds = getActiveDeadlineSecondsForNever()
+		pullPolicy.ActiveDeadlineSeconds = getActiveDeadlineSecondsForNever(job)
 	} else {
 		pullPolicy.TTLSecondsAfterFinished = getTTLSecondsForAlways(job)
 		pullPolicy.ActiveDeadlineSeconds = job.Spec.CompletionPolicy.ActiveDeadlineSeconds
@@ -108,7 +108,13 @@ func getTTLSecondsForNever() *int32 {
 	return &ret
 }
 
-func getActiveDeadlineSecondsForNever() *int64 {
+func getActiveDeadlineSecondsForNever(job *appsv1alpha1.ImagePullJob) *int64 {
+	if job.Spec.PullPolicy != nil && job.Spec.PullPolicy.TimeoutSeconds != nil &&
+		int64(*job.Spec.PullPolicy.TimeoutSeconds) > defaultActiveDeadlineSecondsForNever {
+
+		var ret = int64(*job.Spec.PullPolicy.TimeoutSeconds)
+		return &ret
+	}
 	var ret = defaultActiveDeadlineSecondsForNever
 	return &ret
 }
