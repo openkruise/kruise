@@ -4651,7 +4651,8 @@ func TestScaleUpWithMaxUnavailable(t *testing.T) {
 }
 
 func isOrHasInternalError(err error) bool {
-	agg, ok := err.(utilerrors.Aggregate)
+	var agg utilerrors.Aggregate
+	ok := errors.As(err, &agg)
 	return !ok && !apierrors.IsInternalError(err) || ok && len(agg.Errors()) > 0 && !apierrors.IsInternalError(agg.Errors()[0])
 }
 
@@ -4662,10 +4663,12 @@ func emptyInvariants(set *appsv1beta1.StatefulSet, om *fakeObjectManager) error 
 func TestStatefulSetControlWithStartOrdinal(t *testing.T) {
 	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
 
-	simpleSetFn := func(replicas, startOrdinal int, reservedIds ...int) *appsv1beta1.StatefulSet {
+	simpleSetFn := func(replicas, startOrdinal int, reservedIds ...int32) *appsv1beta1.StatefulSet {
 		statefulSet := newStatefulSet(replicas)
 		statefulSet.Spec.Ordinals = &appsv1beta1.StatefulSetOrdinals{Start: int32(startOrdinal)}
-		statefulSet.Spec.ReserveOrdinals = append([]int{}, reservedIds...)
+		for _, id := range reservedIds {
+			statefulSet.Spec.ReserveOrdinals = append(statefulSet.Spec.ReserveOrdinals, intstr.FromInt32(id))
+		}
 		return statefulSet
 	}
 

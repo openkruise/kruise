@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
@@ -1045,7 +1046,10 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 					WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
 				}
-				set.Spec.ReserveOrdinals = []int{2, 4}
+				set.Spec.ReserveOrdinals = appsv1beta1.ReserveOrdinal{
+					intstr.FromInt32(2),
+					intstr.FromInt32(4),
+				}
 				return set
 			},
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
@@ -1083,7 +1087,10 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 					WhenScaled:  appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 				}
-				set.Spec.ReserveOrdinals = []int{2, 4}
+				set.Spec.ReserveOrdinals = appsv1beta1.ReserveOrdinal{
+					intstr.FromInt32(2),
+					intstr.FromInt32(4),
+				}
 				return set
 			},
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
@@ -1121,7 +1128,10 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 					WhenScaled:  appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 				}
-				set.Spec.ReserveOrdinals = []int{2, 4}
+				set.Spec.ReserveOrdinals = appsv1beta1.ReserveOrdinal{
+					intstr.FromInt32(2),
+					intstr.FromInt32(4),
+				}
 				return set
 			},
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
@@ -1170,7 +1180,10 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 					WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
 				}
-				set.Spec.ReserveOrdinals = []int{2, 4}
+				set.Spec.ReserveOrdinals = appsv1beta1.ReserveOrdinal{
+					intstr.FromInt32(2),
+					intstr.FromInt32(4),
+				}
 				return set
 			},
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {

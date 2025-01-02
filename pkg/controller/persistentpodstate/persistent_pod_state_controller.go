@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/openkruise/kruise/pkg/util/configuration"
+	"k8s.io/utils/ptr"
 
 	ctrlUtil "github.com/openkruise/kruise/pkg/controller/util"
 
@@ -36,7 +37,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	utilpointer "k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -146,7 +146,7 @@ type innerStatefulset struct {
 	// replicas
 	Replicas int32
 	// kruise statefulset filed
-	ReserveOrdinals   []int
+	ReserveOrdinals   sets.Set[int]
 	DeletionTimestamp *metav1.Time
 }
 
@@ -354,11 +354,10 @@ func (r *ReconcilePersistentPodState) getPodState(pod *corev1.Pod, nodeTopologyK
 }
 
 func isInStatefulSetReplicas(index int, sts *innerStatefulset) bool {
-	reserveOrdinals := sets.NewInt(sts.ReserveOrdinals...)
 	replicas := sets.NewInt()
 	replicaIndex := 0
 	for realReplicaCount := 0; realReplicaCount < int(sts.Replicas); replicaIndex++ {
-		if reserveOrdinals.Has(replicaIndex) {
+		if sts.ReserveOrdinals.Has(replicaIndex) {
 			continue
 		}
 		realReplicaCount++
@@ -457,7 +456,7 @@ func newStatefulSetPersistentPodState(workload *controllerfinder.ScaleAndSelecto
 					APIVersion: workload.APIVersion,
 					Kind:       workload.Kind,
 					Name:       workload.Name,
-					Controller: utilpointer.BoolPtr(true),
+					Controller: ptr.To(true),
 					UID:        workload.UID,
 				},
 			},

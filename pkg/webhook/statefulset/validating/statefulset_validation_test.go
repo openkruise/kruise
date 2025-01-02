@@ -545,7 +545,9 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:             utilpointer.Int32Ptr(5),
 					RevisionHistoryLimit: utilpointer.Int32Ptr(5),
-					ReserveOrdinals:      []int{1},
+					ReserveOrdinals: appsv1beta1.ReserveOrdinal{
+						intstr.FromInt32(1),
+					},
 					Lifecycle:            &appspub.Lifecycle{PreDelete: &appspub.LifecycleHook{FinalizersHandler: []string{"foo/bar"}}},
 					Template:             validPodTemplate1.Template,
 					VolumeClaimTemplates: []v1.PersistentVolumeClaim{validVolumeClaimTemplate("30Gi")},
@@ -569,7 +571,9 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:             utilpointer.Int32Ptr(10),
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
-					ReserveOrdinals:      []int{2},
+					ReserveOrdinals: appsv1beta1.ReserveOrdinal{
+						intstr.FromInt32(2),
+					},
 					Lifecycle:            &appspub.Lifecycle{PreDelete: &appspub.LifecycleHook{FinalizersHandler: []string{"foo/hello"}}},
 					Template:             validPodTemplate2.Template,
 					VolumeClaimTemplates: []v1.PersistentVolumeClaim{validVolumeClaimTemplate("60Gi")},
