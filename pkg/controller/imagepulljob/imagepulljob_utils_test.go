@@ -20,10 +20,12 @@ import (
 	"reflect"
 	"testing"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestTargetFromSource(t *testing.T) {
@@ -119,6 +121,61 @@ func TestTargetFromSource(t *testing.T) {
 			obj.GenerateName = ""
 			if !reflect.DeepEqual(obj, cs.expect) {
 				t.Fatalf("expect(%s), but get(%s)", util.DumpJSON(cs.expect), util.DumpJSON(obj))
+			}
+		})
+	}
+}
+
+func TestGetActiveDeadlineSecondsForNever(t *testing.T) {
+	cases := []struct {
+		name        string
+		getImageJob func() *appsv1alpha1.ImagePullJob
+		expected    int64
+	}{
+		{
+			name: "not set timeout",
+			getImageJob: func() *appsv1alpha1.ImagePullJob {
+				return &appsv1alpha1.ImagePullJob{}
+			},
+			expected: 1800,
+		},
+		{
+			name: "timeout < 1800",
+			getImageJob: func() *appsv1alpha1.ImagePullJob {
+				return &appsv1alpha1.ImagePullJob{
+					Spec: appsv1alpha1.ImagePullJobSpec{
+						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+							PullPolicy: &appsv1alpha1.PullPolicy{
+								TimeoutSeconds: utilpointer.Int32Ptr(1799),
+							},
+						},
+					},
+				}
+			},
+			expected: 1800,
+		},
+		{
+			name: "timeout > 1800",
+			getImageJob: func() *appsv1alpha1.ImagePullJob {
+				return &appsv1alpha1.ImagePullJob{
+					Spec: appsv1alpha1.ImagePullJobSpec{
+						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+							PullPolicy: &appsv1alpha1.PullPolicy{
+								TimeoutSeconds: utilpointer.Int32Ptr(7200),
+							},
+						},
+					},
+				}
+			},
+			expected: 7200,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			ret := getActiveDeadlineSecondsForNever(cs.getImageJob())
+			if *ret != cs.expected {
+				t.Fatalf("expect(%d), but get(%d)", cs.expected, *ret)
 			}
 		})
 	}

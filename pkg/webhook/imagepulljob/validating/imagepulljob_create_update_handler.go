@@ -21,16 +21,15 @@ import (
 	"fmt"
 	"net/http"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
+	utilpointer "k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // ImagePullJobCreateUpdateHandler handles ImagePullJob
@@ -97,10 +96,17 @@ func validate(obj *appsv1alpha1.ImagePullJob) error {
 	if _, err := daemonutil.NormalizeImageRef(obj.Spec.Image); err != nil {
 		return fmt.Errorf("invalid image %s: %v", obj.Spec.Image, err)
 	}
-
+	if obj.Spec.PullPolicy == nil {
+		obj.Spec.PullPolicy = &appsv1alpha1.PullPolicy{}
+	}
+	if obj.Spec.PullPolicy.TimeoutSeconds == nil {
+		obj.Spec.PullPolicy.TimeoutSeconds = utilpointer.Int32Ptr(600)
+	}
 	switch obj.Spec.CompletionPolicy.Type {
 	case appsv1alpha1.Always:
-
+		if obj.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil && int64(*obj.Spec.PullPolicy.TimeoutSeconds) > *obj.Spec.CompletionPolicy.ActiveDeadlineSeconds {
+			return fmt.Errorf("completionPolicy.activeDeadlineSeconds must be greater than pullPolicy.timeoutSeconds(default 600)")
+		}
 	case appsv1alpha1.Never:
 		if obj.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil || obj.Spec.CompletionPolicy.TTLSecondsAfterFinished != nil {
 			return fmt.Errorf("activeDeadlineSeconds and ttlSecondsAfterFinished can only work with Always CompletionPolicyType")
