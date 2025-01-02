@@ -17,10 +17,15 @@ limitations under the License.
 package v1beta1
 
 import (
+	"strconv"
+	"strings"
+
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 )
@@ -275,7 +280,8 @@ type StatefulSetSpec struct {
 	//   Then controller will delete Pod-1 and create Pod-3 (existing Pods will be [0, 2, 3])
 	// - If you just want to delete Pod-1, you should set spec.reserveOrdinal to [1] and spec.replicas to 2.
 	//   Then controller will delete Pod-1 (existing Pods will be [0, 2])
-	ReserveOrdinals []int `json:"reserveOrdinals,omitempty"`
+	// You can also use ranges along with numbers, such as [1, 3-5], which is a shortcut for [1, 3, 4, 5].
+	ReserveOrdinals ReserveOrdinal `json:"reserveOrdinals,omitempty"`
 
 	// Lifecycle defines the lifecycle hooks for Pods pre-delete, in-place update.
 	Lifecycle *appspub.Lifecycle `json:"lifecycle,omitempty"`
@@ -297,6 +303,37 @@ type StatefulSetSpec struct {
 	// enabled, which is beta.
 	// +optional
 	Ordinals *StatefulSetOrdinals `json:"ordinals,omitempty"`
+}
+
+type ReserveOrdinal []intstr.IntOrString
+
+func (r ReserveOrdinal) GetIntSet() sets.Set[int] {
+	values := sets.New[int]()
+	for _, elem := range r {
+		if elem.Type == intstr.Int {
+			values.Insert(int(elem.IntVal))
+		} else {
+			split := strings.Split(elem.StrVal, "-")
+			if len(split) != 2 {
+				klog.ErrorS(nil, "invalid range reserveOrdinal found, an empty slice will be returned", "reserveOrdinal", elem.StrVal)
+				return nil
+			}
+			start, err := strconv.Atoi(split[0])
+			if err != nil {
+				klog.ErrorS(err, "invalid range reserveOrdinal found, an empty slice will be returned", "reserveOrdinal", elem.StrVal)
+				return nil
+			}
+			end, err := strconv.Atoi(split[1])
+			if err != nil {
+				klog.ErrorS(err, "invalid range reserveOrdinal found, an empty slice will be returned", "reserveOrdinal", elem.StrVal)
+				return nil
+			}
+			for i := start; i <= end; i++ {
+				values.Insert(i)
+			}
+		}
+	}
+	return values
 }
 
 // StatefulSetScaleStrategy defines strategies for pods scale.

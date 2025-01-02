@@ -2293,7 +2293,10 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 				WhenScaled: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 			}
-			ss.Spec.ReserveOrdinals = []int{0, 1}
+			ss.Spec.ReserveOrdinals = appsv1beta1.ReserveOrdinal{
+				intstr.FromInt32(0),
+				intstr.FromInt32(1),
+			}
 			_, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
@@ -2307,6 +2310,35 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Verifying all but one PVC deleted")
 			err = verifyStatefulSetPVCsExist(c, ss, []int{2})
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should delete PVCs with a OnScaledown policy and range reserveOrdinals=[0,2-5]", func() {
+			if framework.SkipIfNoDefaultStorageClass(c) {
+				return
+			}
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			*(ss.Spec.Replicas) = 3
+			ss.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenScaled: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+			}
+			ss.Spec.ReserveOrdinals = appsv1beta1.ReserveOrdinal{
+				intstr.FromInt32(0),
+				intstr.FromString("2-5"),
+			}
+			_, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirming all 3 PVCs exist")
+			err = verifyStatefulSetPVCsExist(c, ss, []int{1, 6, 7})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Scaling stateful set " + ss.Name + " to one replica")
+			ss, err = framework.NewStatefulSetTester(c, kc).Scale(ss, 1)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying all but one PVC deleted")
+			err = verifyStatefulSetPVCsExist(c, ss, []int{1})
 			framework.ExpectNoError(err)
 		})
 
