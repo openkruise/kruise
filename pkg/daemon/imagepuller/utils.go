@@ -19,13 +19,9 @@ package imagepuller
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/rand"
 	"time"
 
-	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clientalpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
@@ -128,38 +124,3 @@ func (su *statusUpdater) updateStatus(nodeImage *appsv1alpha1.NodeImage, newStat
 	su.previousTimestamp = time.Now()
 	return false, err
 }
-
-func isLatestDigest(hash string, imageName, tag string, options ...remote.Option) bool {
-	//alpine:3.12
-	ref, err := name.ParseReference(fmt.Sprintf("%s:%s", imageName, tag))
-	if err != nil {
-		log.Fatalln(err)
-		return false
-	}
-	des, err := remote.Get(ref, options...)
-	if err != nil {
-		return false
-	}
-	return hash == des.Digest.String()
-}
-
-type authProvider struct {
-	username string
-	password string
-}
-
-func (a *authProvider) Authorization() (*authn.AuthConfig, error) {
-	return &authn.AuthConfig{
-		Username: a.username,
-		Password: a.password,
-	}, nil
-}
-
-func newAuthProvide(username, password string) *authProvider {
-	return &authProvider{
-		username: username,
-		password: password,
-	}
-}
-
-var _ authn.Authenticator = &authProvider{}

@@ -23,12 +23,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/util/secret"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -437,13 +435,7 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1alpha1.Im
 
 	klog.InfoS("Worker is starting to pull image", "name", w.name, "tag", tag, "version", w.tagSpec.Version)
 
-	if info, e := w.getImageInfo(ctx); imagePullPolicy == appsv1alpha1.PullAlways {
-		if e == nil && !w.shouldPull(info.ID, w.name, tag, w.secrets) {
-			klog.InfoS("Image is already exists", "name", w.name, "tag", tag)
-			newStatus.Progress = 100
-			return nil
-		}
-	} else if e == nil {
+	if info, _ := w.getImageInfo(ctx); info != nil && imagePullPolicy == appsv1alpha1.PullIfNotPresent {
 		klog.InfoS("Image is already exists", "name", w.name, "tag", tag)
 		newStatus.Progress = 100
 		return nil
@@ -530,17 +522,4 @@ func minDuration(a, b time.Duration) time.Duration {
 		return a
 	}
 	return b
-}
-
-func (w *pullWorker) shouldPull(id, imageName, imageTag string, pullSecrets []v1.Secret) bool {
-	if len(pullSecrets) > 0 {
-		for _, auth := range secret.AuthInfos(context.Background(), imageName, imageTag, pullSecrets) {
-			if isLatestDigest(id, imageName, imageTag, remote.WithAuth(newAuthProvide(auth.Username, auth.Password))) {
-				return false
-			}
-		}
-	} else {
-		return !isLatestDigest(id, imageName, imageTag)
-	}
-	return true
 }
