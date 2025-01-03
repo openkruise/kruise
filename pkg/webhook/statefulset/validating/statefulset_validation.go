@@ -14,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -44,15 +43,16 @@ func validatePodManagementPolicy(spec *appsv1beta1.StatefulSetSpec, fldPath *fie
 
 func validateReserveOrdinals(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-
-	if spec.ReserveOrdinals != nil {
-		orders := sets.NewInt(spec.ReserveOrdinals...)
-		if orders.Len() != len(spec.ReserveOrdinals) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.ReserveOrdinals, "reserveOrdinals contains duplicated items"))
-		}
-		for _, i := range spec.ReserveOrdinals {
-			if i < 0 {
-				allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.ReserveOrdinals, fmt.Sprintf("reserveOrdinals contains %d which must be order >= 0", i)))
+	if len(spec.ReserveOrdinals) > 0 {
+		matcher := regexp.MustCompile(`^\d+-\d+$`)
+		for i, elem := range spec.ReserveOrdinals {
+			if elem.Type == intstr.String && !matcher.MatchString(elem.StrVal) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.ReserveOrdinals,
+					fmt.Sprintf("%d th reserve ordinal is not a valid range: %s", i, elem.StrVal)))
+			}
+			if elem.Type == intstr.Int && elem.IntVal < 0 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.ReserveOrdinals,
+					fmt.Sprintf("%d th reserve ordinal is negative: %d", i, elem.IntVal)))
 			}
 		}
 	}
