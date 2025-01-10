@@ -18,6 +18,8 @@ package podprobemarker
 
 import (
 	"context"
+	"reflect"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,8 +34,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 var _ handler.EventHandler = &enqueueRequestForPodProbeMarker{}
@@ -94,14 +98,42 @@ func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.UpdateEvent
 	// add pod probe to nodePodProbe.spec
 	oldInitialCondition := util.GetCondition(old, corev1.PodInitialized)
 	newInitialCondition := util.GetCondition(new, corev1.PodInitialized)
-	if newInitialCondition == nil {
+	if !kubecontroller.IsPodActive(new) || newInitialCondition == nil ||
+		newInitialCondition.Status != corev1.ConditionTrue || new.Spec.NodeName == "" {
 		return
 	}
-	if !kubecontroller.IsPodActive(new) {
-		return
-	}
+
+	// normal pod
 	if ((oldInitialCondition == nil || oldInitialCondition.Status == corev1.ConditionFalse) &&
 		newInitialCondition.Status == corev1.ConditionTrue) || old.Status.PodIP != new.Status.PodIP {
+		ppms, err := p.getPodProbeMarkerForPod(new)
+		if err != nil {
+			klog.ErrorS(err, "Failed to List PodProbeMarker")
+			return
+		}
+		for _, ppm := range ppms {
+			q.Add(reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: ppm.Namespace,
+					Name:      ppm.Name,
+				},
+			})
+		}
+	}
+
+	// serverless pod
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnablePodProbeMarkerOnServerless) {
+		if reflect.DeepEqual(old.Status.Conditions, new.Status.Conditions) {
+			return
+		}
+		node := &corev1.Node{}
+		if err := p.reader.Get(context.TODO(), client.ObjectKey{Name: new.Spec.NodeName}, node); err != nil {
+			klog.ErrorS(err, "Failed to get Node", "nodeName", new.Spec.NodeName)
+			return
+		}
+		if node.Labels["type"] != VirtualKubelet {
+			return
+		}
 		ppms, err := p.getPodProbeMarkerForPod(new)
 		if err != nil {
 			klog.ErrorS(err, "Failed to List PodProbeMarker")
@@ -119,11 +151,25 @@ func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.UpdateEvent
 }
 
 func (p *enqueueRequestForPod) getPodProbeMarkerForPod(pod *corev1.Pod) ([]*appsalphav1.PodProbeMarker, error) {
+	var ppms []*appsalphav1.PodProbeMarker
+	// new pod have annotation kruise.io/podprobemarker-list
+	if str, ok := pod.Annotations[appsalphav1.PodProbeMarkerListAnnotationKey]; ok && str != "" {
+		names := strings.Split(str, ",")
+		for _, name := range names {
+			ppm := &appsalphav1.PodProbeMarker{}
+			if err := p.reader.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: name}, ppm); err != nil {
+				klog.ErrorS(err, "Failed to get PodProbeMarker", "name", name)
+				continue
+			}
+			ppms = append(ppms, ppm)
+		}
+		return ppms, nil
+	}
+
 	ppmList := &appsalphav1.PodProbeMarkerList{}
 	if err := p.reader.List(context.TODO(), ppmList, &client.ListOptions{Namespace: pod.Namespace}, utilclient.DisableDeepCopy); err != nil {
 		return nil, err
 	}
-	var ppms []*appsalphav1.PodProbeMarker
 	for i := range ppmList.Items {
 		ppm := &ppmList.Items[i]
 		// This error is irreversible, so continue
