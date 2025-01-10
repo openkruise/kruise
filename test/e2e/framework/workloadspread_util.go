@@ -29,6 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -40,6 +41,7 @@ import (
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type WorkloadSpreadTester struct {
@@ -350,6 +352,17 @@ func (t *WorkloadSpreadTester) WaitForWorkloadSpreadRunning(ws *appsv1alpha1.Wor
 	if pollErr != nil {
 		Failf("Failed waiting for workloadSpread to enter running: %v", pollErr)
 	}
+}
+
+func (t *WorkloadSpreadTester) CreatePriorityClass(pc *schedulingv1.PriorityClass) *schedulingv1.PriorityClass {
+	gomega.Eventually(func(g gomega.Gomega) {
+		Logf("create priorityClass (%s)", pc.Name)
+		_, err := t.C.SchedulingV1().PriorityClasses().Create(context.TODO(), pc, metav1.CreateOptions{})
+		g.Expect(client.IgnoreAlreadyExists(err)).NotTo(gomega.HaveOccurred())
+		Logf("create priorityClass (%s/%s) success", pc.Namespace, pc.Name)
+		pc, _ = t.C.SchedulingV1().PriorityClasses().Get(context.TODO(), pc.Name, metav1.GetOptions{})
+	}).WithTimeout(20 * time.Second).WithPolling(time.Second).Should(gomega.Succeed())
+	return pc
 }
 
 func (t *WorkloadSpreadTester) CreateCloneSet(cloneSet *appsv1alpha1.CloneSet) *appsv1alpha1.CloneSet {

@@ -648,6 +648,14 @@ func injectWorkloadSpreadIntoPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Po
 			klog.ErrorS(err, "failed to unmarshal to Pod", "pod", modified)
 			return false, err
 		}
+		if newPod.Spec.PriorityClassName != pod.Spec.PriorityClassName {
+			// Workloadspread webhook is called after builtin admission plugin,
+			// which means the priority is already set before priorityClassName being patched.
+			// Mismatched priorityClassName and priority value will be rejected by apiserver.
+			// we have to clear priority to avoid the problem, and the builtin admission plugin
+			// will be reinvoked after kruise webhook to setting the correct priority value.
+			newPod.Spec.Priority = nil
+		}
 		*pod = *newPod
 	}
 
