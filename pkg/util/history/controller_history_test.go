@@ -22,12 +22,14 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -69,7 +71,13 @@ func TestRevisionHistory(t *testing.T) {
 		t.Fatalf("Failed to new controller revision: %v", err)
 	}
 
-	fakeClient := fake.NewClientBuilder().Build()
+	fakeClient := fake.NewClientBuilder().WithIndex(&apps.ControllerRevision{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
+		var owners []string
+		for _, ref := range obj.GetOwnerReferences() {
+			owners = append(owners, string(ref.UID))
+		}
+		return owners
+	}).Build()
 	historyControl := NewHistory(fakeClient)
 
 	newCR, err := historyControl.CreateControllerRevision(parent, cr, parent.Status.CollisionCount)
