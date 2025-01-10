@@ -92,6 +92,9 @@ var (
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "node5", Labels: map[string]string{"arch": "arm64"}},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "node6"},
+		},
 	}
 
 	initialPods = []*v1.Pod{
@@ -166,6 +169,125 @@ var (
 			ObjectMeta: metav1.ObjectMeta{Name: "job6", Finalizers: []string{"apps.kruise.io/fake-block"}},
 			Spec:       appsv1alpha1.ImagePullJobSpec{},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "job7"},
+			Spec: appsv1alpha1.ImagePullJobSpec{
+				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+					Tolerations: []v1.Toleration{
+						{
+							Key:      "key1",
+							Value:    "val1",
+							Effect:   v1.TaintEffectNoSchedule,
+							Operator: v1.TolerationOpEqual,
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "job8"},
+			Spec: appsv1alpha1.ImagePullJobSpec{
+				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+					Tolerations: []v1.Toleration{
+						{
+							Key:      "key2",
+							Value:    "val2",
+							Effect:   v1.TaintEffectNoExecute,
+							Operator: v1.TolerationOpExists,
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "job9"},
+			Spec: appsv1alpha1.ImagePullJobSpec{
+				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+					Tolerations: []v1.Toleration{
+						{
+							Key:      "key1",
+							Value:    "val1",
+							Effect:   v1.TaintEffectNoSchedule,
+							Operator: v1.TolerationOpExists,
+						},
+						{
+							Key:      "key2",
+							Value:    "val2",
+							Effect:   v1.TaintEffectNoExecute,
+							Operator: v1.TolerationOpExists,
+						},
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "job10"},
+			Spec: appsv1alpha1.ImagePullJobSpec{
+				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+					Tolerations: []v1.Toleration{
+						{
+							Key:      "key2",
+							Value:    "val2",
+							Effect:   v1.TaintEffectNoSchedule,
+							Operator: v1.TolerationOpExists,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	initialNode = []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: map[string]string{"arch": "amd64"}},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: map[string]string{"arch": "arm64"}},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "node4"},
+			Spec: v1.NodeSpec{
+				Taints: []v1.Taint{
+					{
+						Key:    "key1",
+						Value:  "val1",
+						Effect: v1.TaintEffectNoSchedule,
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "node5", Labels: map[string]string{"arch": "arm64"}},
+			Spec: v1.NodeSpec{
+				Taints: []v1.Taint{
+					{
+						Key:    "key2",
+						Value:  "val2",
+						Effect: v1.TaintEffectNoExecute,
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "node6"},
+			Spec: v1.NodeSpec{
+				Taints: []v1.Taint{
+					{
+						Key:    "key1",
+						Value:  "val1",
+						Effect: v1.TaintEffectNoSchedule,
+					},
+					{
+						Key:    "key2",
+						Value:  "val2",
+						Effect: v1.TaintEffectNoExecute,
+					},
+				},
+			},
+		},
 	}
 )
 
@@ -183,6 +305,11 @@ func TestAll(t *testing.T) {
 			g.Expect(err).NotTo(gomega.HaveOccurred())
 		}
 	}
+	for _, o := range initialNode {
+		if err = c.Create(context.TODO(), o); err != nil {
+			g.Expect(err).NotTo(gomega.HaveOccurred())
+		}
+	}
 	for _, o := range initialPods {
 		if o.Namespace == "" {
 			o.Namespace = metav1.NamespaceDefault
@@ -196,6 +323,15 @@ func TestAll(t *testing.T) {
 		if o.Namespace == "" {
 			o.Namespace = metav1.NamespaceDefault
 		}
+
+		// A mock node that is not-ready after creation, node will add Taint "node.kubernetes.io/not-ready"
+		// add a same Tolerations to the job.
+		o.Spec.Tolerations = append(o.Spec.Tolerations, v1.Toleration{
+			Key:      "node.kubernetes.io/not-ready",
+			Operator: v1.TolerationOpExists,
+			Value:    "",
+			Effect:   v1.TaintEffectNoSchedule,
+		})
 		if err = c.Create(context.TODO(), o); err != nil {
 			g.Expect(err).NotTo(gomega.HaveOccurred())
 		}
@@ -217,6 +353,9 @@ func TestAll(t *testing.T) {
 	// Test GetNodeImagesForJob
 	testGetNodeImagesForJob(g)
 
+	// Test TolerationNodeImages
+	testTolerationNodeImages(g)
+
 	// Test GetActiveJobsForPod
 	testGetActiveJobsForPod(g)
 
@@ -235,12 +374,30 @@ func testGetNodeImagesForJob(g *gomega.GomegaWithT) {
 		return names.List()
 	}
 
-	g.Expect(getNodeImagesForJob(initialJobs[0])).Should(gomega.Equal([]string{"node1", "node2", "node3", "node4", "node5"}))
+	g.Expect(getNodeImagesForJob(initialJobs[0])).Should(gomega.Equal([]string{"node1", "node2", "node3", "node4", "node5", "node6"}))
 	g.Expect(getNodeImagesForJob(initialJobs[1])).Should(gomega.Equal([]string{"node2", "node4"}))
 	g.Expect(getNodeImagesForJob(initialJobs[2])).Should(gomega.Equal([]string{"node3", "node5"}))
-	g.Expect(getNodeImagesForJob(initialJobs[3])).Should(gomega.Equal([]string{"node1", "node4"}))
+	g.Expect(getNodeImagesForJob(initialJobs[3])).Should(gomega.Equal([]string{"node1", "node4", "node6"}))
 	g.Expect(getNodeImagesForJob(initialJobs[4])).Should(gomega.Equal([]string{"node2"}))
 	//g.Expect(getNodeImagesForJob(initialJobs[5])).Should(gomega.Equal([]string{"node2"}))
+}
+
+func testTolerationNodeImages(g *gomega.GomegaWithT) {
+	getTolerationNodeImages := func(ng []*appsv1alpha1.NodeImage, job *appsv1alpha1.ImagePullJob) []string {
+		nodeNames, err := TolerationNodeImages(c, ng, job)
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		names := sets.NewString()
+		for _, n := range nodeNames {
+			names.Insert(n.Name)
+		}
+		return names.List()
+	}
+
+	g.Expect(getTolerationNodeImages(initialNodeImages, initialJobs[0])).Should(gomega.Equal([]string{"node1", "node2", "node3"}))
+	g.Expect(getTolerationNodeImages(initialNodeImages, initialJobs[6])).Should(gomega.Equal([]string{"node1", "node2", "node3", "node4"}))
+	g.Expect(getTolerationNodeImages(initialNodeImages, initialJobs[7])).Should(gomega.Equal([]string{"node1", "node2", "node3", "node5"}))
+	g.Expect(getTolerationNodeImages(initialNodeImages, initialJobs[8])).Should(gomega.Equal([]string{"node1", "node2", "node3", "node4", "node5", "node6"}))
+	g.Expect(getTolerationNodeImages(initialNodeImages, initialJobs[9])).Should(gomega.Equal([]string{"node1", "node2", "node3"}))
 }
 
 func testGetActiveJobsForPod(g *gomega.GomegaWithT) {
@@ -274,9 +431,9 @@ func testGetActiveJobsForNodeImage(g *gomega.GomegaWithT) {
 		return names.List()
 	}
 
-	g.Expect(getActiveJobsForNodeImage(initialNodeImages[0])).Should(gomega.Equal([]string{"job1", "job4"}))
-	g.Expect(getActiveJobsForNodeImage(initialNodeImages[1])).Should(gomega.Equal([]string{"job1", "job2", "job5"}))
-	g.Expect(getActiveJobsForNodeImage(initialNodeImages[2])).Should(gomega.Equal([]string{"job1", "job3"}))
-	g.Expect(getActiveJobsForNodeImage(initialNodeImages[3])).Should(gomega.Equal([]string{"job1", "job2", "job4"}))
-	g.Expect(getActiveJobsForNodeImage(initialNodeImages[4])).Should(gomega.Equal([]string{"job1", "job3", "job5"}))
+	g.Expect(getActiveJobsForNodeImage(initialNodeImages[0])).Should(gomega.Equal([]string{"job1", "job10", "job4", "job7", "job8", "job9"}))
+	g.Expect(getActiveJobsForNodeImage(initialNodeImages[1])).Should(gomega.Equal([]string{"job1", "job10", "job2", "job5", "job7", "job8", "job9"}))
+	g.Expect(getActiveJobsForNodeImage(initialNodeImages[2])).Should(gomega.Equal([]string{"job1", "job10", "job3", "job7", "job8", "job9"}))
+	g.Expect(getActiveJobsForNodeImage(initialNodeImages[3])).Should(gomega.Equal([]string{"job1", "job10", "job2", "job4", "job7", "job8", "job9"}))
+	g.Expect(getActiveJobsForNodeImage(initialNodeImages[4])).Should(gomega.Equal([]string{"job1", "job10", "job3", "job5", "job7", "job8", "job9"}))
 }
