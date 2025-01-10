@@ -77,7 +77,7 @@ type ScaleAndSelector struct {
 	// controller.spec.Replicas; the value -1 means it is uncertain currently
 	Scale int32
 	// kruise statefulSet.spec.ReserveOrdinals
-	ReserveOrdinals []int
+	ReserveOrdinals sets.Set[int]
 	// controller.spec.Selector
 	Selector *metav1.LabelSelector
 	// metadata
@@ -381,7 +381,7 @@ func (r *ControllerFinder) getPodKruiseStatefulSet(ref ControllerReference, name
 
 	return &ScaleAndSelector{
 		Scale:           *(ss.Spec.Replicas),
-		ReserveOrdinals: ss.Spec.ReserveOrdinals,
+		ReserveOrdinals: ss.Spec.ReserveOrdinals.GetIntSet(),
 		Selector:        ss.Spec.Selector,
 		ControllerReference: ControllerReference{
 			APIVersion: ss.APIVersion,
