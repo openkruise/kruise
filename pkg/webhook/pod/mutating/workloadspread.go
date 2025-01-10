@@ -19,16 +19,17 @@ package mutating
 import (
 	"context"
 
+	"github.com/openkruise/kruise/pkg/util"
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 func (h *PodCreateHandler) workloadSpreadMutatingPod(ctx context.Context, req admission.Request, pod *corev1.Pod) (skip bool, err error) {
+	logger := util.FromLogContext(ctx)
 	if len(req.AdmissionRequest.SubResource) > 0 ||
 		req.AdmissionRequest.Resource.Resource != "pods" {
 		return true, nil
@@ -47,10 +48,11 @@ func (h *PodCreateHandler) workloadSpreadMutatingPod(ctx context.Context, req ad
 		// check dry run
 		dryRun = dryrun.IsDryRun(options.DryRun)
 		if dryRun {
-			klog.V(5).InfoS("Operation is a dry run, then admit", "operation", req.AdmissionRequest.Operation, "namespace", pod.Namespace, "podName", pod.Name)
+			logger.V(5).WithValues("operation", req.AdmissionRequest.Operation, "namespace", pod.Namespace, "podName", pod.Name).
+				Info("Operation is a dry run, then admit")
 			return true, nil
 		}
-		return workloadSpreadHandler.HandlePodCreation(pod)
+		return workloadSpreadHandler.HandlePodCreation(ctx, pod)
 	default:
 		return true, nil
 	}

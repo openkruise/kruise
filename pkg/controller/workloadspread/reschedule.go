@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/openkruise/kruise/pkg/controller/util"
+	util2 "github.com/openkruise/kruise/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
@@ -36,9 +37,10 @@ import (
 // should be recovered schedulable status to try scheduling Pods again.
 // TODO optimize the unschedulable duration of subset.
 // return one parameters - unschedulable Pods belongs to this subset.
-func (r *ReconcileWorkloadSpread) rescheduleSubset(ws *appsv1alpha1.WorkloadSpread,
+func (r *ReconcileWorkloadSpread) rescheduleSubset(ctx context.Context, ws *appsv1alpha1.WorkloadSpread,
 	pods []*corev1.Pod,
 	subsetStatus, oldSubsetStatus *appsv1alpha1.WorkloadSpreadSubsetStatus) []*corev1.Pod {
+	logger := util2.FromLogContext(ctx)
 	scheduleFailedPods := make([]*corev1.Pod, 0)
 	for i := range pods {
 		if PodUnscheduledTimeout(ws, pods[i]) {
@@ -47,7 +49,7 @@ func (r *ReconcileWorkloadSpread) rescheduleSubset(ws *appsv1alpha1.WorkloadSpre
 	}
 	unschedulable := len(scheduleFailedPods) > 0
 	if unschedulable {
-		klog.V(3).InfoS("Subset of WorkloadSpread is unschedulable", "subsetName", subsetStatus.Name, "workloadSpread", klog.KObj(ws))
+		logger.V(3).Info("Subset of WorkloadSpread is unschedulable", "subsetName", subsetStatus.Name, "workloadSpread", klog.KObj(ws))
 	}
 
 	oldCondition := GetWorkloadSpreadSubsetCondition(oldSubsetStatus, appsv1alpha1.SubsetSchedulable)
@@ -85,18 +87,19 @@ func (r *ReconcileWorkloadSpread) rescheduleSubset(ws *appsv1alpha1.WorkloadSpre
 	return scheduleFailedPods
 }
 
-func (r *ReconcileWorkloadSpread) cleanupUnscheduledPods(ws *appsv1alpha1.WorkloadSpread,
+func (r *ReconcileWorkloadSpread) cleanupUnscheduledPods(ctx context.Context, ws *appsv1alpha1.WorkloadSpread,
 	scheduleFailedPodsMap map[string][]*corev1.Pod) error {
 	for subsetName, pods := range scheduleFailedPodsMap {
-		if err := r.deletePodsForSubset(ws, pods, subsetName); err != nil {
+		if err := r.deletePodsForSubset(ctx, ws, pods, subsetName); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *ReconcileWorkloadSpread) deletePodsForSubset(ws *appsv1alpha1.WorkloadSpread,
+func (r *ReconcileWorkloadSpread) deletePodsForSubset(ctx context.Context, ws *appsv1alpha1.WorkloadSpread,
 	pods []*corev1.Pod, subsetName string) error {
+	logger := util2.FromLogContext(ctx)
 	for _, pod := range pods {
 		if err := r.Client.Delete(context.TODO(), pod); err != nil {
 			r.recorder.Eventf(ws, corev1.EventTypeWarning,
@@ -105,7 +108,7 @@ func (r *ReconcileWorkloadSpread) deletePodsForSubset(ws *appsv1alpha1.WorkloadS
 				pod.Namespace, pod.Name, subsetName, ws.Namespace, ws.Name)
 			return err
 		}
-		klog.V(3).InfoS("WorkloadSpread deleted unschedulabe Pod in Subset successfully", "workloadSpread", klog.KObj(ws), "pod", klog.KObj(pod), "subsetName", subsetName)
+		logger.V(3).Info("WorkloadSpread deleted unschedulabe Pod in Subset successfully", "workloadSpread", klog.KObj(ws), "pod", klog.KObj(pod), "subsetName", subsetName)
 	}
 	return nil
 }

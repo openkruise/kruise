@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/openkruise/kruise/pkg/util"
 	admissionv1 "k8s.io/api/admission/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -46,6 +47,7 @@ var _ admission.Handler = &WorkloadSpreadCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *WorkloadSpreadCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
+	ctx = util.NewLogContextWithId(ctx, string(req.UID))
 	obj := &appsv1alpha1.WorkloadSpread{}
 	oldObj := &appsv1alpha1.WorkloadSpread{}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadSpread) {
@@ -56,7 +58,7 @@ func (h *WorkloadSpreadCreateUpdateHandler) Handle(ctx context.Context, req admi
 		if err := h.Decoder.Decode(req, obj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
-		if allErrs := h.validatingWorkloadSpreadFn(obj); len(allErrs) > 0 {
+		if allErrs := h.validatingWorkloadSpreadFn(ctx, obj); len(allErrs) > 0 {
 			return admission.Errored(http.StatusBadRequest, allErrs.ToAggregate())
 		}
 	case admissionv1.Update:
@@ -67,7 +69,7 @@ func (h *WorkloadSpreadCreateUpdateHandler) Handle(ctx context.Context, req admi
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
-		validationErrorList := h.validatingWorkloadSpreadFn(obj)
+		validationErrorList := h.validatingWorkloadSpreadFn(ctx, obj)
 		updateErrorList := validateWorkloadSpreadUpdate(obj, oldObj)
 		if allErrs := append(validationErrorList, updateErrorList...); len(allErrs) > 0 {
 			return admission.Errored(http.StatusBadRequest, allErrs.ToAggregate())

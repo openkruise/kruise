@@ -17,6 +17,7 @@ limitations under the License.
 package workloadspread
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -227,7 +228,7 @@ func TestMatchSubset(t *testing.T) {
 			subset := cs.getSubset()
 			node := cs.getNode()
 			pod := cs.getPod()
-			isMatch, score, err := matchesSubset(pod, node, subset, 0)
+			isMatch, score, err := matchesSubset(context.Background(), pod, node, subset, 0)
 			if err != nil {
 				t.Fatal("unexpected err occurred")
 			}

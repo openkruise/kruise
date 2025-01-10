@@ -192,7 +192,7 @@ func matchReference(ref *metav1.OwnerReference) (bool, error) {
 
 // TODO consider pod/status update operation
 
-func (h *Handler) HandlePodCreation(pod *corev1.Pod) (skip bool, err error) {
+func (h *Handler) HandlePodCreation(ctx context.Context, pod *corev1.Pod) (skip bool, err error) {
 	start := time.Now()
 
 	// filter out pods, include the following:
@@ -200,6 +200,7 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) (skip bool, err error) {
 	// 2. Pod.Status.Phase = Succeeded or Failed
 	// 3. Pod.OwnerReference is nil
 	// 4. Pod.OwnerReference is not one of workloads, such as CloneSet, Deployment, ReplicaSet.
+	logger := util.FromLogContext(ctx)
 	if !kubecontroller.IsPodActive(pod) {
 		return true, nil
 	}
@@ -224,9 +225,9 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) (skip bool, err error) {
 			continue
 		}
 		// determine if the reference of workloadSpread and pod is equal
-		referenceEqual, err := h.isReferenceEqual(ws.Spec.TargetReference, ref, pod.GetNamespace())
+		referenceEqual, err := h.isReferenceEqual(ctx, ws.Spec.TargetReference, ref, pod.GetNamespace())
 		if err != nil {
-			klog.ErrorS(err, "failed to determine whether workloadspread refers pod's owner",
+			logger.Error(err, "failed to determine whether workloadspread refers pod's owner",
 				"pod", klog.KObj(pod), "workloadspread", klog.KObj(&ws))
 			if errors.IsNotFound(err) {
 				return true, err
@@ -235,7 +236,7 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) (skip bool, err error) {
 		}
 		selected, err := IsPodSelected(ws.Spec.TargetFilter, pod.GetLabels())
 		if err != nil {
-			klog.ErrorS(err, "failed to determine whether workloadspread selects pod",
+			logger.Error(err, "failed to determine whether workloadspread selects pod",
 				"pod", klog.KObj(pod), "workloadspread", klog.KObj(&ws))
 			continue
 		}
@@ -251,16 +252,16 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) (skip bool, err error) {
 	}
 
 	defer func() {
-		klog.V(3).InfoS("Cost of handling pod creation by WorkloadSpread",
+		logger.V(3).Info("Cost of handling pod creation by WorkloadSpread",
 			"namespace", matchedWS.Namespace, "name", matchedWS.Name, "cost", time.Since(start))
 	}()
 
-	return false, h.mutatingPod(matchedWS, pod, nil, CreateOperation)
+	return false, h.mutatingPod(ctx, matchedWS, pod, nil, CreateOperation)
 }
 
-func (h *Handler) HandlePodDeletion(pod *corev1.Pod, operation Operation) error {
+func (h *Handler) HandlePodDeletion(ctx context.Context, pod *corev1.Pod, operation Operation) error {
 	start := time.Now()
-
+	logger := util.FromLogContext(ctx)
 	var injectWS *InjectWorkloadSpread
 	str, ok := pod.Annotations[MatchedWorkloadSpreadSubsetAnnotations]
 	if !ok || str == "" {
@@ -268,7 +269,7 @@ func (h *Handler) HandlePodDeletion(pod *corev1.Pod, operation Operation) error 
 	}
 	err := json.Unmarshal([]byte(str), &injectWS)
 	if err != nil {
-		klog.ErrorS(err, "parse Pod annotations failed", "namespace", pod.Namespace, "name", pod.Name,
+		logger.Error(err, "parse Pod annotations failed", "namespace", pod.Namespace, "name", pod.Name,
 			"key", MatchedWorkloadSpreadSubsetAnnotations, "value", str)
 		return nil
 	}
@@ -285,33 +286,34 @@ func (h *Handler) HandlePodDeletion(pod *corev1.Pod, operation Operation) error 
 	err = h.Client.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: injectWS.Name}, matchedWS)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			klog.InfoS("Pod matched WorkloadSpread Not Found", "namespace", pod.Namespace, "name", pod.Name, "workloadSpread", injectWS.Name)
+			logger.Info("Pod matched WorkloadSpread Not Found", "namespace", pod.Namespace, "name", pod.Name, "workloadSpread", injectWS.Name)
 			return nil
 		}
-		klog.ErrorS(err, "get pod matched workloadSpread failed", "namespace", pod.Namespace, "name", pod.Name, "workloadSpread", injectWS.Name)
+		logger.Error(err, "get pod matched workloadSpread failed", "namespace", pod.Namespace, "name", pod.Name, "workloadSpread", injectWS.Name)
 		return err
 	}
 
 	defer func() {
-		klog.V(3).InfoS("Cost of handling pod deletion by WorkloadSpread",
+		logger.V(3).Info("Cost of handling pod deletion by WorkloadSpread",
 			"namespace", matchedWS.Namespace, "name", matchedWS.Name, "cost", time.Since(start))
 	}()
 
-	return h.mutatingPod(matchedWS, pod, injectWS, operation)
+	return h.mutatingPod(ctx, matchedWS, pod, injectWS, operation)
 }
 
-func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
+func (h *Handler) mutatingPod(ctx context.Context, matchedWS *appsv1alpha1.WorkloadSpread,
 	pod *corev1.Pod,
 	injectWS *InjectWorkloadSpread,
 	operation Operation) error {
+	logger := util.FromLogContext(ctx)
 	podName := pod.Name
 	if podName == "" {
 		podName = pod.GetGenerateName()
 	}
 
-	klog.V(3).InfoS("Operation Pod matched WorkloadSpread", "operation", operation, "podNs", pod.Namespace, "podName", podName, "wsNs", matchedWS.Namespace, "wsName", matchedWS.Name)
+	logger.V(3).Info("Operation Pod matched WorkloadSpread", "operation", operation, "podNs", pod.Namespace, "podName", podName, "wsNs", matchedWS.Namespace, "wsName", matchedWS.Name)
 
-	suitableSubsetName, generatedUID, err := h.acquireSuitableSubset(matchedWS, pod, injectWS, operation)
+	suitableSubsetName, generatedUID, err := h.acquireSuitableSubset(ctx, matchedWS, pod, injectWS, operation)
 	if err != nil {
 		return err
 	}
@@ -319,25 +321,26 @@ func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
 	var injectErr error
 	// if create pod, inject affinity、toleration、metadata in pod object
 	if operation == CreateOperation && len(suitableSubsetName) > 0 {
-		if _, injectErr = injectWorkloadSpreadIntoPod(matchedWS, pod, suitableSubsetName, generatedUID); injectErr != nil {
-			klog.InfoS("failed to inject Pod subset data for WorkloadSpread",
+		if _, injectErr = injectWorkloadSpreadIntoPod(ctx, matchedWS, pod, suitableSubsetName, generatedUID); injectErr != nil {
+			logger.Info("failed to inject Pod subset data for WorkloadSpread",
 				"podNs", pod.Namespace, "podName", podName, "suitableSubsetName", suitableSubsetName, "wsNs", matchedWS.Namespace, "wsName", matchedWS.Name)
 			return injectErr
 		}
-		klog.V(3).InfoS("inject Pod subset data for WorkloadSpread",
+		logger.V(3).Info("inject Pod subset data for WorkloadSpread",
 			"podNs", pod.Namespace, "podName", podName, "suitableSubsetName", suitableSubsetName, "wsNs", matchedWS.Namespace, "wsName", matchedWS.Name)
 	}
 
-	klog.V(3).InfoS("handler operation Pod generatedUID for WorkloadSpread done",
+	logger.V(3).Info("handler operation Pod generatedUID for WorkloadSpread done",
 		"operation", operation, "podNs", pod.Namespace, "podName", podName, "generatedUID", generatedUID, "wsNs", matchedWS.Namespace, "wsName", matchedWS.Name)
 
 	return injectErr
 }
 
-func (h *Handler) acquireSuitableSubset(matchedWS *appsv1alpha1.WorkloadSpread,
+func (h *Handler) acquireSuitableSubset(ctx context.Context, matchedWS *appsv1alpha1.WorkloadSpread,
 	pod *corev1.Pod,
 	injectWS *InjectWorkloadSpread,
 	operation Operation) (string, string, error) {
+	logger := util.FromLogContext(ctx)
 	if len(matchedWS.Spec.Subsets) == 1 &&
 		matchedWS.Spec.Subsets[0].MaxReplicas == nil {
 		return matchedWS.Spec.Subsets[0].Name, "", nil
@@ -394,7 +397,7 @@ func (h *Handler) acquireSuitableSubset(matchedWS *appsv1alpha1.WorkloadSpread,
 			// 1. get two matchedWS, one is cached by this webhook process,
 			// another is cached by informer, compare and get the newer one;
 			// 2. if 1. failed, directly fetch matchedWS from APIServer;
-			wsClone, err = h.tryToGetTheLatestMatchedWS(matchedWS, refresh)
+			wsClone, err = h.tryToGetTheLatestMatchedWS(ctx, matchedWS, refresh)
 			costOfGet += time.Since(startGet)
 			if err != nil {
 				return err
@@ -405,7 +408,7 @@ func (h *Handler) acquireSuitableSubset(matchedWS *appsv1alpha1.WorkloadSpread,
 			// check whether WorkloadSpread has suitable subset for the pod
 			// 1. changed indicates whether workloadSpread status changed
 			// 2. suitableSubset is matched subset for the pod
-			changed, suitableSubset, generatedUID, err = h.updateSubsetForPod(wsClone, pod, injectWS, operation)
+			changed, suitableSubset, generatedUID, err = h.updateSubsetForPod(ctx, wsClone, pod, injectWS, operation)
 			if !changed || err != nil {
 				return err
 			}
@@ -416,17 +419,17 @@ func (h *Handler) acquireSuitableSubset(matchedWS *appsv1alpha1.WorkloadSpread,
 				refresh = true
 				conflictTimes++
 			} else {
-				klog.V(3).InfoS("update WorkloadSpread success",
+				logger.V(3).Info("update WorkloadSpread success",
 					"namespace", wsClone.Namespace, "name", wsClone.Name, "subsetStatus", suitableSubset.Name,
 					"missingReplicas", suitableSubset.MissingReplicas, "creatingPods", len(suitableSubset.CreatingPods), "deletingPods", len(suitableSubset.DeletingPods))
 				if cacheErr := util.GlobalCache.Add(wsClone); cacheErr != nil {
-					klog.ErrorS(cacheErr, "Failed to update workloadSpread cache after update status", "namespace", wsClone.Namespace, "name", wsClone.Name)
+					logger.Error(cacheErr, "Failed to update workloadSpread cache after update status", "namespace", wsClone.Namespace, "name", wsClone.Name)
 				}
 			}
 			costOfUpdate += time.Since(start)
 			return err
 		}); err != nil {
-			klog.ErrorS(err, "update WorkloadSpread error", "namespace", matchedWS.Namespace, "name", matchedWS.Name)
+			logger.Error(err, "update WorkloadSpread error", "namespace", matchedWS.Namespace, "name", matchedWS.Name)
 			return "", "", err
 		}
 	}
@@ -435,17 +438,17 @@ func (h *Handler) acquireSuitableSubset(matchedWS *appsv1alpha1.WorkloadSpread,
 		suitableSubsetName = suitableSubset.Name
 	}
 
-	klog.V(5).InfoS("Cost of assigning suitable subset of WorkloadSpread for pod",
+	logger.V(5).Info("Cost of assigning suitable subset of WorkloadSpread for pod",
 		"namespace", matchedWS.Namespace, "name", matchedWS.Name, "conflictTimes", conflictTimes, "costOfGet", costOfGet, "costOfUpdate", costOfUpdate)
 
 	return suitableSubsetName, generatedUID, nil
 }
 
-func (h *Handler) tryToGetTheLatestMatchedWS(matchedWS *appsv1alpha1.WorkloadSpread, refresh bool) (
+func (h *Handler) tryToGetTheLatestMatchedWS(ctx context.Context, matchedWS *appsv1alpha1.WorkloadSpread, refresh bool) (
 	*appsv1alpha1.WorkloadSpread, error) {
 	var err error
 	var wsClone *appsv1alpha1.WorkloadSpread
-
+	logger := util.FromLogContext(ctx)
 	if refresh {
 		// TODO: shall we set metav1.GetOptions{resourceVersion="0"} so that we get the cached object in apiServer memory instead of etcd?
 		wsClone, err = kubeClient.GetGenericClient().KruiseClient.AppsV1alpha1().
@@ -454,13 +457,13 @@ func (h *Handler) tryToGetTheLatestMatchedWS(matchedWS *appsv1alpha1.WorkloadSpr
 			if errors.IsNotFound(err) {
 				return nil, nil
 			}
-			klog.ErrorS(err, "error getting updated WorkloadSpread from APIServer", "namespace", matchedWS.Namespace, "name", matchedWS.Name)
+			logger.Error(err, "error getting updated WorkloadSpread from APIServer", "namespace", matchedWS.Namespace, "name", matchedWS.Name)
 			return nil, err
 		}
 	} else {
 		item, _, cacheErr := util.GlobalCache.Get(matchedWS)
 		if cacheErr != nil {
-			klog.ErrorS(cacheErr, "Failed to get cached WorkloadSpread from GlobalCache", "namespace", matchedWS.Namespace, "name", matchedWS.Name)
+			logger.Error(cacheErr, "Failed to get cached WorkloadSpread from GlobalCache", "namespace", matchedWS.Namespace, "name", matchedWS.Name)
 		}
 		if localCachedWS, ok := item.(*appsv1alpha1.WorkloadSpread); ok {
 			wsClone = localCachedWS.DeepCopy()
@@ -489,7 +492,7 @@ func (h *Handler) tryToGetTheLatestMatchedWS(matchedWS *appsv1alpha1.WorkloadSpr
 // 1. changed(bool) indicates if workloadSpread.Status has changed
 // 2. suitableSubset(*struct{}) indicates which workloadSpread.Subset does this pod match
 // 3. generatedUID(types.UID) indicates which workloadSpread generate a UID for identifying Pod without a full name.
-func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
+func (h *Handler) updateSubsetForPod(ctx context.Context, ws *appsv1alpha1.WorkloadSpread,
 	pod *corev1.Pod, injectWS *InjectWorkloadSpread, operation Operation) (
 	bool, *appsv1alpha1.WorkloadSpreadSubsetStatus, string, error) {
 	var suitableSubset *appsv1alpha1.WorkloadSpreadSubsetStatus
@@ -497,10 +500,11 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 
 	// We only care about the corresponding versioned subset status.
 	var err error
+	logger := util.FromLogContext(ctx)
 	version := GetPodVersion(pod)
 	subsetStatuses := ws.Status.VersionedSubsetStatuses[version]
 	if len(subsetStatuses) == 0 {
-		subsetStatuses, err = h.initializedSubsetStatuses(ws)
+		subsetStatuses, err = h.initializedSubsetStatuses(ctx, ws)
 		if err != nil {
 			return false, nil, "", err
 		}
@@ -521,7 +525,7 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 
 		suitableSubset = h.getSuitableSubset(subsetStatuses)
 		if suitableSubset == nil {
-			klog.InfoS("WorkloadSpread doesn't have a suitable subset for Pod when creating",
+			logger.Info("WorkloadSpread doesn't have a suitable subset for Pod when creating",
 				"namespace", ws.Namespace, "wsName", ws.Name, "podName", pod.GetGenerateName())
 			return false, nil, "", nil
 		}
@@ -551,7 +555,7 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 
 		suitableSubset = getSpecificSubset(subsetStatuses, injectWS.Subset)
 		if suitableSubset == nil {
-			klog.V(5).InfoS("Pod matched WorkloadSpread not found Subset when deleting",
+			logger.V(5).Info("Pod matched WorkloadSpread not found Subset when deleting",
 				"namespace", ws.Namespace, "podName", pod.Name, "wsName", ws.Name, "subset", injectWS.Subset)
 			return false, nil, "", nil
 		}
@@ -594,7 +598,8 @@ func isPodRecordedInSubset(subsetStatuses []appsv1alpha1.WorkloadSpreadSubsetSta
 	return false, nil
 }
 
-func injectWorkloadSpreadIntoPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod, subsetName string, generatedUID string) (bool, error) {
+func injectWorkloadSpreadIntoPod(ctx context.Context, ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod, subsetName string, generatedUID string) (bool, error) {
+	logger := util.FromLogContext(ctx)
 	var subset *appsv1alpha1.WorkloadSpreadSubset
 	for _, object := range ws.Spec.Subsets {
 		if subsetName == object.Name {
@@ -640,12 +645,12 @@ func injectWorkloadSpreadIntoPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Po
 		cloneBytes, _ := json.Marshal(pod)
 		modified, err := strategicpatch.StrategicMergePatch(cloneBytes, subset.Patch.Raw, &corev1.Pod{})
 		if err != nil {
-			klog.ErrorS(err, "failed to merge patch raw", "raw", subset.Patch.Raw)
+			logger.Error(err, "failed to merge patch raw", "raw", subset.Patch.Raw)
 			return false, err
 		}
 		newPod := &corev1.Pod{}
 		if err = json.Unmarshal(modified, newPod); err != nil {
-			klog.ErrorS(err, "failed to unmarshal to Pod", "pod", modified)
+			logger.Error(err, "failed to unmarshal to Pod", "pod", modified)
 			return false, err
 		}
 		*pod = *newPod
@@ -702,20 +707,21 @@ func (h *Handler) getSuitableSubset(subsetStatuses []appsv1alpha1.WorkloadSpread
 	return nil
 }
 
-func (h *Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *metav1.OwnerReference, namespace string) (bool, error) {
+func (h *Handler) isReferenceEqual(ctx context.Context, target *appsv1alpha1.TargetReference, owner *metav1.OwnerReference, namespace string) (bool, error) {
+	logger := util.FromLogContext(ctx)
 	if owner == nil {
 		return false, nil
 	}
 
 	targetGv, err := schema.ParseGroupVersion(target.APIVersion)
 	if err != nil {
-		klog.ErrorS(err, "parse TargetReference apiVersion failed", "apiVersion", target.APIVersion)
+		logger.Error(err, "parse TargetReference apiVersion failed", "apiVersion", target.APIVersion)
 		return false, err
 	}
 
 	ownerGv, err := schema.ParseGroupVersion(owner.APIVersion)
 	if err != nil {
-		klog.ErrorS(err, "parse OwnerReference apiVersion failed", "apiVersion", owner.APIVersion)
+		logger.Error(err, "parse OwnerReference apiVersion failed", "apiVersion", owner.APIVersion)
 		return false, err
 	}
 
@@ -732,7 +738,7 @@ func (h *Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *
 		return false, err
 	}
 
-	return h.isReferenceEqual(target, metav1.GetControllerOfNoCopy(ownerObject), namespace)
+	return h.isReferenceEqual(ctx, target, metav1.GetControllerOfNoCopy(ownerObject), namespace)
 }
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -804,9 +810,10 @@ func initializeWorkloadsInWhiteList(c client.Client) {
 	workloadsInWhiteListInitialized = true
 }
 
-func (h *Handler) initializedSubsetStatuses(ws *appsv1alpha1.WorkloadSpread) ([]appsv1alpha1.WorkloadSpreadSubsetStatus, error) {
-	replicas, err := h.getWorkloadReplicas(ws)
-	klog.V(5).InfoS("get workload replicas", "replicas", replicas, "err", err, "workloadSpread", klog.KObj(ws))
+func (h *Handler) initializedSubsetStatuses(ctx context.Context, ws *appsv1alpha1.WorkloadSpread) ([]appsv1alpha1.WorkloadSpreadSubsetStatus, error) {
+	logger := util.FromLogContext(ctx)
+	replicas, err := h.getWorkloadReplicas(ctx, ws)
+	logger.V(5).Info("get workload replicas", "replicas", replicas, "err", err, "workloadSpread", klog.KObj(ws))
 	if err != nil {
 		return nil, err
 	}
@@ -825,7 +832,7 @@ func (h *Handler) initializedSubsetStatuses(ws *appsv1alpha1.WorkloadSpread) ([]
 	return subsetStatuses, nil
 }
 
-func (h *Handler) getWorkloadReplicas(ws *appsv1alpha1.WorkloadSpread) (int32, error) {
+func (h *Handler) getWorkloadReplicas(ctx context.Context, ws *appsv1alpha1.WorkloadSpread) (int32, error) {
 	if ws.Spec.TargetReference == nil || !hasPercentSubset(ws) {
 		return 0, nil
 	}
@@ -857,7 +864,7 @@ func (h *Handler) getWorkloadReplicas(ws *appsv1alpha1.WorkloadSpread) (int32, e
 	case *appsv1beta1.StatefulSet:
 		return *o.Spec.Replicas, nil
 	case *unstructured.Unstructured:
-		return GetReplicasFromCustomWorkload(h.Client, o), nil
+		return GetReplicasFromCustomWorkload(ctx, h.Client, o), nil
 	}
 	return 0, fmt.Errorf("got unexpected workload type for workloadspread %s/%s", ws.Namespace, ws.Name)
 }
@@ -901,13 +908,14 @@ func GetReplicasFromObject(object *unstructured.Unstructured, replicasPath strin
 	return int32(replicas), nil
 }
 
-func GetReplicasFromCustomWorkload(reader client.Reader, object *unstructured.Unstructured) int32 {
+func GetReplicasFromCustomWorkload(ctx context.Context, reader client.Reader, object *unstructured.Unstructured) int32 {
 	if object == nil {
 		return 0
 	}
+	logger := util.FromLogContext(ctx)
 	whiteList, err := configuration.GetWSWatchCustomWorkloadWhiteList(reader)
 	if err != nil {
-		klog.Error("Failed to get workloadSpread custom workload white list from kruise config map")
+		logger.Error(err, "Failed to get workloadSpread custom workload white list from kruise config map")
 		return 0
 	}
 
@@ -918,7 +926,7 @@ func GetReplicasFromCustomWorkload(reader client.Reader, object *unstructured.Un
 		}
 		replicas, err := GetReplicasFromObject(object, wl.ReplicasPath)
 		if err != nil {
-			klog.ErrorS(err, "Failed to get replicas from custom workload", "gvk", gvk, "object", klog.KObj(object), "replicasPath", wl.ReplicasPath)
+			logger.Error(err, "Failed to get replicas from custom workload", "gvk", gvk, "object", klog.KObj(object), "replicasPath", wl.ReplicasPath)
 		}
 		return replicas
 	}

@@ -474,7 +474,7 @@ func TestWorkloadSpreadCreatePodWithoutFullName(t *testing.T) {
 	ws.Status.VersionedSubsetStatuses[VersionIgnored] = ws.Status.SubsetStatuses
 	pod := podDemo.DeepCopy()
 	pod.Name = ""
-	_, suitableSubset, generatedUID, _ := handler.updateSubsetForPod(ws, pod, nil, CreateOperation)
+	_, suitableSubset, generatedUID, _ := handler.updateSubsetForPod(context.Background(), ws, pod, nil, CreateOperation)
 	if generatedUID == "" {
 		t.Fatalf("generate id failed")
 	}
@@ -1135,11 +1135,11 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			var err error
 			switch cs.getOperation() {
 			case CreateOperation:
-				_, err = handler.HandlePodCreation(podIn)
+				_, err = handler.HandlePodCreation(context.Background(), podIn)
 			case DeleteOperation:
-				err = handler.HandlePodDeletion(podIn, DeleteOperation)
+				err = handler.HandlePodDeletion(context.Background(), podIn, DeleteOperation)
 			case EvictionOperation:
-				err = handler.HandlePodDeletion(podIn, EvictionOperation)
+				err = handler.HandlePodDeletion(context.Background(), podIn, EvictionOperation)
 			}
 			errHandler := cs.errorHandler
 			if errHandler == nil {
@@ -1153,6 +1153,8 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			if !reflect.DeepEqual(podInBy, expectPodBy) {
 				t.Logf("actual annotations: %+v", podIn.Annotations)
 				t.Logf("expect annotations: %+v", podExpect.Annotations)
+				t.Logf("actual json: %s", podInBy)
+				t.Logf("expect json: %s", expectPodBy)
 				t.Fatalf("pod DeepEqual failed")
 			}
 			latestWS, err := getLatestWorkloadSpread(fakeClient, workloadSpreadIn)
@@ -1293,7 +1295,7 @@ func TestGetWorkloadReplicas(t *testing.T) {
 			ws.Spec.Subsets = append(ws.Spec.Subsets, appsv1alpha1.WorkloadSpreadSubset{
 				MaxReplicas: &percent,
 			})
-			replicas, err := h.getWorkloadReplicas(ws)
+			replicas, err := h.getWorkloadReplicas(context.Background(), ws)
 			if cs.wantErr != (err != nil) {
 				t.Fatalf("wantErr: %v, but got: %v", cs.wantErr, err)
 			}
@@ -1481,7 +1483,7 @@ func TestIsReferenceEqual(t *testing.T) {
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			h := Handler{fake.NewClientBuilder().Build()}
-			ok, err := h.isReferenceEqual(cs.getTargetRef(), cs.getOwnerRef(), "")
+			ok, err := h.isReferenceEqual(context.Background(), cs.getTargetRef(), cs.getOwnerRef(), "")
 			if ok != cs.expectEqual {
 				t.Fatalf("isReferenceEqual failed")
 			}
@@ -1625,7 +1627,7 @@ func TestIsReferenceEqual2(t *testing.T) {
 			handler := &Handler{Client: cli}
 			workloadsInWhiteListInitialized = false
 			initializeWorkloadsInWhiteList(cli)
-			result, _ := handler.isReferenceEqual(&ref, metav1.GetControllerOf(pod), pod.GetNamespace())
+			result, _ := handler.isReferenceEqual(context.Background(), &ref, metav1.GetControllerOf(pod), pod.GetNamespace())
 			if result != cs.Expect {
 				t.Fatalf("got unexpected result")
 			}
@@ -1890,7 +1892,7 @@ func TestInitializedSubsetStatuses(t *testing.T) {
 			}
 			spread := cs.spread()
 			handler := &Handler{builder.Build()}
-			result, err := handler.initializedSubsetStatuses(spread)
+			result, err := handler.initializedSubsetStatuses(context.Background(), spread)
 			if err != nil {
 				t.Fatal(err.Error())
 			}
