@@ -1121,6 +1121,52 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				return errors.IsNotFound(err)
 			},
 		},
+		{
+			name: "operation = create, pod priority class name is patched",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.Spec.Priority = utilpointer.Int32(10000)
+				pod.Spec.PriorityClassName = "high"
+				return pod
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.Subsets[0].Patch = runtime.RawExtension{
+					Raw: []byte(`{"spec":{"priorityClassName":"low"}}`),
+				}
+				ws.Spec.Subsets[0].RequiredNodeSelectorTerm = nil
+				ws.Spec.Subsets[0].PreferredNodeSelectorTerms = nil
+				ws.Spec.Subsets[0].Tolerations = nil
+				return ws
+			},
+			getOperation: func() Operation {
+				return CreateOperation
+			},
+			expectPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.Spec.Priority = nil
+				pod.Spec.PriorityClassName = "low"
+				pod.Spec.Affinity = &corev1.Affinity{NodeAffinity: &corev1.NodeAffinity{}}
+				pod.Annotations[MatchedWorkloadSpreadSubsetAnnotations] = `{"name":"test-ws","subset":"subset-a"}`
+				return pod
+			},
+			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.Subsets[0].Patch = runtime.RawExtension{
+					Raw: []byte(`{"spec":{"priorityClassName":"low"}}`),
+				}
+				ws.ResourceVersion = "1"
+				ws.Status.SubsetStatuses[0].MissingReplicas = 4
+				ws.Status.SubsetStatuses[0].CreatingPods[podDemo.Name] = metav1.Time{Time: time.Now()}
+				ws.Status.VersionedSubsetStatuses = map[string][]appsv1alpha1.WorkloadSpreadSubsetStatus{
+					VersionIgnored: ws.Status.SubsetStatuses,
+				}
+				ws.Spec.Subsets[0].RequiredNodeSelectorTerm = nil
+				ws.Spec.Subsets[0].PreferredNodeSelectorTerms = nil
+				ws.Spec.Subsets[0].Tolerations = nil
+				return ws
+			},
+		},
 	}
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
