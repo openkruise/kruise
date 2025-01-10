@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"reflect"
 
+	"github.com/openkruise/kruise/pkg/util"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -56,7 +57,7 @@ var _ handler.EventHandler = &podEventHandler{}
 type podEventHandler struct{}
 
 func (p *podEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	p.handlePod(q, evt.Object, CreateEventAction)
+	p.handlePod(ctx, q, evt.Object, CreateEventAction)
 }
 
 func (p *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
@@ -64,27 +65,28 @@ func (p *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q w
 	newPod := evt.ObjectNew.(*corev1.Pod)
 
 	if kubecontroller.IsPodActive(oldPod) && !kubecontroller.IsPodActive(newPod) || wsutil.GetPodVersion(oldPod) != wsutil.GetPodVersion(newPod) {
-		p.handlePod(q, newPod, UpdateEventAction)
+		p.handlePod(ctx, q, newPod, UpdateEventAction)
 	}
 }
 
 func (p *podEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	p.handlePod(q, evt.Object, DeleteEventAction)
+	p.handlePod(ctx, q, evt.Object, DeleteEventAction)
 }
 
 func (p *podEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 }
 
-func (p *podEventHandler) handlePod(q workqueue.RateLimitingInterface, obj runtime.Object, action EventAction) {
+func (p *podEventHandler) handlePod(ctx context.Context, q workqueue.RateLimitingInterface, obj runtime.Object, action EventAction) {
+	logger := util.FromLogContext(ctx)
 	pod := obj.(*corev1.Pod)
 	if value, exist := pod.GetAnnotations()[wsutil.MatchedWorkloadSpreadSubsetAnnotations]; exist {
 		injectWorkloadSpread := &wsutil.InjectWorkloadSpread{}
 		if err := json.Unmarshal([]byte(value), injectWorkloadSpread); err != nil {
-			klog.ErrorS(err, "Failed to unmarshal JSON to WorkloadSpread", "JSON", value)
+			logger.Error(err, "Failed to unmarshal JSON to WorkloadSpread", "JSON", value)
 			return
 		}
 		nsn := types.NamespacedName{Namespace: pod.GetNamespace(), Name: injectWorkloadSpread.Name}
-		klog.V(5).InfoS("Handle Pod and reconcile WorkloadSpread",
+		logger.V(5).Info("Handle Pod and reconcile WorkloadSpread",
 			"action", action, "pod", klog.KObj(pod), "workloadSpread", nsn)
 		q.Add(reconcile.Request{NamespacedName: nsn})
 	}
@@ -96,11 +98,12 @@ type workloadEventHandler struct {
 	client.Reader
 }
 
-func (w workloadEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	w.handleWorkload(q, evt.Object, CreateEventAction)
+func (w *workloadEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+	w.handleWorkload(ctx, q, evt.Object, CreateEventAction)
 }
 
-func (w workloadEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (w *workloadEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+	logger := util.FromLogContext(ctx)
 	var gvk schema.GroupVersionKind
 	var oldReplicas int32
 	var newReplicas int32
@@ -138,8 +141,8 @@ func (w workloadEventHandler) Update(ctx context.Context, evt event.UpdateEvent,
 		newReplicas = *evt.ObjectNew.(*appsv1beta1.StatefulSet).Spec.Replicas
 		gvk = controllerKruiseKindSts
 	case *unstructured.Unstructured:
-		oldReplicas = wsutil.GetReplicasFromCustomWorkload(w.Reader, evt.ObjectOld.(*unstructured.Unstructured))
-		newReplicas = wsutil.GetReplicasFromCustomWorkload(w.Reader, evt.ObjectNew.(*unstructured.Unstructured))
+		oldReplicas = wsutil.GetReplicasFromCustomWorkload(ctx, w.Reader, evt.ObjectOld.(*unstructured.Unstructured))
+		newReplicas = wsutil.GetReplicasFromCustomWorkload(ctx, w.Reader, evt.ObjectNew.(*unstructured.Unstructured))
 		gvk = evt.ObjectNew.(*unstructured.Unstructured).GroupVersionKind()
 	default:
 		return
@@ -152,14 +155,14 @@ func (w workloadEventHandler) Update(ctx context.Context, evt event.UpdateEvent,
 			Name:      evt.ObjectNew.GetName(),
 		}
 		owner := metav1.GetControllerOfNoCopy(evt.ObjectNew)
-		ws, err := w.getWorkloadSpreadForWorkload(workloadNsn, gvk, owner)
+		ws, err := w.getWorkloadSpreadForWorkload(ctx, workloadNsn, gvk, owner)
 		if err != nil {
-			klog.ErrorS(err, "Unable to get WorkloadSpread related with resource kind",
+			logger.Error(err, "Unable to get WorkloadSpread related with resource kind",
 				"kind", gvk.Kind, "workload", workloadNsn)
 			return
 		}
 		if ws != nil {
-			klog.V(3).InfoS("Workload changed replicas managed by WorkloadSpread",
+			logger.V(3).Info("Workload changed replicas managed by WorkloadSpread",
 				"kind", gvk.Kind, "workload", workloadNsn, "oldReplicas", oldReplicas, "newReplicas", newReplicas, "workloadSpread", klog.KObj(ws))
 			nsn := types.NamespacedName{Namespace: ws.GetNamespace(), Name: ws.GetName()}
 			q.Add(reconcile.Request{NamespacedName: nsn})
@@ -167,15 +170,16 @@ func (w workloadEventHandler) Update(ctx context.Context, evt event.UpdateEvent,
 	}
 }
 
-func (w workloadEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	w.handleWorkload(q, evt.Object, DeleteEventAction)
+func (w *workloadEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+	w.handleWorkload(ctx, q, evt.Object, DeleteEventAction)
 }
 
-func (w workloadEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (w *workloadEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
 }
 
-func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
+func (w *workloadEventHandler) handleWorkload(ctx context.Context, q workqueue.RateLimitingInterface,
 	obj client.Object, action EventAction) {
+	logger := util.FromLogContext(ctx)
 	var gvk schema.GroupVersionKind
 	switch obj.(type) {
 	case *appsv1alpha1.CloneSet:
@@ -199,27 +203,28 @@ func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
 		Name:      obj.GetName(),
 	}
 	owner := metav1.GetControllerOfNoCopy(obj)
-	ws, err := w.getWorkloadSpreadForWorkload(workloadNsn, gvk, owner)
+	ws, err := w.getWorkloadSpreadForWorkload(ctx, workloadNsn, gvk, owner)
 	if err != nil {
-		klog.ErrorS(err, "Unable to get WorkloadSpread related with workload",
+		logger.Error(err, "Unable to get WorkloadSpread related with workload",
 			"kind", gvk.Kind, "workload", workloadNsn)
 		return
 	}
 	if ws != nil {
-		klog.V(5).InfoS("Handle workload and reconcile WorkloadSpread",
+		logger.V(5).Info("Handle workload and reconcile WorkloadSpread",
 			"action", action, "kind", gvk.Kind, "workload", workloadNsn, "workloadSpread", klog.KObj(ws))
 		nsn := types.NamespacedName{Namespace: ws.GetNamespace(), Name: ws.GetName()}
 		q.Add(reconcile.Request{NamespacedName: nsn})
 	}
 }
 
-func (w *workloadEventHandler) getWorkloadSpreadForWorkload(
+func (w *workloadEventHandler) getWorkloadSpreadForWorkload(ctx context.Context,
 	workloadNamespaceName types.NamespacedName,
 	gvk schema.GroupVersionKind, ownerRef *metav1.OwnerReference) (*appsv1alpha1.WorkloadSpread, error) {
+	logger := util.FromLogContext(ctx)
 	wsList := &appsv1alpha1.WorkloadSpreadList{}
 	listOptions := &client.ListOptions{Namespace: workloadNamespaceName.Namespace}
 	if err := w.List(context.TODO(), wsList, listOptions); err != nil {
-		klog.ErrorS(err, "Failed to list WorkloadSpread", "namespace", workloadNamespaceName.Namespace)
+		logger.Error(err, "Failed to list WorkloadSpread", "namespace", workloadNamespaceName.Namespace)
 		return nil, err
 	}
 
