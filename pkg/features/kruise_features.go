@@ -138,6 +138,10 @@ const (
 	// InPlaceWorkloadVerticalScaling enable CloneSet/Advanced StatefulSet controller to support vertical scaling
 	// of managed Pods.
 	InPlaceWorkloadVerticalScaling featuregate.Feature = "InPlaceWorkloadVerticalScaling"
+
+	// CloneSetPVCReuseDuringUpdate enables CloneSet to reuse PVC during update, and it also depends on
+	// the spec.scaleStrategy.disablePVCReuse not to be true.
+	CloneSetPVCReuseDuringUpdate featuregate.Feature = "CloneSetPVCReuseDuringUpdate"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -175,6 +179,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	StatefulSetAutoResizePVCGate:             {Default: false, PreRelease: featuregate.Alpha},
 	ForceDeleteTimeoutExpectationFeatureGate: {Default: false, PreRelease: featuregate.Alpha},
 	InPlaceWorkloadVerticalScaling:           {Default: false, PreRelease: featuregate.Alpha},
+	CloneSetPVCReuseDuringUpdate:             {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

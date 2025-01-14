@@ -308,7 +308,8 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 
 	klog.V(2).InfoS("CloneSet started to patch Pod specified-delete for update", "cloneSet", klog.KObj(cs), "pod", klog.KObj(pod), "updateRevision", klog.KObj(updateRevision))
 
-	if patched, err := specifieddelete.PatchPodSpecifiedDelete(c.Client, pod, "true"); err != nil {
+	keepPVC := !cs.Spec.ScaleStrategy.DisablePVCReuse && utilfeature.DefaultFeatureGate.Enabled(features.CloneSetPVCReuseDuringUpdate)
+	if patched, err := specifieddelete.PatchPodSpecifiedDelete(c.Client, pod, keepPVC); err != nil {
 		c.recorder.Eventf(cs, v1.EventTypeWarning, "FailedUpdatePodReCreate",
 			"failed to patch pod specified-delete %s for update(revision %s): %v", pod.Name, updateRevision.Name, err)
 		return 0, err

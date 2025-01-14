@@ -10,6 +10,9 @@ const (
 	// SpecifiedDeleteKey indicates this object should be deleted, and the value could be the deletion option.
 	SpecifiedDeleteKey = "apps.kruise.io/specified-delete"
 
+	// KeepPVCForDeletionKey indicates should keep PVC for reuse when specified delete the pod.
+	KeepPVCForDeletionKey = "apps.kruise.io/keep-pvc-for-deletion"
+
 	// ImagePreDownloadCreatedKey indicates the images of this revision have been pre-downloaded
 	ImagePreDownloadCreatedKey = "apps.kruise.io/pre-predownload-created"
 

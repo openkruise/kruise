@@ -18,13 +18,14 @@ package specifieddelete
 
 import (
 	"context"
-	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 func IsSpecifiedDelete(obj metav1.Object) bool {
@@ -32,15 +33,28 @@ func IsSpecifiedDelete(obj metav1.Object) bool {
 	return ok
 }
 
-func PatchPodSpecifiedDelete(c client.Client, pod *v1.Pod, value string) (bool, error) {
+func ShouldKeepPVC(obj metav1.Object) bool {
+	return obj.GetLabels()[appsv1alpha1.KeepPVCForDeletionKey] == "true"
+}
+
+func PatchPodSpecifiedDelete(c client.Client, pod *v1.Pod, keepPVC bool) (bool, error) {
 	if _, ok := pod.Labels[appsv1alpha1.SpecifiedDeleteKey]; ok {
 		return false, nil
 	}
 
-	body := fmt.Sprintf(
-		`{"metadata":{"labels":{"%s":"%s"}}}`,
-		appsv1alpha1.SpecifiedDeleteKey,
-		value,
-	)
-	return true, c.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
+	body := patchBody{Metadata: patchMeta{Labels: map[string]string{
+		appsv1alpha1.SpecifiedDeleteKey: "true",
+	}}}
+	if keepPVC {
+		body.Metadata.Labels[appsv1alpha1.KeepPVCForDeletionKey] = "true"
+	}
+	return true, c.Patch(context.TODO(), pod, client.RawPatch(types.StrategicMergePatchType, []byte(util.DumpJSON(body))))
+}
+
+type patchBody struct {
+	Metadata patchMeta `json:"metadata"`
+}
+
+type patchMeta struct {
+	Labels map[string]string `json:"labels"`
 }

@@ -36,6 +36,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/revision"
+	"github.com/openkruise/kruise/pkg/util/specifieddelete"
 )
 
 const (
@@ -289,6 +290,9 @@ func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.P
 		modified = true
 		r.recorder.Event(cs, v1.EventTypeNormal, "SuccessfulDelete", fmt.Sprintf("succeed to delete pod %s", pod.Name))
 
+		if specifieddelete.ShouldKeepPVC(pod) {
+			continue
+		}
 		// delete pvcs which have the same instance-id
 		for _, pvc := range pvcs {
 			if pvc.Labels[appsv1alpha1.CloneSetInstanceID] != pod.Labels[appsv1alpha1.CloneSetInstanceID] {
