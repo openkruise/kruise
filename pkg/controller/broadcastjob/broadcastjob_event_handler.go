@@ -21,7 +21,7 @@ import (
 )
 
 type podEventHandler struct {
-	enqueueHandler handler.EventHandler
+	enqueueHandler handler.TypedEventHandler[*v1.Pod]
 }
 
 func isBroadcastJobController(controllerRef *metav1.OwnerReference) bool {
@@ -33,10 +33,10 @@ func isBroadcastJobController(controllerRef *metav1.OwnerReference) bool {
 	return controllerRef.Kind == controllerKind.Kind && refGV.Group == controllerKind.Group
 }
 
-func (p *podEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	pod := evt.Object.(*v1.Pod)
+func (p *podEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+	pod := evt.Object
 	if pod.DeletionTimestamp != nil {
-		p.Delete(ctx, event.DeleteEvent{Object: evt.Object}, q)
+		p.Delete(ctx, event.TypedDeleteEvent[*v1.Pod]{Object: pod}, q)
 		return
 	}
 	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil && isBroadcastJobController(controllerRef) {
@@ -46,8 +46,8 @@ func (p *podEventHandler) Create(ctx context.Context, evt event.CreateEvent, q w
 	}
 }
 
-func (p *podEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	pod := evt.Object.(*v1.Pod)
+func (p *podEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+	pod := evt.Object
 	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil && isBroadcastJobController(controllerRef) {
 		key := types.NamespacedName{Namespace: pod.Namespace, Name: controllerRef.Name}.String()
 		scaleExpectations.ObserveScale(key, expectations.Delete, getAssignedNode(pod))
@@ -55,37 +55,34 @@ func (p *podEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q w
 	}
 }
 
-func (p *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (p *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
 	p.enqueueHandler.Update(ctx, evt, q)
 }
 
-func (p *podEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (p *podEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
 }
 
 type enqueueBroadcastJobForNode struct {
 	reader client.Reader
 }
 
-func (p *enqueueBroadcastJobForNode) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueBroadcastJobForNode) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.Node], q workqueue.RateLimitingInterface) {
 	p.addNode(q, evt.Object)
 }
 
-func (p *enqueueBroadcastJobForNode) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueBroadcastJobForNode) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.Node], q workqueue.RateLimitingInterface) {
 	p.deleteNode(q, evt.Object)
 }
 
-func (p *enqueueBroadcastJobForNode) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueBroadcastJobForNode) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.Node], q workqueue.RateLimitingInterface) {
 }
 
-func (p *enqueueBroadcastJobForNode) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueBroadcastJobForNode) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.Node], q workqueue.RateLimitingInterface) {
 	p.updateNode(q, evt.ObjectOld, evt.ObjectNew)
 }
 
-func (p *enqueueBroadcastJobForNode) addNode(q workqueue.RateLimitingInterface, obj runtime.Object) {
-	node, ok := obj.(*v1.Node)
-	if !ok {
-		return
-	}
+func (p *enqueueBroadcastJobForNode) addNode(q workqueue.RateLimitingInterface, obj *v1.Node) {
+	node := obj
 	jobList := &v1alpha1.BroadcastJobList{}
 	err := p.reader.List(context.TODO(), jobList)
 	if err != nil {
@@ -107,9 +104,9 @@ func (p *enqueueBroadcastJobForNode) addNode(q workqueue.RateLimitingInterface, 
 	}
 }
 
-func (p *enqueueBroadcastJobForNode) updateNode(q workqueue.RateLimitingInterface, old, cur runtime.Object) {
-	oldNode := old.(*v1.Node)
-	curNode := cur.(*v1.Node)
+func (p *enqueueBroadcastJobForNode) updateNode(q workqueue.RateLimitingInterface, old, cur *v1.Node) {
+	oldNode := old
+	curNode := cur
 	if shouldIgnoreNodeUpdate(*oldNode, *curNode) {
 		return
 	}

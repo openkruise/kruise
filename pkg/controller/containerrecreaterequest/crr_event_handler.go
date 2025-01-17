@@ -36,16 +36,16 @@ type podEventHandler struct {
 	client.Reader
 }
 
-var _ handler.EventHandler = &podEventHandler{}
+var _ handler.TypedEventHandler[*v1.Pod] = &podEventHandler{}
 
-func (e *podEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	obj := evt.Object.(*v1.Pod)
+func (e *podEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+	obj := evt.Object
 	e.handle(obj, q)
 }
 
-func (e *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	obj := evt.ObjectNew.(*v1.Pod)
-	oldObj := evt.ObjectOld.(*v1.Pod)
+func (e *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+	obj := evt.ObjectNew
+	oldObj := evt.ObjectOld
 	if oldObj.DeletionTimestamp == nil && obj.DeletionTimestamp != nil {
 		e.handle(obj, q)
 		return
@@ -56,12 +56,12 @@ func (e *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q w
 	}
 }
 
-func (e *podEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	obj := evt.Object.(*v1.Pod)
+func (e *podEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+	obj := evt.Object
 	e.handle(obj, q)
 }
 
-func (e *podEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
 }
 
 func (e *podEventHandler) handle(pod *v1.Pod, q workqueue.RateLimitingInterface) {

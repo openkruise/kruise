@@ -5,6 +5,50 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - events
+  - persistentvolumeclaims
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/ephemeralcontainers
+  - pods/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
   - '*'
   resources:
   - '*'
@@ -22,15 +66,6 @@ rules:
   - admissionregistration.k8s.io
   resources:
   - mutatingwebhookconfigurations
-  verbs:
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - admissionregistration.k8s.io
-  resources:
   - validatingwebhookconfigurations
   verbs:
   - get
@@ -52,18 +87,8 @@ rules:
   - apps
   resources:
   - controllerrevisions
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
   - deployments
+  - statefulsets
   verbs:
   - create
   - delete
@@ -76,6 +101,7 @@ rules:
   - apps
   resources:
   - deployments/status
+  - statefulsets/status
   verbs:
   - get
   - patch
@@ -95,29 +121,22 @@ rules:
   verbs:
   - get
 - apiGroups:
-  - apps
-  resources:
-  - statefulsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - statefulsets/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
   - apps.kruise.io
   resources:
   - advancedcronjobs
+  - broadcastjobs
+  - clonesets
+  - containerrecreaterequests
+  - daemonsets
+  - imagelistpulljobs
+  - imagepulljobs
+  - nodeimages
+  - nodepodprobes
+  - persistentpodstates
+  - podprobemarkers
+  - sidecarsets
+  - statefulsets
+  - uniteddeployments
   verbs:
   - create
   - delete
@@ -130,116 +149,44 @@ rules:
   - apps.kruise.io
   resources:
   - advancedcronjobs/finalizers
+  - broadcastjobs/finalizers
+  - clonesets/finalizers
+  - containerrecreaterequests/finalizers
+  - daemonsets/finalizers
+  - imagelistpulljobs/finalizers
+  - imagepulljobs/finalizers
+  - nodeimages/finalizers
+  - nodepodprobes/finalizers
+  - persistentpodstates/finalizers
+  - podprobemarkers/finalizers
+  - resourcedistributions/finalizers
+  - sidecarsets/finalizers
+  - statefulsets/finalizers
+  - uniteddeployments/finalizers
+  - workloadspreads/finalizers
   verbs:
   - update
 - apiGroups:
   - apps.kruise.io
   resources:
   - advancedcronjobs/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - broadcastjobs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - broadcastjobs/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
   - broadcastjobs/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - clonesets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - clonesets/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
   - clonesets/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - containerrecreaterequests
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - containerrecreaterequests/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
   - containerrecreaterequests/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - daemonsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - daemonsets/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
   - daemonsets/status
+  - ephemeraljobs/finalizers
+  - ephemeraljobs/status
+  - imagelistpulljobs/status
+  - imagepulljobs/status
+  - nodeimages/status
+  - nodepodprobes/status
+  - persistentpodstates/status
+  - podprobemarkers/status
+  - resourcedistributions/status
+  - sidecarsets/status
+  - statefulsets/status
+  - uniteddeployments/status
+  - workloadspreads/status
   verbs:
   - get
   - patch
@@ -258,275 +205,11 @@ rules:
 - apiGroups:
   - apps.kruise.io
   resources:
-  - ephemeraljobs/finalizers
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - ephemeraljobs/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - imagelistpulljobs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - imagelistpulljobs/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - imagelistpulljobs/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - imagepulljobs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - imagepulljobs/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - imagepulljobs/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - nodeimages
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - nodeimages/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - nodeimages/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - nodepodprobes
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - nodepodprobes/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - nodepodprobes/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - persistentpodstates
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - persistentpodstates/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - persistentpodstates/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - podprobemarkers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - podprobemarkers/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - podprobemarkers/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
   - resourcedistributions
   verbs:
   - get
   - list
   - watch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - resourcedistributions/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - resourcedistributions/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - sidecarsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - sidecarsets/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - sidecarsets/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - statefulsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - statefulsets/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - statefulsets/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - uniteddeployments
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - uniteddeployments/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - uniteddeployments/status
-  verbs:
-  - get
-  - patch
-  - update
 - apiGroups:
   - apps.kruise.io
   resources:
@@ -537,20 +220,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - workloadspreads/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kruise.io
-  resources:
-  - workloadspreads/status
-  verbs:
-  - get
-  - patch
-  - update
 - apiGroups:
   - batch
   resources:
@@ -571,97 +240,6 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - namespaces
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - nodes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - persistentvolumeclaims
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - pods/ephemeralcontainers
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - pods/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - update
-  - watch
 - apiGroups:
   - policy.kruise.io
   resources:

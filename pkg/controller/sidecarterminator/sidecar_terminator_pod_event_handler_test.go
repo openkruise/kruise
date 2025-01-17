@@ -250,7 +250,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			eventHandler := &enqueueRequestForPod{}
-			evt := event.UpdateEvent{
+			evt := event.TypedUpdateEvent[*corev1.Pod]{
 				ObjectOld: cs.getOldPod(),
 				ObjectNew: cs.getNewPod(),
 			}
@@ -357,7 +357,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			eventHandler := &enqueueRequestForPod{}
-			evt := event.CreateEvent{
+			evt := event.TypedCreateEvent[*corev1.Pod]{
 				Object: cs.getPod(),
 			}
 			que := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())

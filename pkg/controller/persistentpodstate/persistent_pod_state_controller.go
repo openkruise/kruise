@@ -105,22 +105,22 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to Pod
-	if err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}), &enqueueRequestForPod{reader: mgr.GetClient(), client: mgr.GetClient()}); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}, &enqueueRequestForPod{reader: mgr.GetClient(), client: mgr.GetClient()})); err != nil {
 		return err
 	}
 
 	// watch for changes to PersistentPodState
-	if err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.PersistentPodState{}), &handler.EnqueueRequestForObject{}); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.PersistentPodState{}, &handler.TypedEnqueueRequestForObject[*appsv1alpha1.PersistentPodState]{})); err != nil {
 		return err
 	}
 
 	// watch for changes to StatefulSet
-	if err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.StatefulSet{}), &enqueueRequestForStatefulSet{reader: mgr.GetClient()}); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.StatefulSet{}, &enqueueRequestForStatefulSet{reader: mgr.GetClient()})); err != nil {
 		return err
 	}
 
 	// watch for changes to kruise StatefulSet
-	if err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.StatefulSet{}), &enqueueRequestForKruiseStatefulSet{reader: mgr.GetClient()}); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.StatefulSet{}, &enqueueRequestForKruiseStatefulSet{reader: mgr.GetClient()})); err != nil {
 		return err
 	}
 

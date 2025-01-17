@@ -42,10 +42,10 @@ type nodeHandler struct {
 	client.Reader
 }
 
-var _ handler.EventHandler = &nodeHandler{}
+var _ handler.TypedEventHandler[*v1.Node] = &nodeHandler{}
 
-func (e *nodeHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	node := evt.Object.(*v1.Node)
+func (e *nodeHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.Node], q workqueue.RateLimitingInterface) {
+	node := evt.Object
 	if node.Labels["type"] == VirtualKubelet {
 		return
 	}
@@ -56,11 +56,11 @@ func (e *nodeHandler) Create(ctx context.Context, evt event.CreateEvent, q workq
 	e.nodeCreateOrUpdate(node, q)
 }
 
-func (e *nodeHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *nodeHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.Node], q workqueue.RateLimitingInterface) {
 }
 
-func (e *nodeHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	node := evt.ObjectNew.(*v1.Node)
+func (e *nodeHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.Node], q workqueue.RateLimitingInterface) {
+	node := evt.ObjectNew
 	if node.Labels["type"] == VirtualKubelet {
 		return
 	}
@@ -71,8 +71,8 @@ func (e *nodeHandler) Update(ctx context.Context, evt event.UpdateEvent, q workq
 	}
 }
 
-func (e *nodeHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	node := evt.Object.(*v1.Node)
+func (e *nodeHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.Node], q workqueue.RateLimitingInterface) {
+	node := evt.Object
 	if node.Labels["type"] == VirtualKubelet {
 		return
 	}
@@ -117,21 +117,23 @@ func (e *nodeHandler) nodeDelete(node *v1.Node, q workqueue.RateLimitingInterfac
 	q.Add(reconcile.Request{NamespacedName: namespacedName})
 }
 
+var _ handler.TypedEventHandler[*appsv1alpha1.ImagePullJob] = &imagePullJobHandler{}
+
 type imagePullJobHandler struct {
 	client.Reader
 }
 
-func (e *imagePullJobHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (e *imagePullJobHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*appsv1alpha1.ImagePullJob], q workqueue.RateLimitingInterface) {
 }
 
-func (e *imagePullJobHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *imagePullJobHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsv1alpha1.ImagePullJob], q workqueue.RateLimitingInterface) {
 }
 
-func (e *imagePullJobHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (e *imagePullJobHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1alpha1.ImagePullJob], q workqueue.RateLimitingInterface) {
 }
 
-func (e *imagePullJobHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	job := evt.Object.(*appsv1alpha1.ImagePullJob)
+func (e *imagePullJobHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1alpha1.ImagePullJob], q workqueue.RateLimitingInterface) {
+	job := evt.Object
 	nodeImageNames := utilimagejob.PopCachedNodeImagesForJob(job)
 	for _, name := range nodeImageNames {
 		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: name}})

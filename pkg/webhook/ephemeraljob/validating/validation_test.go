@@ -93,7 +93,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			},
 		}},
 	} {
-		if errs := validateEphemeralContainers(ephemeralContainers, field.NewPath("ephemeralContainers"), validation.PodValidationOptions{}); len(errs) != 0 {
+		if errs := validateEphemeralContainers(ephemeralContainers, field.NewPath("ephemeralContainers"), validation.PodValidationOptions{}, true); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
 		}
 	}
@@ -380,7 +380,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateEphemeralContainers(tc.ephemeralContainers, field.NewPath("ephemeralContainers"), validation.PodValidationOptions{})
+			errs := validateEphemeralContainers(tc.ephemeralContainers, field.NewPath("ephemeralContainers"), validation.PodValidationOptions{}, true)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}

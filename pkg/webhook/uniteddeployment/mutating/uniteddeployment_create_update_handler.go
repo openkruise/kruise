@@ -43,7 +43,7 @@ type UnitedDeploymentCreateUpdateHandler struct {
 	// Client  client.Client
 
 	// Decoder decodes objects
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 }
 
 var _ admission.Handler = &UnitedDeploymentCreateUpdateHandler{}

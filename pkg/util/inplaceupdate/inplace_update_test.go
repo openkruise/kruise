@@ -639,6 +639,9 @@ func TestRefresh(t *testing.T) {
 			t.Fatalf("failed to get pod: %v", err)
 		}
 
+		got.APIVersion = "v1"
+		got.Kind = "Pod"
+
 		testCase.expectedPod.ResourceVersion = got.ResourceVersion
 		if !reflect.DeepEqual(testCase.expectedPod, got) {
 			t.Fatalf("case %s failed, expected \n%v\n got \n%v", testCase.name, util.DumpJSON(testCase.expectedPod), util.DumpJSON(got))

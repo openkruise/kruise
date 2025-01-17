@@ -13,7 +13,7 @@ permissions: read-all
 
 env:
   # Common versions
-  GO_VERSION: '1.20'
+  GO_VERSION: '1.22'
   KIND_ACTION_VERSION: 'v1.3.0'
   KIND_VERSION: 'v0.14.0'
   KIND_IMAGE: 'kindest/node:v1.24.6'

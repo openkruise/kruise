@@ -31,13 +31,13 @@ import (
 type pvcEventHandler struct {
 }
 
-var _ handler.EventHandler = &pvcEventHandler{}
+var _ handler.TypedEventHandler[*v1.PersistentVolumeClaim] = &pvcEventHandler{}
 
-func (e *pvcEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (e *pvcEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.PersistentVolumeClaim], q workqueue.RateLimitingInterface) {
 }
 
-func (e *pvcEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	newPVC := evt.ObjectNew.(*v1.PersistentVolumeClaim)
+func (e *pvcEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.PersistentVolumeClaim], q workqueue.RateLimitingInterface) {
+	newPVC := evt.ObjectNew
 	if len(newPVC.Annotations) == 0 {
 		return
 	}
@@ -54,8 +54,8 @@ func (e *pvcEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q w
 	return
 }
 
-func (e *pvcEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (e *pvcEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.PersistentVolumeClaim], q workqueue.RateLimitingInterface) {
 }
 
-func (e *pvcEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *pvcEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.PersistentVolumeClaim], q workqueue.RateLimitingInterface) {
 }

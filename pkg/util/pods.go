@@ -288,6 +288,9 @@ func ContainsObjectRef(slice []v1.ObjectReference, obj v1.ObjectReference) bool 
 }
 
 func GetCondition(pod *v1.Pod, cType v1.PodConditionType) *v1.PodCondition {
+	if pod == nil {
+		return nil
+	}
 	for _, c := range pod.Status.Conditions {
 		if c.Type == cType {
 			return &c

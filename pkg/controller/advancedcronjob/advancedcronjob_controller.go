@@ -85,8 +85,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to AdvancedCronJob
-	src := source.Kind(mgr.GetCache(), &appsv1alpha1.AdvancedCronJob{})
-	if err = c.Watch(src, &handler.EnqueueRequestForObject{}); err != nil {
+	src := source.Kind(mgr.GetCache(), &appsv1alpha1.AdvancedCronJob{}, &handler.TypedEnqueueRequestForObject[*appsv1alpha1.AdvancedCronJob]{})
+	if err = c.Watch(src); err != nil {
 		klog.ErrorS(err, "Failed to watch AdvancedCronJob")
 		return err
 	}

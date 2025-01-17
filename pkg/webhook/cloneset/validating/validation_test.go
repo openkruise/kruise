@@ -5,10 +5,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/openkruise/kruise/apis/apps/defaults"
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,6 +12,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/openkruise/kruise/apis/apps/defaults"
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 type testCase struct {
@@ -83,7 +84,7 @@ func TestValidate(t *testing.T) {
 			Spec: v1.PersistentVolumeClaimSpec{
 				StorageClassName: utilpointer.String("foo/bar"),
 				AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{Requests: map[v1.ResourceName]resource.Quantity{
+				Resources: v1.VolumeResourceRequirements{Requests: map[v1.ResourceName]resource.Quantity{
 					v1.ResourceStorage: resource.MustParse(size),
 				}},
 			},

@@ -524,7 +524,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			Spec: v1.PersistentVolumeClaimSpec{
 				StorageClassName: utilpointer.String("foo/bar"),
 				AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{Requests: map[v1.ResourceName]resource.Quantity{
+				Resources: v1.VolumeResourceRequirements{Requests: map[v1.ResourceName]resource.Quantity{
 					v1.ResourceStorage: resource.MustParse(size),
 				}},
 			},
@@ -853,7 +853,7 @@ func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
 							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
 							Spec: v1.PersistentVolumeClaimSpec{
 								StorageClassName: &allowExpandSC.Name,
-								Resources: v1.ResourceRequirements{
+								Resources: v1.VolumeResourceRequirements{
 									Requests: map[v1.ResourceName]resource.Quantity{
 										v1.ResourceStorage: resource.MustParse("3Gi"),
 									},
@@ -870,7 +870,7 @@ func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
 							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
 							Spec: v1.PersistentVolumeClaimSpec{
 								StorageClassName: &allowExpandSC.Name,
-								Resources: v1.ResourceRequirements{
+								Resources: v1.VolumeResourceRequirements{
 									Requests: map[v1.ResourceName]resource.Quantity{
 										v1.ResourceStorage: resource.MustParse("2Gi"),
 									},
@@ -894,7 +894,7 @@ func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
 							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
 							Spec: v1.PersistentVolumeClaimSpec{
 								StorageClassName: &disallowExpandSC.Name,
-								Resources: v1.ResourceRequirements{
+								Resources: v1.VolumeResourceRequirements{
 									Requests: map[v1.ResourceName]resource.Quantity{
 										v1.ResourceStorage: resource.MustParse("3Gi"),
 									},
@@ -911,7 +911,7 @@ func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
 							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
 							Spec: v1.PersistentVolumeClaimSpec{
 								StorageClassName: &disallowExpandSC.Name,
-								Resources: v1.ResourceRequirements{
+								Resources: v1.VolumeResourceRequirements{
 									Requests: map[v1.ResourceName]resource.Quantity{
 										v1.ResourceStorage: resource.MustParse("2Gi"),
 									},
@@ -935,7 +935,7 @@ func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
 							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
 							Spec: v1.PersistentVolumeClaimSpec{
 								StorageClassName: &allowExpandSC.Name,
-								Resources: v1.ResourceRequirements{
+								Resources: v1.VolumeResourceRequirements{
 									Requests: map[v1.ResourceName]resource.Quantity{
 										v1.ResourceStorage: resource.MustParse("3Gi"),
 									},
@@ -952,7 +952,7 @@ func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
 							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
 							Spec: v1.PersistentVolumeClaimSpec{
 								StorageClassName: &allowExpandSC.Name,
-								Resources: v1.ResourceRequirements{
+								Resources: v1.VolumeResourceRequirements{
 									Requests: map[v1.ResourceName]resource.Quantity{
 										v1.ResourceStorage: resource.MustParse("2Gi"),
 									},
@@ -976,7 +976,7 @@ func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
 							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
 							Spec: v1.PersistentVolumeClaimSpec{
 								StorageClassName: &allowExpandSC.Name,
-								Resources: v1.ResourceRequirements{
+								Resources: v1.VolumeResourceRequirements{
 									Requests: map[v1.ResourceName]resource.Quantity{
 										v1.ResourceStorage: resource.MustParse("2Gi"),
 									},
@@ -993,7 +993,7 @@ func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
 							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
 							Spec: v1.PersistentVolumeClaimSpec{
 								StorageClassName: &allowExpandSC.Name,
-								Resources: v1.ResourceRequirements{
+								Resources: v1.VolumeResourceRequirements{
 									Requests: map[v1.ResourceName]resource.Quantity{
 										v1.ResourceStorage: resource.MustParse("3Gi"),
 									},
@@ -1017,7 +1017,7 @@ func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
 							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
 							Spec: v1.PersistentVolumeClaimSpec{
 								StorageClassName: &disallowExpandSC.Name,
-								Resources: v1.ResourceRequirements{
+								Resources: v1.VolumeResourceRequirements{
 									Requests: map[v1.ResourceName]resource.Quantity{
 										v1.ResourceStorage: resource.MustParse("2Gi"),
 									},
@@ -1034,7 +1034,7 @@ func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
 							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
 							Spec: v1.PersistentVolumeClaimSpec{
 								StorageClassName: &disallowExpandSC.Name,
-								Resources: v1.ResourceRequirements{
+								Resources: v1.VolumeResourceRequirements{
 									Requests: map[v1.ResourceName]resource.Quantity{
 										v1.ResourceStorage: resource.MustParse("3Gi"),
 									},

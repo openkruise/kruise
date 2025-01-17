@@ -94,16 +94,17 @@ func add(mgr manager.Manager, r *ReconcileImageListPullJob) error {
 	}
 
 	// Watch for changes to ImageListPullJob
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.ImageListPullJob{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.ImageListPullJob{}, &handler.TypedEnqueueRequestForObject[*appsv1alpha1.ImageListPullJob]{}))
 	if err != nil {
 		return err
 	}
 	// Watch for changes to ImagePullJob
 	// todo the imagelistpulljob(status) will not change if  the pull job status does not change significantly (ex. number of failed nodeimage changes from 1 to 2)
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.ImagePullJob{}), &imagePullJobEventHandler{
-		enqueueHandler: handler.EnqueueRequestForOwner(
-			mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.ImageListPullJob{}, handler.OnlyControllerOwner()),
-	})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.ImagePullJob{},
+		&imagePullJobEventHandler{
+			enqueueHandler: handler.TypedEnqueueRequestForOwner[*appsv1alpha1.ImagePullJob](mgr.GetScheme(), mgr.GetRESTMapper(),
+				&appsv1alpha1.ImageListPullJob{}, handler.OnlyControllerOwner()),
+		}))
 	if err != nil {
 		return err
 	}

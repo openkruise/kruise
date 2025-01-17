@@ -23,10 +23,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/test/e2e/framework"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -43,6 +39,11 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	utilpointer "k8s.io/utils/pointer"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
 const (
@@ -134,7 +135,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 					AccessModes: []v1.PersistentVolumeAccessMode{
 						v1.ReadWriteOnce,
 					},
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("50Mi"),
 						},

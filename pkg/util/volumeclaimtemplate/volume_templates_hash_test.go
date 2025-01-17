@@ -42,7 +42,7 @@ func Test_vctHasher_GetExpectHash(t *testing.T) {
 						},
 						Spec: v1.PersistentVolumeClaimSpec{
 							AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-							Resources: v1.ResourceRequirements{
+							Resources: v1.VolumeResourceRequirements{
 								Requests: map[v1.ResourceName]resource.Quantity{
 									v1.ResourceStorage: resource.MustParse("1Gi"),
 								},
@@ -66,7 +66,7 @@ func Test_vctHasher_GetExpectHash(t *testing.T) {
 						},
 						Spec: v1.PersistentVolumeClaimSpec{
 							AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-							Resources: v1.ResourceRequirements{
+							Resources: v1.VolumeResourceRequirements{
 								Requests: map[v1.ResourceName]resource.Quantity{
 									v1.ResourceStorage: resource.MustParse("1Gi"),
 								},
@@ -82,7 +82,7 @@ func Test_vctHasher_GetExpectHash(t *testing.T) {
 						},
 						Spec: v1.PersistentVolumeClaimSpec{
 							AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-							Resources: v1.ResourceRequirements{
+							Resources: v1.VolumeResourceRequirements{
 								Requests: map[v1.ResourceName]resource.Quantity{
 									v1.ResourceStorage: resource.MustParse("2Gi"),
 								},
@@ -144,7 +144,7 @@ func TestPatchVCTemplateHash(t *testing.T) {
 						},
 						Spec: v1.PersistentVolumeClaimSpec{
 							AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-							Resources: v1.ResourceRequirements{
+							Resources: v1.VolumeResourceRequirements{
 								Requests: map[v1.ResourceName]resource.Quantity{
 									v1.ResourceStorage: resource.MustParse("1Gi"),
 								},
@@ -169,7 +169,7 @@ func TestPatchVCTemplateHash(t *testing.T) {
 						},
 						Spec: v1.PersistentVolumeClaimSpec{
 							AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-							Resources: v1.ResourceRequirements{
+							Resources: v1.VolumeResourceRequirements{
 								Requests: map[v1.ResourceName]resource.Quantity{
 									v1.ResourceStorage: resource.MustParse("1Gi"),
 								},
@@ -185,7 +185,7 @@ func TestPatchVCTemplateHash(t *testing.T) {
 						},
 						Spec: v1.PersistentVolumeClaimSpec{
 							AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-							Resources: v1.ResourceRequirements{
+							Resources: v1.VolumeResourceRequirements{
 								Requests: map[v1.ResourceName]resource.Quantity{
 									v1.ResourceStorage: resource.MustParse("2Gi"),
 								},

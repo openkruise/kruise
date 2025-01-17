@@ -20,21 +20,18 @@ type podHandler struct {
 	client.Reader
 }
 
-func (e *podHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	pod, ok := evt.Object.(*corev1.Pod)
-	if !ok {
-		return
-	}
+func (e *podHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+	pod := evt.Object
 
 	e.handle(pod, q)
 }
 
-func (e *podHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *podHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
 }
 
-func (e *podHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	oldPod := evt.ObjectOld.(*corev1.Pod)
-	curPod := evt.ObjectNew.(*corev1.Pod)
+func (e *podHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+	oldPod := evt.ObjectOld
+	curPod := evt.ObjectNew
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
 		return
 	}
@@ -46,11 +43,8 @@ func (e *podHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqu
 	e.handle(curPod, q)
 }
 
-func (e *podHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	pod, ok := evt.Object.(*corev1.Pod)
-	if !ok {
-		return
-	}
+func (e *podHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+	pod := evt.Object
 	e.handle(pod, q)
 }
 
@@ -76,11 +70,8 @@ type ejobHandler struct {
 	client.Reader
 }
 
-func (e *ejobHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	ejob, ok := evt.Object.(*appsv1alpha1.EphemeralJob)
-	if !ok {
-		return
-	}
+func (e *ejobHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*appsv1alpha1.EphemeralJob], q workqueue.RateLimitingInterface) {
+	ejob := evt.Object
 	if ejob.DeletionTimestamp != nil {
 		return
 	}
@@ -88,12 +79,12 @@ func (e *ejobHandler) Create(ctx context.Context, evt event.CreateEvent, q workq
 	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Namespace: ejob.Namespace, Name: ejob.Name}})
 }
 
-func (e *ejobHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *ejobHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsv1alpha1.EphemeralJob], q workqueue.RateLimitingInterface) {
 }
 
-func (e *ejobHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	oldEJob := evt.ObjectOld.(*appsv1alpha1.EphemeralJob)
-	curEJob := evt.ObjectNew.(*appsv1alpha1.EphemeralJob)
+func (e *ejobHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1alpha1.EphemeralJob], q workqueue.RateLimitingInterface) {
+	oldEJob := evt.ObjectOld
+	curEJob := evt.ObjectNew
 	if oldEJob.ResourceVersion == curEJob.ResourceVersion {
 		return
 	}
@@ -113,11 +104,8 @@ func (e *ejobHandler) Update(ctx context.Context, evt event.UpdateEvent, q workq
 	}
 }
 
-func (e *ejobHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	ejob, ok := evt.Object.(*appsv1alpha1.EphemeralJob)
-	if !ok {
-		return
-	}
+func (e *ejobHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1alpha1.EphemeralJob], q workqueue.RateLimitingInterface) {
+	ejob := evt.Object
 	key := types.NamespacedName{Namespace: ejob.Namespace, Name: ejob.Name}
 	scaleExpectations.DeleteExpectations(key.String())
 }

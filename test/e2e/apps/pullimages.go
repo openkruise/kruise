@@ -411,7 +411,7 @@ var _ = SIGDescribe("PullImage", func() {
 				found, err := testerForNodeImage.IsImageInSpec(job.Spec.Image, nodes[0].Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return found
-			}, 3*time.Second, time.Second).Should(gomega.Equal(false))
+			}, 10*time.Second, time.Second).Should(gomega.Equal(false))
 		})
 
 		framework.ConformanceIt("create a never job to pull an image on all nodes", func() {

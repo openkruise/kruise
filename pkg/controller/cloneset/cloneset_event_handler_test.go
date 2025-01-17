@@ -46,20 +46,20 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 	cases := []struct {
 		name                          string
 		css                           []*appsv1alpha1.CloneSet
-		e                             event.CreateEvent
+		e                             event.TypedCreateEvent[*v1.Pod]
 		alterExpectationCreationsKey  string
 		alterExpectationCreationsAdds []string
 		expectedQueueLen              int
 	}{
 		{
 			name: "no cs",
-			e:    event.CreateEvent{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &metav1.Time{Time: time.Now()}}}},
+			e:    event.TypedCreateEvent[*v1.Pod]{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &metav1.Time{Time: time.Now()}}}},
 
 			expectedQueueLen: 0,
 		},
 		{
 			name: "no cs",
-			e:    event.CreateEvent{Object: &v1.Pod{}},
+			e:    event.TypedCreateEvent[*v1.Pod]{Object: &v1.Pod{}},
 
 			expectedQueueLen: 0,
 		},
@@ -99,7 +99,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 					},
 				},
 			},
-			e:                event.CreateEvent{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pod-abc", Labels: map[string]string{"key": "v1"}}}},
+			e:                event.TypedCreateEvent[*v1.Pod]{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pod-abc", Labels: map[string]string{"key": "v1"}}}},
 			expectedQueueLen: 2,
 		},
 		{
@@ -140,7 +140,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 					},
 				},
 			},
-			e: event.CreateEvent{
+			e: event.TypedCreateEvent[*v1.Pod]{
 				Object: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
@@ -200,12 +200,12 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 	cases := []struct {
 		name             string
 		css              []*appsv1alpha1.CloneSet
-		e                event.UpdateEvent
+		e                event.TypedUpdateEvent[*v1.Pod]
 		expectedQueueLen int
 	}{
 		{
 			name:             "resourceVersion no changed",
-			e:                event.UpdateEvent{ObjectNew: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "01"}}, ObjectOld: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "01"}}},
+			e:                event.TypedUpdateEvent[*v1.Pod]{ObjectNew: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "01"}}, ObjectOld: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "01"}}},
 			expectedQueueLen: 0,
 		},
 		{
@@ -246,7 +246,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 					},
 				},
 			},
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Pod]{
 				ObjectOld: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "default",
@@ -321,7 +321,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 					},
 				},
 			},
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Pod]{
 				ObjectOld: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "default",
@@ -396,7 +396,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 					},
 				},
 			},
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Pod]{
 				ObjectOld: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "default",
@@ -470,7 +470,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 					},
 				},
 			},
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Pod]{
 				ObjectOld: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "default",
@@ -544,7 +544,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 					},
 				},
 			},
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Pod]{
 				ObjectOld: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "default",
@@ -617,7 +617,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 					},
 				},
 			},
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Pod]{
 				ObjectOld: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "default",
@@ -682,7 +682,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 					},
 				},
 			},
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Pod]{
 				ObjectOld: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "default",
