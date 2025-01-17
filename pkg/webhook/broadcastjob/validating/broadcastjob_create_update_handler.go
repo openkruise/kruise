@@ -54,7 +54,7 @@ type BroadcastJobCreateUpdateHandler struct {
 	// Client  client.Client
 
 	// Decoder decodes objects
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 }
 
 func (h *BroadcastJobCreateUpdateHandler) validatingBroadcastJobFn(ctx context.Context, obj *appsv1alpha1.BroadcastJob) (bool, string, error) {

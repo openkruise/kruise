@@ -50,7 +50,7 @@ func TestHasOwnerRef(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceStorage: resource.MustParse("10"),
 				},
@@ -92,7 +92,7 @@ func TestRemoveOwner(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceStorage: resource.MustParse("10"),
 				},
@@ -128,7 +128,7 @@ func TestSetOwnerRef(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceStorage: resource.MustParse("10"),
 				},

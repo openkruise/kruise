@@ -511,6 +511,9 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 			}, realCRR)
 			expectCRR := cs.getCRR()
 
+			realCRR.TypeMeta.APIVersion = appsv1alpha1.SchemeGroupVersion.String()
+			realCRR.TypeMeta.Kind = "ContainerRecreateRequest"
+
 			realBy, _ := json.Marshal(realCRR)
 			expectBy, _ := json.Marshal(expectCRR)
 

@@ -17,7 +17,7 @@ set -euo pipefail
 
 # Setup default values
 CLUSTER_NAME=${CLUSTER_NAME:-"ci-testing"}
-KIND_NODE_TAG=${KIND_NODE_TAG:-"v1.28.7"}
+KIND_NODE_TAG=${KIND_NODE_TAG:-"v1.30.8"}
 KIND_CONFIG=${KIND_CONFIG:-"test/kind-conf-with-vpa.yaml"}
 echo "$KIND_NODE_TAG"
 echo "$CLUSTER_NAME"

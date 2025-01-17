@@ -19,15 +19,17 @@ package podprobemarker
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/podprobemarker"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
+
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
@@ -37,21 +39,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-var _ handler.EventHandler = &enqueueRequestForPodProbeMarker{}
+var _ handler.TypedEventHandler[*appsalphav1.PodProbeMarker] = &enqueueRequestForPodProbeMarker{}
 
 type enqueueRequestForPodProbeMarker struct{}
 
-func (p *enqueueRequestForPodProbeMarker) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPodProbeMarker) Create(ctx context.Context, evt event.TypedCreateEvent[*appsalphav1.PodProbeMarker], q workqueue.RateLimitingInterface) {
 	p.queue(q, evt.Object)
 }
 
-func (p *enqueueRequestForPodProbeMarker) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPodProbeMarker) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsalphav1.PodProbeMarker], q workqueue.RateLimitingInterface) {
 }
 
-func (p *enqueueRequestForPodProbeMarker) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPodProbeMarker) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsalphav1.PodProbeMarker], q workqueue.RateLimitingInterface) {
 }
 
-func (p *enqueueRequestForPodProbeMarker) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPodProbeMarker) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsalphav1.PodProbeMarker], q workqueue.RateLimitingInterface) {
 	p.queue(q, evt.ObjectNew)
 }
 
@@ -68,30 +70,24 @@ func (p *enqueueRequestForPodProbeMarker) queue(q workqueue.RateLimitingInterfac
 	})
 }
 
-var _ handler.EventHandler = &enqueueRequestForPod{}
+var _ handler.TypedEventHandler[*corev1.Pod] = &enqueueRequestForPod{}
 
 type enqueueRequestForPod struct {
 	reader client.Reader
 }
 
-func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
 }
 
-func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
 }
 
-func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
 }
 
-func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	newObj, ok := evt.ObjectNew.(*corev1.Pod)
-	if !ok {
-		return
-	}
-	oldObj, ok := evt.ObjectOld.(*corev1.Pod)
-	if !ok {
-		return
-	}
+func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+	newObj := evt.ObjectNew
+	oldObj := evt.ObjectOld
 	oldInitialCondition := util.GetCondition(oldObj, corev1.PodInitialized)
 	newInitialCondition := util.GetCondition(newObj, corev1.PodInitialized)
 	if !kubecontroller.IsPodActive(newObj) || newInitialCondition == nil ||

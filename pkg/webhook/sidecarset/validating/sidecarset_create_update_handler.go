@@ -71,7 +71,7 @@ type SidecarSetCreateUpdateHandler struct {
 	Client client.Client
 
 	// Decoder decodes objects
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 }
 
 func (h *SidecarSetCreateUpdateHandler) validatingSidecarSetFn(_ context.Context, obj *appsv1alpha1.SidecarSet, older *appsv1alpha1.SidecarSet) (bool, string, error) {

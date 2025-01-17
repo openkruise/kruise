@@ -119,13 +119,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to PodUnavailableBudget
-	err = c.Watch(source.Kind(mgr.GetCache(), &policyv1alpha1.PodUnavailableBudget{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &policyv1alpha1.PodUnavailableBudget{}, &handler.TypedEnqueueRequestForObject[*policyv1alpha1.PodUnavailableBudget]{}))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Pod
-	if err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}), newEnqueueRequestForPod(mgr.GetClient())); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}, newEnqueueRequestForPod(mgr.GetClient()))); err != nil {
 		return err
 	}
 
@@ -136,7 +136,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// 2. at this time the cloneSet.replicas is scaled down to 50, the pub controller listens to the replicas change, triggering reconcile will adjust UnavailableAllowed to 55.
 	// 3. so pub webhook will not intercept the request to delete the pods
 	// deployment
-	if err = c.Watch(source.Kind(mgr.GetCache(), &apps.Deployment{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
+	if err = c.Watch(source.Kind(mgr.GetCache(), client.Object(&apps.Deployment{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*apps.Deployment)
 			new := e.ObjectNew.(*apps.Deployment)
@@ -145,12 +145,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
 			return true
 		},
-	}); err != nil {
+	})); err != nil {
 		return err
 	}
 
 	// kruise AdvancedStatefulSet
-	if err = c.Watch(source.Kind(mgr.GetCache(), &kruiseappsv1beta1.StatefulSet{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
+	if err = c.Watch(source.Kind(mgr.GetCache(), client.Object(&kruiseappsv1beta1.StatefulSet{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*kruiseappsv1beta1.StatefulSet)
 			new := e.ObjectNew.(*kruiseappsv1beta1.StatefulSet)
@@ -159,12 +159,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
 			return true
 		},
-	}); err != nil {
+	})); err != nil {
 		return err
 	}
 
 	// CloneSet
-	if err = c.Watch(source.Kind(mgr.GetCache(), &kruiseappsv1alpha1.CloneSet{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
+	if err = c.Watch(source.Kind(mgr.GetCache(), client.Object(&kruiseappsv1alpha1.CloneSet{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*kruiseappsv1alpha1.CloneSet)
 			new := e.ObjectNew.(*kruiseappsv1alpha1.CloneSet)
@@ -173,12 +173,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
 			return true
 		},
-	}); err != nil {
+	})); err != nil {
 		return err
 	}
 
 	// StatefulSet
-	if err = c.Watch(source.Kind(mgr.GetCache(), &apps.StatefulSet{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
+	if err = c.Watch(source.Kind(mgr.GetCache(), client.Object(&apps.StatefulSet{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			old := e.ObjectOld.(*apps.StatefulSet)
 			new := e.ObjectNew.(*apps.StatefulSet)
@@ -187,7 +187,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
 			return true
 		},
-	}); err != nil {
+	})); err != nil {
 		return err
 	}
 

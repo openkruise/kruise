@@ -60,7 +60,7 @@ var (
 // PodProbeMarkerCreateUpdateHandler handles PodProbeMarker
 type PodProbeMarkerCreateUpdateHandler struct {
 	// Decoder decodes objects
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 }
 
 var _ admission.Handler = &PodProbeMarkerCreateUpdateHandler{}

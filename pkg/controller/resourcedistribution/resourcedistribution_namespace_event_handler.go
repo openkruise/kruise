@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
-var _ handler.EventHandler = &enqueueRequestForNamespace{}
+var _ handler.TypedEventHandler[*corev1.Namespace] = &enqueueRequestForNamespace{}
 
 type matchFunc func(*corev1.Namespace, *appsv1alpha1.ResourceDistribution) (bool, error)
 
@@ -39,15 +39,15 @@ type enqueueRequestForNamespace struct {
 	reader client.Reader
 }
 
-func (p *enqueueRequestForNamespace) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForNamespace) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Namespace], q workqueue.RateLimitingInterface) {
 	p.addNamespace(q, evt.Object, matchViaTargets)
 }
-func (p *enqueueRequestForNamespace) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForNamespace) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Namespace], q workqueue.RateLimitingInterface) {
 	p.addNamespace(q, evt.Object, matchViaIncludedNamespaces)
 }
-func (p *enqueueRequestForNamespace) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForNamespace) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Namespace], q workqueue.RateLimitingInterface) {
 }
-func (p *enqueueRequestForNamespace) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForNamespace) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Namespace], q workqueue.RateLimitingInterface) {
 	p.updateNamespace(q, evt.ObjectOld, evt.ObjectNew)
 }
 

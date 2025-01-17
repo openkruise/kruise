@@ -116,31 +116,31 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to UnitedDeployment
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.UnitedDeployment{}), &eventHandler{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.UnitedDeployment{}, &eventHandler{}))
 	if err != nil {
 		return err
 	}
 
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.StatefulSet{}), handler.EnqueueRequestForOwner(
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner()))
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.StatefulSet{}, handler.TypedEnqueueRequestForOwner[*appsv1.StatefulSet](
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner())))
 	if err != nil {
 		return err
 	}
 
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.StatefulSet{}), handler.EnqueueRequestForOwner(
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner()))
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.StatefulSet{}, handler.TypedEnqueueRequestForOwner[*appsv1beta1.StatefulSet](
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner())))
 	if err != nil {
 		return err
 	}
 
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.CloneSet{}), handler.EnqueueRequestForOwner(
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner()))
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.CloneSet{}, handler.TypedEnqueueRequestForOwner[*appsv1alpha1.CloneSet](
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner())))
 	if err != nil {
 		return err
 	}
 
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.Deployment{}), handler.EnqueueRequestForOwner(
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner()))
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.Deployment{}, handler.TypedEnqueueRequestForOwner[*appsv1.Deployment](
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner())))
 	if err != nil {
 		return err
 	}

@@ -83,12 +83,12 @@ func add(mgr manager.Manager, r *ReconcileEphemeralJob) error {
 	}
 
 	// Watch for changes to EphemeralJob
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.EphemeralJob{}), &ejobHandler{mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.EphemeralJob{}, &ejobHandler{mgr.GetCache()}))
 	if err != nil {
 		return err
 	}
 	// Watch for changes to Pod
-	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}), &podHandler{mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}, &podHandler{mgr.GetCache()}))
 	if err != nil {
 		return err
 	}

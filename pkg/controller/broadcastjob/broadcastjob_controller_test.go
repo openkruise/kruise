@@ -544,6 +544,10 @@ func TestJobFailedAfterActiveDeadline(t *testing.T) {
 	activeDeadline := int64(0)
 	now := metav1.Now()
 	job := &appsv1alpha1.BroadcastJob{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "BroadcastJob",
+			APIVersion: "apps.kruise.io/v1alpha1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "job10",
 			Namespace: "default",
@@ -631,6 +635,10 @@ func createNode(nodeName string) *v1.Node {
 
 func createJob(jobName string, parallelism intstr.IntOrString) *appsv1alpha1.BroadcastJob {
 	job1 := &appsv1alpha1.BroadcastJob{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "BroadcastJob",
+			APIVersion: "apps.kruise.io/v1alpha1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
 			Namespace: "default",

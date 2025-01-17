@@ -87,7 +87,7 @@ func TestReconcile(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "foo-vol"},
 					Spec: v1.PersistentVolumeClaimSpec{
 						AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-						Resources:   v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}},
+						Resources:   v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}},
 					},
 				},
 			},
@@ -272,7 +272,7 @@ func testScale(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Resources:   v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}},
+			Resources:   v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}},
 		},
 	}
 	err := c.Create(context.TODO(), &pvc1)
@@ -296,7 +296,7 @@ func testScale(g *gomega.GomegaWithT, instance *appsv1alpha1.CloneSet) {
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-			Resources:   v1.ResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}},
+			Resources:   v1.VolumeResourceRequirements{Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Mi")}},
 		},
 	}
 	err = c.Create(context.TODO(), &pvc2)

@@ -32,18 +32,18 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
-var _ handler.EventHandler = &enqueueRequestForPod{}
+var _ handler.TypedEventHandler[*corev1.Pod] = &enqueueRequestForPod{}
 
 type enqueueRequestForPod struct{}
 
-func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
 }
-func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
 }
-func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
 	p.handlePodCreate(q, evt.Object)
 }
-func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
 	p.handlePodUpdate(q, evt.ObjectOld, evt.ObjectNew)
 }
 

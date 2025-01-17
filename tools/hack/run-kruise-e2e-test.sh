@@ -13,14 +13,73 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -ex
+set -e
+# default value
+FOCUS_DEFAULT='\[apps\] StatefulSet'
+FOCUS=${FOCUS_DEFAULT}
+SKIP=""
+TIMEOUT="60m"
+PRINT_INFO=false
+PARALLEL=true
 
-export KUBECONFIG=${HOME}/.kube/config
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        --focus)
+            FOCUS="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        --skip)
+            if [ -z "$SKIP" ]; then
+                SKIP="$2"
+            else
+                SKIP="$SKIP|$2"
+            fi
+            shift # past argument
+            shift # past value
+            ;;
+        --timeout)
+            TIMEOUT="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        --print-info)
+            PRINT_INFO=true
+            shift # past argument
+            ;;
+        --disable-parallel)
+            PARALLEL=false
+            shift # past argument
+            ;;
+        *)
+            echo "Unknown parameter passed: $1"
+            exit 1
+            ;;
+    esac
+done
+
+config=${KUBECONFIG:-${HOME}/.kube/config}
+export KUBECONFIG=${config}
 make ginkgo
-set +e
 echo "installing tfjobs crds"
 kubectl apply -f https://raw.githubusercontent.com/kubeflow/training-operator/refs/heads/v1.8-branch/manifests/base/crds/kubeflow.org_tfjobs.yaml
-./bin/ginkgo -p -timeout 60m -v --focus='\[apps\] StatefulSet' test/e2e
+
+set +e
+set -x
+GINKGO_CMD="./bin/ginkgo -timeout $TIMEOUT -v"
+if [ "$PARALLEL" = true ]; then
+    GINKGO_CMD+=" -p"
+fi
+if [ -n "$FOCUS" ]; then
+    GINKGO_CMD+=" --focus='$FOCUS'"
+fi
+if [ -n "$SKIP" ]; then
+    GINKGO_CMD+=" --skip='$SKIP'"
+fi
+GINKGO_CMD+=" test/e2e"
+
+bash -c "$GINKGO_CMD"
 retVal=$?
 restartCount=$(kubectl get pod -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $4}')
 if [ "${restartCount}" -eq "0" ];then
@@ -31,4 +90,31 @@ else
     kubectl get pod -n kruise-system --no-headers -l control-plane=controller-manager | awk '{print $1}' | xargs kubectl logs -p -n kruise-system
     exit 1
 fi
+
+kubectl get pods -n kruise-system -l control-plane=daemon -o=jsonpath="{range .items[*]}{.metadata.namespace}{\"\t\"}{.metadata.name}{\"\n\"}{end}" | while read ns name;
+do
+  restartCount=$(kubectl get pod -n ${ns} ${name} --no-headers | awk '{print $4}')
+  if [ "${restartCount}" -eq "0" ];then
+      echo "Kruise-daemon has not restarted"
+  else
+      kubectl get pods -n ${ns} -l control-plane=daemon --no-headers
+      echo "Kruise-daemon has restarted, abort!!!"
+      kubectl logs -p -n ${ns} ${name}
+      exit 1
+  fi
+done
+
+if [ "$PRINT_INFO" = true ]; then
+    if [ "$retVal" -ne 0 ];then
+        echo "test fail, dump kruise-manager logs"
+        while read pod; do
+             kubectl logs -n kruise-system $pod
+        done < <(kubectl get pods -n kruise-system -l control-plane=controller-manager --no-headers | awk '{print $1}')
+        echo "test fail, dump kruise-daemon logs"
+        while read pod; do
+             kubectl logs -n kruise-system $pod
+        done < <(kubectl get pods -n kruise-system -l control-plane=daemon --no-headers | awk '{print $1}')
+    fi
+fi
+
 exit $retVal

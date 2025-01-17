@@ -75,7 +75,7 @@ func TestNamespaceEventHandler(t *testing.T) {
 
 func testEnqueueRequestForNamespaceCreate(namespace *corev1.Namespace, expectedNumber int, t *testing.T) {
 	createQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	createEvt := event.CreateEvent{
+	createEvt := event.TypedCreateEvent[*corev1.Namespace]{
 		Object: namespace,
 	}
 	enqueueHandler.Create(context.TODO(), createEvt, createQ)
@@ -86,7 +86,7 @@ func testEnqueueRequestForNamespaceCreate(namespace *corev1.Namespace, expectedN
 
 func testEnqueueRequestForNamespaceUpdate(namespaceOld, namespaceNew *corev1.Namespace, expectedNumber int, t *testing.T) {
 	updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	updateEvt := event.UpdateEvent{
+	updateEvt := event.TypedUpdateEvent[*corev1.Namespace]{
 		ObjectOld: namespaceOld,
 		ObjectNew: namespaceNew,
 	}
@@ -98,7 +98,7 @@ func testEnqueueRequestForNamespaceUpdate(namespaceOld, namespaceNew *corev1.Nam
 
 func testEnqueueRequestForNamespaceDelete(namespace *corev1.Namespace, expectedNumber int, t *testing.T) {
 	deleteQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	deleteEvt := event.DeleteEvent{
+	deleteEvt := event.TypedDeleteEvent[*corev1.Namespace]{
 		Object: namespace,
 	}
 	enqueueHandler.Delete(context.TODO(), deleteEvt, deleteQ)

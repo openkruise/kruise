@@ -31,8 +31,10 @@ import (
 	"github.com/openkruise/kruise/pkg/util/expectations"
 )
 
+var _ handler.TypedEventHandler[*appsv1alpha1.ImagePullJob] = &imagePullJobEventHandler{}
+
 type imagePullJobEventHandler struct {
-	enqueueHandler handler.EventHandler
+	enqueueHandler handler.TypedEventHandler[*appsv1alpha1.ImagePullJob]
 }
 
 func isImageListPullJobController(controllerRef *metav1.OwnerReference) bool {
@@ -44,10 +46,10 @@ func isImageListPullJobController(controllerRef *metav1.OwnerReference) bool {
 	return controllerRef.Kind == controllerKind.Kind && refGV.Group == controllerKind.Group
 }
 
-func (p *imagePullJobEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	job := evt.Object.(*appsv1alpha1.ImagePullJob)
+func (p *imagePullJobEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*appsv1alpha1.ImagePullJob], q workqueue.RateLimitingInterface) {
+	job := evt.Object
 	if job.DeletionTimestamp != nil {
-		p.Delete(ctx, event.DeleteEvent{Object: evt.Object}, q)
+		p.Delete(ctx, event.TypedDeleteEvent[*appsv1alpha1.ImagePullJob]{Object: evt.Object}, q)
 		return
 	}
 	if controllerRef := metav1.GetControllerOf(job); controllerRef != nil && isImageListPullJobController(controllerRef) {
@@ -57,8 +59,8 @@ func (p *imagePullJobEventHandler) Create(ctx context.Context, evt event.CreateE
 	}
 }
 
-func (p *imagePullJobEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	job := evt.Object.(*appsv1alpha1.ImagePullJob)
+func (p *imagePullJobEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1alpha1.ImagePullJob], q workqueue.RateLimitingInterface) {
+	job := evt.Object
 	if controllerRef := metav1.GetControllerOf(job); controllerRef != nil && isImageListPullJobController(controllerRef) {
 		key := types.NamespacedName{Namespace: job.Namespace, Name: controllerRef.Name}.String()
 		scaleExpectations.ObserveScale(key, expectations.Delete, job.Spec.Image)
@@ -66,11 +68,11 @@ func (p *imagePullJobEventHandler) Delete(ctx context.Context, evt event.DeleteE
 	p.enqueueHandler.Delete(ctx, evt, q)
 }
 
-func (p *imagePullJobEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	newJob := evt.ObjectNew.(*appsv1alpha1.ImagePullJob)
+func (p *imagePullJobEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1alpha1.ImagePullJob], q workqueue.RateLimitingInterface) {
+	newJob := evt.ObjectNew
 	resourceVersionExpectations.Expect(newJob)
 	p.enqueueHandler.Update(ctx, evt, q)
 }
 
-func (p *imagePullJobEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (p *imagePullJobEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsv1alpha1.ImagePullJob], q workqueue.RateLimitingInterface) {
 }

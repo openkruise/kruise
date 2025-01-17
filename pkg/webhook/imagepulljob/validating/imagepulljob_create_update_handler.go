@@ -35,7 +35,7 @@ import (
 // ImagePullJobCreateUpdateHandler handles ImagePullJob
 type ImagePullJobCreateUpdateHandler struct {
 	// Decoder decodes objects
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 }
 
 var _ admission.Handler = &ImagePullJobCreateUpdateHandler{}

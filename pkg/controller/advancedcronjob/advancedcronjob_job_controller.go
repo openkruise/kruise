@@ -37,8 +37,8 @@ import (
 )
 
 func watchJob(mgr manager.Manager, c controller.Controller) error {
-	if err := c.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}), handler.EnqueueRequestForOwner(
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.BroadcastJob{}, handler.OnlyControllerOwner())); err != nil {
+	if err := c.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}, handler.TypedEnqueueRequestForOwner[*batchv1.Job](
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.BroadcastJob{}, handler.OnlyControllerOwner()))); err != nil {
 		return err
 	}
 

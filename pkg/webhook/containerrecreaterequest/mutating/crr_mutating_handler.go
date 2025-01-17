@@ -47,7 +47,7 @@ const (
 // ContainerRecreateRequestHandler handles ContainerRecreateRequest
 type ContainerRecreateRequestHandler struct {
 	Client  client.Client
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 }
 
 // Handle handles admission requests.

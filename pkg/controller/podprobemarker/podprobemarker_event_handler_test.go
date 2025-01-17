@@ -69,7 +69,7 @@ func TestPodUpdateEventHandler(t *testing.T) {
 	newPod.ResourceVersion = fmt.Sprintf("%d", time.Now().Unix())
 
 	updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	updateEvent := event.UpdateEvent{
+	updateEvent := event.TypedUpdateEvent[*corev1.Pod]{
 		ObjectOld: podDemo,
 		ObjectNew: newPod,
 	}
@@ -94,7 +94,7 @@ func TestPodUpdateEventHandler(t *testing.T) {
 	}
 
 	// parse pod error
-	updateEvent = event.UpdateEvent{
+	updateEvent = event.TypedUpdateEvent[*corev1.Pod]{
 		ObjectOld: nil,
 		ObjectNew: nil,
 	}
@@ -104,7 +104,7 @@ func TestPodUpdateEventHandler(t *testing.T) {
 	}
 
 	// parse old pod error
-	updateEvent = event.UpdateEvent{
+	updateEvent = event.TypedUpdateEvent[*corev1.Pod]{
 		ObjectOld: nil,
 		ObjectNew: newPod,
 	}
@@ -479,6 +479,51 @@ func TestPodUpdateEventHandler_v2(t *testing.T) {
 			},
 			expectQLen: 0,
 		},
+<<<<<<< HEAD
+=======
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+			handler := enqueueRequestForPod{reader: fakeClient}
+			for _, ppm := range cs.ppmList.Items {
+				fakeClient.Create(context.TODO(), &ppm)
+			}
+			newPod := podDemo.DeepCopy()
+			newPod.ResourceVersion = fmt.Sprintf("%d", time.Now().Unix())
+			util.SetPodCondition(newPod, corev1.PodCondition{
+				Type:   corev1.PodInitialized,
+				Status: corev1.ConditionTrue,
+			})
+			util.SetPodCondition(podDemo, corev1.PodCondition{
+				Type:   corev1.PodInitialized,
+				Status: corev1.ConditionFalse,
+			})
+
+			updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			updateEvent := event.TypedUpdateEvent[*corev1.Pod]{
+				ObjectOld: podDemo,
+				ObjectNew: newPod,
+			}
+			handler.Update(context.TODO(), updateEvent, updateQ)
+			if updateQ.Len() != cs.expectQLen {
+				t.Errorf("unexpected update event handle queue size, expected %v actual %d", cs.expectQLen, updateQ.Len())
+			}
+		})
+	}
+}
+
+func TestGetPodProbeMarkerForPod(t *testing.T) {
+
+	cases := []struct {
+		name      string
+		ppmList   *appsalphav1.PodProbeMarkerList
+		pod       *corev1.Pod
+		expect    []*appsalphav1.PodProbeMarker
+		expectErr error
+	}{
+>>>>>>> 155229207 (upgrade k8s deps 1.30)
 		{
 			name: "podUpdateEvent, serverless pods",
 			getPod: func() (*corev1.Pod, *corev1.Pod) {
