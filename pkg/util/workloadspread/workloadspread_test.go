@@ -55,7 +55,8 @@ import (
 )
 
 var (
-	scheme *runtime.Scheme
+	scheme      *runtime.Scheme
+	defaultTime = time.Now()
 
 	cloneSetDemo = &appsv1alpha1.CloneSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -573,7 +574,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.ResourceVersion = "1"
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
-				workloadSpread.Status.SubsetStatuses[0].CreatingPods[podDemo.Name] = metav1.Time{Time: time.Now()}
+				workloadSpread.Status.SubsetStatuses[0].CreatingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
 				workloadSpread.Status.VersionedSubsetStatuses = map[string][]appsv1alpha1.WorkloadSpreadSubsetStatus{
 					VersionIgnored: workloadSpread.Status.SubsetStatuses,
 				}
@@ -818,7 +819,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = 4
-				demo.Status.SubsetStatuses[0].CreatingPods[podDemo.Name] = metav1.Time{Time: time.Now()}
+				demo.Status.SubsetStatuses[0].CreatingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
 				demo.Status.VersionedSubsetStatuses = map[string][]appsv1alpha1.WorkloadSpreadSubsetStatus{
 					VersionIgnored: demo.Status.SubsetStatuses,
 				}
@@ -893,7 +894,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.ResourceVersion = "1"
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
-				workloadSpread.Status.SubsetStatuses[0].CreatingPods[podDemo.Name] = metav1.Time{Time: time.Now()}
+				workloadSpread.Status.SubsetStatuses[0].CreatingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
 				workloadSpread.Status.VersionedSubsetStatuses = map[string][]appsv1alpha1.WorkloadSpreadSubsetStatus{
 					VersionIgnored: workloadSpread.Status.SubsetStatuses,
 				}
@@ -926,7 +927,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 1
-				workloadSpread.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: time.Now()}
+				workloadSpread.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
 				workloadSpread.Status.VersionedSubsetStatuses = map[string][]appsv1alpha1.WorkloadSpreadSubsetStatus{
 					VersionIgnored: workloadSpread.Status.SubsetStatuses,
 				}
@@ -959,7 +960,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 1
-				workloadSpread.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: time.Now()}
+				workloadSpread.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
 				workloadSpread.Status.VersionedSubsetStatuses = map[string][]appsv1alpha1.WorkloadSpreadSubsetStatus{
 					VersionIgnored: workloadSpread.Status.SubsetStatuses,
 				}
@@ -1040,7 +1041,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				demo := workloadSpreadDemo.DeepCopy()
 				demo.Status.SubsetStatuses[0].MissingReplicas = 1
-				demo.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: time.Now()}
+				demo.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
 				demo.Status.VersionedSubsetStatuses = map[string][]appsv1alpha1.WorkloadSpreadSubsetStatus{
 					VersionIgnored: demo.Status.SubsetStatuses,
 				}
@@ -1057,7 +1058,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 1
-				workloadSpread.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: time.Now()}
+				workloadSpread.Status.SubsetStatuses[0].DeletingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
 				workloadSpread.Status.VersionedSubsetStatuses = map[string][]appsv1alpha1.WorkloadSpreadSubsetStatus{
 					VersionIgnored: workloadSpread.Status.SubsetStatuses,
 				}
@@ -1157,7 +1158,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				}
 				ws.ResourceVersion = "1"
 				ws.Status.SubsetStatuses[0].MissingReplicas = 4
-				ws.Status.SubsetStatuses[0].CreatingPods[podDemo.Name] = metav1.Time{Time: time.Now()}
+				ws.Status.SubsetStatuses[0].CreatingPods[podDemo.Name] = metav1.Time{Time: defaultTime}
 				ws.Status.VersionedSubsetStatuses = map[string][]appsv1alpha1.WorkloadSpreadSubsetStatus{
 					VersionIgnored: ws.Status.SubsetStatuses,
 				}
@@ -1206,7 +1207,7 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				t.Fatalf("getLatestWorkloadSpread failed: %s", err.Error())
 			}
 			setWorkloadSpreadSubset(latestWS)
-			if !compareVersionedSubsetStatuses(latestWS.Status.VersionedSubsetStatuses, expectWS.Status.VersionedSubsetStatuses) {
+			if !reflect.DeepEqual(latestWS.Status.VersionedSubsetStatuses, expectWS.Status.VersionedSubsetStatuses) {
 				t.Logf("actual ws status: %+v", latestWS.Status.VersionedSubsetStatuses)
 				t.Logf("expect ws status: %+v", expectWS.Status.VersionedSubsetStatuses)
 				t.Fatalf("workloadSpread DeepEqual failed")
@@ -1348,56 +1349,6 @@ func TestGetWorkloadReplicas(t *testing.T) {
 			}
 		})
 	}
-}
-func compareVersionedSubsetStatuses(actual, expect map[string][]appsv1alpha1.WorkloadSpreadSubsetStatus) bool {
-	if len(actual) != len(expect) {
-		return false
-	}
-	for key, statusListActual := range actual {
-		statusListExpect, ok := expect[key]
-		if !ok {
-			return false
-		}
-		if len(statusListActual) != len(statusListExpect) {
-			return false
-		}
-		for i, statusActual := range statusListActual {
-			statusExpect := statusListExpect[i]
-			if !compareTimeMap(statusActual.CreatingPods, statusExpect.CreatingPods) {
-				return false
-			}
-			if !compareTimeMap(statusActual.DeletingPods, statusExpect.DeletingPods) {
-				return false
-			}
-			statusActual.CreatingPods, statusExpect.CreatingPods = nil, nil
-			statusActual.DeletingPods, statusExpect.DeletingPods = nil, nil
-			if !reflect.DeepEqual(statusActual, statusExpect) {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-func compareTimeMap(actual, expect map[string]metav1.Time) bool {
-	if len(actual) != len(expect) {
-		return false
-	}
-	for key, tActual := range actual {
-		tExpect, ok := expect[key]
-		if !ok {
-			return false
-		}
-		if tActual.Sub(tExpect.Time) <= -time.Second {
-			// tActual and tExpect are both from time.Now, and tExpect is called before tActual. so this comparison is to make sure
-			// tActual is later than tExpect.
-			// moreover, tExpect is the raw value of that time.Now returns, and tActual will be serialized and deserailized by client.
-			// In K8s object serialization, only second-level precision for timestamps is retained,
-			// so 1 second is reserved to prevent error during comparison between values like 2024-10-08T06:00:47Z and 2024-10-08T06:00:47.04353Z
-			return false
-		}
-	}
-	return true
 }
 
 func TestIsReferenceEqual(t *testing.T) {
@@ -2243,19 +2194,28 @@ func TestGetWorkloadVersion(t *testing.T) {
 
 func setWorkloadSpreadSubset(workloadSpread *appsv1alpha1.WorkloadSpread) {
 	for i := range workloadSpread.Status.SubsetStatuses {
-		subset := &workloadSpread.Status.SubsetStatuses[i]
-		if subset.DeletingPods == nil {
-			subset.DeletingPods = map[string]metav1.Time{}
+		setWorkloadSpreadSubsetStatus(&workloadSpread.Status.SubsetStatuses[i])
+	}
+	for key := range workloadSpread.Status.VersionedSubsetStatuses {
+		version := workloadSpread.Status.VersionedSubsetStatuses[key]
+		for i := range version {
+			setWorkloadSpreadSubsetStatus(&version[i])
 		}
-		if subset.CreatingPods == nil {
-			subset.CreatingPods = map[string]metav1.Time{}
-		}
-		for k := range subset.CreatingPods {
-			subset.CreatingPods[k] = metav1.Time{Time: time.Now()}
-		}
-		for k := range subset.DeletingPods {
-			subset.DeletingPods[k] = metav1.Time{Time: time.Now()}
-		}
+	}
+}
+
+func setWorkloadSpreadSubsetStatus(subset *appsv1alpha1.WorkloadSpreadSubsetStatus) {
+	if subset.DeletingPods == nil {
+		subset.DeletingPods = map[string]metav1.Time{}
+	}
+	if subset.CreatingPods == nil {
+		subset.CreatingPods = map[string]metav1.Time{}
+	}
+	for k := range subset.CreatingPods {
+		subset.CreatingPods[k] = metav1.Time{Time: defaultTime}
+	}
+	for k := range subset.DeletingPods {
+		subset.DeletingPods[k] = metav1.Time{Time: defaultTime}
 	}
 }
 
