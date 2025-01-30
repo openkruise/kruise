@@ -1268,6 +1268,9 @@ func testUpdateVolumeClaimTemplates(tester *framework.CloneSetTester, randStr st
 	updateStrategy := appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.RecreateCloneSetUpdateStrategyType}
 	var replicas int = 4
 	cs := tester.NewCloneSet("clone-"+randStr, int32(replicas), updateStrategy)
+	// If enable DisablePVCReuse and the CloneSetPVCReuseDuringUpdate feature-gate, CloneSet will reuse PVC during upgrade.
+	// So if user wants to recreate PVC, then he shouldn't set pvc to be reused.
+	cs.Spec.ScaleStrategy.DisablePVCReuse = true
 	imageConfig := imageutils.GetConfig(imageutils.Nginx)
 	imageConfig.SetRegistry("docker.io/library")
 	imageConfig.SetVersion("alpine")
