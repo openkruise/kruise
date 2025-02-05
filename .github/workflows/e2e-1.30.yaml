@@ -111,7 +111,7 @@ jobs:
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
-          tools/hack/run-kruise-e2e-test.sh --focus '\[apps\] (PullImage|ContainerRecreateRequest|PullImages|PodProbeMarker)' --print-info --disable-parallel
+          tools/hack/run-kruise-e2e-test.sh --focus '\[apps\] (PullImage|ContainerRecreateRequest|PullImages)' --print-info --disable-parallel
 
   advanced-daemonset:
     runs-on: ubuntu-20.04
@@ -171,7 +171,7 @@ jobs:
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
-          tools/hack/run-kruise-e2e-test.sh --focus '\[apps\] SidecarSet' --print-info --disable-parallel
+          tools/hack/run-kruise-e2e-test.sh --focus '\[apps\] SidecarSet' --print-info
 
   ephemeraljob:
     runs-on: ubuntu-20.04
@@ -231,7 +231,7 @@ jobs:
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
-          tools/hack/run-kruise-e2e-test.sh --focus '\[policy\] PodUnavailableBudget' --print-info --disable-parallel
+          tools/hack/run-kruise-e2e-test.sh --focus '\[policy\] PodUnavailableBudget' --print-info
 
   clonesetAndInplace:
     runs-on: ubuntu-20.04
@@ -265,7 +265,7 @@ jobs:
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
-          tools/hack/run-kruise-e2e-test.sh --focus '\[apps\] (InplaceVPA)' --print-info
+          tools/hack/run-kruise-e2e-test.sh --focus '\[apps\] (CloneSet|InplaceVPA)' --print-info
 
   other:
     runs-on: ubuntu-20.04
@@ -295,4 +295,4 @@ jobs:
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
-          tools/hack/run-kruise-e2e-test.sh --focus "" --skip '\[apps\] (InplaceVPA|AppStatefulSetStorage|StatefulSet|PullImage|PullImages|ContainerRecreateRequest|DaemonSet|SidecarSet|EphemeralJob|PodProbeMarker)' --skip '\[policy\] PodUnavailableBudget' --timeout 90m --print-info
+          tools/hack/run-kruise-e2e-test.sh --focus "" --skip '\[apps\] (CloneSet|InplaceVPA|AppStatefulSetStorage|StatefulSet|PullImage|PullImages|ContainerRecreateRequest|DaemonSet|SidecarSet|EphemeralJob)' --skip '\[policy\] PodUnavailableBudget' --timeout 90m --print-info

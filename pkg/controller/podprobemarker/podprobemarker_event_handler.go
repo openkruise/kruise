@@ -90,7 +90,7 @@ func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.TypedUpdate
 	oldObj := evt.ObjectOld
 	oldInitialCondition := util.GetCondition(oldObj, corev1.PodInitialized)
 	newInitialCondition := util.GetCondition(newObj, corev1.PodInitialized)
-	if !kubecontroller.IsPodActive(newObj) || newInitialCondition == nil ||
+	if newObj == nil || !kubecontroller.IsPodActive(newObj) || newInitialCondition == nil ||
 		newInitialCondition.Status != corev1.ConditionTrue || newObj.Spec.NodeName == "" {
 		return
 	}
