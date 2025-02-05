@@ -21,13 +21,14 @@ import (
 	"reflect"
 	"testing"
 
-	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 func init() {
@@ -213,6 +214,10 @@ func TestGetPodProbeMarkerForPod(t *testing.T) {
 			},
 			expect: []*appsalphav1.PodProbeMarker{
 				{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "PodProbeMarker",
+						APIVersion: "apps.kruise.io/v1alpha1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:            "game-server-probe-v2",
 						Namespace:       "sp1",
@@ -263,6 +268,10 @@ func TestGetPodProbeMarkerForPod(t *testing.T) {
 					},
 				},
 				{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "PodProbeMarker",
+						APIVersion: "apps.kruise.io/v1alpha1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:            "game-server-probe-v3",
 						Namespace:       "sp1",
@@ -746,6 +755,10 @@ func TestGetPodProbeMarkerForPod(t *testing.T) {
 			get, err := GetPodProbeMarkerForPod(fakeClient, cs.pod)
 			if !reflect.DeepEqual(cs.expectErr, err) {
 				t.Errorf("expectErr: %v, but: %v", cs.expectErr, err)
+			}
+			for i := range get {
+				get[i].TypeMeta.Kind = "PodProbeMarker"
+				get[i].TypeMeta.APIVersion = "apps.kruise.io/v1alpha1"
 			}
 			if !reflect.DeepEqual(util.DumpJSON(cs.expect), util.DumpJSON(get)) {
 				t.Errorf("expectGet: %v, but: %v", util.DumpJSON(cs.expect), util.DumpJSON(get))

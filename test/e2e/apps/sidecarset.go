@@ -24,13 +24,14 @@ import (
 	"strconv"
 	"time"
 
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 	"github.com/openkruise/kruise/test/e2e/framework"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -47,6 +48,7 @@ import (
 )
 
 var _ = SIGDescribe("SidecarSet", func() {
+	framework.TestContext.DeleteNamespaceOnFailure = false
 	f := framework.NewDefaultFramework("sidecarset")
 	var ns string
 	var c clientset.Interface
@@ -66,7 +68,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all SidecarSet in cluster")
-			tester.DeleteSidecarSets()
+			tester.DeleteSidecarSets(ns)
 			tester.DeleteDeployments(ns)
 		})
 		framework.ConformanceIt("pods don't have matched sidecarSet", func() {
@@ -652,14 +654,14 @@ var _ = SIGDescribe("SidecarSet", func() {
 		})*/
 	})
 
-	framework.KruiseDescribe("SidecarSet Upgrade functionality [SidecarSeUpgrade]", func() {
+	framework.KruiseDescribe("SidecarSet Upgrade functionality [SidecarSetUpgrade]", func() {
 
 		ginkgo.AfterEach(func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all SidecarSet in cluster")
-			tester.DeleteSidecarSets()
+			tester.DeleteSidecarSets(ns)
 			tester.DeleteDeployments(ns)
 		})
 

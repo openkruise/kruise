@@ -65,7 +65,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			tester.DeletePubs(ns)
 			tester.DeleteDeployments(ns)
 			tester.DeleteCloneSets(ns)
-			sidecarTester.DeleteSidecarSets()
+			sidecarTester.DeleteSidecarSets(ns)
 		})
 
 		ginkgo.It("PodUnavailableBudget selector no matched pods", func() {

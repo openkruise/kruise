@@ -53,7 +53,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all SidecarSet in cluster")
-			tester.DeleteSidecarSets()
+			tester.DeleteSidecarSets(ns)
 			tester.DeleteDeployments(ns)
 		})
 
