@@ -16,6 +16,7 @@ package v1alpha1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -119,6 +120,21 @@ type ResourceDistributionCondition struct {
 
 	// FailedNamespaces describe all failed namespaces when Status is False
 	FailedNamespaces []string `json:"failedNamespace,omitempty"`
+}
+
+func (rd *ResourceDistribution) Validate() (error field.ErrorList) {
+	var allErrs field.ErrorList
+	// Ensure resource is not empty
+	if len(rd.Spec.Resource.Raw) == 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.resource"), rd.Spec.Resource, "resource must not be empty"))
+	}
+
+	// Ensure at least one target is specified
+	if !rd.Spec.Targets.AllNamespaces && len(rd.Spec.Targets.IncludedNamespaces.List) == 0 && len(rd.Spec.Targets.NamespaceLabelSelector.MatchLabels) == 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.targets"), rd.Spec.Targets, "at least one target namespace must be specified"))
+	}
+
+	return allErrs
 }
 
 type ResourceDistributionConditionType string
