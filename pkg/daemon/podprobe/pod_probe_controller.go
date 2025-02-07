@@ -363,7 +363,7 @@ func (c *Controller) syncUpdateNodePodProbeStatus() error {
 		klog.ErrorS(err, "NodePodProbe update status failed", "nodeName", c.nodeName)
 		return err
 	}
-	klog.InfoS("NodePodProbe(%s) update status success", "nodeName", c.nodeName, "from", commonutil.DumpJSON(npp.Status), "to", commonutil.DumpJSON(nppClone.Status))
+	klog.InfoS("NodePodProbe update status success", "nodeName", c.nodeName, "from", commonutil.DumpJSON(npp.Status), "to", commonutil.DumpJSON(nppClone.Status))
 	return nil
 }
 

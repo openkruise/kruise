@@ -23,7 +23,19 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	clientset "k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	kruiseapis "github.com/openkruise/kruise/apis"
 	"github.com/openkruise/kruise/pkg/client"
@@ -36,18 +48,6 @@ import (
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
-	clientset "k8s.io/client-go/kubernetes"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
-	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 var (
@@ -85,7 +85,7 @@ type daemon struct {
 }
 
 // NewDaemon create a daemon
-func NewDaemon(cfg *rest.Config, bindAddress string) (Daemon, error) {
+func NewDaemon(cfg *rest.Config, bindAddress string, MaxWorkersForPullImages int) (Daemon, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("cfg can not be nil")
 	}
@@ -133,6 +133,8 @@ func NewDaemon(cfg *rest.Config, bindAddress string) (Daemon, error) {
 		PodInformer:    podInformer,
 		RuntimeFactory: runtimeFactory,
 		Healthz:        healthz,
+
+		MaxWorkersForPullImages: MaxWorkersForPullImages,
 	}
 
 	puller, err := imagepuller.NewController(opts, secretManager, cfg)

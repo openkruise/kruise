@@ -47,6 +47,9 @@ var (
 	enablePprof      = flag.Bool("enable-pprof", true, "Enable pprof for daemon.")
 	pluginConfigFile = flag.String("plugin-config-file", "/kruise/CredentialProviderPlugin.yaml", "The path of plugin config file.")
 	pluginBinDir     = flag.String("plugin-bin-dir", "/kruise/plugins", "The path of directory of plugin binaries.")
+
+	//todo: After the feature is stable, the default value should also be restricted, e.g. 5.
+	maxWorkersForPullImage = flag.Int("max-workers-for-pull-image", -1, "The maximum number of workers for pulling images.")
 )
 
 func main() {
@@ -71,7 +74,7 @@ func main() {
 		}()
 	}
 	ctx := signals.SetupSignalHandler()
-	d, err := daemon.NewDaemon(cfg, *bindAddr)
+	d, err := daemon.NewDaemon(cfg, *bindAddr, *maxWorkersForPullImage)
 	if err != nil {
 		klog.Fatalf("Failed to new daemon: %v", err)
 	}
