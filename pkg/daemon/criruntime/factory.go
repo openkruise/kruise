@@ -83,12 +83,7 @@ func NewFactory(accountManager daemonutil.ImagePullAccountManager) (Factory, err
 		var runtimeService criapi.RuntimeService
 		var typedVersion *runtimeapi.VersionResponse
 
-		addr, _, err := kubeletutil.GetAddressAndDialer(cfg.runtimeRemoteURI)
-		if err != nil {
-			klog.ErrorS(err, "Failed to get address", "runtimeType", cfg.runtimeType, "runtimeURI", cfg.runtimeURI, "runtimeRemoteURI", cfg.runtimeRemoteURI)
-			continue
-		}
-		imageService, err = runtimeimage.NewCRIImageService(addr, accountManager)
+		imageService, err = runtimeimage.NewCRIImageService(cfg.runtimeRemoteURI, accountManager)
 		if err != nil {
 			klog.ErrorS(err, "Failed to new image service", "runtimeType", cfg.runtimeType, "runtimeURI", cfg.runtimeURI, "runtimeRemoteURI", cfg.runtimeRemoteURI)
 			continue

@@ -40,9 +40,9 @@ const (
 )
 
 // NewCRIImageService create a common CRI runtime
-func NewCRIImageService(runtimeURI string, accountManager daemonutil.ImagePullAccountManager) (ImageService, error) {
-	klog.V(3).InfoS("Connecting to image service", "endpoint", runtimeURI)
-	addr, dialer, err := util.GetAddressAndDialer(runtimeURI)
+func NewCRIImageService(remoteRuntimeURI string, accountManager daemonutil.ImagePullAccountManager) (ImageService, error) {
+	klog.V(3).InfoS("Connecting to image service", "endpoint", remoteRuntimeURI)
+	addr, dialer, err := util.GetAddressAndDialer(remoteRuntimeURI)
 	if err != nil {
 		return nil, err
 	}
