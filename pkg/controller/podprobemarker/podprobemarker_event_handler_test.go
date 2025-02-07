@@ -3,10 +3,13 @@ package podprobemarker
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
+	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -14,9 +17,6 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-
-	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
 )
 
 var (
@@ -119,10 +119,35 @@ func TestPodUpdateEventHandler_v2(t *testing.T) {
 	cases := []struct {
 		name       string
 		ppmList    *appsalphav1.PodProbeMarkerList
+		getPod     func() (*corev1.Pod, *corev1.Pod)
+		getNode    func() *corev1.Node
 		expectQLen int
 	}{
 		{
 			name: "podUpdateEvent, exist podProbeMarker",
+			getPod: func() (*corev1.Pod, *corev1.Pod) {
+				newPod := podDemo.DeepCopy()
+				newPod.Spec.NodeName = "test-node"
+				newPod.ResourceVersion = fmt.Sprintf("%d", time.Now().Unix())
+				util.SetPodCondition(newPod, corev1.PodCondition{
+					Type:   corev1.PodInitialized,
+					Status: corev1.ConditionTrue,
+				})
+				oldPod := podDemo.DeepCopy()
+				oldPod.Spec.NodeName = "test-node"
+				util.SetPodCondition(oldPod, corev1.PodCondition{
+					Type:   corev1.PodInitialized,
+					Status: corev1.ConditionFalse,
+				})
+				return oldPod, newPod
+			},
+			getNode: func() *corev1.Node {
+				return &corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-node",
+					},
+				}
+			},
 			ppmList: &appsalphav1.PodProbeMarkerList{
 				Items: []appsalphav1.PodProbeMarker{
 					{
@@ -278,6 +303,29 @@ func TestPodUpdateEventHandler_v2(t *testing.T) {
 		},
 		{
 			name: "podUpdateEvent, no exist podProbeMarker",
+			getPod: func() (*corev1.Pod, *corev1.Pod) {
+				newPod := podDemo.DeepCopy()
+				newPod.Spec.NodeName = "test-node"
+				newPod.ResourceVersion = fmt.Sprintf("%d", time.Now().Unix())
+				util.SetPodCondition(newPod, corev1.PodCondition{
+					Type:   corev1.PodInitialized,
+					Status: corev1.ConditionTrue,
+				})
+				oldPod := podDemo.DeepCopy()
+				oldPod.Spec.NodeName = "test-node"
+				util.SetPodCondition(oldPod, corev1.PodCondition{
+					Type:   corev1.PodInitialized,
+					Status: corev1.ConditionFalse,
+				})
+				return oldPod, newPod
+			},
+			getNode: func() *corev1.Node {
+				return &corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-node",
+					},
+				}
+			},
 			ppmList: &appsalphav1.PodProbeMarkerList{
 				Items: []appsalphav1.PodProbeMarker{
 					{
@@ -431,61 +479,49 @@ func TestPodUpdateEventHandler_v2(t *testing.T) {
 			},
 			expectQLen: 0,
 		},
-	}
-
-	for _, cs := range cases {
-		t.Run(cs.name, func(t *testing.T) {
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
-			handler := enqueueRequestForPod{reader: fakeClient}
-			for _, ppm := range cs.ppmList.Items {
-				fakeClient.Create(context.TODO(), &ppm)
-			}
-			newPod := podDemo.DeepCopy()
-			newPod.ResourceVersion = fmt.Sprintf("%d", time.Now().Unix())
-			util.SetPodCondition(newPod, corev1.PodCondition{
-				Type:   corev1.PodInitialized,
-				Status: corev1.ConditionTrue,
-			})
-			util.SetPodCondition(podDemo, corev1.PodCondition{
-				Type:   corev1.PodInitialized,
-				Status: corev1.ConditionFalse,
-			})
-
-			updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-			updateEvent := event.UpdateEvent{
-				ObjectOld: podDemo,
-				ObjectNew: newPod,
-			}
-			handler.Update(context.TODO(), updateEvent, updateQ)
-			if updateQ.Len() != cs.expectQLen {
-				t.Errorf("unexpected update event handle queue size, expected %v actual %d", cs.expectQLen, updateQ.Len())
-			}
-		})
-	}
-}
-
-func TestGetPodProbeMarkerForPod(t *testing.T) {
-
-	cases := []struct {
-		name      string
-		ppmList   *appsalphav1.PodProbeMarkerList
-		pod       *corev1.Pod
-		expect    []*appsalphav1.PodProbeMarker
-		expectErr error
-	}{
 		{
-			name: "get pod probe marker list resources",
+			name: "podUpdateEvent, serverless pods",
+			getPod: func() (*corev1.Pod, *corev1.Pod) {
+				newPod := podDemo.DeepCopy()
+				newPod.Spec.NodeName = "test-node"
+				newPod.ResourceVersion = fmt.Sprintf("%d", time.Now().Unix())
+				util.SetPodCondition(newPod, corev1.PodCondition{
+					Type:   corev1.PodInitialized,
+					Status: corev1.ConditionTrue,
+				})
+				util.SetPodCondition(newPod, corev1.PodCondition{
+					Type:   "game.kruise.io/idle",
+					Status: corev1.ConditionTrue,
+				})
+				oldPod := podDemo.DeepCopy()
+				oldPod.Spec.NodeName = "test-node"
+				util.SetPodCondition(oldPod, corev1.PodCondition{
+					Type:   corev1.PodInitialized,
+					Status: corev1.ConditionFalse,
+				})
+				return oldPod, newPod
+			},
+			getNode: func() *corev1.Node {
+				return &corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-node",
+						Labels: map[string]string{
+							"type": VirtualKubelet,
+						},
+					},
+				}
+			},
 			ppmList: &appsalphav1.PodProbeMarkerList{
 				Items: []appsalphav1.PodProbeMarker{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "game-server-probe-v1",
-							Namespace: "sp1",
+							Namespace: "default",
 						},
 						Spec: appsalphav1.PodProbeMarkerSpec{
 							Selector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
-									"app": "test-v1",
+									"app": "nginx",
 								},
 							},
 							Probes: []appsalphav1.PodContainerProbe{
@@ -502,75 +538,6 @@ func TestGetPodProbeMarkerForPod(t *testing.T) {
 										},
 									},
 									PodConditionType: "game.kruise.io/healthy",
-									MarkerPolicy: []appsalphav1.ProbeMarkerPolicy{
-										{
-											State: appsalphav1.ProbeSucceeded,
-											Annotations: map[string]string{
-												"controller.kubernetes.io/pod-deletion-cost": "10",
-											},
-											Labels: map[string]string{
-												"server-healthy": "true",
-											},
-										},
-										{
-											State: appsalphav1.ProbeFailed,
-											Annotations: map[string]string{
-												"controller.kubernetes.io/pod-deletion-cost": "-10",
-											},
-											Labels: map[string]string{
-												"server-healthy": "false",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "game-server-probe-v2",
-							Namespace: "sp1",
-						},
-						Spec: appsalphav1.PodProbeMarkerSpec{
-							Selector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									"app": "test-v2",
-								},
-							},
-							Probes: []appsalphav1.PodContainerProbe{
-								{
-									Name:          "healthy",
-									ContainerName: "main",
-									Probe: appsalphav1.ContainerProbeSpec{
-										Probe: corev1.Probe{
-											ProbeHandler: corev1.ProbeHandler{
-												Exec: &corev1.ExecAction{
-													Command: []string{"/bin/sh", "-c", "/healthy.sh"},
-												},
-											},
-										},
-									},
-									PodConditionType: "game.kruise.io/healthy",
-									MarkerPolicy: []appsalphav1.ProbeMarkerPolicy{
-										{
-											State: appsalphav1.ProbeSucceeded,
-											Annotations: map[string]string{
-												"controller.kubernetes.io/pod-deletion-cost": "10",
-											},
-											Labels: map[string]string{
-												"server-healthy": "true",
-											},
-										},
-										{
-											State: appsalphav1.ProbeFailed,
-											Annotations: map[string]string{
-												"controller.kubernetes.io/pod-deletion-cost": "-10",
-											},
-											Labels: map[string]string{
-												"server-healthy": "false",
-											},
-										},
-									},
 								},
 							},
 						},
@@ -578,350 +545,58 @@ func TestGetPodProbeMarkerForPod(t *testing.T) {
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "game-server-probe-v3",
-							Namespace: "sp1",
+							Namespace: "default",
 						},
 						Spec: appsalphav1.PodProbeMarkerSpec{
 							Selector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
-									"app": "test-v2",
+									"app": "nginx",
 								},
 							},
 							Probes: []appsalphav1.PodContainerProbe{
 								{
-									Name:          "healthy",
+									Name:          "idle",
 									ContainerName: "main",
 									Probe: appsalphav1.ContainerProbeSpec{
 										Probe: corev1.Probe{
 											ProbeHandler: corev1.ProbeHandler{
 												Exec: &corev1.ExecAction{
-													Command: []string{"/bin/sh", "-c", "/healthy.sh"},
+													Command: []string{"/bin/sh", "-c", "/idle.sh"},
 												},
 											},
 										},
 									},
-									PodConditionType: "game.kruise.io/healthy",
-									MarkerPolicy: []appsalphav1.ProbeMarkerPolicy{
-										{
-											State: appsalphav1.ProbeSucceeded,
-											Annotations: map[string]string{
-												"controller.kubernetes.io/pod-deletion-cost": "10",
-											},
-											Labels: map[string]string{
-												"server-healthy": "true",
-											},
-										},
-										{
-											State: appsalphav1.ProbeFailed,
-											Annotations: map[string]string{
-												"controller.kubernetes.io/pod-deletion-cost": "-10",
-											},
-											Labels: map[string]string{
-												"server-healthy": "false",
-											},
-										},
-									},
+									PodConditionType: "game.kruise.io/idle",
 								},
 							},
 						},
 					},
 				},
 			},
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod1",
-					Namespace: "sp1",
-					Labels: map[string]string{
-						"app": "test-v2",
-					},
-				},
-			},
-			expect: []*appsalphav1.PodProbeMarker{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:            "game-server-probe-v2",
-						Namespace:       "sp1",
-						ResourceVersion: "1",
-					},
-					Spec: appsalphav1.PodProbeMarkerSpec{
-						Selector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"app": "test-v2",
-							},
-						},
-						Probes: []appsalphav1.PodContainerProbe{
-							{
-								Name:          "healthy",
-								ContainerName: "main",
-								Probe: appsalphav1.ContainerProbeSpec{
-									Probe: corev1.Probe{
-										ProbeHandler: corev1.ProbeHandler{
-											Exec: &corev1.ExecAction{
-												Command: []string{"/bin/sh", "-c", "/healthy.sh"},
-											},
-										},
-									},
-								},
-								PodConditionType: "game.kruise.io/healthy",
-								MarkerPolicy: []appsalphav1.ProbeMarkerPolicy{
-									{
-										State: appsalphav1.ProbeSucceeded,
-										Annotations: map[string]string{
-											"controller.kubernetes.io/pod-deletion-cost": "10",
-										},
-										Labels: map[string]string{
-											"server-healthy": "true",
-										},
-									},
-									{
-										State: appsalphav1.ProbeFailed,
-										Annotations: map[string]string{
-											"controller.kubernetes.io/pod-deletion-cost": "-10",
-										},
-										Labels: map[string]string{
-											"server-healthy": "false",
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:            "game-server-probe-v3",
-						Namespace:       "sp1",
-						ResourceVersion: "1",
-					},
-					Spec: appsalphav1.PodProbeMarkerSpec{
-						Selector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"app": "test-v2",
-							},
-						},
-						Probes: []appsalphav1.PodContainerProbe{
-							{
-								Name:          "healthy",
-								ContainerName: "main",
-								Probe: appsalphav1.ContainerProbeSpec{
-									Probe: corev1.Probe{
-										ProbeHandler: corev1.ProbeHandler{
-											Exec: &corev1.ExecAction{
-												Command: []string{"/bin/sh", "-c", "/healthy.sh"},
-											},
-										},
-									},
-								},
-								PodConditionType: "game.kruise.io/healthy",
-								MarkerPolicy: []appsalphav1.ProbeMarkerPolicy{
-									{
-										State: appsalphav1.ProbeSucceeded,
-										Annotations: map[string]string{
-											"controller.kubernetes.io/pod-deletion-cost": "10",
-										},
-										Labels: map[string]string{
-											"server-healthy": "true",
-										},
-									},
-									{
-										State: appsalphav1.ProbeFailed,
-										Annotations: map[string]string{
-											"controller.kubernetes.io/pod-deletion-cost": "-10",
-										},
-										Labels: map[string]string{
-											"server-healthy": "false",
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			expectErr: nil,
-		},
-		{
-			name: "no found pod probe marker list resources",
-			ppmList: &appsalphav1.PodProbeMarkerList{
-				Items: []appsalphav1.PodProbeMarker{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:            "game-server-probe-v1",
-							Namespace:       "sp1",
-							ResourceVersion: "01",
-						},
-						Spec: appsalphav1.PodProbeMarkerSpec{
-							Selector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									"app": "test-v1",
-								},
-							},
-							Probes: []appsalphav1.PodContainerProbe{
-								{
-									Name:          "healthy",
-									ContainerName: "main",
-									Probe: appsalphav1.ContainerProbeSpec{
-										Probe: corev1.Probe{
-											ProbeHandler: corev1.ProbeHandler{
-												Exec: &corev1.ExecAction{
-													Command: []string{"/bin/sh", "-c", "/healthy.sh"},
-												},
-											},
-										},
-									},
-									PodConditionType: "game.kruise.io/healthy",
-									MarkerPolicy: []appsalphav1.ProbeMarkerPolicy{
-										{
-											State: appsalphav1.ProbeSucceeded,
-											Annotations: map[string]string{
-												"controller.kubernetes.io/pod-deletion-cost": "10",
-											},
-											Labels: map[string]string{
-												"server-healthy": "true",
-											},
-										},
-										{
-											State: appsalphav1.ProbeFailed,
-											Annotations: map[string]string{
-												"controller.kubernetes.io/pod-deletion-cost": "-10",
-											},
-											Labels: map[string]string{
-												"server-healthy": "false",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:            "game-server-probe-v2",
-							Namespace:       "sp1",
-							ResourceVersion: "01",
-						},
-						Spec: appsalphav1.PodProbeMarkerSpec{
-							Selector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									"app": "test-v2",
-								},
-							},
-							Probes: []appsalphav1.PodContainerProbe{
-								{
-									Name:          "healthy",
-									ContainerName: "main",
-									Probe: appsalphav1.ContainerProbeSpec{
-										Probe: corev1.Probe{
-											ProbeHandler: corev1.ProbeHandler{
-												Exec: &corev1.ExecAction{
-													Command: []string{"/bin/sh", "-c", "/healthy.sh"},
-												},
-											},
-										},
-									},
-									PodConditionType: "game.kruise.io/healthy",
-									MarkerPolicy: []appsalphav1.ProbeMarkerPolicy{
-										{
-											State: appsalphav1.ProbeSucceeded,
-											Annotations: map[string]string{
-												"controller.kubernetes.io/pod-deletion-cost": "10",
-											},
-											Labels: map[string]string{
-												"server-healthy": "true",
-											},
-										},
-										{
-											State: appsalphav1.ProbeFailed,
-											Annotations: map[string]string{
-												"controller.kubernetes.io/pod-deletion-cost": "-10",
-											},
-											Labels: map[string]string{
-												"server-healthy": "false",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:            "game-server-probe-v3",
-							Namespace:       "sp1",
-							ResourceVersion: "01",
-						},
-						Spec: appsalphav1.PodProbeMarkerSpec{
-							Selector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									"app": "test-v2",
-								},
-							},
-							Probes: []appsalphav1.PodContainerProbe{
-								{
-									Name:          "healthy",
-									ContainerName: "main",
-									Probe: appsalphav1.ContainerProbeSpec{
-										Probe: corev1.Probe{
-											ProbeHandler: corev1.ProbeHandler{
-												Exec: &corev1.ExecAction{
-													Command: []string{"/bin/sh", "-c", "/healthy.sh"},
-												},
-											},
-										},
-									},
-									PodConditionType: "game.kruise.io/healthy",
-									MarkerPolicy: []appsalphav1.ProbeMarkerPolicy{
-										{
-											State: appsalphav1.ProbeSucceeded,
-											Annotations: map[string]string{
-												"controller.kubernetes.io/pod-deletion-cost": "10",
-											},
-											Labels: map[string]string{
-												"server-healthy": "true",
-											},
-										},
-										{
-											State: appsalphav1.ProbeFailed,
-											Annotations: map[string]string{
-												"controller.kubernetes.io/pod-deletion-cost": "-10",
-											},
-											Labels: map[string]string{
-												"server-healthy": "false",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			pod: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod1",
-					Namespace: "sp1",
-					Labels: map[string]string{
-						"app": "test",
-					},
-				},
-			},
-			expect:    nil,
-			expectErr: nil,
+			expectQLen: 1,
 		},
 	}
-
+	_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", features.EnablePodProbeMarkerOnServerless))
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
+			if cs.name != "podUpdateEvent, serverless pods" {
+				return
+			}
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
-			for _, ppm := range cs.ppmList.Items {
-				fakeClient.Create(context.TODO(), &ppm)
-			}
 			handler := enqueueRequestForPod{reader: fakeClient}
-			get, err := handler.getPodProbeMarkerForPod(cs.pod)
-			if !reflect.DeepEqual(cs.expectErr, err) {
-				t.Errorf("expectErr: %v, but: %v", cs.expectErr, err)
+			for _, ppm := range cs.ppmList.Items {
+				_ = fakeClient.Create(context.TODO(), &ppm)
 			}
-			if !reflect.DeepEqual(util.DumpJSON(cs.expect), util.DumpJSON(get)) {
-				t.Errorf("expectGet: %v, but: %v", util.DumpJSON(cs.expect), util.DumpJSON(get))
+			_ = fakeClient.Create(context.TODO(), cs.getNode())
+			oldPod, newPod := cs.getPod()
+			updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			updateEvent := event.UpdateEvent{
+				ObjectOld: oldPod,
+				ObjectNew: newPod,
+			}
+			handler.Update(context.TODO(), updateEvent, updateQ)
+			if updateQ.Len() != cs.expectQLen {
+				t.Errorf("unexpected update event handle queue size, expected %d actual %d", cs.expectQLen, updateQ.Len())
 			}
 		})
 	}

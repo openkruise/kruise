@@ -19,10 +19,15 @@ package podprobemarker
 import (
 	"context"
 
+	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/podprobemarker"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
@@ -30,10 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
 )
 
 var _ handler.EventHandler = &enqueueRequestForPodProbeMarker{}
@@ -83,59 +84,96 @@ func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.GenericEve
 }
 
 func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	new, ok := evt.ObjectNew.(*corev1.Pod)
+	newObj, ok := evt.ObjectNew.(*corev1.Pod)
 	if !ok {
 		return
 	}
-	old, ok := evt.ObjectOld.(*corev1.Pod)
+	oldObj, ok := evt.ObjectOld.(*corev1.Pod)
 	if !ok {
 		return
 	}
-	// add pod probe to nodePodProbe.spec
-	oldInitialCondition := util.GetCondition(old, corev1.PodInitialized)
-	newInitialCondition := util.GetCondition(new, corev1.PodInitialized)
-	if newInitialCondition == nil {
+	oldInitialCondition := util.GetCondition(oldObj, corev1.PodInitialized)
+	newInitialCondition := util.GetCondition(newObj, corev1.PodInitialized)
+	if !kubecontroller.IsPodActive(newObj) || newInitialCondition == nil ||
+		newInitialCondition.Status != corev1.ConditionTrue || newObj.Spec.NodeName == "" {
 		return
 	}
-	if !kubecontroller.IsPodActive(new) {
+
+	isServerlessPod := false
+	node := &corev1.Node{}
+	if err := p.reader.Get(context.TODO(), client.ObjectKey{Name: newObj.Spec.NodeName}, node); err != nil {
+		klog.ErrorS(err, "Failed to get Node", "nodeName", newObj.Spec.NodeName)
 		return
 	}
-	if ((oldInitialCondition == nil || oldInitialCondition.Status == corev1.ConditionFalse) &&
-		newInitialCondition.Status == corev1.ConditionTrue) || old.Status.PodIP != new.Status.PodIP {
-		ppms, err := p.getPodProbeMarkerForPod(new)
-		if err != nil {
-			klog.ErrorS(err, "Failed to List PodProbeMarker")
-			return
+	if node.Labels["type"] == VirtualKubelet {
+		isServerlessPod = true
+	}
+
+	triggerReconcile := false
+	diff := sets.NewString()
+	// normal pod
+	if !isServerlessPod {
+		if ((oldInitialCondition == nil || oldInitialCondition.Status == corev1.ConditionFalse) &&
+			newInitialCondition.Status == corev1.ConditionTrue) || oldObj.Status.PodIP != newObj.Status.PodIP {
+			triggerReconcile = true
 		}
-		for _, ppm := range ppms {
+	} else if utilfeature.DefaultFeatureGate.Enabled(features.EnablePodProbeMarkerOnServerless) {
+		// The serverless pod probe results will patch to the pod condition field,
+		// so it needs to be processed by reconcile, which in turn will patch pod labels or annotations.
+		diff = diffPodConditions(oldObj.Status.Conditions, newObj.Status.Conditions)
+		if diff.Len() > 0 {
+			triggerReconcile = true
+		}
+
+	}
+	if !triggerReconcile {
+		return
+	}
+
+	ppms, err := podprobemarker.GetPodProbeMarkerForPod(p.reader, newObj)
+	if err != nil {
+		klog.ErrorS(err, "Failed to List PodProbeMarker")
+		return
+	}
+	for _, ppm := range ppms {
+		// normal pod
+		if diff.Len() == 0 {
 			q.Add(reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: ppm.Namespace,
 					Name:      ppm.Name,
 				},
 			})
+			continue
+		}
+
+		// only reconcile related ppm
+		for _, probe := range ppm.Spec.Probes {
+			if diff.Has(probe.PodConditionType) {
+				q.Add(reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Namespace: ppm.Namespace,
+						Name:      ppm.Name,
+					},
+				})
+				continue
+			}
 		}
 	}
 }
 
-func (p *enqueueRequestForPod) getPodProbeMarkerForPod(pod *corev1.Pod) ([]*appsalphav1.PodProbeMarker, error) {
-	ppmList := &appsalphav1.PodProbeMarkerList{}
-	if err := p.reader.List(context.TODO(), ppmList, &client.ListOptions{Namespace: pod.Namespace}, utilclient.DisableDeepCopy); err != nil {
-		return nil, err
+func diffPodConditions(obj1, obj2 []corev1.PodCondition) sets.String {
+	diff := sets.NewString()
+	// type -> status
+	older := map[corev1.PodConditionType]corev1.ConditionStatus{}
+	for _, obj := range obj1 {
+		older[obj.Type] = obj.Status
 	}
-	var ppms []*appsalphav1.PodProbeMarker
-	for i := range ppmList.Items {
-		ppm := &ppmList.Items[i]
-		// This error is irreversible, so continue
-		labelSelector, err := util.ValidatedLabelSelectorAsSelector(ppm.Spec.Selector)
-		if err != nil {
-			continue
+	for _, obj := range obj2 {
+		status, ok := older[obj.Type]
+		if !ok || status != obj.Status {
+			diff.Insert(string(obj.Type))
 		}
-		// If a PUB with a nil or empty selector creeps in, it should match nothing, not everything.
-		if labelSelector.Empty() || !labelSelector.Matches(labels.Set(pod.Labels)) {
-			continue
-		}
-		ppms = append(ppms, ppm)
 	}
-	return ppms, nil
+	return diff
 }
