@@ -25,17 +25,6 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	kruiseapis "github.com/openkruise/kruise/apis"
-	"github.com/openkruise/kruise/pkg/client"
-	"github.com/openkruise/kruise/pkg/daemon/containermeta"
-	"github.com/openkruise/kruise/pkg/daemon/containerrecreate"
-	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
-	"github.com/openkruise/kruise/pkg/daemon/imagepuller"
-	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
-	"github.com/openkruise/kruise/pkg/daemon/podprobe"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
-	"github.com/openkruise/kruise/pkg/features"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,6 +37,18 @@ import (
 	"k8s.io/klog/v2"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
+
+	kruiseapis "github.com/openkruise/kruise/apis"
+	"github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/daemon/containermeta"
+	"github.com/openkruise/kruise/pkg/daemon/containerrecreate"
+	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
+	"github.com/openkruise/kruise/pkg/daemon/imagepuller"
+	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
+	"github.com/openkruise/kruise/pkg/daemon/podprobe"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 const (
@@ -89,7 +90,7 @@ type daemon struct {
 }
 
 // NewDaemon create a daemon
-func NewDaemon(cfg *rest.Config, bindAddress string) (Daemon, error) {
+func NewDaemon(cfg *rest.Config, bindAddress string, MaxWorkersForPullImages int) (Daemon, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("cfg can not be nil")
 	}
@@ -137,6 +138,8 @@ func NewDaemon(cfg *rest.Config, bindAddress string) (Daemon, error) {
 		PodInformer:    podInformer,
 		RuntimeFactory: runtimeFactory,
 		Healthz:        healthz,
+
+		MaxWorkersForPullImages: MaxWorkersForPullImages,
 	}
 
 	puller, err := imagepuller.NewController(opts, secretManager, cfg)

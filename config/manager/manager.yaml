@@ -103,6 +103,7 @@ spec:
         - --logtostderr=true
         - -v=5
         - --feature-gates=AllAlpha=true,AllBeta=true
+        - --max-workers-for-pull-image=2
         image: controller:latest
         imagePullPolicy: Always
         securityContext:
