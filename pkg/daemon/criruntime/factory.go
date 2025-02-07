@@ -26,7 +26,6 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	criremote "k8s.io/kubernetes/pkg/kubelet/cri/remote"
-	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 
 	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
