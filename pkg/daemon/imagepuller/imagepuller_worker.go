@@ -23,15 +23,17 @@ import (
 	"sync"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
-	"github.com/openkruise/kruise/pkg/util"
+	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 const (
@@ -46,6 +48,8 @@ const (
 	PullImageSucceed = "PullImageSucceed"
 	PullImageFailed  = "PullImageFailed"
 )
+
+var workerLimitedPool errgroup.Group
 
 type puller interface {
 	Sync(obj *appsv1alpha1.NodeImage, ref *v1.ObjectReference) error
@@ -63,12 +67,16 @@ type realPuller struct {
 
 var _ puller = &realPuller{}
 
-func newRealPuller(runtime runtimeimage.ImageService, secretManager daemonutil.SecretManager, eventRecorder record.EventRecorder) (*realPuller, error) {
+func newRealPuller(runtime runtimeimage.ImageService, secretManager daemonutil.SecretManager, eventRecorder record.EventRecorder, MaxWorkersForPullImages int) (*realPuller, error) {
 	p := &realPuller{
 		runtime:       runtime,
 		secretManager: secretManager,
 		eventRecorder: eventRecorder,
 		workerPools:   make(map[string]workerPool),
+	}
+	if MaxWorkersForPullImages > 0 {
+		klog.InfoS("set image pull worker number", "worker", MaxWorkersForPullImages)
+		workerLimitedPool.SetLimit(MaxWorkersForPullImages)
 	}
 	return p, nil
 }
@@ -264,6 +272,8 @@ func (w *realWorkerPool) UpdateStatus(status *appsv1alpha1.ImageTagStatus) {
 }
 
 func newPullWorker(name string, tagSpec appsv1alpha1.ImageTagSpec, sandboxConfig *appsv1alpha1.SandboxConfig, secrets []v1.Secret, runtime runtimeimage.ImageService, statusUpdater imageStatusUpdater, ref *v1.ObjectReference, eventRecorder record.EventRecorder) *pullWorker {
+	image := name + ":" + tagSpec.Tag
+	klog.V(5).InfoS("new pull worker", "image", image)
 	o := &pullWorker{
 		name:          name,
 		tagSpec:       tagSpec,
@@ -276,7 +286,23 @@ func newPullWorker(name string, tagSpec appsv1alpha1.ImageTagSpec, sandboxConfig
 		active:        true,
 		stopCh:        make(chan struct{}),
 	}
-	go o.Run()
+
+	go func() {
+		newStatus := &appsv1alpha1.ImageTagStatus{
+			Tag:     tagSpec.Tag,
+			Phase:   appsv1alpha1.ImagePhaseWaiting,
+			Version: tagSpec.Version,
+		}
+		o.statusUpdater.UpdateStatus(newStatus)
+
+		klog.V(5).InfoS("pull worker waiting", "image", image)
+		workerLimitedPool.Go(func() error {
+			klog.V(5).InfoS("pull worker start", "image", image)
+			o.Run()
+			klog.V(5).InfoS("pull worker end", "image", image)
+			return nil
+		})
+	}()
 	return o
 }
 
