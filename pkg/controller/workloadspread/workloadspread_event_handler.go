@@ -52,28 +52,29 @@ const (
 	DeploymentRevisionAnnotation             = "deployment.kubernetes.io/revision"
 )
 
-var _ handler.EventHandler = &podEventHandler{}
+var _ handler.TypedEventHandler[*corev1.Pod] = &podEventHandler{}
 
 type podEventHandler struct{}
 
-func (p *podEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	p.handlePod(ctx, q, evt.Object, CreateEventAction)
+func (p *podEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+	p.handlePod(q, evt.Object, CreateEventAction)
 }
 
-func (p *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	oldPod := evt.ObjectOld.(*corev1.Pod)
-	newPod := evt.ObjectNew.(*corev1.Pod)
+func (p *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+	oldPod := evt.ObjectOld
+	newPod := evt.ObjectNew
 
 	if kubecontroller.IsPodActive(oldPod) && !kubecontroller.IsPodActive(newPod) || wsutil.GetPodVersion(oldPod) != wsutil.GetPodVersion(newPod) {
 		p.handlePod(ctx, q, newPod, UpdateEventAction)
 	}
 }
 
-func (p *podEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	p.handlePod(ctx, q, evt.Object, DeleteEventAction)
+func (p *podEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+	p.handlePod(q, evt.Object, DeleteEventAction)
+
 }
 
-func (p *podEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (p *podEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
 }
 
 func (p *podEventHandler) handlePod(ctx context.Context, q workqueue.RateLimitingInterface, obj runtime.Object, action EventAction) {

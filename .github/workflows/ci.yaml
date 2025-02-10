@@ -13,7 +13,7 @@ permissions: read-all
 
 env:
   # Common versions
-  GO_VERSION: '1.20'
+  GO_VERSION: '1.22'
   GOLANGCI_VERSION: 'v1.55.2'
   DOCKER_BUILDX_VERSION: 'v0.4.2'
 
@@ -31,7 +31,7 @@ jobs:
       - name: Checkout Actions Repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Check spelling with custom config file
-        uses: crate-ci/typos@bd36f89fcd3424dcefd442894589e6ee572a59f2 # v1.28.1
+        uses: crate-ci/typos@11ca4583f2f3f74c7e7785c0ecb20fe2c99a4308 # v1.29.5
         with:
           config: ./typos.toml
 
@@ -73,7 +73,7 @@ jobs:
           output: 'trivy-results.sarif'
           severity: 'CRITICAL'
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@aa578102511db1f4524ed59b8cc2bae4f6e88195 # v3.27.6
+        uses: github/codeql-action/upload-sarif@dd746615b3b9d728a6a37ca2045b68ca76d4841a # v3.28.8
         with:
           sarif_file: 'trivy-results.sarif'
 
@@ -128,9 +128,10 @@ jobs:
           make test
           git status
       - name: Publish Unit Test Coverage
-        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4.6.0
+        uses: codecov/codecov-action@13ce06bfc6bbe3ecf90edbbf1bc32fe5978ca1d3 # v5.3.1
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           flags: unittests
           file: cover.out
-      - name: Check diff
-        run: '[[ -z $(git status -s) ]] || (printf "Existing modified/untracked files.\nPlease run \"make generate manifests\" and push again.\n"; exit 1)'

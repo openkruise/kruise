@@ -4870,7 +4870,7 @@ func TestStatefulSetVCTResize(t *testing.T) {
 			},
 			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
 				set.Spec.Template.Spec.Containers[0].Image = "busybox"
-				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},
@@ -4888,7 +4888,7 @@ func TestStatefulSetVCTResize(t *testing.T) {
 			},
 			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
 				set.Spec.Template.Spec.Containers[0].Image = "busybox"
-				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},
@@ -4906,12 +4906,12 @@ func TestStatefulSetVCTResize(t *testing.T) {
 			},
 			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
 				set.Spec.Template.Spec.Containers[0].Image = "busybox"
-				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},
 				}
-				set.Spec.VolumeClaimTemplates[1].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[1].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},
@@ -4929,7 +4929,7 @@ func TestStatefulSetVCTResize(t *testing.T) {
 			},
 			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
 				set.Spec.Template.Spec.Containers[0].Image = "busybox"
-				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},
@@ -4947,12 +4947,12 @@ func TestStatefulSetVCTResize(t *testing.T) {
 			},
 			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
 				set.Spec.Template.Spec.Containers[0].Image = "busybox"
-				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},
 				}
-				set.Spec.VolumeClaimTemplates[1].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[1].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},
@@ -4970,7 +4970,7 @@ func TestStatefulSetVCTResize(t *testing.T) {
 			},
 			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
 				set.Spec.Template.Spec.Containers[0].Image = "busybox"
-				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},

@@ -41,7 +41,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/gengo/examples/set-gen/sets"
 	"k8s.io/klog/v2"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	kubelettypes "k8s.io/kubelet/pkg/types"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/client"

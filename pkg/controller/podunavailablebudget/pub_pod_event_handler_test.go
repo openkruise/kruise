@@ -42,7 +42,7 @@ func TestPodEventHandler(t *testing.T) {
 
 	// create
 	createQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	createEvt := event.CreateEvent{
+	createEvt := event.TypedCreateEvent[*corev1.Pod]{
 		Object: podDemo.DeepCopy(),
 	}
 	createEvt.Object.SetAnnotations(map[string]string{pubcontrol.PodRelatedPubAnnotation: pubDemo.Name})
@@ -57,7 +57,7 @@ func TestPodEventHandler(t *testing.T) {
 	readyCondition := podutil.GetPodReadyCondition(newPod.Status)
 	readyCondition.Status = corev1.ConditionFalse
 	updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	updateEvent := event.UpdateEvent{
+	updateEvent := event.TypedUpdateEvent[*corev1.Pod]{
 		ObjectOld: podDemo,
 		ObjectNew: newPod,
 	}
@@ -73,7 +73,7 @@ func TestPodEventHandler(t *testing.T) {
 	newPod.ResourceVersion = fmt.Sprintf("%d", time.Now().Unix())
 	newPod.Spec.Containers[0].Image = "nginx:latest"
 	updateQ = workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	updateEvent = event.UpdateEvent{
+	updateEvent = event.TypedUpdateEvent[*corev1.Pod]{
 		ObjectOld: podDemo,
 		ObjectNew: newPod,
 	}

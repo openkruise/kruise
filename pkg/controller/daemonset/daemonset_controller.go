@@ -217,41 +217,41 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	logger := klog.FromContext(context.TODO())
 	// Watch for changes to DaemonSet
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.DaemonSet{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			ds := e.Object.(*appsv1alpha1.DaemonSet)
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.DaemonSet{}, &handler.TypedEnqueueRequestForObject[*appsv1alpha1.DaemonSet]{}, predicate.TypedFuncs[*appsv1alpha1.DaemonSet]{
+		CreateFunc: func(e event.TypedCreateEvent[*appsv1alpha1.DaemonSet]) bool {
+			ds := e.Object
 			klog.V(4).InfoS("Adding DaemonSet", "daemonSet", klog.KObj(ds))
 			return true
 		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			oldDS := e.ObjectOld.(*appsv1alpha1.DaemonSet)
-			newDS := e.ObjectNew.(*appsv1alpha1.DaemonSet)
+		UpdateFunc: func(e event.TypedUpdateEvent[*appsv1alpha1.DaemonSet]) bool {
+			oldDS := e.ObjectOld
+			newDS := e.ObjectNew
 			if oldDS.UID != newDS.UID {
 				dsc.expectations.DeleteExpectations(logger, keyFunc(oldDS))
 			}
 			klog.V(4).InfoS("Updating DaemonSet", "daemonSet", klog.KObj(newDS))
 			return true
 		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			ds := e.Object.(*appsv1alpha1.DaemonSet)
+		DeleteFunc: func(e event.TypedDeleteEvent[*appsv1alpha1.DaemonSet]) bool {
+			ds := e.Object
 			klog.V(4).InfoS("Deleting DaemonSet", "daemonSet", klog.KObj(ds))
 			dsc.expectations.DeleteExpectations(logger, keyFunc(ds))
 			newPodForDSCache.Delete(ds.UID)
 			return true
 		},
-	})
+	}))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Node.
-	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Node{}), &nodeEventHandler{reader: mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Node{}, &nodeEventHandler{reader: mgr.GetCache()}))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Pod created by DaemonSet
-	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}), &podEventHandler{Reader: mgr.GetCache(), expectations: dsc.expectations})
+	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}, &podEventHandler{Reader: mgr.GetCache(), expectations: dsc.expectations}))
 	if err != nil {
 		return err
 	}

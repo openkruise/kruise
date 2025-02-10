@@ -27,6 +27,7 @@ import (
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -1036,6 +1037,14 @@ var _ = SIGDescribe("workloadspread", func() {
 		})
 
 		framework.ConformanceIt("only one subset, zone-a=nil", func() {
+			priorityClass := &schedulingv1.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-priority-class",
+				},
+				Value:         100,
+				GlobalDefault: false,
+			}
+			tester.CreatePriorityClass(priorityClass)
 			cloneSet := tester.NewBaseCloneSet(ns)
 			// create workloadSpread
 			targetRef := appsv1alpha1.TargetReference{
@@ -1056,7 +1065,7 @@ var _ = SIGDescribe("workloadspread", func() {
 				},
 				MaxReplicas: nil,
 				Patch: runtime.RawExtension{
-					Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-a"}}}`),
+					Raw: []byte(`{"metadata":{"annotations":{"subset":"zone-a"}},"spec":{"priorityClassName":"test-priority-class"}}`),
 				},
 			}
 
@@ -1083,6 +1092,8 @@ var _ = SIGDescribe("workloadspread", func() {
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
 						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
+						gomega.Expect(pod.Spec.PriorityClassName).To(gomega.Equal("test-priority-class"))
+						gomega.Expect(*pod.Spec.Priority).To(gomega.BeEquivalentTo(100))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
 				} else {
@@ -1123,6 +1134,8 @@ var _ = SIGDescribe("workloadspread", func() {
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
 						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
+						gomega.Expect(pod.Spec.PriorityClassName).To(gomega.Equal("test-priority-class"))
+						gomega.Expect(*pod.Spec.Priority).To(gomega.BeEquivalentTo(100))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
 				} else {
@@ -1163,6 +1176,8 @@ var _ = SIGDescribe("workloadspread", func() {
 						gomega.Expect(injectWorkloadSpread.Name).To(gomega.Equal(workloadSpread.Name))
 						gomega.Expect(pod.Spec.Affinity).NotTo(gomega.BeNil())
 						gomega.Expect(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions).To(gomega.Equal(subset1.RequiredNodeSelectorTerm.MatchExpressions))
+						gomega.Expect(pod.Spec.PriorityClassName).To(gomega.Equal("test-priority-class"))
+						gomega.Expect(*pod.Spec.Priority).To(gomega.BeEquivalentTo(100))
 						gomega.Expect(pod.Annotations[workloadspread.PodDeletionCostAnnotation]).To(gomega.Equal("100"))
 					}
 				} else {

@@ -66,22 +66,22 @@ func add(mgr manager.Manager, r *ReconcilePodReadiness) error {
 		return err
 	}
 
-	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			pod := e.Object.(*v1.Pod)
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}, &handler.TypedEnqueueRequestForObject[*v1.Pod]{}, predicate.TypedFuncs[*v1.Pod]{
+		CreateFunc: func(e event.TypedCreateEvent[*v1.Pod]) bool {
+			pod := e.Object
 			return utilpodreadiness.ContainsReadinessGate(pod) && utilpodreadiness.GetReadinessCondition(pod) == nil
 		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			pod := e.ObjectNew.(*v1.Pod)
+		UpdateFunc: func(e event.TypedUpdateEvent[*v1.Pod]) bool {
+			pod := e.ObjectNew
 			return utilpodreadiness.ContainsReadinessGate(pod) && utilpodreadiness.GetReadinessCondition(pod) == nil
 		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
+		DeleteFunc: func(e event.TypedDeleteEvent[*v1.Pod]) bool {
 			return false
 		},
-		GenericFunc: func(e event.GenericEvent) bool {
+		GenericFunc: func(e event.TypedGenericEvent[*v1.Pod]) bool {
 			return false
 		},
-	})
+	}))
 	if err != nil {
 		return err
 	}

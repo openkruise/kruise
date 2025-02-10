@@ -96,7 +96,7 @@ func validatePullPolicy(policy core.PullPolicy, fldPath *field.Path) field.Error
 
 // validateContainerCommon applies validation common to all container types. It's called by regular, init, and ephemeral
 // container list validation to require a properly formatted name, image, etc.
-func validateContainerCommon(ctr *core.Container, path *field.Path, opts validation.PodValidationOptions) field.ErrorList {
+func validateContainerCommon(ctr *core.Container, path *field.Path, opts validation.PodValidationOptions, hostUsers bool) field.ErrorList {
 	var allErrs field.ErrorList
 
 	namePath := path.Child("name")
@@ -127,9 +127,9 @@ func validateContainerCommon(ctr *core.Container, path *field.Path, opts validat
 
 	allErrs = append(allErrs, validateContainerPorts(ctr.Ports, path.Child("ports"))...)
 	allErrs = append(allErrs, validation.ValidateEnv(ctr.Env, path.Child("env"), opts)...)
-	allErrs = append(allErrs, validation.ValidateEnvFrom(ctr.EnvFrom, path.Child("envFrom"))...)
+	allErrs = append(allErrs, validation.ValidateEnvFrom(ctr.EnvFrom, path.Child("envFrom"), opts)...)
 	allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, path.Child("imagePullPolicy"))...)
-	allErrs = append(allErrs, validation.ValidateSecurityContext(ctr.SecurityContext, path.Child("securityContext"))...)
+	allErrs = append(allErrs, validation.ValidateSecurityContext(ctr.SecurityContext, path.Child("securityContext"), hostUsers)...)
 	return allErrs
 }
 
@@ -168,7 +168,7 @@ func validateFieldAllowList(value interface{}, allowedFields map[string]bool, er
 
 // validateEphemeralContainers is called by pod spec and template validation to validate the list of ephemeral containers.
 // Note that this is called for pod template even though ephemeral containers aren't allowed in pod templates.
-func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, fldPath *field.Path, opts validation.PodValidationOptions) field.ErrorList {
+func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, fldPath *field.Path, opts validation.PodValidationOptions, hostUsers bool) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if len(ephemeralContainers) == 0 {
@@ -181,7 +181,7 @@ func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, 
 		idxPath := fldPath.Index(i)
 
 		c := (*core.Container)(&ec.EphemeralContainerCommon)
-		allErrs = append(allErrs, validateContainerCommon(c, idxPath, opts)...)
+		allErrs = append(allErrs, validateContainerCommon(c, idxPath, opts, hostUsers)...)
 		// Ephemeral containers don't need looser constraints for pod templates, so it's convenient to apply both validations
 		// here where we've already converted EphemeralContainerCommon to Container.
 		allErrs = append(allErrs, validateContainerOnlyForPod(c, idxPath)...)

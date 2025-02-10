@@ -814,7 +814,7 @@ func newPVC(name string) corev1.PersistentVolumeClaim {
 			Name:      name,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
-			Resources: corev1.ResourceRequirements{
+			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
 				},

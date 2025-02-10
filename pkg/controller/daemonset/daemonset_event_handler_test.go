@@ -45,20 +45,20 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 	cases := []struct {
 		name                          string
 		dss                           []*appsv1alpha1.DaemonSet
-		e                             event.CreateEvent
+		e                             event.TypedCreateEvent[*v1.Pod]
 		alterExpectationCreationsKey  string
 		alterExpectationCreationsAdds []string
 		expectedQueueLen              int
 	}{
 		{
 			name: "no ds",
-			e:    event.CreateEvent{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &metav1.Time{Time: time.Now()}}}},
+			e:    event.TypedCreateEvent[*v1.Pod]{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &metav1.Time{Time: time.Now()}}}},
 
 			expectedQueueLen: 0,
 		},
 		{
 			name: "no ds",
-			e:    event.CreateEvent{Object: &v1.Pod{}},
+			e:    event.TypedCreateEvent[*v1.Pod]{Object: &v1.Pod{}},
 
 			expectedQueueLen: 0,
 		},
@@ -98,7 +98,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 					},
 				},
 			},
-			e:                event.CreateEvent{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pod-abc", Labels: map[string]string{"key": "v1"}}}},
+			e:                event.TypedCreateEvent[*v1.Pod]{Object: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pod-abc", Labels: map[string]string{"key": "v1"}}}},
 			expectedQueueLen: 2,
 		},
 		{
@@ -139,7 +139,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 					},
 				},
 			},
-			e: event.CreateEvent{
+			e: event.TypedCreateEvent[*v1.Pod]{
 				Object: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
@@ -201,12 +201,12 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 	cases := []struct {
 		name             string
 		dss              []*appsv1alpha1.DaemonSet
-		e                event.UpdateEvent
+		e                event.TypedUpdateEvent[*v1.Pod]
 		expectedQueueLen int
 	}{
 		{
 			name:             "resourceVersion no changed",
-			e:                event.UpdateEvent{ObjectNew: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "01"}}, ObjectOld: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "01"}}},
+			e:                event.TypedUpdateEvent[*v1.Pod]{ObjectNew: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "01"}}, ObjectOld: &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "01"}}},
 			expectedQueueLen: 0,
 		},
 		{
@@ -247,7 +247,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 					},
 				},
 			},
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Pod]{
 				ObjectOld: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "default",
@@ -322,7 +322,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 					},
 				},
 			},
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Pod]{
 				ObjectOld: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "default",
@@ -397,7 +397,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 					},
 				},
 			},
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Pod]{
 				ObjectOld: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "default",
@@ -471,7 +471,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 					},
 				},
 			},
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Pod]{
 				ObjectOld: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "default",
@@ -545,7 +545,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 					},
 				},
 			},
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Pod]{
 				ObjectOld: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "default",
@@ -618,7 +618,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 					},
 				},
 			},
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Pod]{
 				ObjectOld: &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:       "default",
@@ -674,7 +674,7 @@ func TestEnqueueRequestForNodeCreate(t *testing.T) {
 	cases := []struct {
 		name             string
 		dss              []*appsv1alpha1.DaemonSet
-		e                event.CreateEvent
+		e                event.TypedCreateEvent[*v1.Node]
 		expectedQueueLen int
 	}{
 		{
@@ -713,7 +713,7 @@ func TestEnqueueRequestForNodeCreate(t *testing.T) {
 					},
 				},
 			},
-			e: event.CreateEvent{
+			e: event.TypedCreateEvent[*v1.Node]{
 				Object: &v1.Node{
 					Spec: v1.NodeSpec{
 						Taints: []v1.Taint{
@@ -764,7 +764,7 @@ func TestEnqueueRequestForNodeCreate(t *testing.T) {
 					},
 				},
 			},
-			e: event.CreateEvent{
+			e: event.TypedCreateEvent[*v1.Node]{
 				Object: &v1.Node{},
 			},
 			expectedQueueLen: 2,
@@ -789,12 +789,12 @@ func TestEnqueueRequestForNodeUpdate(t *testing.T) {
 	cases := []struct {
 		name             string
 		dss              []*appsv1alpha1.DaemonSet
-		e                event.UpdateEvent
+		e                event.TypedUpdateEvent[*v1.Node]
 		expectedQueueLen int
 	}{
 		{
 			name: "shouldIgnoreNodeUpdate",
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Node]{
 				ObjectOld: &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "name0",
@@ -828,7 +828,7 @@ func TestEnqueueRequestForNodeUpdate(t *testing.T) {
 					},
 				},
 			},
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Node]{
 				ObjectOld: &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "name0",
@@ -871,7 +871,7 @@ func TestEnqueueRequestForNodeUpdate(t *testing.T) {
 					},
 				},
 			},
-			e: event.UpdateEvent{
+			e: event.TypedUpdateEvent[*v1.Node]{
 				ObjectOld: &v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "name0",

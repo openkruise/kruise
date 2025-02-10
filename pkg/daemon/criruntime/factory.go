@@ -208,6 +208,14 @@ func detectRuntime(varRunPath string) (cfgs []runtimeConfig) {
 				runtimeRemoteURI: fmt.Sprintf("unix://%s/cri-dockerd.sock", varRunPath),
 			})
 		}
+		// Check if the cri-dockerd runtime socket exists in the expected k3s runtime directory.
+		// If found, append it to the runtime configuration list to ensure k3s can use cri-dockerd.
+		if _, err = os.Stat(fmt.Sprintf("%s/cri-dockerd/cri-dockerd.sock", varRunPath)); err == nil {
+			cfgs = append(cfgs, runtimeConfig{
+				runtimeType:      ContainerRuntimeCommonCRI,
+				runtimeRemoteURI: fmt.Sprintf("unix://%s/cri-dockerd/cri-dockerd.sock", varRunPath),
+			})
+		}
 	}
 	return cfgs
 }

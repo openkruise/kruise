@@ -133,6 +133,9 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, npp := range nppList.Items {
 				for _, podProbe := range npp.Spec.PodProbes {
+					if podProbe.Namespace != ns {
+						continue
+					}
 					gomega.Expect(validPods.Has(podProbe.UID)).To(gomega.BeTrue())
 				}
 			}
@@ -228,6 +231,9 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, npp := range nppList.Items {
 				for _, podProbe := range npp.Spec.PodProbes {
+					if podProbe.Namespace != ns {
+						continue
+					}
 					gomega.Expect(validPods.Has(podProbe.UID)).To(gomega.BeTrue())
 				}
 			}
@@ -262,6 +268,9 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, npp := range nppList.Items {
 				for _, podProbe := range npp.Spec.PodProbes {
+					if podProbe.Namespace != ns {
+						continue
+					}
 					gomega.Expect(validPods.Has(podProbe.UID)).To(gomega.BeTrue())
 				}
 			}
@@ -467,6 +476,10 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, npp := range nppList.Items {
 				for _, podProbe := range npp.Spec.PodProbes {
+					if podProbe.Namespace != ns {
+						// skip other namespace
+						continue
+					}
 					gomega.Expect(validPods.Has(podProbe.UID)).To(gomega.BeTrue())
 				}
 			}
@@ -524,6 +537,9 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, npp := range nppList.Items {
 				for _, podProbe := range npp.Spec.PodProbes {
+					if podProbe.Namespace != ns {
+						continue
+					}
 					gomega.Expect(validPods.Has(podProbe.UID)).To(gomega.BeTrue())
 				}
 			}
@@ -553,6 +569,9 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, npp := range nppList.Items {
 				for _, podProbe := range npp.Spec.PodProbes {
+					if podProbe.Namespace != ns {
+						continue
+					}
 					gomega.Expect(validPods.Has(podProbe.UID)).To(gomega.BeTrue())
 				}
 			}

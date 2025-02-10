@@ -52,14 +52,14 @@ type podEventHandler struct {
 	client.Reader
 }
 
-var _ handler.EventHandler = &podEventHandler{}
+var _ handler.TypedEventHandler[*v1.Pod] = &podEventHandler{}
 
-func (e *podEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	pod := evt.Object.(*v1.Pod)
+func (e *podEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+	pod := evt.Object
 	if pod.DeletionTimestamp != nil {
 		// on a restart of the controller manager, it's possible a new pod shows up in a state that
 		// is already pending deletion. Prevent the pod from being a creation observation.
-		e.Delete(ctx, event.DeleteEvent{Object: evt.Object}, q)
+		e.Delete(ctx, event.TypedDeleteEvent[*v1.Pod]{Object: evt.Object}, q)
 		return
 	}
 
@@ -102,9 +102,9 @@ func (e *podEventHandler) Create(ctx context.Context, evt event.CreateEvent, q w
 	}
 }
 
-func (e *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	oldPod := evt.ObjectOld.(*v1.Pod)
-	curPod := evt.ObjectNew.(*v1.Pod)
+func (e *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+	oldPod := evt.ObjectOld
+	curPod := evt.ObjectNew
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
 		// Periodic resync will send update events for all known pods.
 		// Two different versions of the same pod will always have different RVs.
@@ -118,10 +118,10 @@ func (e *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q w
 		// for modification of the deletion timestamp and expect an rs to create more replicas asap, not wait
 		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
 		// an rs never initiates a phase change, and so is never asleep waiting for the same.
-		e.Delete(ctx, event.DeleteEvent{Object: evt.ObjectNew}, q)
+		e.Delete(ctx, event.TypedDeleteEvent[*v1.Pod]{Object: evt.ObjectNew}, q)
 		if labelChanged {
 			// we don't need to check the oldPod.DeletionTimestamp because DeletionTimestamp cannot be unset.
-			e.Delete(ctx, event.DeleteEvent{Object: evt.ObjectOld}, q)
+			e.Delete(ctx, event.TypedDeleteEvent[*v1.Pod]{Object: evt.ObjectOld}, q)
 		}
 		return
 	}
@@ -187,12 +187,8 @@ func (e *podEventHandler) shouldIgnoreUpdate(req *reconcile.Request, oldPod, cur
 	return clonesetcore.New(cs).IgnorePodUpdateEvent(oldPod, curPod)
 }
 
-func (e *podEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	pod, ok := evt.Object.(*v1.Pod)
-	if !ok {
-		klog.ErrorS(nil, "Skipped pod deletion event", "deleteStateUnknown", evt.DeleteStateUnknown, "obj", evt.Object)
-		return
-	}
+func (e *podEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+	pod := evt.Object
 	clonesetutils.ResourceVersionExpectations.Delete(pod)
 
 	controllerRef := metav1.GetControllerOf(pod)
@@ -210,7 +206,7 @@ func (e *podEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q w
 	q.Add(*req)
 }
 
-func (e *podEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
 
 }
 
@@ -225,7 +221,7 @@ func resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference
 	// Compare the OwnerReference Group and Kind against the OwnerType Group and Kind specified by the user.
 	// If the two match, create a Request for the objected referred to by
 	// the OwnerReference.  Use the Name from the OwnerReference and the Namespace from the
-	// object in the event.
+	// object in the event.Typed
 	if controllerRef.Kind == clonesetutils.ControllerKind.Kind && refGV.Group == clonesetutils.ControllerKind.Group {
 		// Match found - add a Request for the object referred to in the OwnerReference
 		req := reconcile.Request{NamespacedName: types.NamespacedName{
@@ -272,12 +268,12 @@ func (e *podEventHandler) joinCloneSetNames(csList []appsv1alpha1.CloneSet) stri
 type pvcEventHandler struct {
 }
 
-var _ handler.EventHandler = &pvcEventHandler{}
+var _ handler.TypedEventHandler[*v1.PersistentVolumeClaim] = &pvcEventHandler{}
 
-func (e *pvcEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
-	pvc := evt.Object.(*v1.PersistentVolumeClaim)
+func (e *pvcEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.PersistentVolumeClaim], q workqueue.RateLimitingInterface) {
+	pvc := evt.Object
 	if pvc.DeletionTimestamp != nil {
-		e.Delete(ctx, event.DeleteEvent{Object: evt.Object}, q)
+		e.Delete(ctx, event.TypedDeleteEvent[*v1.PersistentVolumeClaim]{Object: evt.Object}, q)
 		return
 	}
 
@@ -298,20 +294,15 @@ func (e *pvcEventHandler) Create(ctx context.Context, evt event.CreateEvent, q w
 	}
 }
 
-func (e *pvcEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	pvc := evt.ObjectNew.(*v1.PersistentVolumeClaim)
+func (e *pvcEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.PersistentVolumeClaim], q workqueue.RateLimitingInterface) {
+	pvc := evt.ObjectNew
 	if pvc.DeletionTimestamp != nil {
-		e.Delete(ctx, event.DeleteEvent{Object: evt.ObjectNew}, q)
+		e.Delete(ctx, event.TypedDeleteEvent[*v1.PersistentVolumeClaim]{Object: evt.ObjectNew}, q)
 	}
 }
 
-func (e *pvcEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	pvc, ok := evt.Object.(*v1.PersistentVolumeClaim)
-	if !ok {
-		klog.ErrorS(nil, "Skipped pvc deletion event", "deleteStateUnknown", evt.DeleteStateUnknown, "obj", evt.Object)
-		return
-	}
-
+func (e *pvcEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.PersistentVolumeClaim], q workqueue.RateLimitingInterface) {
+	pvc := evt.Object
 	if controllerRef := metav1.GetControllerOf(pvc); controllerRef != nil {
 		if req := resolveControllerRef(pvc.Namespace, controllerRef); req != nil {
 			clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Delete, pvc.Name)
@@ -320,6 +311,6 @@ func (e *pvcEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q w
 	}
 }
 
-func (e *pvcEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *pvcEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.PersistentVolumeClaim], q workqueue.RateLimitingInterface) {
 
 }

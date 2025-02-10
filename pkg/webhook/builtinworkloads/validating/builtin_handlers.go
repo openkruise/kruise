@@ -21,22 +21,23 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
 	admissionv1 "k8s.io/api/admission/v1"
 	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
 )
 
 // WorkloadHandler handles built-in workloads, e.g. Deployment, ReplicaSet, StatefulSet
 type WorkloadHandler struct {
 	// Decoder decodes objects
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 }
 
-func (h *WorkloadHandler) InjectDecoder(d *admission.Decoder) error {
+func (h *WorkloadHandler) InjectDecoder(d admission.Decoder) error {
 	h.Decoder = d
 	return nil
 }

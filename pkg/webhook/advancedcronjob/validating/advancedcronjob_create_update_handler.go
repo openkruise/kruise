@@ -54,7 +54,7 @@ var (
 // AdvancedCronJobCreateUpdateHandler handles AdvancedCronJob
 type AdvancedCronJobCreateUpdateHandler struct {
 	// Decoder decodes objects
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 }
 
 func (h *AdvancedCronJobCreateUpdateHandler) validateAdvancedCronJob(obj *appsv1alpha1.AdvancedCronJob) field.ErrorList {

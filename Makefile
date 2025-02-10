@@ -15,7 +15,7 @@ GOOS ?= $(shell go env GOOS)
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 # Run `setup-envtest list` to list available versions.
-ENVTEST_K8S_VERSION ?= 1.28.0
+ENVTEST_K8S_VERSION ?= 1.30.0
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
@@ -28,7 +28,7 @@ all: build
 ##@ Development
 
 go_check:
-	@scripts/check_go_version "1.20"
+	@scripts/check_go_version "1.22"
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	@scripts/generate_client.sh
@@ -48,6 +48,12 @@ lint: golangci-lint ## Run golangci-lint against code.
 	$(GOLANGCI_LINT) run
 
 test: generate fmt vet manifests envtest ## Run tests
+	echo $(ENVTEST)
+	go build -o pkg/daemon/criruntime/imageruntime/fake_plugin/fake-credential-plugin pkg/daemon/criruntime/imageruntime/fake_plugin/main.go && chmod +x pkg/daemon/criruntime/imageruntime/fake_plugin/fake-credential-plugin
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -race ./pkg/... -coverprofile cover.out
+	rm pkg/daemon/criruntime/imageruntime/fake_plugin/fake-credential-plugin
+
+atest: 
 	echo $(ENVTEST)
 	go build -o pkg/daemon/criruntime/imageruntime/fake_plugin/fake-credential-plugin pkg/daemon/criruntime/imageruntime/fake_plugin/main.go && chmod +x pkg/daemon/criruntime/imageruntime/fake_plugin/fake-credential-plugin
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -race ./pkg/... -coverprofile cover.out
@@ -99,11 +105,11 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
 
-# controller-gen@v0.14.0 comply with k8s.io/api v0.28.x
-ifeq ("$(shell $(CONTROLLER_GEN) --version 2> /dev/null)", "Version: v0.14.0")
+# controller-gen@v0.16.5 comply with k8s.io/api v0.30.x
+ifeq ("$(shell $(CONTROLLER_GEN) --version 2> /dev/null)", "Version: v0.16.5")
 else
 	rm -rf $(CONTROLLER_GEN)
-	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.14.0)
+	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.5)
 endif
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
@@ -175,8 +181,13 @@ kube-load-image: $(tools/kind)
 # install-kruise install kruise with local build image to kube cluster.
 .PHONY: install-kruise
 install-kruise:
-	kubectl create ns kruise-system
-	kubectl apply -f test/kruise-e2e-config.yaml
+	kubectl create namespace kruise-system;
+ifeq ($(DISABLE_E2E_CONFIG), true)
+	@echo "Skipping e2e config application...";
+else
+	@echo "Applying e2e config...";
+	kubectl apply -f test/kruise-e2e-config.yaml;
+endif
 	tools/hack/install-kruise.sh $(IMG)
 
 # run-kruise-e2e-test starts to run kruise e2e tests.

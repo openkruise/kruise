@@ -107,25 +107,25 @@ func add(mgr manager.Manager, r *ReconcileImagePullJob) error {
 	}
 
 	// Watch for changes to ImagePullJob
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.ImagePullJob{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.ImagePullJob{}, &handler.TypedEnqueueRequestForObject[*appsv1alpha1.ImagePullJob]{}))
 	if err != nil {
 		return err
 	}
 
 	// Watch for nodeimage update to get image pull status
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.NodeImage{}), &nodeImageEventHandler{Reader: mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.NodeImage{}, &nodeImageEventHandler{Reader: mgr.GetCache()}))
 	if err != nil {
 		return err
 	}
 
 	// Watch for pod for jobs that have pod selector
-	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}), &podEventHandler{Reader: mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}, &podEventHandler{Reader: mgr.GetCache()}))
 	if err != nil {
 		return err
 	}
 
 	// Watch for secret for jobs that have pullSecrets
-	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Secret{}), &secretEventHandler{Reader: mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Secret{}, &secretEventHandler{Reader: mgr.GetCache()}))
 	if err != nil {
 		return err
 	}

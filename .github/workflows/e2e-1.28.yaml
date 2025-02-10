@@ -13,7 +13,7 @@ permissions: read-all
 
 env:
   # Common versions
-  GO_VERSION: '1.20'
+  GO_VERSION: '1.22'
   KIND_VERSION: 'v0.22.0'
   KIND_IMAGE: 'kindest/node:v1.28.7'
   KIND_CLUSTER_NAME: 'ci-testing'
@@ -30,7 +30,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: helm/kind-action@0025e74a8c7512023d06dc019c617aa3cf561fde # v1.10.0
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
@@ -47,33 +47,7 @@ jobs:
           kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
       - name: Install Kruise
         run: |
-          set -ex
-          kubectl cluster-info
-          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} ./scripts/deploy_kind.sh
-          NODES=$(kubectl get node | wc -l)
-          for ((i=1;i<10;i++));
-          do
-            set +e
-            PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-            set -e
-            if [ "$PODS" -eq "$NODES" ]; then
-              break
-            fi
-            sleep 3
-          done
-          set +e
-          PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-          kubectl get node -o yaml
-          kubectl get all -n kruise-system -o yaml
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
-          set -e
-          if [ "$PODS" -eq "$NODES" ]; then
-            echo "Wait for kruise-manager and kruise-daemon ready successfully"
-          else
-            echo "Timeout to wait for kruise-manager and kruise-daemon ready"
-            exit 1
-          fi
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
@@ -113,7 +87,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: helm/kind-action@0025e74a8c7512023d06dc019c617aa3cf561fde # v1.10.0
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
@@ -126,33 +100,7 @@ jobs:
           kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
       - name: Install Kruise
         run: |
-          set -ex
-          kubectl cluster-info
-          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} ./scripts/deploy_kind.sh
-          NODES=$(kubectl get node | wc -l)
-          for ((i=1;i<10;i++));
-          do
-            set +e
-            PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-            set -e
-            if [ "$PODS" -eq "$NODES" ]; then
-              break
-            fi
-            sleep 3
-          done
-          set +e
-          PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-          kubectl get node -o yaml
-          kubectl get all -n kruise-system -o yaml
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
-          set -e
-          if [ "$PODS" -eq "$NODES" ]; then
-            echo "Wait for kruise-manager and kruise-daemon ready successfully"
-          else
-            echo "Timeout to wait for kruise-manager and kruise-daemon ready"
-            exit 1
-          fi
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
@@ -192,7 +140,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: helm/kind-action@0025e74a8c7512023d06dc019c617aa3cf561fde # v1.10.0
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
@@ -205,33 +153,7 @@ jobs:
           kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
       - name: Install Kruise
         run: |
-          set -ex
-          kubectl cluster-info
-          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} ./scripts/deploy_kind.sh
-          NODES=$(kubectl get node | wc -l)
-          for ((i=1;i<10;i++));
-          do
-            set +e
-            PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-            set -e
-            if [ "$PODS" -eq "$NODES" ]; then
-              break
-            fi
-            sleep 3
-          done
-          set +e
-          PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-          kubectl get node -o yaml
-          kubectl get all -n kruise-system -o yaml
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
-          set -e
-          if [ "$PODS" -eq "$NODES" ]; then
-            echo "Wait for kruise-manager and kruise-daemon ready successfully"
-          else
-            echo "Timeout to wait for kruise-manager and kruise-daemon ready"
-            exit 1
-          fi
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
@@ -284,7 +206,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: helm/kind-action@0025e74a8c7512023d06dc019c617aa3cf561fde # v1.10.0
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
@@ -297,33 +219,7 @@ jobs:
           kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
       - name: Install Kruise
         run: |
-          set -ex
-          kubectl cluster-info
-          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} ./scripts/deploy_kind.sh
-          NODES=$(kubectl get node | wc -l)
-          for ((i=1;i<10;i++));
-          do
-            set +e
-            PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-            set -e
-            if [ "$PODS" -eq "$NODES" ]; then
-              break
-            fi
-            sleep 3
-          done
-          set +e
-          PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-          kubectl get node -o yaml
-          kubectl get all -n kruise-system -o yaml
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
-          set -e
-          if [ "$PODS" -eq "$NODES" ]; then
-            echo "Wait for kruise-manager and kruise-daemon ready successfully"
-          else
-            echo "Timeout to wait for kruise-manager and kruise-daemon ready"
-            exit 1
-          fi
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
@@ -376,7 +272,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: helm/kind-action@0025e74a8c7512023d06dc019c617aa3cf561fde # v1.10.0
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
@@ -389,33 +285,7 @@ jobs:
           kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
       - name: Install Kruise
         run: |
-          set -ex
-          kubectl cluster-info
-          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} ./scripts/deploy_kind.sh
-          NODES=$(kubectl get node | wc -l)
-          for ((i=1;i<10;i++));
-          do
-            set +e
-            PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-            set -e
-            if [ "$PODS" -eq "$NODES" ]; then
-              break
-            fi
-            sleep 3
-          done
-          set +e
-          PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-          kubectl get node -o yaml
-          kubectl get all -n kruise-system -o yaml
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
-          set -e
-          if [ "$PODS" -eq "$NODES" ]; then
-            echo "Wait for kruise-manager and kruise-daemon ready successfully"
-          else
-            echo "Timeout to wait for kruise-manager and kruise-daemon ready"
-            exit 1
-          fi
+          DISABLE_E2E_CONFIG=true IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
@@ -468,7 +338,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: helm/kind-action@0025e74a8c7512023d06dc019c617aa3cf561fde # v1.10.0
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
@@ -481,33 +351,7 @@ jobs:
           kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
       - name: Install Kruise
         run: |
-          set -ex
-          kubectl cluster-info
-          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} ./scripts/deploy_kind.sh
-          NODES=$(kubectl get node | wc -l)
-          for ((i=1;i<10;i++));
-          do
-            set +e
-            PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-            set -e
-            if [ "$PODS" -eq "$NODES" ]; then
-              break
-            fi
-            sleep 3
-          done
-          set +e
-          PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-          kubectl get node -o yaml
-          kubectl get all -n kruise-system -o yaml
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
-          set -e
-          if [ "$PODS" -eq "$NODES" ]; then
-            echo "Wait for kruise-manager and kruise-daemon ready successfully"
-          else
-            echo "Timeout to wait for kruise-manager and kruise-daemon ready"
-            exit 1
-          fi
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
@@ -538,7 +382,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: helm/kind-action@0025e74a8c7512023d06dc019c617aa3cf561fde # v1.10.0
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
@@ -551,33 +395,7 @@ jobs:
           kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
       - name: Install Kruise
         run: |
-          set -ex
-          kubectl cluster-info
-          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} ./scripts/deploy_kind.sh
-          NODES=$(kubectl get node | wc -l)
-          for ((i=1;i<10;i++));
-          do
-            set +e
-            PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-            set -e
-            if [ "$PODS" -eq "$NODES" ]; then
-              break
-            fi
-            sleep 3
-          done
-          set +e
-          PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-          kubectl get node -o yaml
-          kubectl get all -n kruise-system -o yaml
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
-          set -e
-          if [ "$PODS" -eq "$NODES" ]; then
-            echo "Wait for kruise-manager and kruise-daemon ready successfully"
-          else
-            echo "Timeout to wait for kruise-manager and kruise-daemon ready"
-            exit 1
-          fi
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
@@ -595,15 +413,15 @@ jobs:
   clonesetAndInplace:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: helm/kind-action@v1.10.0
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
@@ -620,33 +438,7 @@ jobs:
           kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
       - name: Install Kruise
         run: |
-          set -ex
-          kubectl cluster-info
-          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} ./scripts/deploy_kind.sh
-          NODES=$(kubectl get node | wc -l)
-          for ((i=1;i<10;i++));
-          do
-            set +e
-            PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-            set -e
-            if [ "$PODS" -eq "$NODES" ]; then
-              break
-            fi
-            sleep 3
-          done
-          set +e
-          PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-          kubectl get node -o yaml
-          kubectl get all -n kruise-system -o yaml
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
-          set -e
-          if [ "$PODS" -eq "$NODES" ]; then
-            echo "Wait for kruise-manager and kruise-daemon ready successfully"
-          else
-            echo "Timeout to wait for kruise-manager and kruise-daemon ready"
-            exit 1
-          fi
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
@@ -686,7 +478,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
-        uses: helm/kind-action@0025e74a8c7512023d06dc019c617aa3cf561fde # v1.10.0
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
         with:
           node_image: ${{ env.KIND_IMAGE }}
           cluster_name: ${{ env.KIND_CLUSTER_NAME }}
@@ -699,35 +491,7 @@ jobs:
           kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
       - name: Install Kruise
         run: |
-          set -ex
-          kubectl create ns kruise-system
-          kubectl apply -f test/kruise-e2e-config.yaml
-          kubectl cluster-info
-          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} ./scripts/deploy_kind.sh
-          NODES=$(kubectl get node | wc -l)
-          for ((i=1;i<10;i++));
-          do
-            set +e
-            PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-            set -e
-            if [ "$PODS" -eq "$NODES" ]; then
-              break
-            fi
-            sleep 3
-          done
-          set +e
-          PODS=$(kubectl get pod -n kruise-system | grep '1/1' | wc -l)
-          kubectl get node -o yaml
-          kubectl get all -n kruise-system -o yaml
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system
-          kubectl get pod -n kruise-system --no-headers | grep daemon | awk '{print $1}' | xargs kubectl logs -n kruise-system --previous=true
-          set -e
-          if [ "$PODS" -eq "$NODES" ]; then
-            echo "Wait for kruise-manager and kruise-daemon ready successfully"
-          else
-            echo "Timeout to wait for kruise-manager and kruise-daemon ready"
-            exit 1
-          fi
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config

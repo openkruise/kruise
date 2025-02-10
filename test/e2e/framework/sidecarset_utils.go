@@ -18,14 +18,16 @@ package framework
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
-	"k8s.io/utils/ptr"
 
 	"github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1"
@@ -58,7 +60,8 @@ func (s *SidecarSetTester) NewBaseSidecarSet(ns string) *appsv1alpha1.SidecarSet
 			APIVersion: "apps.kruise.io/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-sidecarset",
+
+			Name: fmt.Sprintf("test-sidecarset-%s", ns),
 			Labels: map[string]string{
 				"app": "sidecar",
 			},
@@ -226,7 +229,7 @@ func (s *SidecarSetTester) CreateDeployment(deployment *apps.Deployment) {
 	s.WaitForDeploymentRunning(deployment)
 }
 
-func (s *SidecarSetTester) DeleteSidecarSets() {
+func (s *SidecarSetTester) DeleteSidecarSets(ns string) {
 	sidecarSetList, err := s.kc.AppsV1alpha1().SidecarSets().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		Logf("List sidecarSets failed: %s", err.Error())
@@ -234,6 +237,9 @@ func (s *SidecarSetTester) DeleteSidecarSets() {
 	}
 
 	for _, sidecarSet := range sidecarSetList.Items {
+		if sidecarSet.Namespace != ns {
+			continue
+		}
 		s.DeleteSidecarSet(&sidecarSet)
 	}
 }

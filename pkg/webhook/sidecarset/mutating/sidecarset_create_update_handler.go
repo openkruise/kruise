@@ -42,7 +42,7 @@ type SidecarSetCreateHandler struct {
 	// Client  client.Client
 
 	// Decoder decodes objects
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 }
 
 func setHashSidecarSet(sidecarset *appsv1alpha1.SidecarSet) error {

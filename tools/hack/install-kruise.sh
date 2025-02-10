@@ -16,8 +16,26 @@
 set -ex
 
 readonly IMAGE="$1"
+USE_GOPROXY=false
 
-export GOPROXY=https://mirrors.aliyun.com/goproxy/
+while [[ $# -gt 1 ]]; do
+    key="$2"
+    case $key in
+        --use-goproxy)
+            USE_GOPROXY=true
+            shift # past argument
+            ;;
+        *)
+            echo "Unknown parameter passed: $key"
+            exit 1
+            ;;
+    esac
+    shift # past value
+done
+
+if [ "$USE_GOPROXY" = true ]; then
+    export GOPROXY=https://mirrors.aliyun.com/goproxy/
+fi
 
 kubectl cluster-info
 

@@ -85,23 +85,23 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to SidecarSet
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.SidecarSet{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			oldScS := e.ObjectOld.(*appsv1alpha1.SidecarSet)
-			newScS := e.ObjectNew.(*appsv1alpha1.SidecarSet)
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.SidecarSet{}, &handler.TypedEnqueueRequestForObject[*appsv1alpha1.SidecarSet]{}, predicate.TypedFuncs[*appsv1alpha1.SidecarSet]{
+		UpdateFunc: func(e event.TypedUpdateEvent[*appsv1alpha1.SidecarSet]) bool {
+			oldScS := e.ObjectOld
+			newScS := e.ObjectNew
 			if oldScS.GetGeneration() != newScS.GetGeneration() {
 				klog.V(3).InfoS("Observed updated Spec for SidecarSet", "sidecarSet", klog.KObj(newScS))
 				return true
 			}
 			return false
 		},
-	})
+	}))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Pod
-	if err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}), &enqueueRequestForPod{reader: mgr.GetCache()}); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}, &enqueueRequestForPod{reader: mgr.GetCache()})); err != nil {
 		return err
 	}
 

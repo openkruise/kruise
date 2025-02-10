@@ -986,6 +986,8 @@ func TestUpdate(t *testing.T) {
 				if err := ctrl.Client.Get(context.TODO(), types.NamespacedName{Namespace: p.Namespace, Name: p.Name}, gotPod); err != nil {
 					t.Fatalf("Failed to test %s, get pod %s error: %v", mc.name, p.Name, err)
 				}
+				gotPod.APIVersion = "v1"
+				gotPod.Kind = "Pod"
 
 				if v, ok := gotPod.Annotations[appspub.LifecycleTimestampKey]; ok {
 					if p.Annotations == nil {

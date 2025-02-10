@@ -38,7 +38,7 @@ type PodCreateHandler struct {
 	Client client.Client
 
 	// Decoder decodes objects
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 }
 
 func (h *PodCreateHandler) validatingPodFn(ctx context.Context, req admission.Request) (allowed bool, reason string, err error) {

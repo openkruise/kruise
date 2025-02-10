@@ -39,7 +39,7 @@ var ValidateDaemonSetName = genericvalidation.NameIsDNSSubdomain
 // DaemonSetCreateUpdateHandler handles DaemonSet
 type DaemonSetCreateUpdateHandler struct {
 	// Decoder decodes objects
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 }
 
 func (h *DaemonSetCreateUpdateHandler) validateDaemonSetUpdate(ds, oldDs *appsv1alpha1.DaemonSet) field.ErrorList {
