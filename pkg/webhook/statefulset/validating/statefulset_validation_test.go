@@ -547,7 +547,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:             ptr.To[int32](5),
 					RevisionHistoryLimit: ptr.To[int32](5),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{
+					ReserveOrdinals: []intstr.IntOrString{
 						intstr.FromInt32(1),
 					},
 					Lifecycle:            &appspub.Lifecycle{PreDelete: &appspub.LifecycleHook{FinalizersHandler: []string{"foo/bar"}}},
@@ -573,7 +573,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:             ptr.To[int32](10),
 					RevisionHistoryLimit: ptr.To[int32](10),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{
+					ReserveOrdinals: []intstr.IntOrString{
 						intstr.FromInt32(2),
 					},
 					Lifecycle:            &appspub.Lifecycle{PreDelete: &appspub.LifecycleHook{FinalizersHandler: []string{"foo/hello"}}},

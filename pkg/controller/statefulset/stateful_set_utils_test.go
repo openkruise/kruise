@@ -914,7 +914,7 @@ func TestGetStatefulSetReplicasRange(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas: int32Ptr(4),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{
+					ReserveOrdinals: []intstr.IntOrString{
 						intstr.FromInt32(1),
 						intstr.FromInt32(3),
 					},
@@ -931,7 +931,7 @@ func TestGetStatefulSetReplicasRange(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas: int32Ptr(4),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{
+					ReserveOrdinals: []intstr.IntOrString{
 						intstr.FromInt32(1),
 						intstr.FromInt32(3),
 					},
@@ -948,7 +948,7 @@ func TestGetStatefulSetReplicasRange(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas: int32Ptr(4),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{
+					ReserveOrdinals: []intstr.IntOrString{
 						intstr.FromInt32(1),
 						intstr.FromInt32(3),
 					},
@@ -965,7 +965,7 @@ func TestGetStatefulSetReplicasRange(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas: int32Ptr(4),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{
+					ReserveOrdinals: []intstr.IntOrString{
 						intstr.FromInt32(1),
 						intstr.FromInt32(3),
 					},
@@ -1046,7 +1046,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 0,
 					},
@@ -1077,7 +1077,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 0,
 					},
@@ -1108,7 +1108,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 0,
 					},
@@ -1142,7 +1142,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 0,
 					},
@@ -1176,7 +1176,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 0,
 					},
@@ -1209,7 +1209,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 0,
 					},
@@ -1243,7 +1243,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas: int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{
+					ReserveOrdinals: []intstr.IntOrString{
 						intstr.FromInt32(1),
 					},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
@@ -1281,7 +1281,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 2,
 					},
@@ -1312,7 +1312,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 2,
 					},
@@ -1343,7 +1343,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 2,
 					},
@@ -1377,7 +1377,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 2,
 					},
@@ -1411,7 +1411,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 2,
 					},
@@ -1444,7 +1444,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 2,
 					},
@@ -1479,7 +1479,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 0,
 					},
@@ -1518,7 +1518,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 0,
 					},
@@ -1559,7 +1559,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 2,
 					},
@@ -1598,7 +1598,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{},
+					ReserveOrdinals: []intstr.IntOrString{},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
 						Start: 2,
 					},
@@ -1639,7 +1639,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas: int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{
+					ReserveOrdinals: []intstr.IntOrString{
 						intstr.FromInt32(1),
 					},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
@@ -1682,7 +1682,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas: int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{
+					ReserveOrdinals: []intstr.IntOrString{
 						intstr.FromInt32(1),
 					},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
@@ -1730,7 +1730,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas: int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{
+					ReserveOrdinals: []intstr.IntOrString{
 						intstr.FromInt32(1),
 					},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{
@@ -1767,7 +1767,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas: int32Ptr(3),
-					ReserveOrdinals: appsv1beta1.ReserveOrdinal{
+					ReserveOrdinals: []intstr.IntOrString{
 						intstr.FromInt32(1),
 					},
 					Ordinals: &appsv1beta1.StatefulSetOrdinals{

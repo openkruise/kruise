@@ -21,6 +21,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	apiutil "github.com/openkruise/kruise/pkg/util/api"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -381,7 +382,7 @@ func (r *ControllerFinder) getPodKruiseStatefulSet(ref ControllerReference, name
 
 	return &ScaleAndSelector{
 		Scale:           *(ss.Spec.Replicas),
-		ReserveOrdinals: ss.Spec.ReserveOrdinals.GetIntSet(),
+		ReserveOrdinals: apiutil.GetReserveOrdinalIntSet(ss.Spec.ReserveOrdinals),
 		Selector:        ss.Spec.Selector,
 		ControllerReference: ControllerReference{
 			APIVersion: ss.APIVersion,

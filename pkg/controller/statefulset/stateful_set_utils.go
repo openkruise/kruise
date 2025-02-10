@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"time"
 
+	apiutil "github.com/openkruise/kruise/pkg/util/api"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -792,7 +793,7 @@ func decreaseAndCheckMaxUnavailable(maxUnavailable *int) bool {
 // replicas[endOrdinal - startOrdinal] stores [replica-2, nil(reserveOrdinal 3), replica-4, replica-5, replica-6]
 // todo: maybe we should remove ineffective reserveOrdinals in webhook, reserveOrdinals = {3}
 func getStatefulSetReplicasRange(set *appsv1beta1.StatefulSet) (int, int, sets.Set[int]) {
-	reserveOrdinals := set.Spec.ReserveOrdinals.GetIntSet()
+	reserveOrdinals := apiutil.GetReserveOrdinalIntSet(set.Spec.ReserveOrdinals)
 	replicaMaxOrdinal := getStartOrdinal(set)
 	for realReplicaCount := 0; realReplicaCount < int(*set.Spec.Replicas); replicaMaxOrdinal++ {
 		if reserveOrdinals.Has(replicaMaxOrdinal) {

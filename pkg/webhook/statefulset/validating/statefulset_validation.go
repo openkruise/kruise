@@ -7,6 +7,7 @@ import (
 	"regexp"
 
 	"github.com/appscode/jsonpatch"
+	apiutil "github.com/openkruise/kruise/pkg/util/api"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -27,6 +28,7 @@ import (
 )
 
 var inPlaceUpdateTemplateSpecPatchRexp = regexp.MustCompile("/containers/([0-9]+)/image")
+var reserveOrdinalRangeRexp = regexp.MustCompile(`^\d+-\d+$`)
 
 func validatePodManagementPolicy(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
@@ -44,11 +46,16 @@ func validatePodManagementPolicy(spec *appsv1beta1.StatefulSetSpec, fldPath *fie
 func validateReserveOrdinals(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(spec.ReserveOrdinals) > 0 {
-		matcher := regexp.MustCompile(`^\d+-\d+$`)
 		for i, elem := range spec.ReserveOrdinals {
-			if elem.Type == intstr.String && !matcher.MatchString(elem.StrVal) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.ReserveOrdinals,
-					fmt.Sprintf("%d th reserve ordinal is not a valid range: %s", i, elem.StrVal)))
+			if elem.Type == intstr.String {
+				if !reserveOrdinalRangeRexp.MatchString(elem.StrVal) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.ReserveOrdinals,
+						fmt.Sprintf("%d th reserve ordinal is not a valid range: %s", i, elem.StrVal)))
+				}
+				if _, _, err := apiutil.ParseRange(elem.StrVal); err != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.ReserveOrdinals,
+						fmt.Sprintf("%d th reserve ordinal is invalid: %s, err = %s", i, elem.StrVal, err)))
+				}
 			}
 			if elem.Type == intstr.Int && elem.IntVal < 0 {
 				allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.ReserveOrdinals,

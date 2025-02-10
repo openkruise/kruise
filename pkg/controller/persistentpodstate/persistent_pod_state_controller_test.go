@@ -318,7 +318,7 @@ func TestReconcilePersistentPodState(t *testing.T) {
 			getSts: func() (*apps.StatefulSet, *appsv1beta1.StatefulSet) {
 				kruise := kruiseStsDemo.DeepCopy()
 				kruise.Spec.Replicas = ptr.To[int32](8)
-				kruise.Spec.ReserveOrdinals = appsv1beta1.ReserveOrdinal{
+				kruise.Spec.ReserveOrdinals = []intstr.IntOrString{
 					intstr.FromInt32(0),
 					intstr.FromInt32(3),
 					intstr.FromInt32(7),

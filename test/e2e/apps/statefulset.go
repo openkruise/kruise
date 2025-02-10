@@ -2280,7 +2280,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 				WhenScaled: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 			}
-			ss.Spec.ReserveOrdinals = appsv1beta1.ReserveOrdinal{
+			ss.Spec.ReserveOrdinals = []intstr.IntOrString{
 				intstr.FromInt32(0),
 				intstr.FromString("2-5"),
 			}

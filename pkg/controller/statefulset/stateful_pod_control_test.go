@@ -1045,7 +1045,7 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 					WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
 				}
-				set.Spec.ReserveOrdinals = appsv1beta1.ReserveOrdinal{
+				set.Spec.ReserveOrdinals = []intstr.IntOrString{
 					intstr.FromInt32(2),
 					intstr.FromInt32(4),
 				}
@@ -1086,7 +1086,7 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 					WhenScaled:  appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 				}
-				set.Spec.ReserveOrdinals = appsv1beta1.ReserveOrdinal{
+				set.Spec.ReserveOrdinals = []intstr.IntOrString{
 					intstr.FromInt32(2),
 					intstr.FromInt32(4),
 				}
@@ -1127,7 +1127,7 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 					WhenScaled:  appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 				}
-				set.Spec.ReserveOrdinals = appsv1beta1.ReserveOrdinal{
+				set.Spec.ReserveOrdinals = []intstr.IntOrString{
 					intstr.FromInt32(2),
 					intstr.FromInt32(4),
 				}
@@ -1179,7 +1179,7 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 					WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
 				}
-				set.Spec.ReserveOrdinals = appsv1beta1.ReserveOrdinal{
+				set.Spec.ReserveOrdinals = []intstr.IntOrString{
 					intstr.FromInt32(2),
 					intstr.FromInt32(4),
 				}
@@ -1231,7 +1231,7 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 					WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
 				}
-				set.Spec.ReserveOrdinals = appsv1beta1.ReserveOrdinal{
+				set.Spec.ReserveOrdinals = []intstr.IntOrString{
 					intstr.FromInt32(1),
 					intstr.FromString("3-5"),
 				}
