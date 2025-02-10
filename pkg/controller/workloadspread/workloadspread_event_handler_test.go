@@ -171,7 +171,7 @@ func TestPodEventHandler(t *testing.T) {
 	key, _ := createQ.Get()
 	nsn, _ := key.(reconcile.Request)
 	if nsn.Namespace != createPod.Namespace && nsn.Name != injectWorkloadSpread.Name {
-		t.Errorf("matche WorkloadSpread %s/%s failed", createPod.Namespace, injectWorkloadSpread.Name)
+		t.Errorf("matching WorkloadSpread %s/%s failed", createPod.Namespace, injectWorkloadSpread.Name)
 	}
 
 	// update
@@ -201,7 +201,7 @@ func TestPodEventHandler(t *testing.T) {
 	key, _ = updateQ.Get()
 	nsn, _ = key.(reconcile.Request)
 	if nsn.Namespace != newPod.Namespace && nsn.Name != injectWorkloadSpread.Name {
-		t.Errorf("matche WorkloadSpread %s/%s failed", newPod.Namespace, injectWorkloadSpread.Name)
+		t.Errorf("matching WorkloadSpread %s/%s failed", newPod.Namespace, injectWorkloadSpread.Name)
 	}
 
 	// delete
@@ -224,7 +224,7 @@ func TestPodEventHandler(t *testing.T) {
 	key, _ = deleteQ.Get()
 	nsn, _ = key.(reconcile.Request)
 	if nsn.Namespace != deletePod.Namespace && nsn.Name != injectWorkloadSpread.Name {
-		t.Errorf("matche WorkloadSpread %s/%s failed", deletePod.Namespace, injectWorkloadSpread.Name)
+		t.Errorf("matching WorkloadSpread %s/%s failed", deletePod.Namespace, injectWorkloadSpread.Name)
 	}
 }
 
