@@ -35,7 +35,7 @@ spec:
         - --enable-leader-election
         - --logtostderr=true
         - --v=5
-        - --feature-gates=AllAlpha=true,EnableExternalCerts=false
+        - --feature-gates=AllAlpha=true,AllBeta=true,EnableExternalCerts=false
         image: controller:latest
         imagePullPolicy: Always
         securityContext:
@@ -102,7 +102,7 @@ spec:
         args:
         - --logtostderr=true
         - -v=5
-        - --feature-gates=AllAlpha=true
+        - --feature-gates=AllAlpha=true,AllBeta=true
         image: controller:latest
         imagePullPolicy: Always
         securityContext:
