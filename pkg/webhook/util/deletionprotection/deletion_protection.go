@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
@@ -30,7 +31,6 @@ import (
 	"github.com/openkruise/kruise/pkg/features"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ValidateWorkloadDeletion(obj metav1.Object, replicas *int32) error {
