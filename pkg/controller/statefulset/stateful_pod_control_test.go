@@ -1,6 +1,5 @@
 /*
 Copyright 2019 The Kruise Authors.
-Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
@@ -1045,7 +1045,10 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 					WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
 				}
-				set.Spec.ReserveOrdinals = []int{2, 4}
+				set.Spec.ReserveOrdinals = []intstr.IntOrString{
+					intstr.FromInt32(2),
+					intstr.FromInt32(4),
+				}
 				return set
 			},
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
@@ -1083,7 +1086,10 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 					WhenScaled:  appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 				}
-				set.Spec.ReserveOrdinals = []int{2, 4}
+				set.Spec.ReserveOrdinals = []intstr.IntOrString{
+					intstr.FromInt32(2),
+					intstr.FromInt32(4),
+				}
 				return set
 			},
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
@@ -1121,7 +1127,10 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 					WhenScaled:  appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 				}
-				set.Spec.ReserveOrdinals = []int{2, 4}
+				set.Spec.ReserveOrdinals = []intstr.IntOrString{
+					intstr.FromInt32(2),
+					intstr.FromInt32(4),
+				}
 				return set
 			},
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
@@ -1170,7 +1179,10 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 					WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
 				}
-				set.Spec.ReserveOrdinals = []int{2, 4}
+				set.Spec.ReserveOrdinals = []intstr.IntOrString{
+					intstr.FromInt32(2),
+					intstr.FromInt32(4),
+				}
 				return set
 			},
 			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
@@ -1198,6 +1210,58 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 				sIndex2 := strings.LastIndex(pvcName, "-") + 1
 				index, _ := strconv.Atoi(pvcName[sIndex2:])
 				if index < 7 {
+					return metav1.OwnerReference{
+						APIVersion: "apps.kruise.io/v1beta1",
+						Kind:       "StatefulSet",
+						Name:       "foo",
+					}
+				}
+				return metav1.OwnerReference{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       podName,
+				}
+			},
+		},
+		{
+			name: "reserveOrdinals is [1,3-5], scaleDown=true, whenScaled=Retain, whenDeleted=Delete",
+			getStatefulSet: func() *appsv1beta1.StatefulSet {
+				set := newStatefulSet(3)
+				set.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+					WhenDeleted: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
+					WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
+				}
+				set.Spec.ReserveOrdinals = []intstr.IntOrString{
+					intstr.FromInt32(1),
+					intstr.FromString("3-5"),
+				}
+				return set
+			},
+			getPods: func(set *appsv1beta1.StatefulSet) []*v1.Pod {
+				setClone := set.DeepCopy()
+				setClone.Spec.Replicas = utilpointer.Int32(5)
+				startOrdinal, endOrdinal, reserveOrdinals := getStatefulSetReplicasRange(setClone)
+				pods := make([]*v1.Pod, 0)
+				expectIndex := []int{0, 2, 6, 7, 8}
+				currentIndex := make([]int, 0)
+				for i := startOrdinal; i < endOrdinal; i++ {
+					if reserveOrdinals.Has(i) {
+						continue
+					}
+					currentIndex = append(currentIndex, i)
+					pods = append(pods, newStatefulSetPod(set, i))
+				}
+				if !reflect.DeepEqual(expectIndex, currentIndex) {
+					t.Fatalf("expect(%v), but get(%v)", expectIndex, currentIndex)
+				}
+				return pods
+			},
+			expectPvcOwnerRef: func(pvcName string) metav1.OwnerReference {
+				sIndex1 := strings.Index(pvcName, "-") + 1
+				podName := pvcName[sIndex1:]
+				sIndex2 := strings.LastIndex(pvcName, "-") + 1
+				index, _ := strconv.Atoi(pvcName[sIndex2:])
+				if index < 9 {
 					return metav1.OwnerReference{
 						APIVersion: "apps.kruise.io/v1beta1",
 						Kind:       "StatefulSet",

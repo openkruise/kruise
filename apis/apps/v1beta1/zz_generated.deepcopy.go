@@ -208,7 +208,7 @@ func (in *StatefulSetSpec) DeepCopyInto(out *StatefulSetSpec) {
 	}
 	if in.ReserveOrdinals != nil {
 		in, out := &in.ReserveOrdinals, &out.ReserveOrdinals
-		*out = make([]int, len(*in))
+		*out = make([]intstr.IntOrString, len(*in))
 		copy(*out, *in)
 	}
 	if in.Lifecycle != nil {

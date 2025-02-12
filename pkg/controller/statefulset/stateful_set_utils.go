@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"time"
 
+	apiutil "github.com/openkruise/kruise/pkg/util/api"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -92,7 +93,7 @@ func podInOrdinalRange(pod *v1.Pod, set *appsv1beta1.StatefulSet) bool {
 	return podInOrdinalRangeWithParams(pod, startOrdinal, endOrdinal, reserveOrdinals)
 }
 
-func podInOrdinalRangeWithParams(pod *v1.Pod, startOrdinal, endOrdinal int, reserveOrdinals sets.Int) bool {
+func podInOrdinalRangeWithParams(pod *v1.Pod, startOrdinal, endOrdinal int, reserveOrdinals sets.Set[int]) bool {
 	ordinal := getOrdinal(pod)
 	return ordinal >= startOrdinal && ordinal < endOrdinal &&
 		!reserveOrdinals.Has(ordinal)
@@ -791,8 +792,8 @@ func decreaseAndCheckMaxUnavailable(maxUnavailable *int) bool {
 // result is startOrdinal 2(inclusive), endOrdinal 7(exclusive), reserveOrdinals = {1, 3}
 // replicas[endOrdinal - startOrdinal] stores [replica-2, nil(reserveOrdinal 3), replica-4, replica-5, replica-6]
 // todo: maybe we should remove ineffective reserveOrdinals in webhook, reserveOrdinals = {3}
-func getStatefulSetReplicasRange(set *appsv1beta1.StatefulSet) (int, int, sets.Int) {
-	reserveOrdinals := sets.NewInt(set.Spec.ReserveOrdinals...)
+func getStatefulSetReplicasRange(set *appsv1beta1.StatefulSet) (int, int, sets.Set[int]) {
+	reserveOrdinals := apiutil.GetReserveOrdinalIntSet(set.Spec.ReserveOrdinals)
 	replicaMaxOrdinal := getStartOrdinal(set)
 	for realReplicaCount := 0; realReplicaCount < int(*set.Spec.Replicas); replicaMaxOrdinal++ {
 		if reserveOrdinals.Has(replicaMaxOrdinal) {
