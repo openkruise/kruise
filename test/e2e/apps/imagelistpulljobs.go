@@ -113,6 +113,15 @@ var _ = SIGDescribe("PullImages", func() {
 						ActiveDeadlineSeconds:   utilpointer.Int64Ptr(50),
 						TTLSecondsAfterFinished: utilpointer.Int32Ptr(20),
 					},
+					Tolerations: []v1.Toleration{{
+						Key:      "node-role.kubernetes.io/master",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}, {
+						Key:      "node-role.kubernetes.io/control-plane",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}},
 				},
 			}
 			err := testerForImageListPullJob.CreateJob(job)
@@ -169,6 +178,15 @@ var _ = SIGDescribe("PullImages", func() {
 					CompletionPolicy: appsv1alpha1.CompletionPolicy{
 						Type: appsv1alpha1.Always,
 					},
+					Tolerations: []v1.Toleration{{
+						Key:      "node-role.kubernetes.io/master",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}, {
+						Key:      "node-role.kubernetes.io/control-plane",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}},
 				},
 			}
 			err := testerForImageListPullJob.CreateJob(job)
@@ -224,6 +242,15 @@ var _ = SIGDescribe("PullImages", func() {
 					CompletionPolicy: appsv1alpha1.CompletionPolicy{
 						Type: appsv1alpha1.Always,
 					},
+					Tolerations: []v1.Toleration{{
+						Key:      "node-role.kubernetes.io/master",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}, {
+						Key:      "node-role.kubernetes.io/control-plane",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}},
 				},
 			}
 			err := testerForImageListPullJob.CreateJob(job)
@@ -272,6 +299,15 @@ var _ = SIGDescribe("PullImages", func() {
 					CompletionPolicy: appsv1alpha1.CompletionPolicy{
 						Type: appsv1alpha1.Never,
 					},
+					Tolerations: []v1.Toleration{{
+						Key:      "node-role.kubernetes.io/master",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}, {
+						Key:      "node-role.kubernetes.io/control-plane",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}},
 				},
 			}
 			err := testerForImageListPullJob.CreateJob(job)
