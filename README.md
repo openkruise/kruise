@@ -16,6 +16,12 @@ English | [简体中文](./README-zh_CN.md)
 OpenKruise  (official site: [https://openkruise.io](https://openkruise.io)) is a CNCF([Cloud Native Computing Foundation](https://cncf.io/)) incubating project.
 It consists of several controllers which extend and complement the [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) for workload and application management.
 
+## Get Your Own Demo on AlibabaCloud
+
+<a href="https://acs.console.aliyun.com/quick-deploy?repo=openkruise/charts&branch=master" target="_blank">
+  <img src="https://img.alicdn.com/imgextra/i3/O1CN015KxwZy26JdMwbribb_!!6000000007641-55-tps-438-70.svg" width="200" alt="Deploy on AlibabaCloud ACS">
+</a>
+
 ## Key Features
 
 - **Advance Workloads**
