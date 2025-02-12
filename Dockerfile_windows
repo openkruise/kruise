@@ -1,0 +1,11 @@
+# Build Windows image for kruise-daemon 
+
+# Using Windows HostProcess container base image: https://github.com/microsoft/windows-host-process-containers-base-image
+ARG BASE_IMAGE=mcr.microsoft.com/oss/kubernetes/windows-host-process-containers-base-image
+ARG BASE_IMAGE_VERSION=v1.0.0
+FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION}
+
+WORKDIR /
+COPY ./daemon.exe /kruise-daemon.exe
+
+ENTRYPOINT ["kruise-daemon.exe"]
