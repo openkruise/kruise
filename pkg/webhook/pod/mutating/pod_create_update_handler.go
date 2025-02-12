@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/openkruise/kruise/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -46,7 +47,7 @@ var _ admission.Handler = &PodCreateHandler{}
 // Handle handles admission requests.
 func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
 	obj := &corev1.Pod{}
-
+	ctx = util.NewLogContextWithId(ctx, string(req.UID))
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)

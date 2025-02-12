@@ -284,7 +284,7 @@ func TestRescheduleSubset(t *testing.T) {
 				},
 			}
 
-			err := reconciler.syncWorkloadSpread(workloadSpread)
+			err := reconciler.syncWorkloadSpread(context.Background(), workloadSpread)
 			if err != nil {
 				t.Fatalf("sync WorkloadSpread failed: %s", err.Error())
 			}

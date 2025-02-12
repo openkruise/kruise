@@ -725,7 +725,7 @@ func TestSubsetPodDeletionCost(t *testing.T) {
 				recorder: record.NewFakeRecorder(10),
 			}
 
-			err := r.syncSubsetPodDeletionCost(workloadSpread, &workloadSpread.Spec.Subsets[0], cs.subsetIndex, cs.getPods(), 5)
+			err := r.syncSubsetPodDeletionCost(context.Background(), workloadSpread, &workloadSpread.Spec.Subsets[0], cs.subsetIndex, cs.getPods(), 5)
 			if err != nil {
 				t.Fatalf("set pod deletion-cost annotation failed: %s", err.Error())
 			}
@@ -1772,7 +1772,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				controllerFinder: &controllerfinder.ControllerFinder{Client: fakeClient},
 			}
 
-			err := reconciler.syncWorkloadSpread(workloadSpread)
+			err := reconciler.syncWorkloadSpread(context.Background(), workloadSpread)
 			if err != nil {
 				t.Fatalf("sync WorkloadSpread failed: %s", err.Error())
 			}
@@ -1857,11 +1857,11 @@ func TestUpdateSubsetSequence(t *testing.T) {
 	}
 
 	r := ReconcileWorkloadSpread{}
-	versionedPodMap, subsetsPods, err := r.groupVersionedPods(workloadSpread, pods, 5)
+	versionedPodMap, subsetsPods, err := r.groupVersionedPods(context.Background(), workloadSpread, pods, 5)
 	if err != nil {
 		t.Fatalf("error group pods")
 	}
-	status, _ := r.calculateWorkloadSpreadStatus(workloadSpread, versionedPodMap, subsetsPods, 5)
+	status, _ := r.calculateWorkloadSpreadStatus(context.Background(), workloadSpread, versionedPodMap, subsetsPods, 5)
 	if status == nil {
 		t.Fatalf("error get WorkloadSpread status")
 	} else {
