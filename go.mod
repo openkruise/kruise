@@ -31,7 +31,7 @@ require (
 	k8s.io/klog/v2 v2.120.1
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340
 	k8s.io/kubelet v0.30.9
-	k8s.io/kubernetes v1.30.9
+	k8s.io/kubernetes v1.30.10
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	sigs.k8s.io/controller-runtime v0.18.6
 )
