@@ -1,5 +1,72 @@
 # Change Log
 
+## v1.8.0
+
+> Change log since v1.7.3
+### Upgrade Notice
+> No, really, you must read this before you upgrade
+- **Disable** the following feature gates by default: ResourcesDeletionProtection ([#1919](https://github.com/openkruise/kruise/pull/1919), [@ABNER-1](https://github.com/ABNER-1))
+- Promote these feature gates to beta:  
+  `ResourcesDeletionProtection`, `WorkloadSpread`, `PodUnavailableBudgetDeleteGate`, `InPlaceUpdateEnvFromMetadata`,
+  `StatefulSetAutoDeletePVC`,
+  `PodProbeMarkerGate` ([#1919](https://github.com/openkruise/kruise/pull/1919), [@ABNER-1](https://github.com/ABNER-1))
+- Update Kubernetes dependency to v1.30.10 and Golang to v1.22 ([#1896](https://github.com/openkruise/kruise/pull/1896), [@ABNER-1](https://github.com/ABNER-1), [#1924](https://github.com/openkruise/kruise/pull/1924), [@furykerry](https://github.com/furykerry)))
+- Prior to Kruise 1.7.3, `helm uninstall` is a **high-risk** operation that deletes Kruise, its CRDs, and associated CRs. Starting from Kruise 1.7.3, it uses a pre-delete hook to check for existing Kruise CRs before uninstallation and blocks the process to prevent accidental deletion.
+
+### Key Features
+- Support in-place expansion of StatefulSet volumes ([#1674](https://github.com/openkruise/kruise/pull/1674), [#1714](https://github.com/openkruise/kruise/pull/1714), [@ABNER-1](https://github.com/ABNER-1))
+- Enable in-place resource resizing for CloneSet, Advanced StatefulSet, and Advanced DaemonSet ([#1353](https://github.com/openkruise/kruise/pull/1353), [#1866](https://github.com/openkruise/kruise/pull/1866), [@LavenderQAQ](https://github.com/LavenderQAQ), [@ABNER-1](https://github.com/ABNER-1))
+- Support adaptive scheduling strategy for UnitedDeployment ([#1720](https://github.com/openkruise/kruise/pull/1720),  [@AiRanthem](https://github.com/AiRanthem))
+- Add WorkloadSpread support for AI workload like TFJob in KubeFlow ([#1838](https://github.com/openkruise/kruise/pull/1838), [@AiRanthem](https://github.com/AiRanthem))
+
+### Performance Improvements
+- Optimize CA bundle updates to reduce unnecessary changes ([#1717](https://github.com/openkruise/kruise/pull/1717), [@zmberg](https://github.com/zmberg))
+- Add disableDeepCopy for BroadcastJob ([#1696](https://github.com/openkruise/kruise/pull/1696), [@Prepmachine4](https://github.com/Prepmachine4))
+
+### Resilience Enhancement
+- Add Helm pre-delete hook to preserve Kruise CRs during uninstallation ([#1843](https://github.com/openkruise/kruise/pull/1843), [@AiRanthem](https://github.com/AiRanthem))
+
+### Other Notable Changes
+#### Advanced Workload
+- Add lifecycle hooks and tests for Advanced StatefulSet ([#1858](https://github.com/openkruise/kruise/pull/1858), [@mingzhou.swx](https://github.com/mingzhou.swx), [@ABNER-1](https://github.com/ABNER-1))
+- Add range-based reserveOrdinals support for Advanced StatefulSet ([#1873](https://github.com/openkruise/kruise/pull/1873), [@AiRanthem](https://github.com/AiRanthem))
+- Redefined partition semantics to represent non-updated pod count ([#1819](https://github.com/openkruise/kruise/pull/1819), [@ABNER-1](https://github.com/ABNER-1); [#1751](https://github.com/openkruise/kruise/pull/1751), [@zybtakeit](https://github.com/zybtakeit), [@ABNER-1](https://github.com/ABNER-1))
+
+#### Sidecar Management
+- Support inject both stable and updated version sidecar according to updateStrategy ([#1689](https://github.com/openkruise/kruise/pull/1689), [#1856](https://github.com/openkruise/kruise/pull/1856), [@AiRanthem](https://github.com/AiRanthem)) 
+- Refine SidecarSet initContainer handling ([#1719](https://github.com/openkruise/kruise/pull/1719), [@zmberg](https://github.com/zmberg))
+
+#### Multi-domain management
+- Introduce `pub.kruise.io/disable-fetch-replicas-from-workload=true` annotation for CRD compatibility ([#1758](https://github.com/openkruise/kruise/pull/1758), [@zmberg](https://github.com/zmberg))
+- Extend PodProbeMarker to serverless pods ([#1875](https://github.com/openkruise/kruise/pull/1875), [@zmberg](https://github.com/zmberg))
+- Enable priorityClassName patching in WorkloadSpread ([#1877](https://github.com/openkruise/kruise/pull/1877), [@AiRanthem](https://github.com/AiRanthem))
+- Sync all fields in UnitedDeployment spec to subset workload spec ([#1798](https://github.com/openkruise/kruise/pull/1798), [@AiRanthem](https://github.com/AiRanthem))
+
+### Bug Fixes
+- Resolve token permission and dependency pinning issues ([#1707](https://github.com/openkruise/kruise/pull/1707),  [@harshitasao](https://github.com/harshitasao))
+- Fix PyTorchJob pod creation failures ([#1864](https://github.com/openkruise/kruise/pull/1864), [@zmberg](https://github.com/zmberg))
+- Correct ImagePullJob timeout handling (>1800s) ([#1874](https://github.com/openkruise/kruise/pull/1874), [@zmberg](https://github.com/zmberg))
+- Resolve cri-dockerd runtime detection issues ([#1899](https://github.com/openkruise/kruise/pull/1899), [@FlikweertvisionVadym](https://github.com/FlikweertvisionVadym))
+- Remove pod ownerRef requirement in pub webhook ([#1869](https://github.com/openkruise/kruise/pull/1869), [@zmberg](https://github.com/zmberg))
+- Address maxUnavailable blocking in SidecarSet updates ([#1834](https://github.com/openkruise/kruise/pull/1834), [@zmberg](https://github.com/zmberg))
+- Fix CloneSet controller block from scale expectation leaks ([#1829](https://github.com/openkruise/kruise/pull/1829), [@zmberg](https://github.com/zmberg))
+- Enforce imagePullPolicy=Always for ImagePullJob ([#1830](https://github.com/openkruise/kruise/pull/1830), [@zmberg](https://github.com/zmberg))
+- Fix WorkloadSpread webhook panics ([#1807](https://github.com/openkruise/kruise/pull/1807), [@AiRanthem](https://github.com/AiRanthem))
+
+### Misc (Chores and tests)
+- Standardize on CRI for image pulls ([#1867](https://github.com/openkruise/kruise/pull/1867), [@furykerry](https://github.com/furykerry))
+- Introduce JSON log formatting ([#1703](https://github.com/openkruise/kruise/pull/1703), [@zmberg](https://github.com/zmberg))
+- Remove Docker runtime dependency ([#1870](https://github.com/openkruise/kruise/pull/1870),[@furykerry](https://github.com/furykerry))
+- Improve test parallelism and reliability ([#1743](https://github.com/openkruise/kruise/pull/1743), [@MichaelRren](https://github.com/MichaelRren))
+- Enhance WorkloadSpread validation logic ([#1740](https://github.com/openkruise/kruise/pull/1740), [@AiRanthem](https://github.com/AiRanthem))
+- Launche Kruise Guru on Gurubase.io ([#1800](https://github.com/openkruise/kruise/pull/1800), [@kursataktas](https://github.com/kursataktas))
+- Improve documentation accuracy ([#1824](https://github.com/openkruise/kruise/pull/1824), [@furykerry](https://github.com/furykerry))
+- Fix KIND installation issues ([#1688](https://github.com/openkruise/kruise/pull/1688),[@ABNER-1](https://github.com/ABNER-1))
+- Avoid overriding namespace config after deploying ([#1772](https://github.com/openkruise/kruise/pull/1772),[@hantmac](https://github.com/hantmac))
+- Fix WorkloadSpread test flakiness by removing dependencies ([#1895](https://github.com/openkruise/kruise/pull/1895), [@AiRanthem](https://github.com/AiRanthem))
+- Address SidecarSet e2e test failures ([#1724](https://github.com/openkruise/kruise/pull/1724), [@zmberg](https://github.com/zmberg))
+- Enhance unit test stability ([#1784](https://github.com/openkruise/kruise/pull/1784), [@AiRanthem](https://github.com/AiRanthem))
+
 ## v1.7.3
 > Change log since v1.7.2
 
@@ -18,7 +85,7 @@
 ### Advanced Workload
 - Support specified-delete in AdvancedStatefulSet and handle specified deleted pod under maxUnavailable constrain. ([#1734](https://github.com/openkruise/kruise/pull/1734), [@ABNER-1](https://github.com/ABNER-1))
 
-## v1.5.5 
+## v1.5.5
 > Chang log since v1.5.4
 
 ### Advanced Workload
@@ -39,7 +106,7 @@
 - When CloneSet volumeClaimTemplates changed, always recreate pods and related volumes. ([#1561](https://github.com/openkruise/kruise/pull/1561), [@ABNER-1](https://github.com/ABNER-1))
 - Bump K8s dependency to 1.28, and OpenKruise still works with Kubernetes Version >= 1.18. ([#1598](https://github.com/openkruise/kruise/pull/1598), [@ABNER-1](https://github.com/ABNER-1))
 - SidecarSet support k8s 1.28 Sidecar Containers(initContainers[x].restartPolicy=Always), and significantly improves the lifecycle management of Sidecar containers,
-refer to the [community documentation](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) for details. ([#1613](https://github.com/openkruise/kruise/pull/1613), [@zmberg](https://github.com/zmberg))
+  refer to the [community documentation](https://kubernetes.io/docs/concepts/workloads/pods/sidecar-containers/) for details. ([#1613](https://github.com/openkruise/kruise/pull/1613), [@zmberg](https://github.com/zmberg))
 - ImagePullJob support for credential provider plugin, e.g. aws. ([#1383](https://github.com/openkruise/kruise/pull/1383), [@Kuromesi](https://github.com/Kuromesi))
 - Advanced StatefulSet support [start ordinal](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#start-ordinal). ([#1643](https://github.com/openkruise/kruise/pull/1643), [@ABNER-1](https://github.com/ABNER-1))
 - Support webhook CA injection using external certification management tool, e.g. [cert-manager](https://cert-manager.io/). ([#1665](https://github.com/openkruise/kruise/pull/1665), [@Kuromesi](https://github.com/Kuromesi))
@@ -124,14 +191,14 @@ refer to the [community documentation](https://kubernetes.io/docs/concepts/workl
 
 > No, really, you must read this before you upgrade
 - OpenKruise no longer supports Kubernetes versions 1.16, 1.17.
-However it's still possible to use OpenKruise with Kubernetes versions 1.16 and 1.17 as long as KruiseDaemon is not enabled(install/upgrade kruise charts with featureGates="KruiseDaemon=false")
+  However it's still possible to use OpenKruise with Kubernetes versions 1.16 and 1.17 as long as KruiseDaemon is not enabled(install/upgrade kruise charts with featureGates="KruiseDaemon=false")
 - Kruise-Daemon will no longer support v1alpha2 CRI runtimes.
-However it's still possible to use OpenKruise on Kubernetes with nodes that only support v1alpha2 CRI as long as KruiseDaemon is not enabled(install/upgrade kruise charts with featureGates="KruiseDaemon=false")
+  However it's still possible to use OpenKruise on Kubernetes with nodes that only support v1alpha2 CRI as long as KruiseDaemon is not enabled(install/upgrade kruise charts with featureGates="KruiseDaemon=false")
 - OpenKruise leader election default to use leases mode. ([#1407](https://github.com/openkruise/kruise/pull/1407), [dsxing](https://github.com/dsxing))
-For users with OpenKruise version 1.3.0 or lower, please first upgrade your OpenKruise to version 1.4 or 1.5 before upgrading to 1.6.0, so as to avoid unexpected multiple leader problem during the installation.
+  For users with OpenKruise version 1.3.0 or lower, please first upgrade your OpenKruise to version 1.4 or 1.5 before upgrading to 1.6.0, so as to avoid unexpected multiple leader problem during the installation.
 - Bump Kubernetes dependency to 1.26.10. ([#1511](https://github.com/openkruise/kruise/pull/1511), [KaiShi](https://github.com/BH4AWS))
 - To avoid potential circular dependency problem, features rely on webhook will no longer work for resources under kube-system,
-e.g. SidecarSet, WorkloadSpread, PodUnavailableBudget, ContainerLaunchPriority and PersistentPodState. ([#92](https://github.com/openkruise/charts/pull/92), [@hantmac](https://github.com/hantmac))
+  e.g. SidecarSet, WorkloadSpread, PodUnavailableBudget, ContainerLaunchPriority and PersistentPodState. ([#92](https://github.com/openkruise/charts/pull/92), [@hantmac](https://github.com/hantmac))
 
 ### Key Features
 - Fix WorkloadSpread incorrect subset allocation after workload rolling updating. ([#1197](https://github.com/openkruise/kruise/pull/1197), [veophi](https://github.com/veophi))
@@ -266,7 +333,7 @@ thanks!
 > No, really, you must read this before you upgrade
 
 - Enable following feature-gates by default: ResourcesDeletionProtection, WorkloadSpread, PodUnavailableBudgetDeleteGate, InPlaceUpdateEnvFromMetadata,
-StatefulSetAutoDeletePVC, PodProbeMarkerGate. ([#1214](https://github.com/openkruise/kruise/pull/1214), [@zmberg](https://github.com/zmberg))
+  StatefulSetAutoDeletePVC, PodProbeMarkerGate. ([#1214](https://github.com/openkruise/kruise/pull/1214), [@zmberg](https://github.com/zmberg))
 - Change Kruise leader election from configmap to configmapsleases, this is a smooth upgrade with no disruption to OpenKruise service.  ([#1184](https://github.com/openkruise/kruise/pull/1184), [@YTGhost](https://github.com/YTGhost))
 
 ### New Feature: JobSidecarTerminator
@@ -328,7 +395,7 @@ So the Probe capabilities provided in Kubernetes have defined specific semantics
 **In addition, there is actually a need to customize Probe semantics and related behaviors**, such as:
 - **GameServer defines Idle Probe to determine whether the Pod currently has a game match**, if not, from the perspective of cost optimization, the Pod can be scaled down.
 - **K8S Operator defines the main-secondary probe to determine the role of the current Pod (main or secondary)**. When upgrading, the secondary can be upgraded first,
-so as to achieve the behavior of selecting the main only once during the upgrade process, reducing the service interruption time during the upgrade process.
+  so as to achieve the behavior of selecting the main only once during the upgrade process, reducing the service interruption time during the upgrade process.
 
 So we provides the ability to customize the Probe and return the result to the Pod yaml.
 
@@ -875,7 +942,7 @@ spec:
 Since v0.7.0:
 
 1. OpenKruise requires Kubernetes 1.13+ because of CRD conversion.
-  Note that for Kubernetes 1.13 and 1.14, users must enable `CustomResourceWebhookConversion` feature-gate in kube-apiserver before install or upgrade Kruise.
+   Note that for Kubernetes 1.13 and 1.14, users must enable `CustomResourceWebhookConversion` feature-gate in kube-apiserver before install or upgrade Kruise.
 2. OpenKruise official image supports multi-arch, by default including linux/amd64, linux/arm64, and linux/arm platforms.
 
 ### A NEW workload controller - AdvancedCronJob
