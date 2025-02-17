@@ -30,9 +30,9 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	kubelettypes "k8s.io/kubelet/pkg/types"
 	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 

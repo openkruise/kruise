@@ -23,11 +23,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/test/e2e/framework"
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +31,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	utilpointer "k8s.io/utils/pointer"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
 var _ = SIGDescribe("PodUnavailableBudget", func() {
@@ -64,7 +65,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			tester.DeletePubs(ns)
 			tester.DeleteDeployments(ns)
 			tester.DeleteCloneSets(ns)
-			sidecarTester.DeleteSidecarSets()
+			sidecarTester.DeleteSidecarSets(ns)
 		})
 
 		ginkgo.It("PodUnavailableBudget selector no matched pods", func() {
@@ -618,7 +619,9 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 				},
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSet.Name))
-			sidecarSet, _ = sidecarTester.CreateSidecarSet(sidecarSet)
+			var err error
+			sidecarSet, err = sidecarTester.CreateSidecarSet(sidecarSet)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			time.Sleep(time.Second)
 
 			// create deployment

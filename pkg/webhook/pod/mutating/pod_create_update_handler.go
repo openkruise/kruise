@@ -38,7 +38,7 @@ type PodCreateHandler struct {
 	Client client.Client
 
 	// Decoder decodes objects
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 }
 
 var _ admission.Handler = &PodCreateHandler{}
@@ -103,6 +103,14 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 	// EnhancedLivenessProbe enabled
 	if utilfeature.DefaultFeatureGate.Enabled(features.EnhancedLivenessProbeGate) {
 		if skip, err := h.enhancedLivenessProbeWhenPodCreate(ctx, req, obj); err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		} else if !skip {
+			changed = true
+		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnablePodProbeMarkerOnServerless) {
+		if skip, err := h.podProbeMarkerMutatingPod(ctx, req, obj); err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
 		} else if !skip {
 			changed = true

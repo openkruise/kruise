@@ -79,6 +79,11 @@ type TimeTestCase struct {
 func TestIsJSONEqual(t *testing.T) {
 	now := metav1.Now()
 	t1 := TimeTestCase{TestTime: &metav1.Time{Time: now.Time}}
+	if t1.TestTime.Time.UnixMilli()%1000 < 3 {
+		// avoid t1 1.001, and t2 0.999
+		time.Sleep(time.Millisecond * 2)
+		t1 = TimeTestCase{TestTime: &metav1.Time{Time: now.Time}}
+	}
 	t2 := TimeTestCase{TestTime: &metav1.Time{Time: now.Add(-time.Millisecond * 2)}}
 	t3 := TimeTestCase{TestTime: &metav1.Time{Time: now.Add(-time.Second * 2)}}
 

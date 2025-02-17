@@ -796,7 +796,7 @@ var _ = SIGDescribe("CloneSet", func() {
 					ObjectMeta: metav1.ObjectMeta{Name: "data-vol1"},
 					Spec: v1.PersistentVolumeClaimSpec{
 						AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-						Resources: v1.ResourceRequirements{
+						Resources: v1.VolumeResourceRequirements{
 							Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Gi")},
 						},
 					},
@@ -805,7 +805,7 @@ var _ = SIGDescribe("CloneSet", func() {
 					ObjectMeta: metav1.ObjectMeta{Name: "data-vol2"},
 					Spec: v1.PersistentVolumeClaimSpec{
 						AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-						Resources: v1.ResourceRequirements{
+						Resources: v1.VolumeResourceRequirements{
 							Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Gi")},
 						},
 					},
@@ -1277,7 +1277,7 @@ func testUpdateVolumeClaimTemplates(tester *framework.CloneSetTester, randStr st
 			ObjectMeta: metav1.ObjectMeta{Name: "data-vol1"},
 			Spec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Gi")},
 				},
 			},
@@ -1286,7 +1286,7 @@ func testUpdateVolumeClaimTemplates(tester *framework.CloneSetTester, randStr st
 			ObjectMeta: metav1.ObjectMeta{Name: "data-vol2"},
 			Spec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Gi")},
 				},
 			},

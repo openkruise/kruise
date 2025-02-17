@@ -21,6 +21,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	apiutil "github.com/openkruise/kruise/pkg/util/api"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -77,7 +78,7 @@ type ScaleAndSelector struct {
 	// controller.spec.Replicas; the value -1 means it is uncertain currently
 	Scale int32
 	// kruise statefulSet.spec.ReserveOrdinals
-	ReserveOrdinals []int
+	ReserveOrdinals sets.Set[int]
 	// controller.spec.Selector
 	Selector *metav1.LabelSelector
 	// metadata
@@ -381,7 +382,7 @@ func (r *ControllerFinder) getPodKruiseStatefulSet(ref ControllerReference, name
 
 	return &ScaleAndSelector{
 		Scale:           *(ss.Spec.Replicas),
-		ReserveOrdinals: ss.Spec.ReserveOrdinals,
+		ReserveOrdinals: apiutil.GetReserveOrdinalIntSet(ss.Spec.ReserveOrdinals),
 		Selector:        ss.Spec.Selector,
 		ControllerReference: ControllerReference{
 			APIVersion: ss.APIVersion,

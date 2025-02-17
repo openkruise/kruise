@@ -26,7 +26,6 @@ var (
 		AllowInvalidLabelValueInSelector:                  true,
 		AllowHostIPsField:                                 true,
 		AllowInvalidTopologySpreadConstraintLabelSelector: true,
-		AllowMutableNodeSelectorAndNodeAffinity:           true,
 		ResourceIsPod:                                     true,
 	}
 )

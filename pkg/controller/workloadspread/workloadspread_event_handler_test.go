@@ -24,6 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
@@ -157,7 +158,7 @@ func TestPodEventHandler(t *testing.T) {
 		wsutil.MatchedWorkloadSpreadSubsetAnnotations: string(by),
 	}
 
-	createEvt := event.CreateEvent{
+	createEvt := event.TypedCreateEvent[*corev1.Pod]{
 		Object: createPod,
 	}
 	handler.Create(context.TODO(), createEvt, createQ)
@@ -170,7 +171,7 @@ func TestPodEventHandler(t *testing.T) {
 	key, _ := createQ.Get()
 	nsn, _ := key.(reconcile.Request)
 	if nsn.Namespace != createPod.Namespace && nsn.Name != injectWorkloadSpread.Name {
-		t.Errorf("matche WorkloadSpread %s/%s failed", createPod.Namespace, injectWorkloadSpread.Name)
+		t.Errorf("matching WorkloadSpread %s/%s failed", createPod.Namespace, injectWorkloadSpread.Name)
 	}
 
 	// update
@@ -186,7 +187,7 @@ func TestPodEventHandler(t *testing.T) {
 	}
 	newPod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 
-	updateEvt := event.UpdateEvent{
+	updateEvt := event.TypedUpdateEvent[*corev1.Pod]{
 		ObjectOld: oldPod,
 		ObjectNew: newPod,
 	}
@@ -200,7 +201,7 @@ func TestPodEventHandler(t *testing.T) {
 	key, _ = updateQ.Get()
 	nsn, _ = key.(reconcile.Request)
 	if nsn.Namespace != newPod.Namespace && nsn.Name != injectWorkloadSpread.Name {
-		t.Errorf("matche WorkloadSpread %s/%s failed", newPod.Namespace, injectWorkloadSpread.Name)
+		t.Errorf("matching WorkloadSpread %s/%s failed", newPod.Namespace, injectWorkloadSpread.Name)
 	}
 
 	// delete
@@ -210,7 +211,7 @@ func TestPodEventHandler(t *testing.T) {
 		wsutil.MatchedWorkloadSpreadSubsetAnnotations: string(by),
 	}
 
-	deleteEvt := event.DeleteEvent{
+	deleteEvt := event.TypedDeleteEvent[*corev1.Pod]{
 		Object: deletePod,
 	}
 	handler.Delete(context.TODO(), deleteEvt, deleteQ)
@@ -223,7 +224,7 @@ func TestPodEventHandler(t *testing.T) {
 	key, _ = deleteQ.Get()
 	nsn, _ = key.(reconcile.Request)
 	if nsn.Namespace != deletePod.Namespace && nsn.Name != injectWorkloadSpread.Name {
-		t.Errorf("matche WorkloadSpread %s/%s failed", deletePod.Namespace, injectWorkloadSpread.Name)
+		t.Errorf("matching WorkloadSpread %s/%s failed", deletePod.Namespace, injectWorkloadSpread.Name)
 	}
 }
 

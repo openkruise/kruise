@@ -37,7 +37,7 @@ import (
 // CloneSetCreateUpdateHandler handles CloneSet
 type CloneSetCreateUpdateHandler struct {
 	// Decoder decodes objects
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 }
 
 var _ admission.Handler = &CloneSetCreateUpdateHandler{}

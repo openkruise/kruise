@@ -33,7 +33,7 @@ import (
 // EphemeralJobCreateUpdateHandler handles EphemeralJob
 type EphemeralJobCreateUpdateHandler struct {
 	// Decoder decodes objects
-	Decoder *admission.Decoder
+	Decoder admission.Decoder
 }
 
 var _ admission.Handler = &EphemeralJobCreateUpdateHandler{}
@@ -64,7 +64,10 @@ func validate(obj *appsv1alpha1.EphemeralJob) error {
 	if err != nil {
 		return err
 	}
+	// todo: expose this field (`spec.SecurityContext.HostUsers` in pod spec) in the feature if needed.
+	// default hostUsers is true
+	hostUsers := true
 	// don't validate EphemeralContainer TargetContainerName
-	allErrs := validateEphemeralContainers(ecs, field.NewPath("ephemeralContainers"), validation.PodValidationOptions{})
+	allErrs := validateEphemeralContainers(ecs, field.NewPath("ephemeralContainers"), validation.PodValidationOptions{}, hostUsers)
 	return allErrs.ToAggregate()
 }

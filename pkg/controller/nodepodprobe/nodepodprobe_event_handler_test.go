@@ -49,7 +49,7 @@ func TestNodeEventHandler(t *testing.T) {
 	_ = fakeClient.Create(context.TODO(), demo)
 	// create
 	createQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	createEvt := event.CreateEvent{
+	createEvt := event.TypedCreateEvent[*corev1.Node]{
 		Object: demo,
 	}
 	handler.Create(context.TODO(), createEvt, createQ)

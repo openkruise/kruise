@@ -1,6 +1,5 @@
 /*
 Copyright 2019 The Kruise Authors.
-Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -4651,7 +4650,8 @@ func TestScaleUpWithMaxUnavailable(t *testing.T) {
 }
 
 func isOrHasInternalError(err error) bool {
-	agg, ok := err.(utilerrors.Aggregate)
+	var agg utilerrors.Aggregate
+	ok := errors.As(err, &agg)
 	return !ok && !apierrors.IsInternalError(err) || ok && len(agg.Errors()) > 0 && !apierrors.IsInternalError(agg.Errors()[0])
 }
 
@@ -4662,10 +4662,12 @@ func emptyInvariants(set *appsv1beta1.StatefulSet, om *fakeObjectManager) error 
 func TestStatefulSetControlWithStartOrdinal(t *testing.T) {
 	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
 
-	simpleSetFn := func(replicas, startOrdinal int, reservedIds ...int) *appsv1beta1.StatefulSet {
+	simpleSetFn := func(replicas, startOrdinal int, reservedIds ...int32) *appsv1beta1.StatefulSet {
 		statefulSet := newStatefulSet(replicas)
 		statefulSet.Spec.Ordinals = &appsv1beta1.StatefulSetOrdinals{Start: int32(startOrdinal)}
-		statefulSet.Spec.ReserveOrdinals = append([]int{}, reservedIds...)
+		for _, id := range reservedIds {
+			statefulSet.Spec.ReserveOrdinals = append(statefulSet.Spec.ReserveOrdinals, intstr.FromInt32(id))
+		}
 		return statefulSet
 	}
 
@@ -4870,7 +4872,7 @@ func TestStatefulSetVCTResize(t *testing.T) {
 			},
 			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
 				set.Spec.Template.Spec.Containers[0].Image = "busybox"
-				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},
@@ -4888,7 +4890,7 @@ func TestStatefulSetVCTResize(t *testing.T) {
 			},
 			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
 				set.Spec.Template.Spec.Containers[0].Image = "busybox"
-				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},
@@ -4906,12 +4908,12 @@ func TestStatefulSetVCTResize(t *testing.T) {
 			},
 			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
 				set.Spec.Template.Spec.Containers[0].Image = "busybox"
-				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},
 				}
-				set.Spec.VolumeClaimTemplates[1].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[1].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},
@@ -4929,7 +4931,7 @@ func TestStatefulSetVCTResize(t *testing.T) {
 			},
 			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
 				set.Spec.Template.Spec.Containers[0].Image = "busybox"
-				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},
@@ -4947,12 +4949,12 @@ func TestStatefulSetVCTResize(t *testing.T) {
 			},
 			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
 				set.Spec.Template.Spec.Containers[0].Image = "busybox"
-				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},
 				}
-				set.Spec.VolumeClaimTemplates[1].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[1].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},
@@ -4970,7 +4972,7 @@ func TestStatefulSetVCTResize(t *testing.T) {
 			},
 			update: func(set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
 				set.Spec.Template.Spec.Containers[0].Image = "busybox"
-				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.ResourceRequirements{
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources = corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{
 						corev1.ResourceStorage: *resource.NewQuantity(20, resource.BinarySI),
 					},

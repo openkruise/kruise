@@ -138,6 +138,9 @@ const (
 	// InPlaceWorkloadVerticalScaling enable CloneSet/Advanced StatefulSet controller to support vertical scaling
 	// of managed Pods.
 	InPlaceWorkloadVerticalScaling featuregate.Feature = "InPlaceWorkloadVerticalScaling"
+
+	// EnablePodProbeMarkerOnServerless enable PodProbeMarker on Serverless Pod
+	EnablePodProbeMarkerOnServerless featuregate.Feature = "EnablePodProbeMarkerOnServerless"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -149,16 +152,16 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	KruisePodReadinessGate:                    {Default: false, PreRelease: featuregate.Alpha},
 	PreDownloadImageForInPlaceUpdate:          {Default: false, PreRelease: featuregate.Alpha},
 	CloneSetPartitionRollback:                 {Default: false, PreRelease: featuregate.Alpha},
-	ResourcesDeletionProtection:               {Default: true, PreRelease: featuregate.Alpha},
-	WorkloadSpread:                            {Default: true, PreRelease: featuregate.Alpha},
-	PodUnavailableBudgetDeleteGate:            {Default: true, PreRelease: featuregate.Alpha},
+	ResourcesDeletionProtection:               {Default: false, PreRelease: featuregate.Beta},
+	WorkloadSpread:                            {Default: true, PreRelease: featuregate.Beta},
+	PodUnavailableBudgetDeleteGate:            {Default: true, PreRelease: featuregate.Beta},
 	PodUnavailableBudgetUpdateGate:            {Default: false, PreRelease: featuregate.Alpha},
 	TemplateNoDefaults:                        {Default: false, PreRelease: featuregate.Alpha},
-	InPlaceUpdateEnvFromMetadata:              {Default: true, PreRelease: featuregate.Alpha},
-	StatefulSetAutoDeletePVC:                  {Default: true, PreRelease: featuregate.Alpha},
+	InPlaceUpdateEnvFromMetadata:              {Default: true, PreRelease: featuregate.Beta},
+	StatefulSetAutoDeletePVC:                  {Default: true, PreRelease: featuregate.Beta},
 	SidecarSetPatchPodMetadataDefaultsAllowed: {Default: false, PreRelease: featuregate.Alpha},
 	SidecarTerminator:                         {Default: false, PreRelease: featuregate.Alpha},
-	PodProbeMarkerGate:                        {Default: true, PreRelease: featuregate.Alpha},
+	PodProbeMarkerGate:                        {Default: true, PreRelease: featuregate.Beta},
 	PreDownloadImageForDaemonSetUpdate:        {Default: false, PreRelease: featuregate.Alpha},
 
 	CloneSetEventHandlerOptimization:      {Default: false, PreRelease: featuregate.Alpha},
@@ -175,6 +178,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	StatefulSetAutoResizePVCGate:             {Default: false, PreRelease: featuregate.Alpha},
 	ForceDeleteTimeoutExpectationFeatureGate: {Default: false, PreRelease: featuregate.Alpha},
 	InPlaceWorkloadVerticalScaling:           {Default: false, PreRelease: featuregate.Alpha},
+	EnablePodProbeMarkerOnServerless:         {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
@@ -202,6 +206,7 @@ func SetDefaultFeatureGates() {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", WorkloadSpread))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", SidecarSetPatchPodMetadataDefaultsAllowed))
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", EnhancedLivenessProbeGate))
+		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", EnablePodProbeMarkerOnServerless))
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(KruiseDaemon) {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", PreDownloadImageForInPlaceUpdate))

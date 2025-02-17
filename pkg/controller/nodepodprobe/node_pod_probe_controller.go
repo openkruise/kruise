@@ -93,17 +93,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// watch for changes to NodePodProbe
-	if err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.NodePodProbe{}), &enqueueRequestForNodePodProbe{}); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.NodePodProbe{}, &enqueueRequestForNodePodProbe{})); err != nil {
 		return err
 	}
 
 	// watch for changes to pod
-	if err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}), &enqueueRequestForPod{reader: mgr.GetClient()}); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}, &enqueueRequestForPod{reader: mgr.GetClient()})); err != nil {
 		return err
 	}
 
 	// watch for changes to node
-	if err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Node{}), &enqueueRequestForNode{Reader: mgr.GetClient()}); err != nil {
+	if err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Node{}, &enqueueRequestForNode{Reader: mgr.GetClient()})); err != nil {
 		return err
 	}
 

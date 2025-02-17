@@ -7,11 +7,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
-var leaderMetric = promauto.NewGauge(
-	prometheus.GaugeOpts{
-		Name: "kruise_manager_is_leader",
-		Help: "Gauge the leader of kruise-manager",
-	},
+var (
+	leaderMetric = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "kruise_manager_is_leader",
+			Help: "Gauge the leader of kruise-manager",
+		},
+	)
+	leaderSlowpathCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "leader_election_slowpath_total",
+		Help: "Total number of slow path exercised in renewing leader leases. 'name' is the string used to identify the lease. Please make sure to group by name.",
+	}, []string{"name"})
 )
 
 func init() {
@@ -28,10 +34,10 @@ type switchMetric struct{}
 
 var (
 	_ leaderelection.MetricsProvider = metricsProvider{}
-	_ leaderelection.SwitchMetric    = switchMetric{}
+	_ leaderelection.LeaderMetric    = switchMetric{}
 )
 
-func (_ metricsProvider) NewLeaderMetric() leaderelection.SwitchMetric {
+func (_ metricsProvider) NewLeaderMetric() leaderelection.LeaderMetric {
 	return switchMetric{}
 }
 
@@ -41,4 +47,9 @@ func (_ switchMetric) On(_ string) {
 
 func (s switchMetric) Off(string) {
 	leaderMetric.Set(0)
+}
+
+// todo: why not use leaderelection.NewLeaderMetric?
+func (s switchMetric) SlowpathExercised(name string) {
+	leaderSlowpathCounter.WithLabelValues(name).Inc()
 }

@@ -196,30 +196,31 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to StatefulSet
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.StatefulSet{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			oldSS := e.ObjectOld.(*appsv1beta1.StatefulSet)
-			newSS := e.ObjectNew.(*appsv1beta1.StatefulSet)
-			if oldSS.Status.Replicas != newSS.Status.Replicas {
-				klog.V(4).InfoS("Observed updated replica count for StatefulSet",
-					"statefulSet", klog.KObj(newSS), "oldReplicas", oldSS.Status.Replicas, "newReplicas", newSS.Status.Replicas)
-			}
-			return true
-		},
-	})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.StatefulSet{}, &handler.TypedEnqueueRequestForObject[*appsv1beta1.StatefulSet]{},
+		predicate.TypedFuncs[*appsv1beta1.StatefulSet]{
+			UpdateFunc: func(e event.TypedUpdateEvent[*appsv1beta1.StatefulSet]) bool {
+				oldSS := e.ObjectOld
+				newSS := e.ObjectNew
+				if oldSS.Status.Replicas != newSS.Status.Replicas {
+					klog.V(4).InfoS("Observed updated replica count for StatefulSet",
+						"statefulSet", klog.KObj(newSS), "oldReplicas", oldSS.Status.Replicas, "newReplicas", newSS.Status.Replicas)
+				}
+				return true
+			},
+		}))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to PVC patched by StatefulSet
-	err = c.Watch(source.Kind(mgr.GetCache(), &v1.PersistentVolumeClaim{}), &pvcEventHandler{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.PersistentVolumeClaim{}, &pvcEventHandler{}))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Pod created by StatefulSet
-	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}), handler.EnqueueRequestForOwner(
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1beta1.StatefulSet{}, handler.OnlyControllerOwner()))
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}, handler.TypedEnqueueRequestForOwner[*v1.Pod](
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1beta1.StatefulSet{}, handler.OnlyControllerOwner())))
 	if err != nil {
 		return err
 	}

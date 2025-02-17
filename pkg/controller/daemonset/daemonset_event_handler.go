@@ -38,7 +38,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 )
 
-var _ handler.EventHandler = &podEventHandler{}
+var _ handler.TypedEventHandler[*v1.Pod] = &podEventHandler{}
 
 type podEventHandler struct {
 	client.Reader
@@ -53,13 +53,13 @@ func enqueueDaemonSet(q workqueue.RateLimitingInterface, ds *appsv1alpha1.Daemon
 	}})
 }
 
-func (e *podEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
 	logger := klog.FromContext(ctx)
-	pod := evt.Object.(*v1.Pod)
+	pod := evt.Object
 	if pod.DeletionTimestamp != nil {
 		// on a restart of the controller manager, it's possible a new pod shows up in a state that
 		// is already pending deletion. Prevent the pod from being a creation observation.
-		e.Delete(ctx, event.DeleteEvent{Object: evt.Object}, q)
+		e.Delete(ctx, event.TypedDeleteEvent[*v1.Pod]{Object: evt.Object}, q)
 		return
 	}
 
@@ -97,9 +97,9 @@ func joinDaemonSetNames(dsList []*appsv1alpha1.DaemonSet) string {
 	return strings.Join(names, ",")
 }
 
-func (e *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	oldPod := evt.ObjectOld.(*v1.Pod)
-	curPod := evt.ObjectNew.(*v1.Pod)
+func (e *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+	oldPod := evt.ObjectOld
+	curPod := evt.ObjectNew
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
 		// Periodic resync will send update events for all known pods.
 		// Two different versions of the same pod will always have different RVs.
@@ -151,12 +151,9 @@ func (e *podEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q w
 	}
 }
 
-func (e *podEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
-	pod, ok := evt.Object.(*v1.Pod)
-	if !ok {
-		klog.ErrorS(nil, "Skipped pod deletion event", "deleteStateUnknown", evt.DeleteStateUnknown, "object", evt.Object)
-		return
-	}
+func (e *podEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+	pod := evt.Object
+
 	e.deletePod(ctx, pod, q, true)
 }
 
@@ -184,7 +181,7 @@ func (e *podEventHandler) deletePod(ctx context.Context, pod *v1.Pod, q workqueu
 	enqueueDaemonSet(q, ds)
 }
 
-func (e *podEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
 
 }
 
@@ -230,13 +227,13 @@ func (e *podEventHandler) getPodDaemonSets(pod *v1.Pod) []*appsv1alpha1.DaemonSe
 	return dsMatched
 }
 
-var _ handler.EventHandler = &nodeEventHandler{}
+var _ handler.TypedEventHandler[*v1.Node] = &nodeEventHandler{}
 
 type nodeEventHandler struct {
 	reader client.Reader
 }
 
-func (e *nodeEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (e *nodeEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.Node], q workqueue.RateLimitingInterface) {
 	dsList := &appsv1alpha1.DaemonSetList{}
 	err := e.reader.List(context.TODO(), dsList)
 	if err != nil {
@@ -244,7 +241,7 @@ func (e *nodeEventHandler) Create(ctx context.Context, evt event.CreateEvent, q 
 		return
 	}
 
-	node := evt.Object.(*v1.Node)
+	node := evt.Object
 	for i := range dsList.Items {
 		ds := &dsList.Items[i]
 		if shouldSchedule, _ := nodeShouldRunDaemonPod(node, ds); shouldSchedule {
@@ -256,9 +253,9 @@ func (e *nodeEventHandler) Create(ctx context.Context, evt event.CreateEvent, q 
 	}
 }
 
-func (e *nodeEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
-	oldNode := evt.ObjectOld.(*v1.Node)
-	curNode := evt.ObjectNew.(*v1.Node)
+func (e *nodeEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.Node], q workqueue.RateLimitingInterface) {
+	oldNode := evt.ObjectOld
+	curNode := evt.ObjectNew
 	if shouldIgnoreNodeUpdate(*oldNode, *curNode) {
 		return
 	}
@@ -285,8 +282,8 @@ func (e *nodeEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q 
 	}
 }
 
-func (e *nodeEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (e *nodeEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.Node], q workqueue.RateLimitingInterface) {
 }
 
-func (e *nodeEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *nodeEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.Node], q workqueue.RateLimitingInterface) {
 }

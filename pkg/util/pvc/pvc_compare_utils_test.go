@@ -24,7 +24,7 @@ func TestCompareWithCheckFn(t *testing.T) {
 					AccessModes: []v1.PersistentVolumeAccessMode{
 						v1.ReadWriteOnce,
 					},
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -40,7 +40,7 @@ func TestCompareWithCheckFn(t *testing.T) {
 					AccessModes: []v1.PersistentVolumeAccessMode{
 						v1.ReadWriteOnce,
 					},
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -61,7 +61,7 @@ func TestCompareWithCheckFn(t *testing.T) {
 					AccessModes: []v1.PersistentVolumeAccessMode{
 						v1.ReadWriteOnce,
 					},
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -77,7 +77,7 @@ func TestCompareWithCheckFn(t *testing.T) {
 					AccessModes: []v1.PersistentVolumeAccessMode{
 						v1.ReadWriteOnce,
 					},
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -98,7 +98,7 @@ func TestCompareWithCheckFn(t *testing.T) {
 					AccessModes: []v1.PersistentVolumeAccessMode{
 						v1.ReadWriteOnce,
 					},
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -114,7 +114,7 @@ func TestCompareWithCheckFn(t *testing.T) {
 					AccessModes: []v1.PersistentVolumeAccessMode{
 						v1.ReadOnlyMany,
 					},
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -136,7 +136,7 @@ func TestCompareWithCheckFn(t *testing.T) {
 						v1.ReadWriteOnce,
 						v1.ReadWriteOncePod,
 					},
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -152,7 +152,7 @@ func TestCompareWithCheckFn(t *testing.T) {
 					AccessModes: []v1.PersistentVolumeAccessMode{
 						v1.ReadOnlyMany,
 					},
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -173,7 +173,7 @@ func TestCompareWithCheckFn(t *testing.T) {
 					AccessModes: []v1.PersistentVolumeAccessMode{
 						v1.ReadWriteOnce,
 					},
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("500Mi"),
 						},
@@ -189,7 +189,7 @@ func TestCompareWithCheckFn(t *testing.T) {
 					AccessModes: []v1.PersistentVolumeAccessMode{
 						v1.ReadWriteOnce,
 					},
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -210,7 +210,7 @@ func TestCompareWithCheckFn(t *testing.T) {
 					AccessModes: []v1.PersistentVolumeAccessMode{
 						v1.ReadWriteOnce,
 					},
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("5Gi"),
 						},
@@ -226,7 +226,7 @@ func TestCompareWithCheckFn(t *testing.T) {
 					AccessModes: []v1.PersistentVolumeAccessMode{
 						v1.ReadWriteOnce,
 					},
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -276,7 +276,7 @@ func TestIsPVCCompatibleAndReady(t *testing.T) {
 					},
 				},
 				Spec: v1.PersistentVolumeClaimSpec{
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -285,7 +285,7 @@ func TestIsPVCCompatibleAndReady(t *testing.T) {
 			},
 			template: &v1.PersistentVolumeClaim{
 				Spec: v1.PersistentVolumeClaimSpec{
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -304,7 +304,7 @@ func TestIsPVCCompatibleAndReady(t *testing.T) {
 					},
 				},
 				Spec: v1.PersistentVolumeClaimSpec{
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -313,7 +313,7 @@ func TestIsPVCCompatibleAndReady(t *testing.T) {
 			},
 			template: &v1.PersistentVolumeClaim{
 				Spec: v1.PersistentVolumeClaimSpec{
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -332,7 +332,7 @@ func TestIsPVCCompatibleAndReady(t *testing.T) {
 					},
 				},
 				Spec: v1.PersistentVolumeClaimSpec{
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("2Gi"),
 						},
@@ -341,7 +341,7 @@ func TestIsPVCCompatibleAndReady(t *testing.T) {
 			},
 			template: &v1.PersistentVolumeClaim{
 				Spec: v1.PersistentVolumeClaimSpec{
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -360,7 +360,7 @@ func TestIsPVCCompatibleAndReady(t *testing.T) {
 					},
 				},
 				Spec: v1.PersistentVolumeClaimSpec{
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("4Gi"),
 						},
@@ -369,7 +369,7 @@ func TestIsPVCCompatibleAndReady(t *testing.T) {
 			},
 			template: &v1.PersistentVolumeClaim{
 				Spec: v1.PersistentVolumeClaimSpec{
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},
@@ -388,7 +388,7 @@ func TestIsPVCCompatibleAndReady(t *testing.T) {
 					},
 				},
 				Spec: v1.PersistentVolumeClaimSpec{
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("2Gi"),
 						},
@@ -397,7 +397,7 @@ func TestIsPVCCompatibleAndReady(t *testing.T) {
 			},
 			template: &v1.PersistentVolumeClaim{
 				Spec: v1.PersistentVolumeClaimSpec{
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("3Gi"),
 						},
@@ -485,7 +485,7 @@ func TestIsPatchPVCCompleted(t *testing.T) {
 
 	template := &v1.PersistentVolumeClaim{
 		Spec: v1.PersistentVolumeClaimSpec{
-			Resources: v1.ResourceRequirements{
+			Resources: v1.VolumeResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceStorage: resource.MustParse("1Gi"),
 				},
@@ -498,7 +498,7 @@ func TestIsPatchPVCCompleted(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			claim := &v1.PersistentVolumeClaim{
 				Spec: v1.PersistentVolumeClaimSpec{
-					Resources: v1.ResourceRequirements{
+					Resources: v1.VolumeResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceStorage: resource.MustParse("1Gi"),
 						},

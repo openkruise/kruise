@@ -137,29 +137,30 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to CloneSet
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.CloneSet{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			oldCS := e.ObjectOld.(*appsv1alpha1.CloneSet)
-			newCS := e.ObjectNew.(*appsv1alpha1.CloneSet)
-			if *oldCS.Spec.Replicas != *newCS.Spec.Replicas {
-				klog.V(4).InfoS("Observed updated replicas for CloneSet",
-					"cloneSet", klog.KObj(newCS), "oldReplicas", *oldCS.Spec.Replicas, "newReplicas", *newCS.Spec.Replicas)
-			}
-			return true
-		},
-	})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.CloneSet{}, &handler.TypedEnqueueRequestForObject[*appsv1alpha1.CloneSet]{},
+		predicate.TypedFuncs[*appsv1alpha1.CloneSet]{
+			UpdateFunc: func(e event.TypedUpdateEvent[*appsv1alpha1.CloneSet]) bool {
+				oldCS := e.ObjectOld
+				newCS := e.ObjectNew
+				if *oldCS.Spec.Replicas != *newCS.Spec.Replicas {
+					klog.V(4).InfoS("Observed updated replicas for CloneSet",
+						"cloneSet", klog.KObj(newCS), "oldReplicas", *oldCS.Spec.Replicas, "newReplicas", *newCS.Spec.Replicas)
+				}
+				return true
+			},
+		}))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Pod
-	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}), &podEventHandler{Reader: mgr.GetCache()})
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}, &podEventHandler{Reader: mgr.GetCache()}))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to PVC, just ensure cache updated
-	err = c.Watch(source.Kind(mgr.GetCache(), &v1.PersistentVolumeClaim{}), &pvcEventHandler{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &v1.PersistentVolumeClaim{}, &pvcEventHandler{}))
 	if err != nil {
 		return err
 	}

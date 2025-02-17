@@ -122,21 +122,21 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to BroadcastJob
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.BroadcastJob{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.BroadcastJob{}, &handler.TypedEnqueueRequestForObject[*appsv1alpha1.BroadcastJob]{}))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Pod
-	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}), &podEventHandler{
-		enqueueHandler: handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.BroadcastJob{}, handler.OnlyControllerOwner()),
-	})
+	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Pod{}, &podEventHandler{
+		enqueueHandler: handler.TypedEnqueueRequestForOwner[*corev1.Pod](mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.BroadcastJob{}, handler.OnlyControllerOwner()),
+	}))
 	if err != nil {
 		return err
 	}
 
 	// Watch for changes to Node
-	return c.Watch(source.Kind(mgr.GetCache(), &corev1.Node{}), &enqueueBroadcastJobForNode{reader: mgr.GetCache()})
+	return c.Watch(source.Kind(mgr.GetCache(), &corev1.Node{}, &enqueueBroadcastJobForNode{reader: mgr.GetCache()}))
 }
 
 var _ reconcile.Reconciler = &ReconcileBroadcastJob{}

@@ -10,6 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -68,5 +69,5 @@ func AddWatcherDynamically(mgr manager.Manager, c controller.Controller, h handl
 	object := &unstructured.Unstructured{}
 	object.SetGroupVersionKind(gvk)
 	watcherMap.Store(cacheKey, true)
-	return true, c.Watch(source.Kind(mgr.GetCache(), object), h)
+	return true, c.Watch(source.Kind(mgr.GetCache(), crclient.Object(object), h))
 }

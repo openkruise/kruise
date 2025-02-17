@@ -17,12 +17,11 @@ limitations under the License.
 package v1beta1
 
 import (
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
 )
 
 const (
@@ -275,7 +274,8 @@ type StatefulSetSpec struct {
 	//   Then controller will delete Pod-1 and create Pod-3 (existing Pods will be [0, 2, 3])
 	// - If you just want to delete Pod-1, you should set spec.reserveOrdinal to [1] and spec.replicas to 2.
 	//   Then controller will delete Pod-1 (existing Pods will be [0, 2])
-	ReserveOrdinals []int `json:"reserveOrdinals,omitempty"`
+	// You can also use ranges along with numbers, such as [1, 3-5], which is a shortcut for [1, 3, 4, 5].
+	ReserveOrdinals []intstr.IntOrString `json:"reserveOrdinals,omitempty"`
 
 	// Lifecycle defines the lifecycle hooks for Pods pre-delete, in-place update.
 	Lifecycle *appspub.Lifecycle `json:"lifecycle,omitempty"`
