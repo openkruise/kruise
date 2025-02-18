@@ -66,6 +66,14 @@ OpenKruise (官网: [https://openkruise.io](https://openkruise.io)) 是CNCF([Clo
 - 安装/升级 Kruise [稳定版本](https://openkruise.io/docs/installation)
 - 安装/升级 Kruise [最新版本（包括 alpha/beta/rc）](https://openkruise.io/docs/next/installation)
 
+### 在阿里云上快速体验
+
+- 3分钟内在阿里云上创建 Kruise 体验环境:
+
+  <a href="https://acs.console.aliyun.com/quick-deploy?repo=openkruise/charts&branch=master&paths=%5B%22versions/kruise/1.7.3%22%5D" target="_blank">
+    <img src="https://img.alicdn.com/imgextra/i1/O1CN01aiPSuA1Wiz7wkgF5u_!!6000000002823-55-tps-399-70.svg" width="200" alt="Deploy on Alibaba Cloud">
+  </a>
+
 ## 用户
 
 登记: [如果贵司正在使用 Kruise 请留言](https://github.com/openkruise/kruise/issues/289)

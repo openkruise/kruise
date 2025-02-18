@@ -68,6 +68,14 @@ You can view the full documentation from the [OpenKruise website](https://openkr
 - Install or upgrade Kruise with [the stable version](https://openkruise.io/docs/installation).
 - Install or upgrade Kruise with [the latest version including alpha/beta/rc](https://openkruise.io/docs/next/installation).
 
+### Get Your Own Demo with Alibaba Cloud
+
+- install Kruise on a Serverless K8S cluster in 3 minutes, try:
+
+  <a href="https://acs.console.aliyun.com/quick-deploy?repo=openkruise/charts&branch=master&paths=%5B%22versions/kruise/1.7.3%22%5D" target="_blank">
+    <img src="https://img.alicdn.com/imgextra/i1/O1CN01aiPSuA1Wiz7wkgF5u_!!6000000002823-55-tps-399-70.svg" width="200" alt="Deploy on Alibaba Cloud">
+  </a>
+
 ## Users
 
 Registration: [Who is using Kruise](https://github.com/openkruise/kruise/issues/289)
