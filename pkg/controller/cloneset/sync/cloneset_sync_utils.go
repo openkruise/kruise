@@ -49,39 +49,39 @@ var (
 )
 
 type expectationDiffs struct {
-	// scaleUpNum is a non-negative integer, which indicates the number that should scale up.
-	scaleUpNum int
+	// ScaleUpNum is a non-negative integer, which indicates the number that should scale up.
+	ScaleUpNum int `json:"scaleUpNum"`
 	// scaleNumOldRevision is a non-negative integer, which indicates the number of old revision Pods that should scale up.
-	// It might be bigger than scaleUpNum, but controller will scale up at most scaleUpNum number of Pods.
-	scaleUpNumOldRevision int
-	// scaleDownNum is a non-negative integer, which indicates the number that should scale down.
+	// It might be bigger than ScaleUpNum, but controller will scale up at most ScaleUpNum number of Pods.
+	ScaleUpNumOldRevision int `json:"scaleUpNumOldRevision"`
+	// ScaleDownNum is a non-negative integer, which indicates the number that should scale down.
 	// It has excluded the number of Pods that are already specified to delete.
-	scaleDownNum int
-	// scaleDownNumOldRevision is a non-negative integer, which indicates the number of old revision Pods that should scale down.
-	// It might be bigger than scaleDownNum, but controller will scale down at most scaleDownNum number of Pods.
+	ScaleDownNum int `json:"scaleDownNum"`
+	// ScaleDownNumOldRevision is a non-negative integer, which indicates the number of old revision Pods that should scale down.
+	// It might be bigger than ScaleDownNum, but controller will scale down at most ScaleDownNum number of Pods.
 	// It has excluded the number of old Pods that are already specified to delete.
-	scaleDownNumOldRevision int
+	ScaleDownNumOldRevision int `json:"scaleDownNumOldRevision"`
 
-	// scaleUpLimit is the limit number of creating Pods when scaling up
+	// ScaleUpLimit is the limit number of creating Pods when scaling up
 	// it is limited by scaleStrategy.maxUnavailable
-	scaleUpLimit int
-	// deleteReadyLimit is the limit number of ready Pods that can be deleted
+	ScaleUpLimit int `json:"scaleUpLimit"`
+	// DeleteReadyLimit is the limit number of ready Pods that can be deleted
 	// it is limited by UpdateStrategy.maxUnavailable
-	deleteReadyLimit int
+	DeleteReadyLimit int `json:"deleteReadyLimit"`
 
-	// useSurge is the number that temporarily expect to be above the desired replicas
-	useSurge int
-	// useSurgeOldRevision is part of the useSurge number
+	// UseSurge is the number that temporarily expect to be above the desired replicas
+	UseSurge int `json:"useSurge"`
+	// UseSurgeOldRevision is part of the UseSurge number
 	// it indicates the above number of old revision Pods
-	useSurgeOldRevision int
+	UseSurgeOldRevision int `json:"useSurgeOldRevision"`
 
-	// updateNum is the diff number that should update
+	// UpdateNum is the diff number that should update
 	// '0' means no need to update
 	// positive number means need to update more Pods to updateRevision
 	// negative number means need to update more Pods to currentRevision (rollback)
-	updateNum int
-	// updateMaxUnavailable is the maximum number of ready Pods that can be updating
-	updateMaxUnavailable int
+	UpdateNum int `json:"updateNum"`
+	// UpdateMaxUnavailable is the maximum number of ready Pods that can be updating
+	UpdateMaxUnavailable int `json:"updateMaxUnavailable"`
 }
 
 func (e expectationDiffs) isEmpty() bool {
@@ -131,7 +131,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		}
 		klog.V(1).InfoS("Calculate diffs for CloneSet", "cloneSet", klog.KObj(cs), "replicas", replicas, "partition", partition,
 			"maxSurge", maxSurge, "maxUnavailable", maxUnavailable, "allPodCount", len(pods), "newRevisionCount", newRevisionCount,
-			"newRevisionActiveCount", newRevisionActiveCount, "oldrevisionCount", oldRevisionCount, "oldRevisionActiveCount", oldRevisionActiveCount,
+			"newRevisionActiveCount", newRevisionActiveCount, "oldRevisionCount", oldRevisionCount, "oldRevisionActiveCount", oldRevisionActiveCount,
 			"unavailableNewRevisionCount", unavailableNewRevisionCount, "unavailableOldRevisionCount", unavailableOldRevisionCount,
 			"preDeletingNewRevisionCount", preDeletingNewRevisionCount, "preDeletingOldRevisionCount", preDeletingOldRevisionCount,
 			"toDeleteNewRevisionCount", toDeleteNewRevisionCount, "toDeleteOldRevisionCount", toDeleteOldRevisionCount,
@@ -210,15 +210,22 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 
 		// Use surge for old and new revision updating
 		var updateSurge, updateOldRevisionSurge int
-		if util.IsIntPlusAndMinus(updateOldDiff, updateNewDiff) {
+		// TODO delete the comments when released
+		if util.IsIntPlusAndMinus(updateOldDiff, updateNewDiff) || (updateNewDiff == 0 && unavailableNewRevisionCount > 0) {
 			if util.IntAbs(updateOldDiff) <= util.IntAbs(updateNewDiff) {
+				// 要删的旧 Pod <= 要建的新 Pod，允许建最多要删除旧 Pod 数量的新 Pod（100%，后面会用 maxSurge 限制）
 				updateSurge = util.IntAbs(updateOldDiff)
 				if updateOldDiff < 0 {
+					// 如果要建旧 Pod，允许新增要新建数量的旧 Pod
 					updateOldRevisionSurge = updateSurge
 				}
 			} else {
-				updateSurge = util.IntAbs(updateNewDiff)
+				// 要删的旧 Pod >  要建的新 Pod，不允许再新建 Pod，等待后面删除旧 Pod
+				//updateSurge = util.IntAbs(updateNewDiff)
+				// => 改为无论如何都允许新建旧 Pod 数量的新 Pod
+				updateSurge = util.IntAbs(updateOldDiff)
 				if updateNewDiff > 0 {
+					// 如果要删新 Pod，保留相等数量的旧 Pod
 					updateOldRevisionSurge = updateSurge
 				}
 			}
@@ -226,11 +233,12 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 
 		// It is because the controller is designed not to do scale and update in once reconcile
 		if scaleSurge >= updateSurge {
-			res.useSurge = integer.IntMin(maxSurge, scaleSurge)
-			res.useSurgeOldRevision = integer.IntMin(res.useSurge, scaleOldRevisionSurge)
+			res.UseSurge = integer.IntMin(maxSurge, scaleSurge)
+			res.UseSurgeOldRevision = integer.IntMin(res.UseSurge, scaleOldRevisionSurge)
 		} else {
-			res.useSurge = integer.IntMin(maxSurge, updateSurge)
-			res.useSurgeOldRevision = integer.IntMin(res.useSurge, updateOldRevisionSurge)
+			res.UseSurge = integer.IntMin(maxSurge, updateSurge)
+			res.UseSurgeOldRevision = integer.IntMin(res.UseSurge, updateOldRevisionSurge)
+			res.UseSurgeOldRevision = integer.IntMin(res.UseSurgeOldRevision+unavailableNewRevisionCount, oldRevisionActiveCount-partition)
 		}
 	}
 
@@ -241,35 +249,35 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		currentTotalCount = currentTotalCount - preDeletingOldRevisionCount - preDeletingNewRevisionCount
 		currentTotalOldCount = currentTotalOldCount - preDeletingOldRevisionCount
 	}
-	expectedTotalCount := replicas + res.useSurge
-	expectedTotalOldCount := partition + res.useSurgeOldRevision
+	expectedTotalCount := replicas + res.UseSurge
+	expectedTotalOldCount := partition + res.UseSurgeOldRevision
 
 	// scale up
 	if num := expectedTotalCount - currentTotalCount; num > 0 {
-		res.scaleUpNum = num
-		res.scaleUpNumOldRevision = integer.IntMax(expectedTotalOldCount-currentTotalOldCount, 0)
+		res.ScaleUpNum = num
+		res.ScaleUpNumOldRevision = integer.IntMax(expectedTotalOldCount-currentTotalOldCount, 0)
 
-		res.scaleUpLimit = integer.IntMin(res.scaleUpNum, integer.IntMax(scaleMaxUnavailable-totalUnavailable, 0))
+		res.ScaleUpLimit = integer.IntMin(res.ScaleUpNum, integer.IntMax(scaleMaxUnavailable-totalUnavailable, 0))
 	}
 
 	// scale down
 	// Note that this should exclude the number of Pods that are already specified to delete.
 	if num := currentTotalCount - toDeleteOldRevisionCount - toDeleteNewRevisionCount - expectedTotalCount; num > 0 {
-		res.scaleDownNum = num
-		res.scaleDownNumOldRevision = integer.IntMax(currentTotalOldCount-toDeleteOldRevisionCount-expectedTotalOldCount, 0)
+		res.ScaleDownNum = num
+		res.ScaleDownNumOldRevision = integer.IntMax(currentTotalOldCount-toDeleteOldRevisionCount-expectedTotalOldCount, 0)
 	}
-	if toDeleteNewRevisionCount > 0 || toDeleteOldRevisionCount > 0 || res.scaleDownNum > 0 {
-		res.deleteReadyLimit = integer.IntMax(maxUnavailable+(len(pods)-replicas)-totalUnavailable, 0)
+	if toDeleteNewRevisionCount > 0 || toDeleteOldRevisionCount > 0 || res.ScaleDownNum > 0 {
+		res.DeleteReadyLimit = integer.IntMax(maxUnavailable+(len(pods)-replicas)-totalUnavailable, 0)
 	}
 
 	// The consistency between scale and update will be guaranteed by syncCloneSet and expectations
 	if util.IntAbs(updateOldDiff) <= util.IntAbs(updateNewDiff) {
-		res.updateNum = updateOldDiff
+		res.UpdateNum = updateOldDiff
 	} else {
-		res.updateNum = 0 - updateNewDiff
+		res.UpdateNum = 0 - updateNewDiff
 	}
-	if res.updateNum != 0 {
-		res.updateMaxUnavailable = maxUnavailable + len(pods) - replicas
+	if res.UpdateNum != 0 {
+		res.UpdateMaxUnavailable = maxUnavailable + len(pods) - replicas
 	}
 
 	return
@@ -287,8 +295,8 @@ func isSpecifiedDelete(cs *appsv1alpha1.CloneSet, pod *v1.Pod) bool {
 	return false
 }
 
-func isPodReady(coreControl clonesetcore.Control, pod *v1.Pod) bool {
-	return IsPodAvailable(coreControl, pod, 0)
+func isPodReady(coreControl clonesetcore.Control, pod *v1.Pod, minReadySeconds int32) bool {
+	return IsPodAvailable(coreControl, pod, minReadySeconds)
 }
 
 func IsPodAvailable(coreControl clonesetcore.Control, pod *v1.Pod, minReadySeconds int32) bool {
