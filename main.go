@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"math/rand"
 	"net/http"
@@ -203,6 +204,17 @@ func main() {
 			Host:    "0.0.0.0",
 			Port:    webhookutil.GetPort(),
 			CertDir: webhookutil.GetCertDir(),
+			TLSOpts: []func(*tls.Config){
+				func(cfg *tls.Config) {
+					cfg.MinVersion = tls.VersionTLS12
+					cfg.CipherSuites = []uint16{
+						tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+						tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+					}
+				},
+			},
 		}),
 		NewCache: utilclient.NewCache,
 	})
