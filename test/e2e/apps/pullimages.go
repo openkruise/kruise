@@ -63,6 +63,12 @@ var _ = SIGDescribe("PullImage", func() {
 				} else {
 					framework.Logf("[FAILURE_DEBUG] List NodeImages: %v", util.DumpJSON(nodeImageList))
 				}
+				nodeList, err := testerForNodeImage.ListNode()
+				if err != nil {
+					framework.Logf("[FAILURE_DEBUG] List Node in %s error: %v", ns, err)
+				} else {
+					framework.Logf("[FAILURE_DEBUG] List Node in %s: %v", ns, util.DumpJSON(nodeList))
+				}
 				imagePullJobList, err := testerForImagePullJob.ListJobs(ns)
 				if err != nil {
 					framework.Logf("[FAILURE_DEBUG] List ImagePullJobs in %s error: %v", ns, err)
@@ -148,6 +154,15 @@ var _ = SIGDescribe("PullImage", func() {
 						ActiveDeadlineSeconds:   utilpointer.Int64Ptr(50),
 						TTLSecondsAfterFinished: utilpointer.Int32Ptr(20),
 					},
+					Tolerations: []v1.Toleration{{
+						Key:      "node-role.kubernetes.io/master",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}, {
+						Key:      "node-role.kubernetes.io/control-plane",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}},
 				},
 			}
 			err = testerForImagePullJob.CreateJob(job)
@@ -235,6 +250,15 @@ var _ = SIGDescribe("PullImage", func() {
 					CompletionPolicy: appsv1alpha1.CompletionPolicy{
 						Type: appsv1alpha1.Never,
 					},
+					Tolerations: []v1.Toleration{{
+						Key:      "node-role.kubernetes.io/master",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}, {
+						Key:      "node-role.kubernetes.io/control-plane",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}},
 				},
 			}
 			err = testerForImagePullJob.CreateJob(job)
@@ -323,6 +347,15 @@ var _ = SIGDescribe("PullImage", func() {
 						TTLSecondsAfterFinished: utilpointer.Int32Ptr(20),
 					},
 					PullSecrets: []string{"test-pull-secret"},
+					Tolerations: []v1.Toleration{{
+						Key:      "node-role.kubernetes.io/master",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}, {
+						Key:      "node-role.kubernetes.io/control-plane",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}},
 				},
 			}
 			secret := &v1.Secret{
@@ -382,6 +415,15 @@ var _ = SIGDescribe("PullImage", func() {
 					CompletionPolicy: appsv1alpha1.CompletionPolicy{
 						Type: appsv1alpha1.Always,
 					},
+					Tolerations: []v1.Toleration{{
+						Key:      "node-role.kubernetes.io/master",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}, {
+						Key:      "node-role.kubernetes.io/control-plane",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}},
 				},
 			}
 			err := testerForImagePullJob.CreateJob(job)
@@ -427,6 +469,15 @@ var _ = SIGDescribe("PullImage", func() {
 					CompletionPolicy: appsv1alpha1.CompletionPolicy{
 						Type: appsv1alpha1.Never,
 					},
+					Tolerations: []v1.Toleration{{
+						Key:      "node-role.kubernetes.io/master",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}, {
+						Key:      "node-role.kubernetes.io/control-plane",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}},
 				},
 			}
 			err := testerForImagePullJob.CreateJob(job)
@@ -472,6 +523,15 @@ var _ = SIGDescribe("PullImage", func() {
 					CompletionPolicy: appsv1alpha1.CompletionPolicy{
 						Type: appsv1alpha1.Never,
 					},
+					Tolerations: []v1.Toleration{{
+						Key:      "node-role.kubernetes.io/master",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}, {
+						Key:      "node-role.kubernetes.io/control-plane",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}},
 				},
 			}
 			err := testerForImagePullJob.CreateJob(job1)
@@ -509,6 +569,15 @@ var _ = SIGDescribe("PullImage", func() {
 					CompletionPolicy: appsv1alpha1.CompletionPolicy{
 						Type: appsv1alpha1.Never,
 					},
+					Tolerations: []v1.Toleration{{
+						Key:      "node-role.kubernetes.io/master",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}, {
+						Key:      "node-role.kubernetes.io/control-plane",
+						Operator: v1.TolerationOpExists,
+						Effect:   "NoSchedule",
+					}},
 				},
 			}
 			err = testerForImagePullJob.CreateJob(job2)

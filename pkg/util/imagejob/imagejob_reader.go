@@ -153,6 +153,47 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1alpha1.ImagePullJob) (
 	return convertNodeImages(nodeImageList), err
 }
 
+func TolerationNodeImages(reader client.Reader, nodeImages []*appsv1alpha1.NodeImage, job *appsv1alpha1.ImagePullJob) (tolerationNodeImage []*appsv1alpha1.NodeImage, err error) {
+	for _, ng := range nodeImages {
+		var node v1.Node
+		if err = reader.Get(context.TODO(), types.NamespacedName{Name: ng.Name}, &node); err != nil {
+			if errors.IsNotFound(err) {
+				tolerationNodeImage = append(tolerationNodeImage, ng)
+				continue
+			}
+			return nil, fmt.Errorf("get specific Node %s error: %v", ng.Name, err)
+		}
+		if nodeMatchesTolerations(node, job.Spec.Tolerations) {
+			tolerationNodeImage = append(tolerationNodeImage, ng)
+		}
+	}
+	return
+}
+
+// nodeMatchesTolerations pod must have Toleration that matches all node Taint to return true
+func nodeMatchesTolerations(node v1.Node, tolerations []v1.Toleration) bool {
+	for _, taint := range node.Spec.Taints {
+		if !tolerationToleratesTaint(tolerations, taint) {
+			return false
+		}
+	}
+	return true
+}
+
+func tolerationToleratesTaint(tolerations []v1.Toleration, taint v1.Taint) bool {
+	for _, toleration := range tolerations {
+		if toleration.Key == taint.Key && toleration.Effect == taint.Effect {
+			if toleration.Operator == v1.TolerationOpExists {
+				return true
+			}
+			if toleration.Operator == v1.TolerationOpEqual && toleration.Value == taint.Value {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func convertNodeImages(nodeImageList *appsv1alpha1.NodeImageList) []*appsv1alpha1.NodeImage {
 	nodeImages := make([]*appsv1alpha1.NodeImage, 0, len(nodeImageList.Items))
 	for i := range nodeImageList.Items {
