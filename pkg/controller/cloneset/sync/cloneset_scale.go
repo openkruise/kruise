@@ -70,17 +70,16 @@ func (r *realControl) Scale(
 	// 2. calculate scale numbers
 	diffRes := calculateDiffsWithExpectation(updateCS, pods, currentRevision, updateRevision, revision.IsPodUpdate)
 	updatedPods, notUpdatedPods := clonesetutils.GroupUpdateAndNotUpdatePods(pods, updateRevision)
-
-	if diffRes.scaleUpNum > diffRes.scaleUpLimit {
-		r.recorder.Event(updateCS, v1.EventTypeWarning, "ScaleUpLimited", fmt.Sprintf("scaleUp is limited because of scaleStrategy.maxUnavailable, limit: %d", diffRes.scaleUpLimit))
+	if diffRes.ScaleUpNum > diffRes.ScaleUpLimit {
+		r.recorder.Event(updateCS, v1.EventTypeWarning, "ScaleUpLimited", fmt.Sprintf("scaleUp is limited because of scaleStrategy.maxUnavailable, limit: %d", diffRes.ScaleUpLimit))
 	}
 
 	// 3. scale out
-	if diffRes.scaleUpNum > 0 {
+	if diffRes.ScaleUpNum > 0 {
 		// total number of this creation
-		expectedCreations := diffRes.scaleUpLimit
+		expectedCreations := diffRes.ScaleUpLimit
 		// lack number of current version
-		expectedCurrentCreations := diffRes.scaleUpNumOldRevision
+		expectedCurrentCreations := diffRes.ScaleUpNumOldRevision
 
 		klog.V(3).InfoS("CloneSet began to scale out pods, including current revision",
 			"cloneSet", klog.KObj(updateCS), "expectedCreations", expectedCreations, "expectedCurrentCreations", expectedCurrentCreations)
@@ -108,16 +107,16 @@ func (r *realControl) Scale(
 	// 5. specified delete
 	if podsToDelete := util.DiffPods(podsSpecifiedToDelete, podsInPreDelete); len(podsToDelete) > 0 {
 		newPodsToDelete, oldPodsToDelete := clonesetutils.GroupUpdateAndNotUpdatePods(podsToDelete, updateRevision)
-		klog.V(3).InfoS("CloneSet tried to delete pods specified", "cloneSet", klog.KObj(updateCS), "deleteReadyLimit", diffRes.deleteReadyLimit,
+		klog.V(3).InfoS("CloneSet tried to delete pods specified", "cloneSet", klog.KObj(updateCS), "DeleteReadyLimit", diffRes.DeleteReadyLimit,
 			"newPods", util.GetPodNames(newPodsToDelete).List(), "oldPods", util.GetPodNames(oldPodsToDelete).List())
 
 		podsCanDelete := make([]*v1.Pod, 0, len(podsToDelete))
 		for _, pod := range podsToDelete {
-			if !isPodReady(coreControl, pod) {
+			if !isPodReady(coreControl, pod, updateCS.Spec.MinReadySeconds) {
 				podsCanDelete = append(podsCanDelete, pod)
-			} else if diffRes.deleteReadyLimit > 0 {
+			} else if diffRes.DeleteReadyLimit > 0 {
 				podsCanDelete = append(podsCanDelete, pod)
-				diffRes.deleteReadyLimit--
+				diffRes.DeleteReadyLimit--
 			}
 		}
 
@@ -127,24 +126,24 @@ func (r *realControl) Scale(
 	}
 
 	// 6. scale in
-	if diffRes.scaleDownNum > 0 {
+	if diffRes.ScaleDownNum > 0 {
 		if numToDelete > 0 {
-			klog.V(3).InfoS("CloneSet skipped to scale in for deletion", "cloneSet", klog.KObj(updateCS), "scaleDownNum", diffRes.scaleDownNum,
+			klog.V(3).InfoS("CloneSet skipped to scale in for deletion", "cloneSet", klog.KObj(updateCS), "ScaleDownNum", diffRes.ScaleDownNum,
 				"numToDelete", numToDelete, "specifiedToDelete", len(podsSpecifiedToDelete), "preDelete", len(podsInPreDelete))
 			return false, nil
 		}
 
-		klog.V(3).InfoS("CloneSet began to scale in", "cloneSet", klog.KObj(updateCS), "scaleDownNum", diffRes.scaleDownNum,
-			"oldRevision", diffRes.scaleDownNumOldRevision, "deleteReadyLimit", diffRes.deleteReadyLimit)
+		klog.V(3).InfoS("CloneSet began to scale in", "cloneSet", klog.KObj(updateCS), "ScaleDownNum", diffRes.ScaleDownNum,
+			"oldRevision", diffRes.ScaleDownNumOldRevision, "DeleteReadyLimit", diffRes.DeleteReadyLimit)
 
-		podsPreparingToDelete := r.choosePodsToDelete(updateCS, diffRes.scaleDownNum, diffRes.scaleDownNumOldRevision, notUpdatedPods, updatedPods)
+		podsPreparingToDelete := r.choosePodsToDelete(updateCS, diffRes.ScaleDownNum, diffRes.ScaleDownNumOldRevision, notUpdatedPods, updatedPods)
 		podsToDelete := make([]*v1.Pod, 0, len(podsPreparingToDelete))
 		for _, pod := range podsPreparingToDelete {
-			if !isPodReady(coreControl, pod) {
+			if !isPodReady(coreControl, pod, updateCS.Spec.MinReadySeconds) {
 				podsToDelete = append(podsToDelete, pod)
-			} else if diffRes.deleteReadyLimit > 0 {
+			} else if diffRes.DeleteReadyLimit > 0 {
 				podsToDelete = append(podsToDelete, pod)
-				diffRes.deleteReadyLimit--
+				diffRes.DeleteReadyLimit--
 			}
 		}
 
