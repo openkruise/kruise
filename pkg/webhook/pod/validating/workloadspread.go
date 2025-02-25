@@ -19,12 +19,12 @@ package validating
 import (
 	"context"
 
+	"github.com/openkruise/kruise/pkg/util"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/policy"
 
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
@@ -38,16 +38,19 @@ import (
 // 3. err(error)
 func (p *PodCreateHandler) workloadSpreadValidatingPod(ctx context.Context, req admission.Request) (bool, string, error) {
 	pod := &corev1.Pod{}
+	ctx = util.NewLogContext(ctx)
+	logger := util.FromLogContext(ctx)
+
 	var dryRun bool
 	var err error
 	workloadSpreadHandler := wsutil.NewWorkloadSpreadHandler(p.Client)
 
-	klog.V(6).InfoS("workloadSpread validate Operation", "operation", req.Operation, "namespace", req.Namespace, "name", req.Name)
+	logger.V(6).Info("workloadSpread validate Operation", "operation", req.Operation, "namespace", req.Namespace, "name", req.Name)
 
 	switch req.AdmissionRequest.Operation {
 	case admissionv1.Delete:
 		if req.AdmissionRequest.SubResource != "" {
-			klog.V(6).InfoS("Pod AdmissionRequest operation(DELETE) subResource, then admit", "namespace", req.Namespace, "name", req.Name, "subResource", req.SubResource)
+			logger.V(6).Info("Pod AdmissionRequest operation(DELETE) subResource, then admit", "namespace", req.Namespace, "name", req.Name, "subResource", req.SubResource)
 			return true, "", nil
 		}
 
@@ -64,18 +67,18 @@ func (p *PodCreateHandler) workloadSpreadValidatingPod(ctx context.Context, req 
 		}
 		dryRun = dryrun.IsDryRun(deletion.DryRun)
 		if dryRun {
-			klog.V(5).InfoS("Operation is a dry run, then admit", "operation", req.AdmissionRequest.Operation, "namespace", pod.Namespace, "name", pod.Name)
+			logger.V(5).Info("Operation is a dry run, then admit", "operation", req.AdmissionRequest.Operation, "namespace", pod.Namespace, "name", pod.Name)
 			return true, "", err
 		}
 
-		err = workloadSpreadHandler.HandlePodDeletion(pod, wsutil.DeleteOperation)
+		err = workloadSpreadHandler.HandlePodDeletion(ctx, pod, wsutil.DeleteOperation)
 		if err != nil {
 			return false, "", err
 		}
 	case admissionv1.Create:
 		// ignore create operation other than subresource eviction
 		if req.AdmissionRequest.SubResource != "eviction" {
-			klog.V(6).InfoS("Pod AdmissionRequest operation(CREATE) Resource and subResource, then admit", "namespace", req.Namespace, "name", req.Name, "resource", req.Resource, "subResource", req.SubResource)
+			logger.V(6).Info("Pod AdmissionRequest operation(CREATE) Resource and subResource, then admit", "namespace", req.Namespace, "name", req.Name, "resource", req.Resource, "subResource", req.SubResource)
 			return true, "", nil
 		}
 
@@ -88,7 +91,7 @@ func (p *PodCreateHandler) workloadSpreadValidatingPod(ctx context.Context, req 
 		if eviction.DeleteOptions != nil {
 			dryRun = dryrun.IsDryRun(eviction.DeleteOptions.DryRun)
 			if dryRun {
-				klog.V(5).InfoS("Operation[Eviction] is a dry run, then admit", "namespace", req.AdmissionRequest.Namespace, "name", req.AdmissionRequest.Name)
+				logger.V(5).Info("Operation[Eviction] is a dry run, then admit", "namespace", req.AdmissionRequest.Namespace, "name", req.AdmissionRequest.Name)
 				return true, "", nil
 			}
 		}
@@ -102,7 +105,7 @@ func (p *PodCreateHandler) workloadSpreadValidatingPod(ctx context.Context, req 
 			return false, "", err
 		}
 
-		err = workloadSpreadHandler.HandlePodDeletion(pod, wsutil.EvictionOperation)
+		err = workloadSpreadHandler.HandlePodDeletion(ctx, pod, wsutil.EvictionOperation)
 		if err != nil {
 			return false, "", err
 		}
