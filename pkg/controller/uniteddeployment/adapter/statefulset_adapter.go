@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -84,6 +85,15 @@ func (a *StatefulSetAdapter) GetStatusReplicas(obj metav1.Object) int32 {
 
 func (a *StatefulSetAdapter) GetStatusReadyReplicas(obj metav1.Object) int32 {
 	return obj.(*appsv1.StatefulSet).Status.ReadyReplicas
+}
+
+func (a *StatefulSetAdapter) SetMaxUnavailable(obj metav1.Object, val int32) metav1.Object {
+	set := obj.(*appsv1.StatefulSet)
+	if set.Spec.UpdateStrategy.RollingUpdate == nil {
+		set.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
+	}
+	set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &intstr.IntOrString{Type: intstr.Int, IntVal: val}
+	return set
 }
 
 // GetSubsetFailure returns the failure information of the subset.

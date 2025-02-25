@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/klog/v2"
 
@@ -105,6 +106,15 @@ func (a *AdvancedStatefulSetAdapter) ConvertToResourceList(obj runtime.Object) [
 	}
 
 	return objList
+}
+
+func (a *AdvancedStatefulSetAdapter) SetMaxUnavailable(obj metav1.Object, val int32) metav1.Object {
+	set := obj.(*alpha1.StatefulSet)
+	if set.Spec.UpdateStrategy.RollingUpdate == nil {
+		set.Spec.UpdateStrategy.RollingUpdate = &alpha1.RollingUpdateStatefulSetStrategy{}
+	}
+	set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &intstr.IntOrString{Type: intstr.Int, IntVal: val}
+	return set
 }
 
 // ApplySubsetTemplate updates the subset to the latest revision, depending on the AdvancedStatefulSetTemplate.
