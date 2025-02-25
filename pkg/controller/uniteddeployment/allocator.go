@@ -61,6 +61,9 @@ type ReplicaAllocator interface {
 }
 
 func NewReplicaAllocator(ud *appsv1alpha1.UnitedDeployment) ReplicaAllocator {
+	if ud.Spec.Topology.ScheduleStrategy.Type == appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType {
+		return &elasticAllocator{ud}
+	}
 	for _, subset := range ud.Spec.Topology.Subsets {
 		if subset.MinReplicas != nil || subset.MaxReplicas != nil {
 			return &elasticAllocator{ud}
@@ -78,7 +81,7 @@ func getSubsetRunningReplicas(nameToSubset *map[string]*Subset) map[string]int32
 	}
 	var result = make(map[string]int32)
 	for name, subset := range *nameToSubset {
-		result[name] = subset.Status.Replicas - subset.Status.UnschedulableStatus.PendingPods
+		result[name] = subset.Status.Replicas - subset.Status.UnschedulableStatus.StagingPods
 	}
 	return result
 }
@@ -293,6 +296,7 @@ func (ac *elasticAllocator) validateAndCalculateMinMaxMap(replicas int32, nameTo
 	minReplicasMap := make(map[string]int32, numSubset)
 	maxReplicasMap := make(map[string]int32, numSubset)
 	runningReplicasMap := getSubsetRunningReplicas(nameToSubset)
+	var countedReplicas int32
 	for index, subset := range ac.Spec.Topology.Subsets {
 		minReplicas := int32(0)
 		maxReplicas := int32(math.MaxInt32)
@@ -311,11 +315,26 @@ func (ac *elasticAllocator) validateAndCalculateMinMaxMap(replicas int32, nameTo
 				minReplicas = integer.Int32Min(runningReplicas, minReplicas)
 				maxReplicas = integer.Int32Min(runningReplicas, maxReplicas)
 			}
-			// To prevent healthy pod from being deleted
-			if runningReplicas := runningReplicasMap[subset.Name]; !unschedulable && runningReplicas > minReplicas {
-				klog.InfoS("Assign min(runningReplicas, maxReplicas) to minReplicas to avoid deleting running pods",
-					"subset", subset.Name, "minReplicas", minReplicas, "runningReplicas", runningReplicas, "maxReplicas", maxReplicas)
-				minReplicas = integer.Int32Min(runningReplicas, maxReplicas)
+			if ac.Spec.Topology.ScheduleStrategy.IsAdaptiveTemporarily() {
+				countedReplicas += runningReplicasMap[subset.Name]
+				if countedReplicas >= replicas {
+					// only replicas number of running pods are protected
+					unschedulable = false
+				}
+				// In Temporary mode, running pods in unschedulable subsets are protected.
+				if runningReplicas := runningReplicasMap[subset.Name]; unschedulable && runningReplicas > minReplicas {
+					klog.InfoS("Assign min(runningReplicas, maxReplicas) to minReplicas to avoid deleting staging pods",
+						"subset", subset.Name, "minReplicas", minReplicas, "runningReplicas", runningReplicas, "maxReplicas", maxReplicas)
+					minReplicas = integer.Int32Min(runningReplicas, maxReplicas)
+				}
+			} else {
+				// All healthy pods are permanently allocated to a subset if rescheduleTemporarily is disabled.
+				// We have to prevent them from being deleted
+				if runningReplicas := runningReplicasMap[subset.Name]; !unschedulable && runningReplicas > minReplicas {
+					klog.InfoS("Assign min(runningReplicas, maxReplicas) to minReplicas to avoid deleting running pods",
+						"subset", subset.Name, "minReplicas", minReplicas, "runningReplicas", runningReplicas, "maxReplicas", maxReplicas)
+					minReplicas = integer.Int32Min(runningReplicas, maxReplicas)
+				}
 			}
 		}
 
