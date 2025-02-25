@@ -4,6 +4,9 @@ const (
 	// ControllerRevisionHashLabelKey is used to record the controller revision of current resource.
 	ControllerRevisionHashLabelKey = "apps.kruise.io/controller-revision-hash"
 
+	// ReservedPodLabelKey is used to mark the reserved pods.
+	ReservedPodLabelKey = "apps.kruise.io/is-reserved-pod"
+
 	// SubSetNameLabelKey is used to record the name of current subset.
 	SubSetNameLabelKey = "apps.kruise.io/subset-name"
 

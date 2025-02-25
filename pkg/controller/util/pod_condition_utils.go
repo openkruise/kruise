@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -24,23 +25,44 @@ func UpdateMessageKvCondition(kv map[string]interface{}, condition *v1.PodCondit
 	condition.Message = string(message)
 }
 
+// getScheduleFailedCondition should be changed later to get the condition from kruise-config.
+func getScheduleFailedCondition() v1.PodCondition {
+	return v1.PodCondition{
+		Type:   v1.PodScheduled,
+		Status: v1.ConditionFalse,
+		Reason: v1.PodReasonUnschedulable,
+	}
+}
+
 // GetTimeBeforePendingTimeout return true when Pod was scheduled failed and timeout.
 // nextCheckAfter > 0 means the pod is failed to schedule but not timeout yet.
-func GetTimeBeforePendingTimeout(pod *v1.Pod, timeout time.Duration) (timeouted bool, nextCheckAfter time.Duration) {
+func GetTimeBeforePendingTimeout(pod *v1.Pod, timeout time.Duration, now time.Time) (timeouted bool, nextCheckAfter time.Duration) {
 	if pod.DeletionTimestamp != nil || pod.Status.Phase != v1.PodPending || pod.Spec.NodeName != "" {
 		return false, -1
 	}
+	scheduleFailedCondition := getScheduleFailedCondition()
 	for _, condition := range pod.Status.Conditions {
-		if condition.Type == v1.PodScheduled && condition.Status == v1.ConditionFalse &&
-			condition.Reason == v1.PodReasonUnschedulable {
-			currentTime := time.Now()
+		if condition.Type == scheduleFailedCondition.Type && condition.Status == scheduleFailedCondition.Status &&
+			condition.Reason == scheduleFailedCondition.Reason {
 			expectSchedule := pod.CreationTimestamp.Add(timeout)
 			// schedule timeout
-			if expectSchedule.Before(currentTime) {
+			if expectSchedule.Before(now) {
 				return true, -1
 			}
-			return false, expectSchedule.Sub(currentTime)
+			return false, expectSchedule.Sub(now)
 		}
 	}
 	return false, -1
+}
+
+// GetTimeBeforeLegacyTimeout is used during updating. when the updating lasts longer than timeout, all pods will be considered as timeout.
+func GetTimeBeforeLegacyTimeout(pod *v1.Pod, updatedCondition *appsv1alpha1.UnitedDeploymentCondition, timeout time.Duration, now time.Time) (timeouted bool, nextCheckAfter time.Duration) {
+	if pod.DeletionTimestamp != nil {
+		return false, -1
+	}
+	expectReschedule := updatedCondition.LastTransitionTime.Add(timeout)
+	if expectReschedule.Before(now) {
+		return true, -1
+	}
+	return false, expectReschedule.Sub(now)
 }

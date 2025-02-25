@@ -980,6 +980,13 @@ spec:
                               over RescheduleCriticalSeconds duration, the controller will reschedule it to a suitable subset. Default is 30 seconds.
                             format: int32
                             type: integer
+                          rescheduleTemporarily:
+                            description: |-
+                              RescheduleTemporarily indicates whether to enable temporarily rescheduling, which is disabled by default.
+                              If this feature is enabled, those pending pods that would otherwise be permanently transferred to other subsets
+                              due to scheduling failure will be retained, and a temporary substitute Pod will be created in another subset to take over its work.
+                              When the retained pod is successfully scheduled and ready, its temporary substitute will be deleted.
+                            type: boolean
                           unschedulableLastSeconds:
                             description: |-
                               UnschedulableLastSeconds is used to set the number of seconds for a Subset to recover from an unschedulable state,
@@ -1255,6 +1262,10 @@ spec:
                 description: Replicas is the most recently observed number of replicas.
                 format: int32
                 type: integer
+              reservedPods:
+                description: The number of reserved pods in temporary adaptive strategy.
+                format: int32
+                type: integer
               subsetReplicas:
                 additionalProperties:
                   format: int32
@@ -1294,8 +1305,16 @@ spec:
                       description: Records the current partition. Currently unused.
                       format: int32
                       type: integer
+                    readyReplicas:
+                      description: Records the current ready replicas. Currently unused.
+                      format: int32
+                      type: integer
                     replicas:
-                      description: Recores the current replicas. Currently unused.
+                      description: Records the current replicas. Currently unused.
+                      format: int32
+                      type: integer
+                    reservedPods:
+                      description: Records the reserved pods in the subset.
                       format: int32
                       type: integer
                   type: object
@@ -1325,6 +1344,7 @@ spec:
             required:
             - currentRevision
             - replicas
+            - reservedPods
             - updatedReplicas
             type: object
         type: object

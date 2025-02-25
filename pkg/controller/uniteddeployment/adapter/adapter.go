@@ -36,6 +36,8 @@ type Adapter interface {
 	GetSubsetPods(obj metav1.Object) ([]*corev1.Pod, error)
 	// GetSpecReplicas returns the replicas information of the subset workload.
 	GetSpecReplicas(obj metav1.Object) *int32
+	// SetMaxUnavailable sets the maxUnavailable of the subset workload.
+	SetMaxUnavailable(obj metav1.Object, val int32) metav1.Object
 	// GetSpecPartition returns the partition information of the subset workload if possible.
 	GetSpecPartition(obj metav1.Object, pods []*corev1.Pod) *int32
 	// GetStatusReplicas returns the replicas from the subset workload status.
