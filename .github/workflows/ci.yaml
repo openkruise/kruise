@@ -65,7 +65,7 @@ jobs:
           skip-pkg-cache: true
           mod: readonly
       - name: Run Trivy vulnerability scanner in repo mode
-        uses: aquasecurity/trivy-action@d2a392a13760cb64cb6bbd31d4bed2a7d9a5298d # master
+        uses: aquasecurity/trivy-action@a11da62073708815958ea6d84f5650c78a3ef85b # master
         with:
           scan-type: 'fs'
           ignore-unfixed: true
