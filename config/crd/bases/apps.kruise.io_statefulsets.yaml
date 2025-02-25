@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: statefulsets.apps.kruise.io
 spec:
   group: apps.kruise.io
@@ -93,7 +93,6 @@ spec:
                   These are replicas in the sense that they are instantiations of the
                   same Template, but individual replicas also have a consistent identity.
                   If unspecified, defaults to 1.
-                  TODO: Consider a rename of this field.
                 format: int32
                 type: integer
               revisionHistoryLimit:
@@ -136,11 +135,13 @@ spec:
                           items:
                             type: string
                           type: array
+                          x-kubernetes-list-type: atomic
                       required:
                       - key
                       - operator
                       type: object
                     type: array
+                    x-kubernetes-list-type: atomic
                   matchLabels:
                     additionalProperties:
                       type: string
@@ -301,11 +302,13 @@ spec:
                                                 items:
                                                   type: string
                                                 type: array
+                                                x-kubernetes-list-type: atomic
                                             required:
                                             - key
                                             - operator
                                             type: object
                                           type: array
+                                          x-kubernetes-list-type: atomic
                                         matchLabels:
                                           additionalProperties:
                                             type: string
@@ -344,7 +347,6 @@ spec:
                   this list must have at least one matching (by name) volumeMount in one
                   container in the template. A claim in this list takes precedence over
                   any volumes in the template, with the same name.
-                  TODO: Define the behavior if a claim already exists with the same name.
                 x-kubernetes-preserve-unknown-fields: true
             required:
             - selector
@@ -640,7 +642,6 @@ spec:
                   These are replicas in the sense that they are instantiations of the
                   same Template, but individual replicas also have a consistent identity.
                   If unspecified, defaults to 1.
-                  TODO: Consider a rename of this field.
                 format: int32
                 type: integer
               reserveOrdinals:
@@ -715,11 +716,13 @@ spec:
                           items:
                             type: string
                           type: array
+                          x-kubernetes-list-type: atomic
                       required:
                       - key
                       - operator
                       type: object
                     type: array
+                    x-kubernetes-list-type: atomic
                   matchLabels:
                     additionalProperties:
                       type: string
@@ -878,11 +881,13 @@ spec:
                                                 items:
                                                   type: string
                                                 type: array
+                                                x-kubernetes-list-type: atomic
                                             required:
                                             - key
                                             - operator
                                             type: object
                                           type: array
+                                          x-kubernetes-list-type: atomic
                                         matchLabels:
                                           additionalProperties:
                                             type: string
@@ -921,7 +926,6 @@ spec:
                   this list must have at least one matching (by name) volumeMount in one
                   container in the template. A claim in this list takes precedence over
                   any volumes in the template, with the same name.
-                  TODO: Define the behavior if a claim already exists with the same name.
                 x-kubernetes-preserve-unknown-fields: true
               volumeClaimUpdateStrategy:
                 description: |-

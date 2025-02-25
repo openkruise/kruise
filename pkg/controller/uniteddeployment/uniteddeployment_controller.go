@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -395,20 +396,15 @@ func processSubsetForTemporaryAdaptiveStrategy(name string, subset *Subset, ud *
 func (r *ReconcileUnitedDeployment) patchStagingChangedPods(podsToPatch []*corev1.Pod) error {
 	for _, pod := range podsToPatch {
 		patch := utilcontroller.GetEmptyObjectWithKey(pod)
-		if oldStaging, ok := GetPodStaging(pod); !ok {
-			patch.SetLabels(map[string]string{
-				LabelKeyStagingPod: "false",
-			})
-		} else if oldStaging {
-			patch.SetLabels(map[string]string{
-				LabelKeyStagingPod: "false",
-			})
+		var patchStr string
+		if oldStaging, ok := GetPodStaging(pod); !ok || oldStaging {
+			patchStr = fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`,
+				LabelKeyStagingPod, "false")
 		} else {
-			patch.SetLabels(map[string]string{
-				LabelKeyStagingPod: "true",
-			})
+			patchStr = fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`,
+				LabelKeyStagingPod, "true")
 		}
-		if err := r.Patch(context.TODO(), patch, client.Merge); err != nil {
+		if err := r.Patch(context.TODO(), patch, client.RawPatch(types.StrategicMergePatchType, []byte(patchStr))); err != nil {
 			return err
 		}
 	}
