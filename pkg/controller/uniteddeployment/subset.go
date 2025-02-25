@@ -51,7 +51,12 @@ type SubsetStatus struct {
 
 type SubsetUnschedulableStatus struct {
 	Unschedulable bool
-	PendingPods   int32
+	// StagingPods is the number of staging pods in the subset,
+	// which is more complex in temporary adaptive strategy.
+	// Please refer to the function CheckPodStaging.
+	//
+	// If temporary adaptive strategy is disabled, StagingPods is equal to Pending Pods.
+	StagingPods int32
 }
 
 // SubsetUpdateStrategy stores the strategy detail of the Subset.

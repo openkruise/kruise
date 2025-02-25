@@ -18,6 +18,7 @@ package uniteddeployment
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"testing"
 
@@ -335,15 +336,12 @@ func TestAdaptiveElasticAllocator(t *testing.T) {
 					Status: SubsetStatus{
 						UnschedulableStatus: SubsetUnschedulableStatus{
 							Unschedulable: true,
-							PendingPods:   failedPods,
+							StagingPods:   failedPods,
 						},
 						Replicas: maxReplicas,
 					},
 					Spec: SubsetSpec{Replicas: minReplicas},
 				},
-				//"subset-2": {
-				//	Status: SubsetStatus{},
-				//},
 			}
 	}
 	cases := []struct {
@@ -507,6 +505,200 @@ func TestProtectingRunningPodsAdaptive(t *testing.T) {
 	if err == nil {
 		t.Logf("expected error not happen")
 		t.Fail()
+	}
+}
+
+// Cases of TestGetTemporaryAdaptiveNext must be aligned with TestRescheduleTemporarily
+func TestGetTemporaryAdaptiveNext(t *testing.T) {
+	getUnitedDeploymentAndSubsets := func(totalReplicas, minReplicas, maxReplicas int32, staging []int32, cur []int32) (
+		*appsv1alpha1.UnitedDeployment, map[string]*Subset) {
+		var minR, maxR *intstr.IntOrString
+		if minReplicas != 0 {
+			minR = &intstr.IntOrString{Type: intstr.Int, IntVal: minReplicas}
+		}
+		if maxReplicas != 0 {
+			maxR = &intstr.IntOrString{Type: intstr.Int, IntVal: maxReplicas}
+		}
+		ud := &appsv1alpha1.UnitedDeployment{
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Replicas: &totalReplicas,
+				Topology: appsv1alpha1.Topology{
+					ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
+						Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
+						Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
+							RescheduleTemporarily: true,
+						},
+					},
+				},
+			},
+		}
+		nameToSubset := map[string]*Subset{}
+		for i := range staging {
+			name := fmt.Sprintf("subset-%d", i)
+			ud.Spec.Topology.Subsets = append(ud.Spec.Topology.Subsets, appsv1alpha1.Subset{
+				Name:        name,
+				MinReplicas: minR,
+				MaxReplicas: maxR,
+			})
+			nameToSubset[name] = &Subset{
+				Status: SubsetStatus{
+					UnschedulableStatus: SubsetUnschedulableStatus{
+						Unschedulable: staging[i] != 0,
+						StagingPods:   staging[i],
+					},
+					Replicas: cur[i],
+				},
+			}
+		}
+		ud.Spec.Topology.Subsets[len(ud.Spec.Topology.Subsets)-1].MaxReplicas = nil
+		return ud, nameToSubset
+	}
+	tests := []struct {
+		name        string
+		replicas    int32   // total replicas of UnitedDeployment
+		minReplicas int32   // min replicas of each subset
+		maxReplicas int32   // max replicas of each subset except the last one
+		staging     []int32 // current staging pod nums of each subset
+		cur         []int32 // last allocated results, equals to last expect
+		next        []int32 // allocated replicas calculated this time
+	}{
+		{
+			name:        "4 subsets, 2 each, start",
+			replicas:    8,
+			minReplicas: 1,
+			maxReplicas: 2,
+			next:        []int32{2, 2, 2, 2},
+			cur:         []int32{0, 0, 0, 0},
+			staging:     []int32{0, 0, 0, 0},
+		},
+		{
+			name:        "4 subsets, subset 1 and 2 unschedulable detected",
+			replicas:    8,
+			minReplicas: 1,
+			maxReplicas: 2,
+			next:        []int32{2, 0, 0, 6},
+			cur:         []int32{2, 2, 2, 2},
+			staging:     []int32{0, 2, 2, 0},
+		},
+		{
+			name:        "4 subsets, subset 1 and 2 starts each 1 pods",
+			replicas:    8,
+			minReplicas: 1,
+			maxReplicas: 2,
+			next:        []int32{2, 1, 1, 4},
+			cur:         []int32{2, 2, 2, 6},
+			staging:     []int32{0, 1, 1, 0},
+		},
+		{
+			name:        "4 subsets, subset 1 recovered",
+			replicas:    8,
+			minReplicas: 1,
+			maxReplicas: 2,
+			next:        []int32{2, 2, 1, 3},
+			cur:         []int32{2, 2, 2, 4},
+			staging:     []int32{0, 0, 1, 0},
+		},
+		{
+			name:        "4 subsets, all subset recovered",
+			replicas:    8,
+			minReplicas: 1,
+			maxReplicas: 2,
+			next:        []int32{2, 2, 2, 2},
+			cur:         []int32{2, 2, 2, 3},
+			staging:     []int32{0, 0, 0, 0},
+		},
+		{
+			name:        "4 subsets, part of subset 1 and 2 started, scaled to 16 replicas",
+			replicas:    16,
+			minReplicas: 2,
+			maxReplicas: 4,
+			next:        []int32{4, 1, 1, 10},
+			cur:         []int32{2, 2, 2, 6},
+			staging:     []int32{0, 1, 1, 0},
+		},
+		{
+			name:        "4 subsets, part of subset 1 and 2 started, scaled back to 8 replicas",
+			replicas:    8,
+			minReplicas: 1,
+			maxReplicas: 2,
+			next:        []int32{2, 1, 1, 4},
+			cur:         []int32{4, 2, 2, 10},
+			staging:     []int32{0, 1, 1, 0},
+		},
+		{
+			name:        "4 subsets, all of subset 1 and 2 started, already scaled to 16 replicas",
+			replicas:    16,
+			minReplicas: 2,
+			maxReplicas: 4,
+			next:        []int32{4, 4, 4, 4},
+			cur:         []int32{4, 2, 2, 10},
+			staging:     []int32{0, 0, 0, 0},
+		},
+		{
+			name:     "3 infinity subsets, start",
+			replicas: 2,
+			next:     []int32{2, 0, 0},
+			cur:      []int32{0, 0, 0},
+			staging:  []int32{0, 0, 0},
+		},
+		{
+			name:     "3 infinity subsets, start",
+			replicas: 2,
+			next:     []int32{2, 0, 0},
+			cur:      []int32{0, 0, 0},
+			staging:  []int32{0, 0, 0},
+		},
+		{
+			name:     "3 infinity subsets, found subset-0 unschedulable",
+			replicas: 2,
+			next:     []int32{0, 2, 0},
+			cur:      []int32{2, 0, 0},
+			staging:  []int32{2, 0, 0},
+		},
+		{
+			name:     "3 infinity subsets, found subset-1 unschedulable",
+			replicas: 2,
+			next:     []int32{0, 0, 2},
+			cur:      []int32{2, 2, 0},
+			staging:  []int32{2, 2, 0},
+		},
+		{
+			name:     "3 infinity subsets, one of subset-1 started",
+			replicas: 2,
+			next:     []int32{0, 1, 1},
+			cur:      []int32{2, 2, 2},
+			staging:  []int32{2, 1, 0},
+		},
+		{
+			name:     "3 infinity subsets, subset-0 recovered",
+			replicas: 2,
+			next:     []int32{2, 0, 0},
+			cur:      []int32{2, 2, 1},
+			staging:  []int32{0, 1, 0},
+		},
+		{
+			name:     "3 infinity subsets, too many pods running",
+			replicas: 2,
+			next:     []int32{2, 0, 0},
+			cur:      []int32{2, 2, 0},
+			staging:  []int32{0, 0, 0},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ud, subsets := getUnitedDeploymentAndSubsets(tt.replicas, tt.minReplicas, tt.maxReplicas, tt.staging, tt.cur)
+			result, err := NewReplicaAllocator(ud).Alloc(&subsets)
+			if err != nil {
+				t.Fatalf("unexpected alloc error %v", err)
+			}
+			actual := make([]int32, len(tt.next))
+			for i := 0; i < len(tt.next); i++ {
+				actual[i] = (*result)[fmt.Sprintf("subset-%d", i)]
+			}
+			if !reflect.DeepEqual(actual, tt.next) {
+				t.Fatalf("expected %v, got %v", tt.next, actual)
+			}
+		})
 	}
 }
 
