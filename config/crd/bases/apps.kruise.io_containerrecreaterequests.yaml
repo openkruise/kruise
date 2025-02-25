@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.5
   name: containerrecreaterequests.apps.kruise.io
 spec:
   group: apps.kruise.io
@@ -143,6 +143,7 @@ spec:
                               items:
                                 type: string
                               type: array
+                              x-kubernetes-list-type: atomic
                           type: object
                         httpGet:
                           description: HTTPGet specifies the http request to perform.
@@ -172,6 +173,7 @@ spec:
                                 - value
                                 type: object
                               type: array
+                              x-kubernetes-list-type: atomic
                             path:
                               description: Path to access on the HTTP server.
                               type: string
@@ -196,7 +198,6 @@ spec:
                           description: |-
                             TCPSocket specifies an action involving a TCP port.
                             TCP hooks not yet supported
-                            TODO: implement a realistic TCP lifecycle hook
                           properties:
                             host:
                               description: 'Optional: Host name to connect to, defaults
