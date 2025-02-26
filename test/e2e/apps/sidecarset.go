@@ -48,7 +48,6 @@ import (
 )
 
 var _ = SIGDescribe("SidecarSet", func() {
-	framework.TestContext.DeleteNamespaceOnFailure = false
 	f := framework.NewDefaultFramework("sidecarset")
 	var ns string
 	var c clientset.Interface

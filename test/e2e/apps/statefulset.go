@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -50,18 +49,6 @@ import (
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/test/e2e/framework"
-)
-
-const (
-	zookeeperManifestPath   = "test/e2e/testing-manifests/statefulset/zookeeper"
-	mysqlGaleraManifestPath = "test/e2e/testing-manifests/statefulset/mysql-galera"
-	redisManifestPath       = "test/e2e/testing-manifests/statefulset/redis"
-	cockroachDBManifestPath = "test/e2e/testing-manifests/statefulset/cockroachdb"
-	// We don't restart MySQL cluster regardless of restartCluster, since MySQL doesn't handle restart well
-	restartCluster = true
-
-	// Timeout for reads from databases running on stateful pods.
-	readTimeout = 60 * time.Second
 )
 
 // GCE Quota requirements: 3 pds, one per stateful pod manifest declared above.
@@ -1770,14 +1757,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 
 			ginkgo.By("Confirming that stateful set scale up will halt with unhealthy stateful pod")
-			sst.BreakHTTPProbe(ss)
+			_ = sst.BreakHTTPProbe(ss)
 			sst.WaitForRunningAndNotReady(*ss.Spec.Replicas, ss)
 			sst.WaitForStatusReadyReplicas(ss, 0)
 			sst.UpdateReplicas(ss, 3)
 			sst.ConfirmStatefulPodCount(1, ss, 10*time.Second, true)
 
 			ginkgo.By("Scaling up stateful set " + ssName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
-			sst.RestoreHTTPProbe(ss)
+			_ = sst.RestoreHTTPProbe(ss)
 			sst.WaitForRunningAndReady(3, ss)
 
 			ginkgo.By("Verifying that stateful set " + ssName + " was scaled up in order")
@@ -1803,15 +1790,15 @@ var _ = SIGDescribe("StatefulSet", func() {
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			sst.BreakHTTPProbe(ss)
+			_ = sst.BreakHTTPProbe(ss)
 			sst.WaitForStatusReadyReplicas(ss, 0)
 			sst.WaitForRunningAndNotReady(3, ss)
 			sst.UpdateReplicas(ss, 0)
 			sst.ConfirmStatefulPodCount(3, ss, 10*time.Second, true)
 
 			ginkgo.By("Scaling down stateful set " + ssName + " to 0 replicas and waiting until none of pods will run in namespace" + ns)
-			sst.RestoreHTTPProbe(ss)
-			sst.Scale(ss, 0)
+			_ = sst.RestoreHTTPProbe(ss)
+			_, _ = sst.Scale(ss, 0)
 
 			ginkgo.By("Verifying that stateful set " + ssName + " was scaled down in reverse order")
 			expectedOrder = []string{ssName + "-2", ssName + "-1", ssName + "-0"}
@@ -1851,26 +1838,26 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 
 			ginkgo.By("Confirming that stateful set scale up will not halt with unhealthy stateful pod")
-			sst.BreakHTTPProbe(ss)
+			_ = sst.BreakHTTPProbe(ss)
 			sst.WaitForRunningAndNotReady(*ss.Spec.Replicas, ss)
 			sst.WaitForStatusReadyReplicas(ss, 0)
 			sst.UpdateReplicas(ss, 3)
 			sst.ConfirmStatefulPodCount(3, ss, 10*time.Second, false)
 
 			ginkgo.By("Scaling up stateful set " + ssName + " to 3 replicas and waiting until all of them will be running in namespace " + ns)
-			sst.RestoreHTTPProbe(ss)
+			_ = sst.RestoreHTTPProbe(ss)
 			sst.WaitForRunningAndReady(3, ss)
 
 			ginkgo.By("Scale down will not halt with unhealthy stateful pod")
-			sst.BreakHTTPProbe(ss)
+			_ = sst.BreakHTTPProbe(ss)
 			sst.WaitForStatusReadyReplicas(ss, 0)
 			sst.WaitForRunningAndNotReady(3, ss)
 			sst.UpdateReplicas(ss, 0)
 			sst.ConfirmStatefulPodCount(0, ss, 10*time.Second, false)
 
 			ginkgo.By("Scaling down stateful set " + ssName + " to 0 replicas and waiting until none of pods will run in namespace" + ns)
-			sst.RestoreHTTPProbe(ss)
-			sst.Scale(ss, 0)
+			_ = sst.RestoreHTTPProbe(ss)
+			_, _ = sst.Scale(ss, 0)
 			sst.WaitForStatusReplicas(ss, 0)
 		})
 
@@ -2016,7 +2003,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		*/
 		framework.ConformanceIt("Should can update pods when the statefulset scale strategy is set", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			maxUnavailable := intstr.FromInt(2)
+			maxUnavailable := intstr.FromInt32(2)
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 3, nil, nil, labels)
 			ss.Spec.Template.Spec.Containers[0].Name = "busybox"
 			ss.Spec.Template.Spec.Containers[0].Image = BusyboxImage
@@ -2284,7 +2271,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("should delete PVCs with a OnScaledown policy and reserveOrdinals=[0,1]", func() {
+		ginkgo.It("should delete PVCs with a OnScaledown policy and range reserveOrdinals=[0,2-5]", func() {
 			if framework.SkipIfNoDefaultStorageClass(c) {
 				return
 			}
@@ -2293,12 +2280,15 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.PersistentVolumeClaimRetentionPolicy = &appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 				WhenScaled: appsv1beta1.DeletePersistentVolumeClaimRetentionPolicyType,
 			}
-			ss.Spec.ReserveOrdinals = []int{0, 1}
+			ss.Spec.ReserveOrdinals = []intstr.IntOrString{
+				intstr.FromInt32(0),
+				intstr.FromString("2-5"),
+			}
 			_, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Confirming all 3 PVCs exist")
-			err = verifyStatefulSetPVCsExist(c, ss, []int{2, 3, 4})
+			err = verifyStatefulSetPVCsExist(c, ss, []int{1, 6, 7})
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Scaling stateful set " + ss.Name + " to one replica")
@@ -2306,7 +2296,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Verifying all but one PVC deleted")
-			err = verifyStatefulSetPVCsExist(c, ss, []int{2})
+			err = verifyStatefulSetPVCsExist(c, ss, []int{1})
 			framework.ExpectNoError(err)
 		})
 
@@ -2657,219 +2647,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 	})
 })
 
-func kubectlExecWithRetries(args ...string) (out string) {
-	var err error
-	for i := 0; i < 3; i++ {
-		if out, err = framework.RunKubectl(args...); err == nil {
-			return
-		}
-		framework.Logf("Retrying %v:\nerror %v\nstdout %v", args, err, out)
-	}
-	framework.Failf("Failed to execute \"%v\" with retries: %v", args, err)
-	return
-}
-
-type statefulPodTester interface {
-	deploy(ns string) *appsv1beta1.StatefulSet
-	write(statefulPodIndex int, kv map[string]string)
-	read(statefulPodIndex int, key string) string
-	name() string
-}
-
-//type clusterAppTester struct {
-//	ns          string
-//	statefulPod statefulPodTester
-//	tester      *framework.StatefulSetTester
-//}
-//
-//func (c *clusterAppTester) run() {
-//	ginkgo.By("Deploying " + c.statefulPod.name())
-//	ss := c.statefulPod.deploy(c.ns)
-//
-//	ginkgo.By("Creating foo:bar in member with index 0")
-//	c.statefulPod.write(0, map[string]string{"foo": "bar"})
-//
-//	switch c.statefulPod.(type) {
-//	case *mysqlGaleraTester:
-//		// Don't restart MySQL cluster since it doesn't handle restarts well
-//	default:
-//		if restartCluster {
-//			ginkgo.By("Restarting stateful set " + ss.Name)
-//			c.tester.Restart(ss)
-//			c.tester.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
-//		}
-//	}
-//
-//	ginkgo.By("Reading value under foo from member with index 2")
-//	if err := pollReadWithTimeout(c.statefulPod, 2, "foo", "bar"); err != nil {
-//		framework.Failf("%v", err)
-//	}
-//}
-//
-//type zookeeperTester struct {
-//	ss     *appsv1beta1.StatefulSet
-//	tester *framework.StatefulSetTester
-//}
-//
-//func (z *zookeeperTester) name() string {
-//	return "zookeeper"
-//}
-//
-//func (z *zookeeperTester) deploy(ns string) *appsv1beta1.StatefulSet {
-//	z.ss = z.tester.CreateStatefulSet(zookeeperManifestPath, ns)
-//	return z.ss
-//}
-//
-//func (z *zookeeperTester) write(statefulPodIndex int, kv map[string]string) {
-//	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
-//	ns := fmt.Sprintf("--namespace=%v", z.ss.Namespace)
-//	for k, v := range kv {
-//		cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh create /%v %v", k, v)
-//		framework.Logf(framework.RunKubectlOrDie("exec", ns, name, "--", "/bin/sh", "-c", cmd))
-//	}
-//}
-//
-//func (z *zookeeperTester) read(statefulPodIndex int, key string) string {
-//	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
-//	ns := fmt.Sprintf("--namespace=%v", z.ss.Namespace)
-//	cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh get /%v", key)
-//	return lastLine(framework.RunKubectlOrDie("exec", ns, name, "--", "/bin/sh", "-c", cmd))
-//}
-//
-//type mysqlGaleraTester struct {
-//	ss     *appsv1beta1.StatefulSet
-//	tester *framework.StatefulSetTester
-//}
-//
-//func (m *mysqlGaleraTester) name() string {
-//	return "mysql: galera"
-//}
-//
-//func (m *mysqlGaleraTester) mysqlExec(cmd, ns, podName string) string {
-//	cmd = fmt.Sprintf("/usr/bin/mysql -u root -B -e '%v'", cmd)
-//	// TODO: Find a readiness probe for mysql that guarantees writes will
-//	// succeed and ditch retries. Current probe only reads, so there's a window
-//	// for a race.
-//	return kubectlExecWithRetries(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
-//}
-//
-//func (m *mysqlGaleraTester) deploy(ns string) *appsv1beta1.StatefulSet {
-//	m.ss = m.tester.CreateStatefulSet(mysqlGaleraManifestPath, ns)
-//
-//	framework.Logf("Deployed statefulset %v, initializing database", m.ss.Name)
-//	for _, cmd := range []string{
-//		"create database statefulset;",
-//		"use statefulset; create table foo (k varchar(20), v varchar(20));",
-//	} {
-//		framework.Logf(m.mysqlExec(cmd, ns, fmt.Sprintf("%v-0", m.ss.Name)))
-//	}
-//	return m.ss
-//}
-//
-//func (m *mysqlGaleraTester) write(statefulPodIndex int, kv map[string]string) {
-//	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-//	for k, v := range kv {
-//		cmd := fmt.Sprintf("use statefulset; insert into foo (k, v) values (\"%v\", \"%v\");", k, v)
-//		framework.Logf(m.mysqlExec(cmd, m.ss.Namespace, name))
-//	}
-//}
-//
-//func (m *mysqlGaleraTester) read(statefulPodIndex int, key string) string {
-//	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-//	return lastLine(m.mysqlExec(fmt.Sprintf("use statefulset; select v from foo where k=\"%v\";", key), m.ss.Namespace, name))
-//}
-//
-//type redisTester struct {
-//	ss     *appsv1beta1.StatefulSet
-//	tester *framework.StatefulSetTester
-//}
-//
-//func (m *redisTester) name() string {
-//	return "redis: master/slave"
-//}
-//
-//func (m *redisTester) redisExec(cmd, ns, podName string) string {
-//	cmd = fmt.Sprintf("/opt/redis/redis-cli -h %v %v", podName, cmd)
-//	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
-//}
-//
-//func (m *redisTester) deploy(ns string) *appsv1beta1.StatefulSet {
-//	m.ss = m.tester.CreateStatefulSet(redisManifestPath, ns)
-//	return m.ss
-//}
-//
-//func (m *redisTester) write(statefulPodIndex int, kv map[string]string) {
-//	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-//	for k, v := range kv {
-//		framework.Logf(m.redisExec(fmt.Sprintf("SET %v %v", k, v), m.ss.Namespace, name))
-//	}
-//}
-//
-//func (m *redisTester) read(statefulPodIndex int, key string) string {
-//	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
-//	return lastLine(m.redisExec(fmt.Sprintf("GET %v", key), m.ss.Namespace, name))
-//}
-//
-//type cockroachDBTester struct {
-//	ss     *appsv1beta1.StatefulSet
-//	tester *framework.StatefulSetTester
-//}
-//
-//func (c *cockroachDBTester) name() string {
-//	return "CockroachDB"
-//}
-//
-//func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
-//	cmd = fmt.Sprintf("/cockroach/cockroach sql --insecure --host %s.cockroachdb -e \"%v\"", podName, cmd)
-//	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
-//}
-//
-//func (c *cockroachDBTester) deploy(ns string) *appsv1beta1.StatefulSet {
-//	c.ss = c.tester.CreateStatefulSet(cockroachDBManifestPath, ns)
-//	framework.Logf("Deployed statefulset %v, initializing database", c.ss.Name)
-//	for _, cmd := range []string{
-//		"CREATE DATABASE IF NOT EXISTS foo;",
-//		"CREATE TABLE IF NOT EXISTS foo.bar (k STRING PRIMARY KEY, v STRING);",
-//	} {
-//		framework.Logf(c.cockroachDBExec(cmd, ns, fmt.Sprintf("%v-0", c.ss.Name)))
-//	}
-//	return c.ss
-//}
-//
-//func (c *cockroachDBTester) write(statefulPodIndex int, kv map[string]string) {
-//	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
-//	for k, v := range kv {
-//		cmd := fmt.Sprintf("UPSERT INTO foo.bar VALUES ('%v', '%v');", k, v)
-//		framework.Logf(c.cockroachDBExec(cmd, c.ss.Namespace, name))
-//	}
-//}
-//func (c *cockroachDBTester) read(statefulPodIndex int, key string) string {
-//	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
-//	return lastLine(c.cockroachDBExec(fmt.Sprintf("SELECT v FROM foo.bar WHERE k='%v';", key), c.ss.Namespace, name))
-//}
-
-func lastLine(out string) string {
-	outLines := strings.Split(strings.Trim(out, "\n"), "\n")
-	return outLines[len(outLines)-1]
-}
-
-func pollReadWithTimeout(statefulPod statefulPodTester, statefulPodNumber int, key, expectedVal string) error {
-	err := wait.PollImmediate(time.Second, readTimeout, func() (bool, error) {
-		val := statefulPod.read(statefulPodNumber, key)
-		if val == "" {
-			return false, nil
-		} else if val != expectedVal {
-			return false, fmt.Errorf("expected value %v, found %v", expectedVal, val)
-		}
-		return true, nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		return fmt.Errorf("timed out when trying to read value for key %v from stateful pod %d", key, statefulPodNumber)
-	}
-	return err
-}
-
 // This function is used by two tests to test StatefulSet rollbacks: one using
 // PVCs and one using no storage.
 func rollbackTest(c clientset.Interface, kc kruiseclientset.Interface, ns string, ss *appsv1beta1.StatefulSet) {
@@ -2959,7 +2736,7 @@ func rollbackTest(c clientset.Interface, kc kruiseclientset.Interface, ns string
 	ginkgo.By("Rolling back update in reverse ordinal order")
 	pods = sst.GetPodList(ss)
 	sst.SortStatefulPods(pods)
-	sst.RestorePodHTTPProbe(ss, &pods.Items[1])
+	_ = sst.RestorePodHTTPProbe(ss, &pods.Items[1])
 	ss, pods = sst.WaitForPodReady(ss, pods.Items[1].Name)
 	ss, pods = sst.WaitForRollingUpdate(ss)
 	gomega.Expect(ss.Status.CurrentRevision).To(gomega.Equal(priorRevision),
@@ -2991,7 +2768,7 @@ func verifyStatefulSetPVCsExist(c clientset.Interface, ss *appsv1beta1.StatefulS
 	for _, id := range claimIds {
 		idSet[id] = struct{}{}
 	}
-	return wait.PollImmediate(framework.StatefulSetPoll, framework.StatefulSetTimeout, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), framework.StatefulSetPoll, framework.StatefulSetTimeout, true, func(_ context.Context) (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: klabels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvcs for verification, retrying: %v", err)
@@ -3036,7 +2813,7 @@ func verifyStatefulSetPVCsExistWithOwnerRefs(c clientset.Interface, kc kruisecli
 	if setUID == "" {
 		framework.Failf("Statefulset %s missing UID", ss.Name)
 	}
-	return wait.PollImmediate(framework.StatefulSetPoll, framework.StatefulSetTimeout, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), framework.StatefulSetPoll, framework.StatefulSetTimeout, true, func(_ context.Context) (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ss.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: klabels.Everything().String()})
 		if err != nil {
 			framework.Logf("WARNING: Failed to list pvcs for verification, retrying: %v", err)
@@ -3111,7 +2888,7 @@ func uncordonNode(ctx context.Context, c clientset.Interface, oldData, newData [
 
 // waitForStatus waits for the StatefulSetStatus's CurrentReplicas to be equal to expectedReplicas
 // The returned StatefulSet contains such a StatefulSetStatus
-func waitForStatusCurrentReplicas(ctx context.Context, c clientset.Interface, kc kruiseclientset.Interface, set *appsv1beta1.StatefulSet, expectedReplicas int32) *appsv1beta1.StatefulSet {
+func waitForStatusCurrentReplicas(_ context.Context, c clientset.Interface, kc kruiseclientset.Interface, set *appsv1beta1.StatefulSet, expectedReplicas int32) *appsv1beta1.StatefulSet {
 	sst := framework.NewStatefulSetTester(c, kc)
 	sst.WaitForState(set, func(set2 *appsv1beta1.StatefulSet, pods *v1.PodList) (bool, error) {
 		if set2.Status.ObservedGeneration >= set.Generation && set2.Status.CurrentReplicas == expectedReplicas {
@@ -3125,7 +2902,7 @@ func waitForStatusCurrentReplicas(ctx context.Context, c clientset.Interface, kc
 
 // waitForStatus waits for the StatefulSetStatus's ObservedGeneration to be greater than or equal to set's Generation.
 // The returned StatefulSet contains such a StatefulSetStatus
-func waitForStatus(ctx context.Context, c clientset.Interface, kc kruiseclientset.Interface, set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
+func waitForStatus(_ context.Context, c clientset.Interface, kc kruiseclientset.Interface, set *appsv1beta1.StatefulSet) *appsv1beta1.StatefulSet {
 	sst := framework.NewStatefulSetTester(c, kc)
 	sst.WaitForState(set, func(set2 *appsv1beta1.StatefulSet, pods *v1.PodList) (bool, error) {
 		if set2.Status.ObservedGeneration >= set.Generation {
@@ -3138,7 +2915,7 @@ func waitForStatus(ctx context.Context, c clientset.Interface, kc kruiseclientse
 }
 
 // waitForPodNames waits for the StatefulSet's pods to match expected names.
-func waitForPodNames(ctx context.Context, c clientset.Interface, kc kruiseclientset.Interface, set *appsv1beta1.StatefulSet, expectedPodNames []string) {
+func waitForPodNames(_ context.Context, c clientset.Interface, kc kruiseclientset.Interface, set *appsv1beta1.StatefulSet, expectedPodNames []string) {
 	sst := framework.NewStatefulSetTester(c, kc)
 	sst.WaitForState(set,
 		func(intSet *appsv1beta1.StatefulSet, pods *v1.PodList) (bool, error) {
@@ -3183,7 +2960,7 @@ type updateStatefulSetFunc func(*appsv1beta1.StatefulSet)
 func updateStatefulSetWithRetries(ctx context.Context, kc kruiseclientset.Interface, namespace, name string, applyUpdate updateStatefulSetFunc) (statefulSet *appsv1beta1.StatefulSet, err error) {
 	statefulSets := kc.AppsV1beta1().StatefulSets(namespace)
 	var updateErr error
-	pollErr := wait.PollWithContext(ctx, 10*time.Millisecond, 1*time.Minute, func(ctx context.Context) (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(ctx, 10*time.Millisecond, 1*time.Minute, true, func(ctx context.Context) (bool, error) {
 		if statefulSet, err = statefulSets.Get(ctx, name, metav1.GetOptions{}); err != nil {
 			return false, err
 		}
@@ -3203,7 +2980,7 @@ func updateStatefulSetWithRetries(ctx context.Context, kc kruiseclientset.Interf
 }
 
 // waitForPVCCapacity waits for the StatefulSet's pods to match expected names.
-func waitForPVCCapacity(ctx context.Context, c clientset.Interface, kc kruiseclientset.Interface, set *appsv1beta1.StatefulSet, cmp func(resource.Quantity, resource.Quantity) bool) {
+func waitForPVCCapacity(_ context.Context, c clientset.Interface, kc kruiseclientset.Interface, set *appsv1beta1.StatefulSet, cmp func(resource.Quantity, resource.Quantity) bool) {
 	sst := framework.NewStatefulSetTester(c, kc)
 	capacityMap := map[string]resource.Quantity{}
 	for _, pvc := range set.Spec.VolumeClaimTemplates {

@@ -23,7 +23,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
@@ -36,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -56,7 +57,7 @@ var (
 			UID:       "012d18d5-5eb9-449d-b670-3da8fec8852f",
 		},
 		Spec: appsv1beta1.StatefulSetSpec{
-			Replicas: pointer.Int32Ptr(10),
+			Replicas: ptr.To[int32](10),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{},
@@ -70,7 +71,7 @@ var (
 			Namespace: "ns-test",
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					Controller: pointer.BoolPtr(true),
+					Controller: ptr.To(true),
 				},
 			},
 			Annotations: map[string]string{
@@ -222,7 +223,7 @@ func TestReconcilePersistentPodState(t *testing.T) {
 			name: "kruise statefulset, scale down replicas 10->8, 1 pod deleted, 1 pod running",
 			getSts: func() (*apps.StatefulSet, *appsv1beta1.StatefulSet) {
 				kruise := kruiseStsDemo.DeepCopy()
-				kruise.Spec.Replicas = pointer.Int32Ptr(8)
+				kruise.Spec.Replicas = ptr.To[int32](8)
 				return nil, kruise
 			},
 			getPods: func() []*corev1.Pod {
@@ -316,8 +317,12 @@ func TestReconcilePersistentPodState(t *testing.T) {
 			name: "kruise reserveOrigin statefulset, scale down replicas 10->8, 1 pod deleted, 1 pod running",
 			getSts: func() (*apps.StatefulSet, *appsv1beta1.StatefulSet) {
 				kruise := kruiseStsDemo.DeepCopy()
-				kruise.Spec.Replicas = pointer.Int32Ptr(8)
-				kruise.Spec.ReserveOrdinals = []int{0, 3, 7}
+				kruise.Spec.Replicas = ptr.To[int32](8)
+				kruise.Spec.ReserveOrdinals = []intstr.IntOrString{
+					intstr.FromInt32(0),
+					intstr.FromInt32(3),
+					intstr.FromInt32(7),
+				}
 				return nil, kruise
 			},
 			getPods: func() []*corev1.Pod {

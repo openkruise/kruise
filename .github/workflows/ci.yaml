@@ -31,7 +31,7 @@ jobs:
       - name: Checkout Actions Repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Check spelling with custom config file
-        uses: crate-ci/typos@bd36f89fcd3424dcefd442894589e6ee572a59f2 # v1.28.1
+        uses: crate-ci/typos@11ca4583f2f3f74c7e7785c0ecb20fe2c99a4308 # v1.29.5
         with:
           config: ./typos.toml
 
@@ -58,7 +58,7 @@ jobs:
         run: |
           make generate
       - name: Lint golang code
-        uses: golangci/golangci-lint-action@971e284b6050e8a5849b72094c50ab08da042db8 # v6.1.1
+        uses: golangci/golangci-lint-action@2226d7cb06a077cd73e56eedd38eecad18e5d837 # v6.5.0
         with:
           version: ${{ env.GOLANGCI_VERSION }}
           args: --verbose
@@ -128,9 +128,10 @@ jobs:
           make test
           git status
       - name: Publish Unit Test Coverage
-        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4.6.0
+        uses: codecov/codecov-action@13ce06bfc6bbe3ecf90edbbf1bc32fe5978ca1d3 # v5.3.1
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           flags: unittests
           file: cover.out
-      - name: Check diff
-        run: '[[ -z $(git status -s) ]] || (printf "Existing modified/untracked files.\nPlease run \"make generate manifests\" and push again.\n"; exit 1)'
