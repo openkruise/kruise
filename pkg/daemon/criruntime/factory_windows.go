@@ -19,6 +19,11 @@ limitations under the License.
 
 package criruntime
 
+import (
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
+)
+
 var (
 	// containerdRemoteURI is the remote URI for containerd.
 	// On Windows the default CRI endpoint is npipe://./pipe/containerd-containerd .
@@ -34,4 +39,8 @@ func detectRuntime() (cfgs []runtimeConfig) {
 		runtimeRemoteURI: containerdRemoteURI,
 	})
 	return cfgs
+}
+
+func newImageService(cfg runtimeConfig, accountManager daemonutil.ImagePullAccountManager) (runtimeimage.ImageService, error) {
+	return runtimeimage.NewCRIImageService(cfg.runtimeRemoteURI, accountManager)
 }

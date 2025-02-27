@@ -82,7 +82,7 @@ func NewFactory(accountManager daemonutil.ImagePullAccountManager) (Factory, err
 		var runtimeService criapi.RuntimeService
 		var typedVersion *runtimeapi.VersionResponse
 
-		imageService, err = runtimeimage.NewCRIImageService(cfg.runtimeRemoteURI, accountManager)
+		imageService, err = newImageService(cfg, accountManager)
 		if err != nil {
 			klog.ErrorS(err, "Failed to new image service", "runtimeType", cfg.runtimeType, "runtimeURI", cfg.runtimeURI, "runtimeRemoteURI", cfg.runtimeRemoteURI)
 			continue

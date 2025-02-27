@@ -25,6 +25,9 @@ import (
 	"os"
 
 	"k8s.io/klog/v2"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
+	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 )
 
 const (
@@ -106,4 +109,13 @@ func detectRuntime() (cfgs []runtimeConfig) {
 		}
 	}
 	return cfgs
+}
+
+func newImageService(cfg runtimeConfig, accountManager daemonutil.ImagePullAccountManager) (runtimeimage.ImageService, error) {
+	addr, _, err := kubeletutil.GetAddressAndDialer(cfg.runtimeRemoteURI)
+	if err != nil {
+		klog.ErrorS(err, "Failed to get address", "runtimeType", cfg.runtimeType, "runtimeURI", cfg.runtimeURI, "runtimeRemoteURI", cfg.runtimeRemoteURI)
+		return nil, err
+	}
+	return runtimeimage.NewCRIImageService(addr, accountManager)
 }
