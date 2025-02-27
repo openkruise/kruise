@@ -20,8 +20,8 @@ limitations under the License.
 package criruntime
 
 import (
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 )
 
 var (
