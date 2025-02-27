@@ -32,6 +32,7 @@ const (
 )
 
 var (
+	statFunc          = os.Stat
 	criSocketFileName = flag.String("socket-file", "", "The name of CRI socket file, and it should be in the mounted /hostvarrun directory.")
 )
 
@@ -41,7 +42,7 @@ func detectRuntime() (cfgs []runtimeConfig) {
 	// firstly check if it is configured from flag
 	if criSocketFileName != nil && len(*criSocketFileName) > 0 {
 		filePath := fmt.Sprintf("%s/%s", varRunMountPath, *criSocketFileName)
-		if _, err = os.Stat(filePath); err == nil {
+		if _, err = statFunc(filePath); err == nil {
 			cfgs = append(cfgs, runtimeConfig{
 				runtimeType:      ContainerRuntimeCommonCRI,
 				runtimeRemoteURI: fmt.Sprintf("unix://%s/%s", varRunMountPath, *criSocketFileName),
@@ -57,13 +58,13 @@ func detectRuntime() (cfgs []runtimeConfig) {
 
 	// containerd, with the same behavior of pullImage as commonCRI
 	{
-		if _, err = os.Stat(fmt.Sprintf("%s/containerd.sock", varRunMountPath)); err == nil {
+		if _, err = statFunc(fmt.Sprintf("%s/containerd.sock", varRunMountPath)); err == nil {
 			cfgs = append(cfgs, runtimeConfig{
 				runtimeType:      ContainerRuntimeContainerd,
 				runtimeRemoteURI: fmt.Sprintf("unix://%s/containerd.sock", varRunMountPath),
 			})
 		}
-		if _, err = os.Stat(fmt.Sprintf("%s/containerd/containerd.sock", varRunMountPath)); err == nil {
+		if _, err = statFunc(fmt.Sprintf("%s/containerd/containerd.sock", varRunMountPath)); err == nil {
 			cfgs = append(cfgs, runtimeConfig{
 				runtimeType:      ContainerRuntimeContainerd,
 				runtimeRemoteURI: fmt.Sprintf("unix://%s/containerd/containerd.sock", varRunMountPath),
@@ -73,13 +74,13 @@ func detectRuntime() (cfgs []runtimeConfig) {
 
 	// cri-o
 	{
-		if _, err = os.Stat(fmt.Sprintf("%s/crio.sock", varRunMountPath)); err == nil {
+		if _, err = statFunc(fmt.Sprintf("%s/crio.sock", varRunMountPath)); err == nil {
 			cfgs = append(cfgs, runtimeConfig{
 				runtimeType:      ContainerRuntimeCommonCRI,
 				runtimeRemoteURI: fmt.Sprintf("unix://%s/crio.sock", varRunMountPath),
 			})
 		}
-		if _, err = os.Stat(fmt.Sprintf("%s/crio/crio.sock", varRunMountPath)); err == nil {
+		if _, err = statFunc(fmt.Sprintf("%s/crio/crio.sock", varRunMountPath)); err == nil {
 			cfgs = append(cfgs, runtimeConfig{
 				runtimeType:      ContainerRuntimeCommonCRI,
 				runtimeRemoteURI: fmt.Sprintf("unix://%s/crio/crio.sock", varRunMountPath),
@@ -89,7 +90,7 @@ func detectRuntime() (cfgs []runtimeConfig) {
 
 	// cri-docker dockerd as a compliant Container Runtime Interface, detail see https://github.com/Mirantis/cri-dockerd
 	{
-		if _, err = os.Stat(fmt.Sprintf("%s/cri-dockerd.sock", varRunMountPath)); err == nil {
+		if _, err = statFunc(fmt.Sprintf("%s/cri-dockerd.sock", varRunMountPath)); err == nil {
 			cfgs = append(cfgs, runtimeConfig{
 				runtimeType:      ContainerRuntimeCommonCRI,
 				runtimeRemoteURI: fmt.Sprintf("unix://%s/cri-dockerd.sock", varRunMountPath),
@@ -97,7 +98,7 @@ func detectRuntime() (cfgs []runtimeConfig) {
 		}
 		// Check if the cri-dockerd runtime socket exists in the expected k3s runtime directory.
 		// If found, append it to the runtime configuration list to ensure k3s can use cri-dockerd.
-		if _, err = os.Stat(fmt.Sprintf("%s/cri-dockerd/cri-dockerd.sock", varRunMountPath)); err == nil {
+		if _, err = statFunc(fmt.Sprintf("%s/cri-dockerd/cri-dockerd.sock", varRunMountPath)); err == nil {
 			cfgs = append(cfgs, runtimeConfig{
 				runtimeType:      ContainerRuntimeCommonCRI,
 				runtimeRemoteURI: fmt.Sprintf("unix://%s/cri-dockerd/cri-dockerd.sock", varRunMountPath),

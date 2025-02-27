@@ -20,9 +20,14 @@ limitations under the License.
 package criruntime
 
 var (
+	// containerdRemoteURI is the remote URI for containerd.
+	// On Windows the default CRI endpoint is npipe://./pipe/containerd-containerd .
+	// source: https://kubernetes.io/docs/setup/production-environment/container-runtimes/#containerd
 	containerdRemoteURI = `npipe://./pipe/containerd-containerd`
 )
 
+// detectRuntime returns containerd runtime config
+// Windows node pools support only the containerd runtime for most Kubernetes service providers.
 func detectRuntime() (cfgs []runtimeConfig) {
 	cfgs = append(cfgs, runtimeConfig{
 		runtimeType:      ContainerRuntimeContainerd,
