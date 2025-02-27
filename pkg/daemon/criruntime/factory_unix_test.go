@@ -50,7 +50,7 @@ func TestDetectRuntimeUnix(t *testing.T) {
 			name:             "non-existent-socket-with-flag",
 			flag:             "non-existent-socket",
 			runtimeType:      ContainerRuntimeCommonCRI,
-			runtimeRemoteURI: "unix://hostvarrun/non-existent-socket",
+			runtimeRemoteURI: "unix:///hostvarrun/non-existent-socket",
 			statFunc: func(name string) (os.FileInfo, error) {
 				return nil, os.ErrNotExist
 			},
@@ -60,7 +60,7 @@ func TestDetectRuntimeUnix(t *testing.T) {
 			name:             "crio.sock-with-flag",
 			flag:             "crio.sock",
 			runtimeType:      ContainerRuntimeCommonCRI,
-			runtimeRemoteURI: "unix://hostvarrun/crio.sock",
+			runtimeRemoteURI: "unix:///hostvarrun/crio.sock",
 			statFunc: func(name string) (os.FileInfo, error) {
 				if name == "/hostvarrun/crio.sock" {
 					return &fileInfo{name: name}, nil
@@ -73,7 +73,7 @@ func TestDetectRuntimeUnix(t *testing.T) {
 			name:             "containerd.sock",
 			flag:             "",
 			runtimeType:      ContainerRuntimeContainerd,
-			runtimeRemoteURI: "unix://hostvarrun/containerd.sock",
+			runtimeRemoteURI: "unix:///hostvarrun/containerd.sock",
 			statFunc: func(name string) (os.FileInfo, error) {
 				if name == "/hostvarrun/containerd.sock" {
 					return &fileInfo{name: name}, nil
@@ -86,7 +86,7 @@ func TestDetectRuntimeUnix(t *testing.T) {
 			name:             "containerd/containerd.sock",
 			flag:             "",
 			runtimeType:      ContainerRuntimeContainerd,
-			runtimeRemoteURI: "unix://hostvarrun/containerd/containerd.sock",
+			runtimeRemoteURI: "unix:///hostvarrun/containerd/containerd.sock",
 			statFunc: func(name string) (os.FileInfo, error) {
 				if name == "/hostvarrun/containerd/containerd.sock" {
 					return &fileInfo{name: name}, nil
@@ -99,7 +99,7 @@ func TestDetectRuntimeUnix(t *testing.T) {
 			name:             "crio.sock",
 			flag:             "",
 			runtimeType:      ContainerRuntimeCommonCRI,
-			runtimeRemoteURI: "unix://hostvarrun/crio.sock",
+			runtimeRemoteURI: "unix:///hostvarrun/crio.sock",
 			statFunc: func(name string) (os.FileInfo, error) {
 				if name == "/hostvarrun/crio.sock" {
 					return &fileInfo{name: name}, nil
@@ -112,7 +112,7 @@ func TestDetectRuntimeUnix(t *testing.T) {
 			name:             "crio/crio.sock",
 			flag:             "",
 			runtimeType:      ContainerRuntimeCommonCRI,
-			runtimeRemoteURI: "unix://hostvarrun/crio/crio.sock",
+			runtimeRemoteURI: "unix:///hostvarrun/crio/crio.sock",
 			statFunc: func(name string) (os.FileInfo, error) {
 				if name == "/hostvarrun/crio/crio.sock" {
 					return &fileInfo{name: name}, nil
@@ -125,7 +125,7 @@ func TestDetectRuntimeUnix(t *testing.T) {
 			name:             "cri-dockerd",
 			flag:             "",
 			runtimeType:      ContainerRuntimeCommonCRI,
-			runtimeRemoteURI: "unix://hostvarrun/cri-dockerd.sock",
+			runtimeRemoteURI: "unix:///hostvarrun/cri-dockerd.sock",
 			statFunc: func(name string) (os.FileInfo, error) {
 				if name == "/hostvarrun/cri-dockerd.sock" {
 					return &fileInfo{name: name}, nil
@@ -138,7 +138,7 @@ func TestDetectRuntimeUnix(t *testing.T) {
 			name:             "cri-dockerd/cri-dockerd.sock",
 			flag:             "",
 			runtimeType:      ContainerRuntimeCommonCRI,
-			runtimeRemoteURI: "unix://hostvarrun/cri-dockerd/cri-dockerd.sock",
+			runtimeRemoteURI: "unix:///hostvarrun/cri-dockerd/cri-dockerd.sock",
 			statFunc: func(name string) (os.FileInfo, error) {
 				if name == "/hostvarrun/cri-dockerd/cri-dockerd.sock" {
 					return &fileInfo{name: name}, nil
@@ -151,7 +151,7 @@ func TestDetectRuntimeUnix(t *testing.T) {
 			name:             "non-existent-socket-without-flag",
 			flag:             "",
 			runtimeType:      ContainerRuntimeCommonCRI,
-			runtimeRemoteURI: "unix://hostvarrun/non-existent-socket",
+			runtimeRemoteURI: "unix:///hostvarrun/non-existent-socket",
 			statFunc: func(name string) (os.FileInfo, error) {
 				return nil, os.ErrNotExist
 			},
