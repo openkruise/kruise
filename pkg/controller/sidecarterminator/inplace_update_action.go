@@ -28,7 +28,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func (r *ReconcileSidecarTerminator) executeInPlaceUpdateAction(originalPod *corev1.Pod, sidecars sets.String) error {
+func (r *ReconcileSidecarTerminator) executeInPlaceUpdateAction(originalPod *corev1.Pod, sidecars sets.Set[string]) error {
 	uncompletedSidecars := filterUncompletedSidecars(originalPod, sidecars)
 	if uncompletedSidecars.Len() == 0 {
 		return nil
@@ -60,22 +60,26 @@ func (r *ReconcileSidecarTerminator) executeInPlaceUpdateAction(originalPod *cor
 		klog.V(3).InfoS("SidecarTerminator -- InPlace update pod successfully", "pod", klog.KObj(originalPod))
 
 		r.recorder.Eventf(originalPod, corev1.EventTypeNormal, "SidecarTerminator",
-			"Kruise SidecarTerminator is trying to terminate sidecar %v using in-place update", uncompletedSidecars.List())
+			"Kruise SidecarTerminator is trying to terminate sidecar %v using in-place update", uncompletedSidecars.UnsortedList())
 	}
 
 	return err
 }
 
 // updateSidecarsForInPlaceUpdate replace sidecar image with KruiseTerminateSidecarWithImageEnv
-func updateSidecarsForInPlaceUpdate(pod *corev1.Pod, sidecars sets.String) (bool, *corev1.Pod) {
+func updateSidecarsForInPlaceUpdate(pod *corev1.Pod, sidecars sets.Set[string]) (bool, *corev1.Pod) {
 	changed := false
 	for i := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[i]
 		if !sidecars.Has(container.Name) {
 			continue
 		}
+		newImage := getImageFromEnv(container)
+		if container.Image == newImage {
+			continue
+		}
 		changed = true
-		container.Image = getImageFromEnv(container)
+		container.Image = newImage
 	}
 	return changed, pod
 }
