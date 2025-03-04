@@ -23,6 +23,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/openkruise/kruise/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
@@ -35,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -60,10 +60,11 @@ var (
 	controllerKruiseKindAlphaSts = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
 )
 
-func verifyGroupKind(ref *appsv1alpha1.TargetReference, expectedKind string, expectedGroups []string) (bool, error) {
+func verifyGroupKind(ctx context.Context, ref *appsv1alpha1.TargetReference, expectedKind string, expectedGroups []string) (bool, error) {
+	logger := util.FromLogContext(ctx)
 	gv, err := schema.ParseGroupVersion(ref.APIVersion)
 	if err != nil {
-		klog.ErrorS(err, "failed to parse GroupVersion for apiVersion", "apiVersion", ref.APIVersion)
+		logger.Error(err, "failed to parse GroupVersion for apiVersion", "apiVersion", ref.APIVersion)
 		return false, err
 	}
 
@@ -80,9 +81,9 @@ func verifyGroupKind(ref *appsv1alpha1.TargetReference, expectedKind string, exp
 	return false, nil
 }
 
-func (h *WorkloadSpreadCreateUpdateHandler) validatingWorkloadSpreadFn(obj *appsv1alpha1.WorkloadSpread) field.ErrorList {
+func (h *WorkloadSpreadCreateUpdateHandler) validatingWorkloadSpreadFn(ctx context.Context, obj *appsv1alpha1.WorkloadSpread) field.ErrorList {
 	// validate ws.spec.
-	allErrs := validateWorkloadSpreadSpec(h, obj, field.NewPath("spec"))
+	allErrs := validateWorkloadSpreadSpec(ctx, h, obj, field.NewPath("spec"))
 
 	// validate whether ws.spec.targetRef is in conflict with others.
 	wsList := &appsv1alpha1.WorkloadSpreadList{}
@@ -95,7 +96,7 @@ func (h *WorkloadSpreadCreateUpdateHandler) validatingWorkloadSpreadFn(obj *apps
 	return allErrs
 }
 
-func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv1alpha1.WorkloadSpread, fldPath *field.Path) field.ErrorList {
+func validateWorkloadSpreadSpec(ctx context.Context, h *WorkloadSpreadCreateUpdateHandler, obj *appsv1alpha1.WorkloadSpread, fldPath *field.Path) field.ErrorList {
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
 	var workloadTemplate client.Object
@@ -109,7 +110,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 		} else {
 			switch spec.TargetReference.Kind {
 			case controllerKruiseKindCS.Kind:
-				ok, err := verifyGroupKind(spec.TargetReference, controllerKruiseKindCS.Kind, []string{controllerKruiseKindCS.Group})
+				ok, err := verifyGroupKind(ctx, spec.TargetReference, controllerKruiseKindCS.Kind, []string{controllerKruiseKindCS.Group})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for CloneSet."))
 				} else {
@@ -119,7 +120,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 					}
 				}
 			case controllerKindDep.Kind:
-				ok, err := verifyGroupKind(spec.TargetReference, controllerKindDep.Kind, []string{controllerKindDep.Group})
+				ok, err := verifyGroupKind(ctx, spec.TargetReference, controllerKindDep.Kind, []string{controllerKindDep.Group})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for Deployment."))
 				} else {
@@ -129,7 +130,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 					}
 				}
 			case controllerKindRS.Kind:
-				ok, err := verifyGroupKind(spec.TargetReference, controllerKindRS.Kind, []string{controllerKindRS.Group})
+				ok, err := verifyGroupKind(ctx, spec.TargetReference, controllerKindRS.Kind, []string{controllerKindRS.Group})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for ReplicaSet."))
 				} else {
@@ -139,7 +140,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 					}
 				}
 			case controllerKindJob.Kind:
-				ok, err := verifyGroupKind(spec.TargetReference, controllerKindJob.Kind, []string{controllerKindJob.Group})
+				ok, err := verifyGroupKind(ctx, spec.TargetReference, controllerKindJob.Kind, []string{controllerKindJob.Group})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for Job."))
 				} else {
@@ -149,7 +150,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 					}
 				}
 			case controllerKindSts.Kind:
-				ok, err := verifyGroupKind(spec.TargetReference, controllerKindSts.Kind, []string{controllerKindSts.Group, controllerKruiseKindAlphaSts.Group, controllerKruiseKindBetaSts.Group})
+				ok, err := verifyGroupKind(ctx, spec.TargetReference, controllerKindSts.Kind, []string{controllerKindSts.Group, controllerKruiseKindAlphaSts.Group, controllerKruiseKindBetaSts.Group})
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for StatefulSet."))
 				} else {
@@ -166,7 +167,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 				}
 				matched := false
 				for _, wl := range whiteList.Workloads {
-					if ok, _ := verifyGroupKind(spec.TargetReference, wl.Kind, []string{wl.Group}); ok {
+					if ok, _ := verifyGroupKind(ctx, spec.TargetReference, wl.Kind, []string{wl.Group}); ok {
 						matched = true
 						break
 					}
