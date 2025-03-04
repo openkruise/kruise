@@ -22,8 +22,10 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/controller/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +33,10 @@ import (
 )
 
 const updateRetries = 5
+
+const (
+	LabelKeyStagingPod = "apps.kruise.io/is-staging-pod"
+)
 
 // ParseSubsetReplicas parses the subsetReplicas, and returns the replicas number depending on the sum replicas.
 func ParseSubsetReplicas(udReplicas int32, subsetReplicas intstr.IntOrString) (int32, error) {
@@ -138,3 +144,66 @@ func getUnitedDeploymentKey(ud *appsv1alpha1.UnitedDeployment) string {
 }
 
 var ResourceVersionExpectation = expectations.NewResourceVersionExpectation()
+
+// CheckPodStaging checks whether the Pod is in the Staging state.
+// The Staging state is defined as: the Pod enters Staging after being in the Pending state for a specified duration,
+// and exits Staging after remaining in the Ready state for a certain period.
+//
+// Parameters:
+//   - pod: the Pod object to be checked.
+//   - pendingTimeout: the timeout duration for the Pod to remain in the Pending state.
+//   - minReadySeconds: the duration threshold for the Pod to remain in the Ready state.
+//
+// Returns:
+//   - isStaging: true if the Pod is in the Staging state; otherwise, false.
+//   - nextCheckAfter: the duration until the next check if the Pod has not reached the Staging state; otherwise, -1.
+func CheckPodStaging(pod *corev1.Pod, pendingTimeout time.Duration, minReadySeconds time.Duration, now time.Time) (isStaging bool, nextCheckAfter time.Duration) {
+	if staging, _ := GetPodStaging(pod); staging {
+		if pod.Status.Phase == corev1.PodRunning {
+			readyCondition := getPodReadyCondition(pod)
+			if readyCondition != nil && readyCondition.Status == corev1.ConditionTrue {
+				if readyCondition.LastTransitionTime.Time.Add(minReadySeconds).Before(now) {
+					return false, -1
+				} else {
+					return true, readyCondition.LastTransitionTime.Time.Add(minReadySeconds).Sub(now)
+				}
+			}
+		}
+		// at least after minReadySeconds will the pod get out of Staging state
+		return true, minReadySeconds
+	} else {
+		timeouted, after := util.GetTimeBeforePendingTimeout(pod, pendingTimeout, now)
+		if timeouted {
+			return true, minReadySeconds
+		} else {
+			return false, after
+		}
+	}
+}
+
+// GetPodStaging checks whether the Pod is in the Staging state.
+// The Staging state is defined as: the Pod has the label "apps.kruise.io/is-staging-pod" set to "true".
+//
+// Parameters:
+//   - pod: the Pod object to be checked.
+//
+// Returns:
+//   - staging: true if the Pod is in the Staging state; otherwise, false.
+//   - ok: true if the Pod has the "apps.kruise.io/is-staging-pod" label; otherwise, false.
+func GetPodStaging(pod *corev1.Pod) (staging bool, ok bool) {
+	if pod.Labels != nil {
+		label, ok := pod.Labels[LabelKeyStagingPod]
+		return label == "true", ok
+	} else {
+		return false, false
+	}
+}
+
+func getPodReadyCondition(pod *corev1.Pod) *corev1.PodCondition {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodReady {
+			return &condition
+		}
+	}
+	return nil
+}
