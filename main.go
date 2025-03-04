@@ -67,6 +67,7 @@ const (
 	defaultRenewDeadline              = 10 * time.Second
 	defaultRetryPeriod                = 2 * time.Second
 	defaultControllerCacheSyncTimeout = 2 * time.Minute
+	defaultWebhookInitializeTimeout   = 60 * time.Second
 )
 
 var (
@@ -102,6 +103,7 @@ func main() {
 	var leaderElectionId string
 	var retryPeriod time.Duration
 	var controllerCacheSyncTimeout time.Duration
+	var webhookInitializeTimeout time.Duration
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&healthProbeAddr, "health-probe-addr", ":8000", "The address the healthz/readyz endpoint binds to.")
@@ -126,6 +128,7 @@ func main() {
 	flag.DurationVar(&retryPeriod, "leader-election-retry-period", defaultRetryPeriod,
 		"leader-election-retry-period is the duration the LeaderElector clients should wait between tries of actions. Default is 2 seconds.")
 	flag.DurationVar(&controllerCacheSyncTimeout, "controller-cache-sync-timeout", defaultControllerCacheSyncTimeout, "CacheSyncTimeout refers to the time limit set to wait for syncing caches. Defaults to 2 minutes if not set.")
+	flag.DurationVar(&webhookInitializeTimeout, "webhook-initialize-timeout", defaultWebhookInitializeTimeout, "WebhookInitializeTimeout refers to the time limit set to wait for webhook initialization. Defaults to 60 seconds if not set.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
 	logOptions := logs.NewOptions()
@@ -231,7 +234,7 @@ func main() {
 
 	// +kubebuilder:scaffold:builder
 	setupLog.Info("initialize webhook")
-	if err := webhook.Initialize(ctx, cfg); err != nil {
+	if err := webhook.Initialize(ctx, cfg, webhookInitializeTimeout); err != nil {
 		setupLog.Error(err, "unable to initialize webhook")
 		os.Exit(1)
 	}
