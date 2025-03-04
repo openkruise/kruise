@@ -104,7 +104,7 @@ func SetupWithManager(mgr manager.Manager) error {
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=validatingwebhookconfigurations,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch;update;patch
 
-func Initialize(ctx context.Context, cfg *rest.Config) error {
+func Initialize(ctx context.Context, cfg *rest.Config, webhookInitializeTime time.Duration) error {
 	c, err := webhookcontroller.New(cfg, HandlerMap)
 	if err != nil {
 		return err
@@ -113,13 +113,13 @@ func Initialize(ctx context.Context, cfg *rest.Config) error {
 		c.Start(ctx)
 	}()
 
-	timer := time.NewTimer(time.Second * 20)
+	timer := time.NewTimer(webhookInitializeTime)
 	defer timer.Stop()
 	select {
 	case <-webhookcontroller.Inited():
 		return nil
 	case <-timer.C:
-		return fmt.Errorf("failed to start webhook controller for waiting more than 20s")
+		return fmt.Errorf("failed to start webhook controller for waiting more than %fs", webhookInitializeTime.Seconds())
 	}
 }
 
