@@ -6,6 +6,6 @@ ARG BASE_IMAGE_VERSION=v1.0.0
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION}
 
 WORKDIR /
-COPY ./daemon.exe /kruise-daemon.exe
+COPY ./bin/kruise-daemon.exe .
 
 ENTRYPOINT ["kruise-daemon.exe"]

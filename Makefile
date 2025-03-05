@@ -1,8 +1,10 @@
 # Image URL to use all building/pushing image targets
 IMG ?= openkruise/kruise-manager:test
 HOOK_IMG ?= openkruise/kruise-helm-hook:test
+WIN_DAEMON_IMG ?= openkruise/kruise-daemon-win:test
 # Platforms to build the image for
 PLATFORMS ?= linux/amd64,linux/arm64,linux/ppc64le
+WIN_PLATFORMS ?= windows/amd64
 CRD_OPTIONS ?= "crd:crdVersions=v1"
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
@@ -72,6 +74,9 @@ endif
 build: generate fmt vet manifests ## Build manager binary.
 	go build -o bin/manager main.go
 
+build-win-daemon: ## Build Windows daemon binary.
+	GOOS=windows go build -o bin/kruise-daemon.exe ./cmd/daemon/main.go
+
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
@@ -80,6 +85,9 @@ docker-build: ## Build docker image with the manager.
 
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
+
+docker-win-daemon: # Build Windows docker image with the daemon
+	docker buildx build -f ./Dockerfile_windows --pull --no-cache --platform=$(WIN_PLATFORMS) . -t $(WIN_DAEMON_IMG)
 
 # Build and push the multiarchitecture docker images and manifest.
 docker-multiarch:
