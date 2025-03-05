@@ -294,7 +294,6 @@ func newPullWorker(name string, tagSpec appsv1alpha1.ImageTagSpec, sandboxConfig
 			Version: tagSpec.Version,
 		}
 		o.statusUpdater.UpdateStatus(newStatus)
-
 		klog.V(5).InfoS("pull worker waiting", "image", image)
 		workerLimitedPool.Go(func() error {
 			klog.V(5).InfoS("pull worker start", "image", image)
@@ -470,8 +469,13 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1alpha1.Im
 	// make it asynchronous for CRI runtime will block in pulling image
 	var statusReader runtimeimage.ImagePullStatusReader
 	pullChan := make(chan struct{})
+	// why add this? because directly assign to statusReader will cause race condition
+	readerCh := make(chan runtimeimage.ImagePullStatusReader, 1)
+	errCh := make(chan error, 1)
 	go func() {
-		statusReader, err = w.runtime.PullImage(ctx, w.name, tag, w.secrets, w.sandboxConfig)
+		statusReader, err := w.runtime.PullImage(ctx, w.name, tag, w.secrets, w.sandboxConfig)
+		readerCh <- statusReader
+		errCh <- err
 		close(pullChan)
 	}()
 
@@ -479,6 +483,7 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1alpha1.Im
 		select {
 		case <-pullChan:
 		}
+		statusReader := <-readerCh
 		if statusReader != nil {
 			statusReader.Close()
 		}
@@ -494,6 +499,8 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1alpha1.Im
 		klog.V(2).InfoS("Pulling image canceled", "name", w.name, "tag", tag)
 		return fmt.Errorf("pulling image %s:%s is canceled", w.name, tag)
 	case <-pullChan:
+		statusReader = <-readerCh
+		err = <-errCh
 		if err != nil {
 			return err
 		}
