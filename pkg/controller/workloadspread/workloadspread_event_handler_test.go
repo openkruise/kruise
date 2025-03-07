@@ -381,7 +381,7 @@ func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 				Name:      cs.getCloneSet().Name,
 			}
 			handler := workloadEventHandler{Reader: fakeClient}
-			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(nsn, controllerKruiseKindCS, nil)
+			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(context.Background(), nsn, controllerKruiseKindCS, nil)
 			expectTopology := cs.expectWorkloadSpread()
 
 			if expectTopology == nil {
@@ -506,7 +506,7 @@ func TestGetWorkloadSpreadForDeployment(t *testing.T) {
 				Name:      cs.getDeployment().Name,
 			}
 			handler := workloadEventHandler{Reader: fakeClient}
-			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(nsn, controllerKindDep, nil)
+			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(context.Background(), nsn, controllerKindDep, nil)
 			expectTopology := cs.expectWorkloadSpread()
 
 			if expectTopology == nil {
@@ -608,7 +608,7 @@ func TestGetWorkloadSpreadForJob(t *testing.T) {
 				Name:      cs.getJob().Name,
 			}
 			handler := workloadEventHandler{Reader: fakeClient}
-			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(nsn, controllerKindJob, nil)
+			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(context.Background(), nsn, controllerKindJob, nil)
 			expectTopology := cs.expectWorkloadSpread()
 
 			if expectTopology == nil {
@@ -733,7 +733,7 @@ func TestGetWorkloadSpreadForReplicaSet(t *testing.T) {
 				Name:      cs.getReplicaset().Name,
 			}
 			handler := workloadEventHandler{Reader: fakeClient}
-			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(nsn, controllerKindRS, nil)
+			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(context.Background(), nsn, controllerKindRS, nil)
 			expectTopology := cs.expectWorkloadSpread()
 
 			if expectTopology == nil {
@@ -858,7 +858,7 @@ func TestGetWorkloadSpreadForStatefulSet(t *testing.T) {
 				Name:      cs.getStatefulSet().Name,
 			}
 			handler := workloadEventHandler{Reader: fakeClient}
-			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(nsn, controllerKindSts, nil)
+			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(context.Background(), nsn, controllerKindSts, nil)
 			expectTopology := cs.expectWorkloadSpread()
 
 			if expectTopology == nil {
@@ -983,7 +983,7 @@ func TestGetWorkloadSpreadForAdvancedStatefulSet(t *testing.T) {
 				Name:      cs.getStatefulSet().Name,
 			}
 			handler := workloadEventHandler{Reader: fakeClient}
-			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(nsn, controllerKruiseKindSts, nil)
+			workloadSpread, _ := handler.getWorkloadSpreadForWorkload(context.Background(), nsn, controllerKruiseKindSts, nil)
 			expectTopology := cs.expectWorkloadSpread()
 
 			if expectTopology == nil {
