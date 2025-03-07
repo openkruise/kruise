@@ -50,10 +50,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
-const (
-	varRunMountPath = "/hostvarrun"
-)
-
 var (
 	scheme = runtime.NewScheme()
 )
@@ -123,7 +119,7 @@ func NewDaemon(cfg *rest.Config, bindAddress string) (Daemon, error) {
 	}
 
 	accountManager := daemonutil.NewImagePullAccountManager(genericClient.KubeClient)
-	runtimeFactory, err := daemonruntime.NewFactory(varRunMountPath, accountManager)
+	runtimeFactory, err := daemonruntime.NewFactory(accountManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed to new runtime factory: %v", err)
 	}
