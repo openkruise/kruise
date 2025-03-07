@@ -177,7 +177,7 @@ func testUpdateHotUpgradeSidecar(t *testing.T, hotUpgradeEmptyImage string, side
 		getSidecarset func() *appsv1alpha1.SidecarSet
 		// container.name -> infos []string
 		expectedInfo map[string][]string
-		// MatchedPods, UpdatedPods, ReadyPods, AvailablePods, UnavailablePods
+		// MatchedPods, UpdatedPods, ReadyPods, StagingPods, UnavailablePods
 		expectedStatus []int32
 	}{
 		{
