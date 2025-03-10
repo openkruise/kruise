@@ -233,7 +233,7 @@ func TestDefaultAdaptiveStrategy(t *testing.T) {
 					},
 				}
 				subset.Status.ReadyReplicas = 1
-				subset.Status.UnschedulableStatus.StagingPods = 0
+				subset.Status.UnschedulableStatus.UnavailablePods = 0
 				return subset, ud
 			},
 			expectPendingPods: 0,
@@ -275,10 +275,10 @@ func TestDefaultAdaptiveStrategy(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			subset, ud := c.envFactory()
 			start := time.Now()
-			processSubsetForDefaultAdaptiveStrategy(subset.Name, subset, ud)
+			processSubsetsForDefaultAdaptiveStrategy(subset.Name, subset, ud)
 			cost := time.Now().Sub(start)
-			if subset.Status.UnschedulableStatus.StagingPods != c.expectPendingPods {
-				t.Logf("case %s failed: expect pending pods %d, but got %d", c.name, c.expectPendingPods, subset.Status.UnschedulableStatus.StagingPods)
+			if subset.Status.UnschedulableStatus.UnavailablePods != c.expectPendingPods {
+				t.Logf("case %s failed: expect pending pods %d, but got %d", c.name, c.expectPendingPods, subset.Status.UnschedulableStatus.UnavailablePods)
 				t.Fail()
 			}
 			requeueAfter := durationStore.Pop(getUnitedDeploymentKey(ud))
@@ -330,7 +330,7 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 		}
 		pod.CreationTimestamp = metav1.NewTime(creationTime)
 		if patch != "" {
-			pod.Labels[LabelKeyStagingPod] = patch
+			pod.Labels[appsv1alpha1.ReservedPodLabelKey] = patch
 		}
 	}
 	baseEnvFactory := func() (*Subset, *appsv1alpha1.UnitedDeployment, *corev1.Pod) {
@@ -452,13 +452,13 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			subset, ud := c.envFactory()
-			podsToPatch := processSubsetForTemporaryAdaptiveStrategy(subset.Name, subset, ud, now)
+			podsToPatch := processSubsetsForTemporaryAdaptiveStrategy(subset.Name, subset, ud, now)
 			if len(podsToPatch) != c.podsToPatch {
 				t.Logf("case %s failed: expect pods to patch %d, but got %d", c.name, c.podsToPatch, len(podsToPatch))
 				t.Fail()
 			}
-			if subset.Status.UnschedulableStatus.StagingPods != c.expectStagingPods {
-				t.Logf("case %s failed: expect staging pods %d, but got %d", c.name, c.expectStagingPods, subset.Status.UnschedulableStatus.StagingPods)
+			if subset.Status.UnschedulableStatus.UnavailablePods != c.expectStagingPods {
+				t.Logf("case %s failed: expect staging pods %d, but got %d", c.name, c.expectStagingPods, subset.Status.UnschedulableStatus.UnavailablePods)
 				t.Fail()
 			}
 			status := ud.Status.GetSubsetStatus(subsetName)
@@ -491,7 +491,7 @@ func TestPatchStagingChangedPods(t *testing.T) {
 	basicPod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-pod",
-			Namespace: "test-ns",
+			Namespace: "default",
 			Labels:    make(map[string]string),
 		},
 	}
@@ -521,16 +521,16 @@ func TestPatchStagingChangedPods(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			pod := basicPod.DeepCopy()
 			if tt.label != "" {
-				pod.Labels[LabelKeyStagingPod] = tt.label
+				pod.Labels[appsv1alpha1.ReservedPodLabelKey] = tt.label
 			}
 			cli := fake.NewClientBuilder().WithObjects(pod).Build()
 			r := ReconcileUnitedDeployment{
 				Client: cli,
 			}
-			_ = r.patchStagingChangedPods([]*corev1.Pod{pod})
+			_ = r.patchReservedStatusChangedPods([]*corev1.Pod{pod})
 			_ = cli.Get(context.Background(), client.ObjectKeyFromObject(pod), pod)
-			if pod.Labels[LabelKeyStagingPod] != tt.expectedLabel {
-				t.Errorf("expected label %s, but got %s", tt.expectedLabel, pod.Labels[LabelKeyStagingPod])
+			if pod.Labels[appsv1alpha1.ReservedPodLabelKey] != tt.expectedLabel {
+				t.Errorf("expected label %s, but got %s", tt.expectedLabel, pod.Labels[appsv1alpha1.ReservedPodLabelKey])
 			}
 		})
 	}
@@ -658,14 +658,14 @@ func TestRescheduleTemporarily(t *testing.T) {
 			for i := 0; i < len(tt.next); i++ {
 				nextReplicas[fmt.Sprintf("subset-%d", i)] = tt.next[i]
 			}
-			nameToSubset := make(map[string]*Subset)
+			existingSubsets := make(map[string]*Subset)
 			for i := 0; i < len(tt.cur); i++ {
-				nameToSubset[fmt.Sprintf("subset-%d", i)] = &Subset{
+				existingSubsets[fmt.Sprintf("subset-%d", i)] = &Subset{
 					Status: SubsetStatus{
 						Replicas: tt.cur[i],
 						UnschedulableStatus: SubsetUnschedulableStatus{
-							StagingPods:   tt.staging[i],
-							Unschedulable: tt.staging[i] != 0,
+							UnavailablePods: tt.staging[i],
+							Unschedulable:   tt.staging[i] != 0,
 						},
 					},
 				}
@@ -676,7 +676,7 @@ func TestRescheduleTemporarily(t *testing.T) {
 					Name: fmt.Sprintf("subset-%d", i),
 				}
 			}
-			result := rescheduleTemporarily(&nextReplicas, &nameToSubset, tt.replicas, subsets)
+			result := rescheduleTemporarily(&nextReplicas, &existingSubsets, tt.replicas, subsets)
 			actual := make([]int32, len(tt.expect))
 			for i := 0; i < len(tt.expect); i++ {
 				actual[i] = (*result)[fmt.Sprintf("subset-%d", i)]

@@ -70,6 +70,10 @@ func (a *AdvancedStatefulSetAdapter) GetSpecReplicas(obj metav1.Object) *int32 {
 	return obj.(*v1beta1.StatefulSet).Spec.Replicas
 }
 
+func (a *AdvancedStatefulSetAdapter) GetReplicasPatch(replicas int32) string {
+	return fmt.Sprintf(`{"spec":{"replicas":%d}}`, replicas)
+}
+
 func (a *AdvancedStatefulSetAdapter) GetSpecPartition(obj metav1.Object, pods []*corev1.Pod) *int32 {
 	set := obj.(*v1beta1.StatefulSet)
 	if set.Spec.UpdateStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType {

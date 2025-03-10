@@ -309,7 +309,7 @@ func TestCapacityAllocator(t *testing.T) {
 }
 
 func TestAdaptiveElasticAllocator(t *testing.T) {
-	getUnitedDeploymentAndSubsets := func(totalReplicas, minReplicas, maxReplicas, failedPods int32) (
+	getUnitedDeploymentAndSubsets := func(totalReplicas, minReplicas, maxReplicas, unavailablePods int32) (
 		*appsv1alpha1.UnitedDeployment, map[string]*Subset) {
 		minR, maxR := intstr.FromInt32(minReplicas), intstr.FromInt32(maxReplicas)
 		return &appsv1alpha1.UnitedDeployment{
@@ -335,10 +335,11 @@ func TestAdaptiveElasticAllocator(t *testing.T) {
 				"subset-1": {
 					Status: SubsetStatus{
 						UnschedulableStatus: SubsetUnschedulableStatus{
-							Unschedulable: true,
-							StagingPods:   failedPods,
+							Unschedulable:   true,
+							UnavailablePods: unavailablePods,
 						},
-						Replicas: maxReplicas,
+						Replicas:      maxReplicas,
+						ReadyReplicas: maxReplicas - unavailablePods,
 					},
 					Spec: SubsetSpec{Replicas: minReplicas},
 				},
@@ -425,12 +426,12 @@ func TestProtectingRunningPodsAdaptive(t *testing.T) {
 			}, map[string]*Subset{
 				"subset-1": {
 					Status: SubsetStatus{
-						Replicas: subset1RunningReplicas,
+						ReadyReplicas: subset1RunningReplicas,
 					},
 				},
 				"subset-2": {
 					Status: SubsetStatus{
-						Replicas: subset2RunningReplicas,
+						ReadyReplicas: subset2RunningReplicas,
 					},
 				},
 			}
@@ -486,22 +487,24 @@ func TestProtectingRunningPodsAdaptive(t *testing.T) {
 			subset2Replicas:        1,
 		},
 	}
-	for _, c := range cases {
-		ud, nameToSubset := getUnitedDeploymentAndSubsets(c.subset1MinReplicas, c.subset1MaxReplicas, c.subset1RunningReplicas, c.subset2RunningReplicas)
-		alloc, err := NewReplicaAllocator(ud).Alloc(&nameToSubset)
-		if err != nil {
-			t.Fatalf("unexpected alloc error %v", err)
-		} else {
-			subset1Replicas, subset2Replicas := (*alloc)["subset-1"], (*alloc)["subset-2"]
-			if subset1Replicas != c.subset1Replicas || subset2Replicas != c.subset2Replicas {
-				t.Logf("subset1Replicas got %d, expect %d, subset1Replicas got %d, expect %d", subset1Replicas, c.subset1Replicas, subset2Replicas, c.subset2Replicas)
-				t.Fail()
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			ud, existingSubsets := getUnitedDeploymentAndSubsets(tt.subset1MinReplicas, tt.subset1MaxReplicas, tt.subset1RunningReplicas, tt.subset2RunningReplicas)
+			alloc, err := NewReplicaAllocator(ud).Alloc(&existingSubsets)
+			if err != nil {
+				t.Fatalf("unexpected alloc error %v", err)
+			} else {
+				subset1Replicas, subset2Replicas := (*alloc)["subset-1"], (*alloc)["subset-2"]
+				if subset1Replicas != tt.subset1Replicas || subset2Replicas != tt.subset2Replicas {
+					t.Logf("subset1Replicas got %d, expect %d, subset1Replicas got %d, expect %d", subset1Replicas, tt.subset1Replicas, subset2Replicas, tt.subset2Replicas)
+					t.Fail()
+				}
 			}
-		}
+		})
 	}
 	// invalid inputs
-	ud, nameToSubset := getUnitedDeploymentAndSubsets(4, 2, 0, 0)
-	_, err := NewReplicaAllocator(ud).Alloc(&nameToSubset)
+	ud, existingSubsets := getUnitedDeploymentAndSubsets(4, 2, 0, 0)
+	_, err := NewReplicaAllocator(ud).Alloc(&existingSubsets)
 	if err == nil {
 		t.Logf("expected error not happen")
 		t.Fail()
@@ -510,7 +513,7 @@ func TestProtectingRunningPodsAdaptive(t *testing.T) {
 
 // Cases of TestGetTemporaryAdaptiveNext must be aligned with TestRescheduleTemporarily
 func TestGetTemporaryAdaptiveNext(t *testing.T) {
-	getUnitedDeploymentAndSubsets := func(totalReplicas, minReplicas, maxReplicas int32, staging []int32, cur []int32) (
+	getUnitedDeploymentAndSubsets := func(totalReplicas, minReplicas, maxReplicas int32, reserved []int32, cur []int32) (
 		*appsv1alpha1.UnitedDeployment, map[string]*Subset) {
 		var minR, maxR *intstr.IntOrString
 		if minReplicas != 0 {
@@ -532,26 +535,27 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 				},
 			},
 		}
-		nameToSubset := map[string]*Subset{}
-		for i := range staging {
+		existingSubsets := map[string]*Subset{}
+		for i := range reserved {
 			name := fmt.Sprintf("subset-%d", i)
 			ud.Spec.Topology.Subsets = append(ud.Spec.Topology.Subsets, appsv1alpha1.Subset{
 				Name:        name,
 				MinReplicas: minR,
 				MaxReplicas: maxR,
 			})
-			nameToSubset[name] = &Subset{
+			existingSubsets[name] = &Subset{
 				Status: SubsetStatus{
 					UnschedulableStatus: SubsetUnschedulableStatus{
-						Unschedulable: staging[i] != 0,
-						StagingPods:   staging[i],
+						Unschedulable:   reserved[i] != 0,
+						UnavailablePods: reserved[i],
 					},
-					Replicas: cur[i],
+					Replicas:      cur[i],
+					ReadyReplicas: cur[i] - reserved[i],
 				},
 			}
 		}
 		ud.Spec.Topology.Subsets[len(ud.Spec.Topology.Subsets)-1].MaxReplicas = nil
-		return ud, nameToSubset
+		return ud, existingSubsets
 	}
 	tests := []struct {
 		name        string

@@ -314,6 +314,9 @@ type UnitedDeploymentStatus struct {
 	// The number of pods in current version.
 	UpdatedReplicas int32 `json:"updatedReplicas"`
 
+	// The number of reserved pods in temporary adaptive strategy.
+	ReservedPods int32 `json:"reservedPods"`
+
 	// The number of ready current revision replicas for this UnitedDeployment.
 	// +optional
 	UpdatedReadyReplicas int32 `json:"updatedReadyReplicas,omitempty"`
@@ -354,14 +357,6 @@ func (s *UnitedDeploymentStatus) GetSubsetStatus(subset string) *UnitedDeploymen
 	return nil
 }
 
-func (u *UnitedDeployment) InitSubsetStatuses() {
-	for _, subset := range u.Spec.Topology.Subsets {
-		if u.Status.GetSubsetStatus(subset.Name) == nil {
-			u.Status.SubsetStatuses = append(u.Status.SubsetStatuses, UnitedDeploymentSubsetStatus{Name: subset.Name})
-		}
-	}
-}
-
 // UnitedDeploymentCondition describes current state of a UnitedDeployment.
 type UnitedDeploymentCondition struct {
 	// Type of in place set condition.
@@ -394,10 +389,14 @@ type UpdateStatus struct {
 type UnitedDeploymentSubsetStatus struct {
 	// Subset name specified in Topology.Subsets
 	Name string `json:"name,omitempty"`
-	// Recores the current replicas. Currently unused.
+	// Records the current replicas. Currently unused.
 	Replicas int32 `json:"replicas,omitempty"`
+	// Records the current ready replicas. Currently unused.
+	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
 	// Records the current partition. Currently unused.
 	Partition int32 `json:"partition,omitempty"`
+	// Records the reserved pods in the subset.
+	ReservedPods int32 `json:"reservedPods,omitempty"`
 	// Conditions is an array of current observed subset conditions.
 	Conditions []UnitedDeploymentSubsetCondition `json:"conditions,omitempty"`
 }

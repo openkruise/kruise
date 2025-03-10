@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -109,7 +110,7 @@ func TestCheckPodStaging(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					CreationTimestamp: metav1.Time{Time: now.Add(-100 * time.Second)},
 					Labels: map[string]string{
-						LabelKeyStagingPod: "true",
+						appsv1alpha1.ReservedPodLabelKey: "true",
 					},
 				},
 			},
@@ -138,7 +139,7 @@ func TestCheckPodStaging(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					CreationTimestamp: metav1.Time{Time: now.Add(-100 * time.Second)},
 					Labels: map[string]string{
-						LabelKeyStagingPod: "true",
+						appsv1alpha1.ReservedPodLabelKey: "true",
 					},
 				},
 			},
@@ -167,7 +168,7 @@ func TestCheckPodStaging(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					CreationTimestamp: metav1.Time{Time: now.Add(-100 * time.Second)},
 					Labels: map[string]string{
-						LabelKeyStagingPod: "true",
+						appsv1alpha1.ReservedPodLabelKey: "true",
 					},
 				},
 			},
@@ -180,12 +181,12 @@ func TestCheckPodStaging(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, nextCheckAfter := CheckPodStaging(tt.pod, tt.pendingTimeout, tt.minReadySeconds, now)
+			result, nextCheckAfter := CheckPodReserved(tt.pod, tt.pendingTimeout, tt.minReadySeconds, now)
 			if result != tt.expectedResult {
-				t.Errorf("CheckPodStaging() result = %v, want %v", result, tt.expectedResult)
+				t.Errorf("CheckPodReserved() result = %v, want %v", result, tt.expectedResult)
 			}
 			if nextCheckAfter != tt.expectedNextCheckAfter {
-				t.Errorf("CheckPodStaging() nextCheckAfter = %v, want %v", nextCheckAfter, tt.expectedNextCheckAfter)
+				t.Errorf("CheckPodReserved() nextCheckAfter = %v, want %v", nextCheckAfter, tt.expectedNextCheckAfter)
 			}
 		})
 	}

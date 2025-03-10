@@ -49,14 +49,16 @@ type SubsetStatus struct {
 	UnschedulableStatus  SubsetUnschedulableStatus
 }
 
+// SubsetUnschedulableStatus stores the unschedulable status of the Subset, which is used by adaptive strategy.
 type SubsetUnschedulableStatus struct {
 	Unschedulable bool
-	// StagingPods is the number of staging pods in the subset,
-	// which is more complex in temporary adaptive strategy.
-	// Please refer to the function CheckPodStaging.
+	// The definition of UnavailablePods differs in different strategies:
 	//
-	// If temporary adaptive strategy is disabled, StagingPods is equal to Pending Pods.
-	StagingPods int32
+	// - In temporary adaptive strategy, it is the number of reserved pods in the subset.
+	// Please refer to the function CheckPodReserved.
+	//
+	// - In normal adaptive strategy, it is the number of Pending Pods.
+	UnavailablePods int32
 }
 
 // SubsetUpdateStrategy stores the strategy detail of the Subset.
@@ -84,6 +86,8 @@ type ControlInterface interface {
 	CreateSubset(ud *appsv1alpha1.UnitedDeployment, unit string, revision string, replicas, partition int32) error
 	// UpdateSubset updates the target subset with the input information.
 	UpdateSubset(subSet *Subset, ud *appsv1alpha1.UnitedDeployment, revision string, replicas, partition int32) error
+	// ScaleSubset is used to scale the subset to the input replicas.
+	ScaleSubset(subset *Subset, replicas int32) error
 	// DeleteSubset is used to delete the input subset.
 	DeleteSubset(*Subset) error
 	// GetSubsetFailure extracts the subset failure message to expose on UnitedDeployment status.

@@ -34,10 +34,6 @@ import (
 
 const updateRetries = 5
 
-const (
-	LabelKeyStagingPod = "apps.kruise.io/is-staging-pod"
-)
-
 // ParseSubsetReplicas parses the subsetReplicas, and returns the replicas number depending on the sum replicas.
 func ParseSubsetReplicas(udReplicas int32, subsetReplicas intstr.IntOrString) (int32, error) {
 	if subsetReplicas.Type == intstr.Int {
@@ -145,9 +141,9 @@ func getUnitedDeploymentKey(ud *appsv1alpha1.UnitedDeployment) string {
 
 var ResourceVersionExpectation = expectations.NewResourceVersionExpectation()
 
-// CheckPodStaging checks whether the Pod is in the Staging state.
-// The Staging state is defined as: the Pod enters Staging after being in the Pending state for a specified duration,
-// and exits Staging after remaining in the Ready state for a certain period.
+// CheckPodReserved checks whether the Pod is in the Reserved state.
+// The Reserved state is defined as: the Pod enters Reserved after being in the Pending state for a specified duration,
+// and exits Reserved after remaining in the Ready state for a certain period.
 //
 // Parameters:
 //   - pod: the Pod object to be checked.
@@ -155,10 +151,10 @@ var ResourceVersionExpectation = expectations.NewResourceVersionExpectation()
 //   - minReadySeconds: the duration threshold for the Pod to remain in the Ready state.
 //
 // Returns:
-//   - isStaging: true if the Pod is in the Staging state; otherwise, false.
-//   - nextCheckAfter: the duration until the next check if the Pod has not reached the Staging state; otherwise, -1.
-func CheckPodStaging(pod *corev1.Pod, pendingTimeout time.Duration, minReadySeconds time.Duration, now time.Time) (isStaging bool, nextCheckAfter time.Duration) {
-	if staging, _ := GetPodStaging(pod); staging {
+//   - isReserved: true if the Pod is in the Reserved state; otherwise, false.
+//   - nextCheckAfter: the duration until the next check if the Pod has not reached the Reserved state; otherwise, -1.
+func CheckPodReserved(pod *corev1.Pod, pendingTimeout time.Duration, minReadySeconds time.Duration, now time.Time) (isReserved bool, nextCheckAfter time.Duration) {
+	if reserved, _ := GetPodReserved(pod); reserved {
 		if pod.Status.Phase == corev1.PodRunning {
 			readyCondition := getPodReadyCondition(pod)
 			if readyCondition != nil && readyCondition.Status == corev1.ConditionTrue {
@@ -169,7 +165,7 @@ func CheckPodStaging(pod *corev1.Pod, pendingTimeout time.Duration, minReadySeco
 				}
 			}
 		}
-		// at least after minReadySeconds will the pod get out of Staging state
+		// at least after minReadySeconds will the pod get out of Reserved state
 		return true, minReadySeconds
 	} else {
 		timeouted, after := util.GetTimeBeforePendingTimeout(pod, pendingTimeout, now)
@@ -181,18 +177,18 @@ func CheckPodStaging(pod *corev1.Pod, pendingTimeout time.Duration, minReadySeco
 	}
 }
 
-// GetPodStaging checks whether the Pod is in the Staging state.
-// The Staging state is defined as: the Pod has the label "apps.kruise.io/is-staging-pod" set to "true".
+// GetPodReserved checks whether the Pod is in the Reserved state.
+// The Reserved state is defined as: the Pod has the label "apps.kruise.io/is-reserved-pod" set to "true".
 //
 // Parameters:
 //   - pod: the Pod object to be checked.
 //
 // Returns:
-//   - staging: true if the Pod is in the Staging state; otherwise, false.
-//   - ok: true if the Pod has the "apps.kruise.io/is-staging-pod" label; otherwise, false.
-func GetPodStaging(pod *corev1.Pod) (staging bool, ok bool) {
+//   - reserved: true if the Pod is in the Reserved state; otherwise, false.
+//   - ok: true if the Pod has the "apps.kruise.io/is-reserved-pod" label; otherwise, false.
+func GetPodReserved(pod *corev1.Pod) (reserved bool, ok bool) {
 	if pod.Labels != nil {
-		label, ok := pod.Labels[LabelKeyStagingPod]
+		label, ok := pod.Labels[appsv1alpha1.ReservedPodLabelKey]
 		return label == "true", ok
 	} else {
 		return false, false
@@ -206,4 +202,13 @@ func getPodReadyCondition(pod *corev1.Pod) *corev1.PodCondition {
 		}
 	}
 	return nil
+}
+
+func initStatus(u *appsv1alpha1.UnitedDeployment) {
+	for _, subset := range u.Spec.Topology.Subsets {
+		if u.Status.GetSubsetStatus(subset.Name) == nil {
+			u.Status.SubsetStatuses = append(u.Status.SubsetStatuses, appsv1alpha1.UnitedDeploymentSubsetStatus{Name: subset.Name})
+		}
+	}
+	return
 }
