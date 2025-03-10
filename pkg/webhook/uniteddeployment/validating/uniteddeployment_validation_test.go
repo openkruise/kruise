@@ -22,15 +22,14 @@ import (
 	"strings"
 	"testing"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/pointer"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func TestValidateUnitedDeployment(t *testing.T) {
@@ -621,6 +620,40 @@ func TestValidateUnitedDeployment(t *testing.T) {
 								},
 							},
 						},
+					},
+				},
+			},
+		},
+		"use specific allocator in adaptive mode": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Replicas: &val,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: appsv1alpha1.SubsetTemplate{
+					DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+						Spec: apps.DeploymentSpec{
+							Template: corev1.PodTemplateSpec{
+								ObjectMeta: metav1.ObjectMeta{
+									Labels: validLabels,
+								},
+								Spec: corev1.PodSpec{
+									RestartPolicy: corev1.RestartPolicyAlways,
+									DNSPolicy:     corev1.DNSClusterFirst,
+									Containers:    []corev1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+								},
+							},
+						},
+					},
+				},
+				Topology: appsv1alpha1.Topology{
+					Subsets: []appsv1alpha1.Subset{
+						{
+							Name:     "subset-1",
+							Replicas: &replicas1,
+						},
+					},
+					ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
+						Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
 					},
 				},
 			},

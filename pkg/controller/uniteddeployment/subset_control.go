@@ -115,6 +115,21 @@ func (m *SubsetControl) UpdateSubset(subset *Subset, ud *alpha1.UnitedDeployment
 	return m.adapter.PostUpdate(ud, set, revision, partition)
 }
 
+func (m *SubsetControl) ScaleSubset(subset *Subset, replicas int32) error {
+	set := m.adapter.NewResourceObject()
+	set.SetName(subset.Name)
+	set.SetNamespace(subset.Namespace)
+	var patchError error
+	for i := 0; i < updateRetries; i++ {
+		patchStr := m.adapter.GetReplicasPatch(replicas)
+		patchError = m.Client.Patch(context.TODO(), set, client.RawPatch(types.StrategicMergePatchType, []byte(patchStr)))
+		if patchError == nil {
+			break
+		}
+	}
+	return patchError
+}
+
 // DeleteSubset is called to delete the subset. The target Subset workload can be found with the input subset.
 func (m *SubsetControl) DeleteSubset(subSet *Subset) error {
 	set := subSet.Spec.SubsetRef.Resources[0].(client.Object)

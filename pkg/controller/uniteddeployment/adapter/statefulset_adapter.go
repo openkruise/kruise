@@ -86,6 +86,10 @@ func (a *StatefulSetAdapter) GetStatusReadyReplicas(obj metav1.Object) int32 {
 	return obj.(*appsv1.StatefulSet).Status.ReadyReplicas
 }
 
+func (a *StatefulSetAdapter) GetReplicasPatch(replicas int32) string {
+	return fmt.Sprintf(`{"spec":{"replicas":%d}}`, replicas)
+}
+
 // GetSubsetFailure returns the failure information of the subset.
 // StatefulSet has no condition.
 func (a *StatefulSetAdapter) GetSubsetFailure() *string {

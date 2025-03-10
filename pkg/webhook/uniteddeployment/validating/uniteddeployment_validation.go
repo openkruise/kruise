@@ -101,8 +101,8 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 			allErrs = append(allErrs, apivalidation.ValidateTolerations(coreTolerations, fldPath.Child("topology", "subsets").Index(i).Child("tolerations"))...)
 		}
 
-		if subset.Replicas == nil {
-			continue
+		if subset.Replicas != nil && spec.Topology.ScheduleStrategy.IsAdaptive() {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("topology", "subsets").Index(i).Child("replicas"), "specific allocator is not allowed in adaptive strategy, use minReplicas/maxReplicas to enable elastic allocator instead"))
 		}
 	}
 

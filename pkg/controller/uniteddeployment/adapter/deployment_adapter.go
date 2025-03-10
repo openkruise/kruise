@@ -67,6 +67,10 @@ func (a *DeploymentAdapter) GetSpecReplicas(obj metav1.Object) *int32 {
 	return set.Spec.Replicas
 }
 
+func (a *DeploymentAdapter) GetReplicasPatch(replicas int32) string {
+	return fmt.Sprintf(`{"spec":{"replicas":%d}}`, replicas)
+}
+
 func (a *DeploymentAdapter) GetSpecPartition(_ metav1.Object, _ []*corev1.Pod) *int32 {
 	return nil
 }

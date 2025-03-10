@@ -62,6 +62,10 @@ func (a *CloneSetAdapter) GetStatusReplicas(obj metav1.Object) int32 {
 	return obj.(*alpha1.CloneSet).Status.Replicas
 }
 
+func (a *CloneSetAdapter) GetReplicasPatch(replicas int32) string {
+	return fmt.Sprintf(`{"spec":{"replicas":%d}}`, replicas)
+}
+
 func (a *CloneSetAdapter) GetStatusReadyReplicas(obj metav1.Object) int32 {
 	return obj.(*alpha1.CloneSet).Status.ReadyReplicas
 }

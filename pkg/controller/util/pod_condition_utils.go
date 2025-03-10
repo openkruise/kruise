@@ -26,20 +26,19 @@ func UpdateMessageKvCondition(kv map[string]interface{}, condition *v1.PodCondit
 
 // GetTimeBeforePendingTimeout return true when Pod was scheduled failed and timeout.
 // nextCheckAfter > 0 means the pod is failed to schedule but not timeout yet.
-func GetTimeBeforePendingTimeout(pod *v1.Pod, timeout time.Duration) (timeouted bool, nextCheckAfter time.Duration) {
+func GetTimeBeforePendingTimeout(pod *v1.Pod, timeout time.Duration, now time.Time) (timeouted bool, nextCheckAfter time.Duration) {
 	if pod.DeletionTimestamp != nil || pod.Status.Phase != v1.PodPending || pod.Spec.NodeName != "" {
 		return false, -1
 	}
 	for _, condition := range pod.Status.Conditions {
 		if condition.Type == v1.PodScheduled && condition.Status == v1.ConditionFalse &&
 			condition.Reason == v1.PodReasonUnschedulable {
-			currentTime := time.Now()
 			expectSchedule := pod.CreationTimestamp.Add(timeout)
 			// schedule timeout
-			if expectSchedule.Before(currentTime) {
+			if expectSchedule.Before(now) {
 				return true, -1
 			}
-			return false, expectSchedule.Sub(currentTime)
+			return false, expectSchedule.Sub(now)
 		}
 	}
 	return false, -1
