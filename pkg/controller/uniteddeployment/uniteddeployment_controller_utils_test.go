@@ -90,7 +90,7 @@ func TestCheckPodStaging(t *testing.T) {
 			expectedNextCheckAfter: -1,
 		},
 		{
-			name: "staging pod, pending",
+			name: "unavailable pod, pending",
 			pod: &corev1.Pod{
 				Status: corev1.PodStatus{
 					Phase: corev1.PodPending,
@@ -120,7 +120,7 @@ func TestCheckPodStaging(t *testing.T) {
 			expectedNextCheckAfter: 5 * time.Second,
 		},
 		{
-			name: "staging pod, ready, but not long enough",
+			name: "unavailable pod, ready, but not long enough",
 			pod: &corev1.Pod{
 				Status: corev1.PodStatus{
 					Phase: corev1.PodRunning,
@@ -149,7 +149,7 @@ func TestCheckPodStaging(t *testing.T) {
 			expectedNextCheckAfter: 2 * time.Second,
 		},
 		{
-			name: "staging pod, ready, long enough",
+			name: "unavailable pod, ready, long enough",
 			pod: &corev1.Pod{
 				Status: corev1.PodStatus{
 					Phase: corev1.PodRunning,

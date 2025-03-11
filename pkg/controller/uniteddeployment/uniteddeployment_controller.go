@@ -272,6 +272,9 @@ func (r *ReconcileUnitedDeployment) Reconcile(ctx context.Context, request recon
 		return reconcile.Result{}, nil
 	}
 	newStatus.LabelSelector = selector.String()
+	if instance.Spec.Topology.ScheduleStrategy.IsAdaptiveTemporarily() {
+		newStatus.LabelSelector += extraStatusSelector
+	}
 
 	requeueAfter := durationStore.Pop(getUnitedDeploymentKey(instance))
 	if requeueAfter > 0 {
@@ -457,10 +460,9 @@ func getNextUpdate(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[string]i
 func rescheduleTemporarily(nextReplicas *map[string]int32, existingSubsets *map[string]*Subset, totalReplicas int32, subsets []appsv1alpha1.Subset) *map[string]int32 {
 	for name, next := range *nextReplicas {
 		if subset := (*existingSubsets)[name]; subset != nil && subset.Status.UnschedulableStatus.Unschedulable {
-			(*nextReplicas)[name] = max(next, subset.Status.Replicas)
+			(*nextReplicas)[name] = max(next, subset.Spec.Replicas)
 		}
 	}
-	klog.V(5).InfoS("[ZTY] Phase1 temporary reschedule replicas adjusted", "nextReplicas", *nextReplicas)
 	var countedReplicas int32
 	for _, s := range subsets {
 		name := s.Name
@@ -471,13 +473,12 @@ func rescheduleTemporarily(nextReplicas *map[string]int32, existingSubsets *map[
 		}
 		if subset := (*existingSubsets)[name]; subset != nil {
 			next := (*nextReplicas)[name]
-			countedReplicas += min(subset.Status.Replicas, next) - subset.Status.UnschedulableStatus.UnavailablePods
+			countedReplicas += min(subset.Spec.Replicas, next) - subset.Status.UnschedulableStatus.UnavailablePods
 		}
 		if countedReplicas > totalReplicas {
 			(*nextReplicas)[name] -= countedReplicas - totalReplicas
 		}
 	}
-	klog.V(5).InfoS("[ZTY] Phase2 temporary reschedule replicas adjusted", "nextReplicas", *nextReplicas)
 	return nextReplicas
 }
 
@@ -550,6 +551,8 @@ func (r *ReconcileUnitedDeployment) updateStatus(instance *appsv1alpha1.UnitedDe
 	return err
 }
 
+var extraStatusSelector = fmt.Sprintf(",%s=false", appsv1alpha1.ReservedPodLabelKey)
+
 func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.UnitedDeploymentStatus, existingSubsets *map[string]*Subset, nextReplicas, nextPartition *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, control ControlInterface) *appsv1alpha1.UnitedDeploymentStatus {
 	expectedRevision := currentRevision.Name
 	if updatedRevision != nil {
@@ -564,7 +567,7 @@ func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.Unit
 	// sync from status
 	for name, subset := range *existingSubsets {
 		subsetReplicas, subsetReadyReplicas, subsetUpdatedReplicas, subsetUpdatedReadyReplicas := replicasStatusFn(subset)
-		newStatus.Replicas += subsetReplicas
+		newStatus.Replicas += subsetReplicas - subset.Status.UnschedulableStatus.UnavailablePods
 		newStatus.ReservedPods += subset.Status.UnschedulableStatus.UnavailablePods
 		newStatus.ReadyReplicas += subsetReadyReplicas
 		newStatus.UpdatedReplicas += subsetUpdatedReplicas

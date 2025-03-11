@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 )
@@ -338,53 +340,56 @@ func TestAdaptiveElasticAllocator(t *testing.T) {
 							Unschedulable:   true,
 							UnavailablePods: unavailablePods,
 						},
-						Replicas:      maxReplicas,
-						ReadyReplicas: maxReplicas - unavailablePods,
+						Replicas:             maxReplicas,
+						UpdatedReadyReplicas: maxReplicas - unavailablePods,
 					},
-					Spec: SubsetSpec{Replicas: minReplicas},
+					Spec: SubsetSpec{
+						Replicas:   maxReplicas,
+						SubsetPods: generateSubsetPods(maxReplicas, unavailablePods, 0),
+					},
 				},
 			}
 	}
 	cases := []struct {
-		name                                                 string
-		totalReplicas, minReplicas, maxReplicas, pendingPods int32
-		subset1Replicas, subset2Replicas                     int32
+		name                                                     string
+		totalReplicas, minReplicas, maxReplicas, unavailablePods int32
+		subset1Replicas, subset2Replicas                         int32
 	}{
 		{
 			name:          "5 pending pods > maxReplicas -> 0, 10",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 5,
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, unavailablePods: 5,
 			subset1Replicas: 0, subset2Replicas: 10,
 		},
 		{
 			name:          "4 pending pods = maxReplicas -> 0, 10",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 4,
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, unavailablePods: 4,
 			subset1Replicas: 0, subset2Replicas: 10,
 		},
 		{
 			name:          "3 pending pods < maxReplicas -> 1, 9",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 3,
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, unavailablePods: 3,
 			subset1Replicas: 1, subset2Replicas: 9,
 		},
 		{
 			name:          "2 pending pods = minReplicas -> 2, 8",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 2,
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, unavailablePods: 2,
 			subset1Replicas: 2, subset2Replicas: 8,
 		},
 		{
 			name:          "1 pending pods < minReplicas -> 3, 7",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 1,
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, unavailablePods: 1,
 			subset1Replicas: 3, subset2Replicas: 7,
 		},
 		{
-			name:          "no pending pods -> 2, 8",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 0,
+			name:          "no pending pods -> 4, 6",
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, unavailablePods: 0,
 			subset1Replicas: 4, subset2Replicas: 6,
 		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			ud, subsets := getUnitedDeploymentAndSubsets(
-				testCase.totalReplicas, testCase.minReplicas, testCase.maxReplicas, testCase.pendingPods)
+				testCase.totalReplicas, testCase.minReplicas, testCase.maxReplicas, testCase.unavailablePods)
 			alloc, err := NewReplicaAllocator(ud).Alloc(&subsets)
 			if err != nil {
 				t.Fatalf("unexpected alloc error %v", err)
@@ -426,12 +431,18 @@ func TestProtectingRunningPodsAdaptive(t *testing.T) {
 			}, map[string]*Subset{
 				"subset-1": {
 					Status: SubsetStatus{
-						ReadyReplicas: subset1RunningReplicas,
+						UpdatedReadyReplicas: subset1RunningReplicas,
+					},
+					Spec: SubsetSpec{
+						SubsetPods: generateSubsetPods(subset1RunningReplicas, 0, 0),
 					},
 				},
 				"subset-2": {
 					Status: SubsetStatus{
-						ReadyReplicas: subset2RunningReplicas,
+						UpdatedReadyReplicas: subset2RunningReplicas,
+					},
+					Spec: SubsetSpec{
+						SubsetPods: generateSubsetPods(subset2RunningReplicas, 0, 0),
 					},
 				},
 			}
@@ -511,6 +522,24 @@ func TestProtectingRunningPodsAdaptive(t *testing.T) {
 	}
 }
 
+func generateSubsetPods(total, reserved int32, prefix int) []*corev1.Pod {
+	var pods []*corev1.Pod
+	for i := int32(0); i < total; i++ {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("pod-%d-%d", prefix, i),
+			},
+		}
+		if i < reserved {
+			pod.Status.Phase = corev1.PodPending
+		} else {
+			pod.Status.Phase = corev1.PodRunning
+		}
+		pods = append(pods, pod)
+	}
+	return pods
+}
+
 // Cases of TestGetTemporaryAdaptiveNext must be aligned with TestRescheduleTemporarily
 func TestGetTemporaryAdaptiveNext(t *testing.T) {
 	getUnitedDeploymentAndSubsets := func(totalReplicas, minReplicas, maxReplicas int32, reserved []int32, cur []int32) (
@@ -543,16 +572,20 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 				MinReplicas: minR,
 				MaxReplicas: maxR,
 			})
-			existingSubsets[name] = &Subset{
+			subset := &Subset{
 				Status: SubsetStatus{
 					UnschedulableStatus: SubsetUnschedulableStatus{
 						Unschedulable:   reserved[i] != 0,
 						UnavailablePods: reserved[i],
 					},
-					Replicas:      cur[i],
-					ReadyReplicas: cur[i] - reserved[i],
+					Replicas:             cur[i],
+					UpdatedReadyReplicas: cur[i] - reserved[i],
+				},
+				Spec: SubsetSpec{
+					SubsetPods: generateSubsetPods(cur[i], reserved[i], i),
 				},
 			}
+			existingSubsets[name] = subset
 		}
 		ud.Spec.Topology.Subsets[len(ud.Spec.Topology.Subsets)-1].MaxReplicas = nil
 		return ud, existingSubsets
@@ -562,7 +595,7 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 		replicas    int32   // total replicas of UnitedDeployment
 		minReplicas int32   // min replicas of each subset
 		maxReplicas int32   // max replicas of each subset except the last one
-		staging     []int32 // current staging pod nums of each subset
+		staging     []int32 // current unavailable pod nums of each subset
 		cur         []int32 // last allocated results, equals to last expect
 		next        []int32 // allocated replicas calculated this time
 	}{

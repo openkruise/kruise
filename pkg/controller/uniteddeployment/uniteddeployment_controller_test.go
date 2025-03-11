@@ -426,7 +426,7 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 			name: "Pod recovered, but not long enough",
 			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
 				subset, ud, pod := baseEnvFactory()
-				// create -> 15s check as staging -> 10s running, check
+				// create -> 15s check as unavailable -> 10s running, check
 				modifyPod(pod, now.Add(-10*time.Second), now.Add(-25*time.Second), false, "true")
 				return subset, ud
 			},
@@ -439,7 +439,7 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 			name: "Pod recovered, long enough",
 			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
 				subset, ud, pod := baseEnvFactory()
-				// create -> 15s check as staging -> 35s running
+				// create -> 15s check as unavailable -> 35s running
 				modifyPod(pod, now.Add(-35*time.Second), now.Add(-50*time.Second), false, "true")
 				return subset, ud
 			},
@@ -458,7 +458,7 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 				t.Fail()
 			}
 			if subset.Status.UnschedulableStatus.UnavailablePods != c.expectStagingPods {
-				t.Logf("case %s failed: expect staging pods %d, but got %d", c.name, c.expectStagingPods, subset.Status.UnschedulableStatus.UnavailablePods)
+				t.Logf("case %s failed: expect unavailable pods %d, but got %d", c.name, c.expectStagingPods, subset.Status.UnschedulableStatus.UnavailablePods)
 				t.Fail()
 			}
 			status := ud.Status.GetSubsetStatus(subsetName)
@@ -540,116 +540,116 @@ func TestPatchStagingChangedPods(t *testing.T) {
 // The cases of two tests must be aligned.
 func TestRescheduleTemporarily(t *testing.T) {
 	tests := []struct {
-		name     string
-		replicas int32   // total replicas of UnitedDeployment
-		next     []int32 // allocated replicas calculated this time
-		cur      []int32 // last allocated results, equals to last expect
-		staging  []int32 // current staging pod nums of each subset
-		expect   []int32 // final allocated result after reschedule
+		name        string
+		replicas    int32   // total replicas of UnitedDeployment
+		next        []int32 // allocated replicas calculated this time
+		cur         []int32 // last allocated results, equals to last expect
+		unavailable []int32 // current unavailable pod nums of each subset
+		expect      []int32 // final allocated result after reschedule
 	}{
 		{
-			name:     "4 subsets, 2 each, start",
-			replicas: 8,
-			next:     []int32{2, 2, 2, 2},
-			cur:      []int32{0, 0, 0, 0},
-			staging:  []int32{0, 0, 0, 0},
-			expect:   []int32{2, 2, 2, 2},
+			name:        "4 subsets, 2 each, start",
+			replicas:    8,
+			next:        []int32{2, 2, 2, 2},
+			cur:         []int32{0, 0, 0, 0},
+			unavailable: []int32{0, 0, 0, 0},
+			expect:      []int32{2, 2, 2, 2},
 		},
 		{
-			name:     "4 subsets, subset 1 and 2 unschedulable detected",
-			replicas: 8,
-			next:     []int32{2, 0, 0, 6},
-			cur:      []int32{2, 2, 2, 2},
-			staging:  []int32{0, 2, 2, 0},
-			expect:   []int32{2, 2, 2, 6},
+			name:        "4 subsets, subset 1 and 2 unschedulable detected",
+			replicas:    8,
+			next:        []int32{2, 0, 0, 6},
+			cur:         []int32{2, 2, 2, 2},
+			unavailable: []int32{0, 2, 2, 0},
+			expect:      []int32{2, 2, 2, 6},
 		},
 		{
-			name:     "4 subsets, subset 1 and 2 starts each 1 pods",
-			replicas: 8,
-			next:     []int32{2, 1, 1, 4},
-			cur:      []int32{2, 2, 2, 6},
-			staging:  []int32{0, 1, 1, 0},
-			expect:   []int32{2, 2, 2, 4},
+			name:        "4 subsets, subset 1 and 2 starts each 1 pods",
+			replicas:    8,
+			next:        []int32{2, 1, 1, 4},
+			cur:         []int32{2, 2, 2, 6},
+			unavailable: []int32{0, 1, 1, 0},
+			expect:      []int32{2, 2, 2, 4},
 		},
 		{
-			name:     "4 subsets, subset 1 recovered",
-			replicas: 8,
-			next:     []int32{2, 2, 1, 3},
-			cur:      []int32{2, 2, 2, 4},
-			staging:  []int32{0, 0, 1, 0},
-			expect:   []int32{2, 2, 2, 3},
+			name:        "4 subsets, subset 1 recovered",
+			replicas:    8,
+			next:        []int32{2, 2, 1, 3},
+			cur:         []int32{2, 2, 2, 4},
+			unavailable: []int32{0, 0, 1, 0},
+			expect:      []int32{2, 2, 2, 3},
 		},
 		{
-			name:     "4 subsets, all subset recovered",
-			replicas: 8,
-			next:     []int32{2, 2, 2, 2},
-			cur:      []int32{2, 2, 2, 3},
-			staging:  []int32{0, 0, 0, 0},
-			expect:   []int32{2, 2, 2, 2},
+			name:        "4 subsets, all subset recovered",
+			replicas:    8,
+			next:        []int32{2, 2, 2, 2},
+			cur:         []int32{2, 2, 2, 3},
+			unavailable: []int32{0, 0, 0, 0},
+			expect:      []int32{2, 2, 2, 2},
 		},
 		{
-			name:     "4 subsets, part of subset 1 and 2 started, scaled to 16 replicas",
-			replicas: 16,
-			next:     []int32{4, 1, 1, 10},
-			cur:      []int32{2, 2, 2, 6},
-			staging:  []int32{0, 1, 1, 0},
-			expect:   []int32{4, 2, 2, 10},
+			name:        "4 subsets, part of subset 1 and 2 started, scaled to 16 replicas",
+			replicas:    16,
+			next:        []int32{4, 1, 1, 10},
+			cur:         []int32{2, 2, 2, 6},
+			unavailable: []int32{0, 1, 1, 0},
+			expect:      []int32{4, 2, 2, 10},
 		},
 		{
-			name:     "4 subsets, part of subset 1 and 2 started, scaled back to 8 replicas",
-			replicas: 8,
-			next:     []int32{2, 1, 1, 4},
-			cur:      []int32{4, 2, 2, 10},
-			staging:  []int32{0, 1, 1, 0},
-			expect:   []int32{2, 2, 2, 4},
+			name:        "4 subsets, part of subset 1 and 2 started, scaled back to 8 replicas",
+			replicas:    8,
+			next:        []int32{2, 1, 1, 4},
+			cur:         []int32{4, 2, 2, 10},
+			unavailable: []int32{0, 1, 1, 0},
+			expect:      []int32{2, 2, 2, 4},
 		},
 		{
-			name:     "4 subsets, all of subset 1 and 2 started, already scaled to 16 replicas",
-			replicas: 16,
-			next:     []int32{4, 4, 4, 4},
-			cur:      []int32{4, 2, 2, 10},
-			staging:  []int32{0, 0, 0, 0},
-			expect:   []int32{4, 4, 4, 4},
+			name:        "4 subsets, all of subset 1 and 2 started, already scaled to 16 replicas",
+			replicas:    16,
+			next:        []int32{4, 4, 4, 4},
+			cur:         []int32{4, 2, 2, 10},
+			unavailable: []int32{0, 0, 0, 0},
+			expect:      []int32{4, 4, 4, 4},
 		},
 		{
-			name:     "3 infinity subsets, start",
-			replicas: 2,
-			next:     []int32{2, 0, 0},
-			cur:      []int32{0, 0, 0},
-			staging:  []int32{0, 0, 0},
-			expect:   []int32{2, 0, 0},
+			name:        "3 infinity subsets, start",
+			replicas:    2,
+			next:        []int32{2, 0, 0},
+			cur:         []int32{0, 0, 0},
+			unavailable: []int32{0, 0, 0},
+			expect:      []int32{2, 0, 0},
 		},
 		{
-			name:     "3 infinity subsets, found subset-0 unschedulable",
-			replicas: 2,
-			next:     []int32{0, 2, 0},
-			cur:      []int32{2, 0, 0},
-			staging:  []int32{2, 0, 0},
-			expect:   []int32{2, 2, 0},
+			name:        "3 infinity subsets, found subset-0 unschedulable",
+			replicas:    2,
+			next:        []int32{0, 2, 0},
+			cur:         []int32{2, 0, 0},
+			unavailable: []int32{2, 0, 0},
+			expect:      []int32{2, 2, 0},
 		},
 		{
-			name:     "3 infinity subsets, found subset-1 unschedulable",
-			replicas: 2,
-			next:     []int32{0, 0, 2},
-			cur:      []int32{2, 2, 0},
-			staging:  []int32{2, 2, 0},
-			expect:   []int32{2, 2, 2},
+			name:        "3 infinity subsets, found subset-1 unschedulable",
+			replicas:    2,
+			next:        []int32{0, 0, 2},
+			cur:         []int32{2, 2, 0},
+			unavailable: []int32{2, 2, 0},
+			expect:      []int32{2, 2, 2},
 		},
 		{
-			name:     "3 infinity subsets, one of subset-1 started",
-			replicas: 2,
-			next:     []int32{0, 1, 1},
-			cur:      []int32{2, 2, 2},
-			staging:  []int32{2, 1, 0},
-			expect:   []int32{2, 2, 1},
+			name:        "3 infinity subsets, one of subset-1 started",
+			replicas:    2,
+			next:        []int32{0, 1, 1},
+			cur:         []int32{2, 2, 2},
+			unavailable: []int32{2, 1, 0},
+			expect:      []int32{2, 2, 1},
 		},
 		{
-			name:     "3 infinity subsets, subset-0 recovered",
-			replicas: 2,
-			next:     []int32{2, 0, 0},
-			cur:      []int32{2, 2, 1},
-			staging:  []int32{0, 1, 0},
-			expect:   []int32{2, 0, 0},
+			name:        "3 infinity subsets, subset-0 recovered",
+			replicas:    2,
+			next:        []int32{2, 0, 0},
+			cur:         []int32{2, 2, 1},
+			unavailable: []int32{0, 1, 0},
+			expect:      []int32{2, 0, 0},
 		},
 	}
 	for _, tt := range tests {
@@ -662,11 +662,15 @@ func TestRescheduleTemporarily(t *testing.T) {
 			for i := 0; i < len(tt.cur); i++ {
 				existingSubsets[fmt.Sprintf("subset-%d", i)] = &Subset{
 					Status: SubsetStatus{
-						Replicas: tt.cur[i],
 						UnschedulableStatus: SubsetUnschedulableStatus{
-							UnavailablePods: tt.staging[i],
-							Unschedulable:   tt.staging[i] != 0,
+							UnavailablePods: tt.unavailable[i],
+							Unschedulable:   tt.unavailable[i] != 0,
 						},
+						UpdatedReadyReplicas: tt.cur[i] - tt.unavailable[i],
+					},
+					Spec: SubsetSpec{
+						Replicas:   tt.cur[i],
+						SubsetPods: generateSubsetPods(tt.cur[i], tt.unavailable[i], i),
 					},
 				}
 			}

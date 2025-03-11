@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/integer"
 
@@ -81,7 +82,12 @@ func getSubsetRunningReplicas(existingSubsets *map[string]*Subset) map[string]in
 	}
 	var result = make(map[string]int32)
 	for name, subset := range *existingSubsets {
-		result[name] = subset.Status.ReadyReplicas
+		for _, pod := range subset.Spec.SubsetPods {
+			if reserved, _ := GetPodReserved(pod); !reserved && pod.Status.Phase == corev1.PodRunning {
+				result[name]++
+			}
+		}
+		result[name] = min(subset.Status.UpdatedReadyReplicas, result[name])
 	}
 	return result
 }
@@ -323,7 +329,7 @@ func (ac *elasticAllocator) validateAndCalculateMinMaxMap(replicas int32, existi
 				}
 				// In Temporary mode, running pods in unschedulable subsets are protected.
 				if runningReplicas := runningReplicasMap[subset.Name]; unschedulable && runningReplicas > minReplicas {
-					klog.InfoS("Assign min(runningReplicas, maxReplicas) to minReplicas to avoid deleting staging pods",
+					klog.InfoS("Assign min(runningReplicas, maxReplicas) to minReplicas to avoid deleting unavailable pods",
 						"subset", subset.Name, "minReplicas", minReplicas, "runningReplicas", runningReplicas, "maxReplicas", maxReplicas)
 					minReplicas = integer.Int32Min(runningReplicas, maxReplicas)
 				}
