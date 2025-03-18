@@ -16,6 +16,7 @@ limitations under the License.
 package validating
 
 import (
+	"context"
 	"strconv"
 	"testing"
 
@@ -463,7 +464,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		t.Run("success case "+strconv.Itoa(i), func(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(workloadSpreadDemo).Build()
 			handler.Client = fakeClient
-			if errs := handler.validatingWorkloadSpreadFn(&successCase); len(errs) != 0 {
+			if errs := handler.validatingWorkloadSpreadFn(context.Background(), &successCase); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -811,7 +812,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		t.Run(errorCase.name, func(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(workloadSpreadDemo).Build()
 			handler.Client = fakeClient
-			errs := handler.validatingWorkloadSpreadFn(errorCase.getWorkloadSpread())
+			errs := handler.validatingWorkloadSpreadFn(context.Background(), errorCase.getWorkloadSpread())
 			if len(errs) == 0 {
 				t.Errorf("expected failure for %s", errorCase.name)
 			}
