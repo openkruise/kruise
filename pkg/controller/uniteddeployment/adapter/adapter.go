@@ -36,6 +36,8 @@ type Adapter interface {
 	GetSubsetPods(obj metav1.Object) ([]*corev1.Pod, error)
 	// GetSpecReplicas returns the replicas information of the subset workload.
 	GetSpecReplicas(obj metav1.Object) *int32
+	// GetReplicasPatch returns the patch string to scale the subset workload.
+	GetReplicasPatch(replicas int32) string
 	// GetSpecPartition returns the partition information of the subset workload if possible.
 	GetSpecPartition(obj metav1.Object, pods []*corev1.Pod) *int32
 	// GetStatusReplicas returns the replicas from the subset workload status.

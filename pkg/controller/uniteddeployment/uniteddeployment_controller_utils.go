@@ -22,8 +22,10 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/controller/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -138,3 +140,75 @@ func getUnitedDeploymentKey(ud *appsv1alpha1.UnitedDeployment) string {
 }
 
 var ResourceVersionExpectation = expectations.NewResourceVersionExpectation()
+
+// CheckPodReserved checks whether the Pod is in the Reserved state.
+// The Reserved state is defined as: the Pod enters Reserved after being in the Pending state for a specified duration,
+// and exits Reserved after remaining in the Ready state for a certain period.
+//
+// Parameters:
+//   - pod: the Pod object to be checked.
+//   - pendingTimeout: the timeout duration for the Pod to remain in the Pending state.
+//   - minReadySeconds: the duration threshold for the Pod to remain in the Ready state.
+//
+// Returns:
+//   - isReserved: true if the Pod is in the Reserved state; otherwise, false.
+//   - nextCheckAfter: the duration until the next check if the Pod has not reached the Reserved state; otherwise, -1.
+func CheckPodReserved(pod *corev1.Pod, pendingTimeout time.Duration, minReadySeconds time.Duration, now time.Time) (isReserved bool, nextCheckAfter time.Duration) {
+	if reserved, _ := GetPodReserved(pod); reserved {
+		if pod.Status.Phase == corev1.PodRunning {
+			readyCondition := getPodReadyCondition(pod)
+			if readyCondition != nil && readyCondition.Status == corev1.ConditionTrue {
+				if readyCondition.LastTransitionTime.Time.Add(minReadySeconds).Before(now) {
+					return false, -1
+				} else {
+					return true, readyCondition.LastTransitionTime.Time.Add(minReadySeconds).Sub(now)
+				}
+			}
+		}
+		// at least after minReadySeconds will the pod get out of Reserved state
+		return true, minReadySeconds
+	} else {
+		timeouted, after := util.GetTimeBeforePendingTimeout(pod, pendingTimeout, now)
+		if timeouted {
+			return true, minReadySeconds
+		} else {
+			return false, after
+		}
+	}
+}
+
+// GetPodReserved checks whether the Pod is in the Reserved state.
+// The Reserved state is defined as: the Pod has the label "apps.kruise.io/is-reserved-pod" set to "true".
+//
+// Parameters:
+//   - pod: the Pod object to be checked.
+//
+// Returns:
+//   - reserved: true if the Pod is in the Reserved state; otherwise, false.
+//   - ok: true if the Pod has the "apps.kruise.io/is-reserved-pod" label; otherwise, false.
+func GetPodReserved(pod *corev1.Pod) (reserved bool, ok bool) {
+	if pod.Labels != nil {
+		label, ok := pod.Labels[appsv1alpha1.ReservedPodLabelKey]
+		return label == "true", ok
+	} else {
+		return false, false
+	}
+}
+
+func getPodReadyCondition(pod *corev1.Pod) *corev1.PodCondition {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodReady {
+			return &condition
+		}
+	}
+	return nil
+}
+
+func initStatus(u *appsv1alpha1.UnitedDeployment) {
+	for _, subset := range u.Spec.Topology.Subsets {
+		if u.Status.GetSubsetStatus(subset.Name) == nil {
+			u.Status.SubsetStatuses = append(u.Status.SubsetStatuses, appsv1alpha1.UnitedDeploymentSubsetStatus{Name: subset.Name})
+		}
+	}
+	return
+}
