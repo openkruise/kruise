@@ -130,6 +130,10 @@ type NodeImageStatus struct {
 	// +optional
 	Pulling int32 `json:"pulling"`
 
+	// The number of pulling tasks which are waiting.
+	// +optional
+	Waiting int32 `json:"waiting"`
+
 	// all statuses of active image pulling tasks
 	ImageStatuses map[string]ImageStatus `json:"imageStatuses,omitempty"`
 

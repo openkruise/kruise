@@ -17,11 +17,12 @@ limitations under the License.
 package options
 
 import (
-	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 )
 
 type Options struct {
@@ -32,4 +33,6 @@ type Options struct {
 
 	RuntimeFactory daemonruntime.Factory
 	Healthz        *daemonutil.Healthz
+
+	MaxWorkersForPullImages int
 }
