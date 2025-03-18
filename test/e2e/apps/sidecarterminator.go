@@ -62,6 +62,10 @@ var _ = SIGDescribe("SidecarTerminator", func() {
 						Name:  appsv1alpha1.KruiseTerminateSidecarEnv,
 						Value: "true",
 					},
+					{
+						Name:  appsv1alpha1.KruiseIgnoreContainerExitCodeEnv,
+						Value: "true",
+					},
 				},
 			}
 
