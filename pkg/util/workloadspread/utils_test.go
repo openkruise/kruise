@@ -108,12 +108,24 @@ func TestNestedField(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "slice out of range",
+			name: "slice out of range - positive index",
 			args: args{
 				obj: map[string]any{
 					"m": []any{1},
 				},
 				paths: []string{"m", "10"},
+			},
+			want:    0,
+			exists:  false,
+			wantErr: true,
+		},
+		{
+			name: "slice out of range - negative index",
+			args: args{
+				obj: map[string]any{
+					"m": []any{1},
+				},
+				paths: []string{"m", "-1"},
 			},
 			want:    0,
 			exists:  false,
