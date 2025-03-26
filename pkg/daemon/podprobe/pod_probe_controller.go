@@ -402,11 +402,15 @@ func (c *Controller) fetchLatestPodContainer(podUID, name string) (*runtimeapi.C
 			container = obj
 		}
 	}
-	var containerStatus *runtimeapi.ContainerStatusResponse
+	var containerStatus *runtimeapi.ContainerStatus
+	var resp *runtimeapi.ContainerStatusResponse
 	if container != nil {
-		containerStatus, err = runtimeService.ContainerStatus(context.TODO(), container.Id, false)
+		resp, err = runtimeService.ContainerStatus(context.TODO(), container.Id, false)
+		if resp != nil {
+			containerStatus = resp.Status
+		}
 	}
-	return containerStatus.Status, err
+	return containerStatus, err
 }
 
 func updateNodePodProbeStatus(update Update, newStatus *appsv1alpha1.NodePodProbeStatus) {

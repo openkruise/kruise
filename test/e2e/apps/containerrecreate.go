@@ -295,6 +295,7 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 				gomega.Expect(sidecarContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 
 				ginkgo.By("Check Pod sidecar container recreated after app container ready")
+				gomega.Expect(sidecarContainerStatus.LastTerminationState.Terminated).ShouldNot(gomega.BeNil())
 				interval := sidecarContainerStatus.LastTerminationState.Terminated.FinishedAt.Sub(appContainerStatus.LastTerminationState.Terminated.FinishedAt.Time)
 				gomega.Expect(interval >= 5*time.Second).Should(gomega.Equal(true))
 			}
