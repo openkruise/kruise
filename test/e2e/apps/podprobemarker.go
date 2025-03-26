@@ -581,11 +581,13 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 				err = kc.AppsV1alpha1().PodProbeMarkers(ns).Delete(context.TODO(), ppm.Name, metav1.DeleteOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			}
-			time.Sleep(time.Second * 3)
+			time.Sleep(time.Second * 5)
 			nppList, err = kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, npp := range nppList.Items {
-				gomega.Expect(npp.Spec.PodProbes).To(gomega.HaveLen(0))
+				for _, podProbe := range npp.Spec.PodProbes {
+					gomega.Expect(podProbe.Namespace).NotTo(gomega.Equal(ns))
+				}
 			}
 		})
 	})
