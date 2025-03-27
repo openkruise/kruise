@@ -658,6 +658,43 @@ func TestValidateUnitedDeployment(t *testing.T) {
 				},
 			},
 		},
+		"use stateful workloads with reserved rescheduling enabled": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Replicas: &val,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: appsv1alpha1.SubsetTemplate{
+					StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+						Spec: apps.StatefulSetSpec{
+							Template: corev1.PodTemplateSpec{
+								ObjectMeta: metav1.ObjectMeta{
+									Labels: validLabels,
+								},
+								Spec: corev1.PodSpec{
+									RestartPolicy: corev1.RestartPolicyAlways,
+									DNSPolicy:     corev1.DNSClusterFirst,
+									Containers:    []corev1.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+								},
+							},
+						},
+					},
+				},
+				Topology: appsv1alpha1.Topology{
+					Subsets: []appsv1alpha1.Subset{
+						{
+							Name:     "subset-1",
+							Replicas: &replicas1,
+						},
+					},
+					ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
+						Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
+						Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
+							RescheduleTemporarily: true,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for k, v := range errorCases {
@@ -676,6 +713,7 @@ func TestValidateUnitedDeployment(t *testing.T) {
 					field != "spec.topology.subsets[0]" &&
 					field != "spec.topology.subsets[0].name" &&
 					field != "spec.topology.subsets[0].replicas" &&
+					field != "spec.topology.scheduleStrategy" &&
 					field != "spec.updateStrategy.partitions" &&
 					field != "spec.topology.subsets[0].nodeSelectorTerm.matchExpressions[0].values" {
 					t.Errorf("%s: missing prefix for: %v", k, errs[i])
