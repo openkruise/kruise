@@ -99,7 +99,7 @@ func (a *AdvancedStatefulSetAdapter) GetSubsetFailure() *string {
 
 // ConvertToResourceList converts AdvancedStatefulSetList object to AdvancedStatefulSet array.
 func (a *AdvancedStatefulSetAdapter) ConvertToResourceList(obj runtime.Object) []metav1.Object {
-	stsList := obj.(*alpha1.StatefulSetList)
+	stsList := obj.(*v1beta1.StatefulSetList)
 	objList := make([]metav1.Object, len(stsList.Items))
 	for i, set := range stsList.Items {
 		objList[i] = set.DeepCopy()
@@ -109,9 +109,9 @@ func (a *AdvancedStatefulSetAdapter) ConvertToResourceList(obj runtime.Object) [
 }
 
 func (a *AdvancedStatefulSetAdapter) SetMaxUnavailable(obj metav1.Object, val int32) metav1.Object {
-	set := obj.(*alpha1.StatefulSet)
+	set := obj.(*v1beta1.StatefulSet)
 	if set.Spec.UpdateStrategy.RollingUpdate == nil {
-		set.Spec.UpdateStrategy.RollingUpdate = &alpha1.RollingUpdateStatefulSetStrategy{}
+		set.Spec.UpdateStrategy.RollingUpdate = &v1beta1.RollingUpdateStatefulSetStrategy{}
 	}
 	set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &intstr.IntOrString{Type: intstr.Int, IntVal: val}
 	return set
