@@ -160,7 +160,6 @@ func (t *UnitedDeploymentTester) NewUnitedDeploymentManager(name string) *United
 	default:
 		panic("unsupported kind")
 	}
-	fmt.Printf("%+v\n", ud.Spec.Template)
 	return &UnitedDeploymentManager{
 		kind:             kind,
 		UnitedDeployment: ud,
@@ -237,6 +236,16 @@ func (m *UnitedDeploymentManager) Update() {
 		_, err = m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Update(context.Background(), ud, metav1.UpdateOptions{})
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 	}, time.Minute, time.Second).Should(gomega.Succeed())
+}
+
+func (m *UnitedDeploymentManager) WaitAllPodsReady() {
+	fmt.Print("WaitSubsetPodsReady ")
+	gomega.Eventually(func(g gomega.Gomega) {
+		ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.Background(), m.Name, metav1.GetOptions{})
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		g.Expect(ud.Status.ReadyReplicas == ud.Status.Replicas)
+	}, time.Minute, time.Second).Should(gomega.Succeed())
+	fmt.Println("pass")
 }
 
 func (m *UnitedDeploymentManager) CheckSubsetPods(expect map[string]int32) {
@@ -335,7 +344,6 @@ func (m *UnitedDeploymentManager) SetNodeLabel(key string, value string) {
 }
 
 func (m *UnitedDeploymentManager) SetImage(image string) {
-	fmt.Printf("%+v\n", m.UnitedDeployment.Spec.Template)
 	switch m.kind {
 	case KindDeployment:
 		m.Spec.Template.DeploymentTemplate.Spec.Template.Spec.Containers[0].Image = image
