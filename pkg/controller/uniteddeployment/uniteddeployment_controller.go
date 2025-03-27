@@ -222,7 +222,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(ctx context.Context, request recon
 		return reconcile.Result{}, err
 	}
 
-	adaptiveTemporarily := instance.Spec.Topology.ScheduleStrategy.IsAdaptiveTemporarily()
+	adaptiveTemporarily := instance.Spec.Topology.ScheduleStrategy.IsReservedRescheduleEnabled()
 	if instance.Spec.Topology.ScheduleStrategy.IsAdaptive() {
 		var podsToPatch []podToPatchReservedLabel
 		for name, subset := range *existingSubsets {
@@ -274,7 +274,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(ctx context.Context, request recon
 		return reconcile.Result{}, nil
 	}
 	newStatus.LabelSelector = selector.String()
-	if instance.Spec.Topology.ScheduleStrategy.IsAdaptiveTemporarily() {
+	if instance.Spec.Topology.ScheduleStrategy.IsReservedRescheduleEnabled() {
 		newStatus.LabelSelector += extraStatusSelector
 	}
 

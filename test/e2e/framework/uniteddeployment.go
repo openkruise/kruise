@@ -41,12 +41,12 @@ type TemplateKind int
 
 const (
 	KindDeployment  = TemplateKind(0)
-	KindStatefulSet = TemplateKind(1)
-	KindCloneSet    = TemplateKind(2)
+	KindCloneSet    = TemplateKind(1)
+	KindStatefulSet = TemplateKind(2)
 	KindASTS        = TemplateKind(3)
 )
 
-func (t *UnitedDeploymentTester) NewUnitedDeploymentManager(name string) *UnitedDeploymentManager {
+func (t *UnitedDeploymentTester) NewUnitedDeploymentManager(name string, statelessOnly bool) *UnitedDeploymentManager {
 	podTemplate := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
@@ -66,7 +66,12 @@ func (t *UnitedDeploymentTester) NewUnitedDeploymentManager(name string) *United
 			},
 		},
 	}
-	kind := TemplateKind(rand.IntN(4))
+	var kind TemplateKind
+	if statelessOnly {
+		kind = TemplateKind(rand.IntN(2))
+	} else {
+		kind = TemplateKind(rand.IntN(4))
+	}
 	ud := &appsv1alpha1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
