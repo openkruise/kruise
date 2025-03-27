@@ -281,7 +281,7 @@ func (s *UnitedDeploymentScheduleStrategy) IsAdaptive() bool {
 	return s.Type == AdaptiveUnitedDeploymentScheduleStrategyType
 }
 
-func (s *UnitedDeploymentScheduleStrategy) IsAdaptiveTemporarily() bool {
+func (s *UnitedDeploymentScheduleStrategy) IsReservedRescheduleEnabled() bool {
 	return s.IsAdaptive() && s.Adaptive != nil && s.Adaptive.RescheduleTemporarily
 }
 
