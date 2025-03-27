@@ -56,6 +56,12 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 		}
 	}
 
+	if spec.Topology.ScheduleStrategy.IsReservedRescheduleEnabled() &&
+		(spec.Template.AdvancedStatefulSetTemplate != nil || spec.Template.StatefulSetTemplate != nil) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "scheduleStrategy"), spec.Topology.ScheduleStrategy,
+			"only stateless workloads (Deployment and CloneSet) are supported by reserved rescheduling"))
+	}
+
 	selector, err := metav1.LabelSelectorAsSelector(spec.Selector)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, ""))
