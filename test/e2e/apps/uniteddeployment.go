@@ -119,11 +119,12 @@ var _ = SIGDescribe("uniteddeployment", func() {
 			MatchExpressions: []corev1.NodeSelectorRequirement{
 				{
 					Key:      nodeKey,
-					Operator: corev1.NodeSelectorOpExists,
+					Operator: corev1.NodeSelectorOpIn,
+					Values:   []string{"haha"},
 				},
 			},
 		}
-
+		udManager.SetNodeLabel(nodeKey, "")
 		ginkgo.By("creating united deployment")
 		udManager.Spec.Replicas = ptr.To(int32(3))
 		_, err := f.KruiseClientSet.AppsV1alpha1().UnitedDeployments(udManager.Namespace).Create(context.Background(),
@@ -156,7 +157,7 @@ var _ = SIGDescribe("uniteddeployment", func() {
 
 		ginkgo.By("scale down after recovery")
 		udManager.Scale(3)
-		udManager.CheckSubsetPods(replicasMap([]int32{2, 1, 0})) // even pods in subset-1 are not ready
+		udManager.CheckSubsetPods(replicasMap([]int32{2, 0, 1}))
 		fmt.Println()
 
 		ginkgo.By("create new subset")
@@ -171,21 +172,18 @@ var _ = SIGDescribe("uniteddeployment", func() {
 		fmt.Println()
 
 		ginkgo.By("fix subset-1 and wait recover")
-		nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		someNode := nodeList.Items[1]
-		someNode.Labels[nodeKey] = "haha"
-		_, err = f.ClientSet.CoreV1().Nodes().Update(context.Background(), &someNode, metav1.UpdateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		udManager.CheckUnschedulableStatus(unschedulableMap([]bool{false, false, false}))
+		udManager.SetNodeLabel(nodeKey, "haha")
+		udManager.CheckUnschedulableStatus(unschedulableMap([]bool{false, false, false, false}))
 
 		ginkgo.By("waiting final status after deleting new subset")
 		udManager.Spec.Topology.Subsets = udManager.Spec.Topology.Subsets[:3]
 		udManager.Update()
+		udManager.CheckUnschedulableStatus(unschedulableMap([]bool{false, false, false}))
 		udManager.CheckSubsetPods(replicasMap([]int32{2, 2, 2}))
 		fmt.Println()
 
 		ginkgo.By("scale down after fixed")
+		udManager.WaitAllPodsReady()
 		udManager.Scale(3)
 		udManager.CheckUnschedulableStatus(unschedulableMap([]bool{false, false, false}))
 		udManager.CheckSubsetPods(replicasMap([]int32{2, 1, 0}))
@@ -221,7 +219,7 @@ var _ = SIGDescribe("uniteddeployment", func() {
 			Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
 			Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
 				RescheduleTemporarily:     true,
-				RescheduleCriticalSeconds: ptr.To(int32(10)),
+				RescheduleCriticalSeconds: ptr.To(int32(20)),
 				UnschedulableLastSeconds:  ptr.To(int32(1)),
 			},
 		}
