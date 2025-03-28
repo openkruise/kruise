@@ -516,6 +516,7 @@ func (r *ReconcileWorkloadSpread) getSuitableSubsetNameForPod(ws *appsv1alpha1.W
 	if isNotMatchedWS(injectWS, ws) {
 		// process the pods that were created before workloadSpread
 		matchedSubset, err := r.getAndUpdateSuitableSubsetName(ws, pod, subsetMissingReplicas)
+		klog.V(3).InfoS("no subset injected to pod, find a suitable one", "pod", klog.KObj(pod), "workloadSpread", klog.KObj(ws), "matchedSubset", matchedSubset)
 		if err != nil {
 			return "", err
 		} else if matchedSubset == nil {
@@ -553,6 +554,7 @@ func (r *ReconcileWorkloadSpread) getAndUpdateSuitableSubsetName(ws *appsv1alpha
 			klog.ErrorS(err, "Unexpected error occurred when matching pod with subset, please check requiredSelectorTerm field of subset in WorkloadSpread",
 				"pod", klog.KObj(pod), "subsetName", subset.Name, "workloadSpread", klog.KObj(ws))
 		}
+		klog.V(4).InfoS("preferred score for subset", "pod", klog.KObj(pod), "subsetName", subset.Name, "workloadSpread", klog.KObj(ws), "preferredScore", preferredScore, "node", node.Name)
 		// select the most favorite subsets for the pod by subset.PreferredNodeSelectorTerms
 		if matched && preferredScore > maxPreferredScore {
 			favoriteSubset = subset
@@ -833,29 +835,33 @@ func (r *ReconcileWorkloadSpread) UpdateWorkloadSpreadStatus(ws *appsv1alpha1.Wo
 	clone.Status = *status
 
 	err := r.writeWorkloadSpreadStatus(clone)
-	if err == nil {
-		klog.V(3).InfoS(makeStatusChangedLog(ws, status), "workloadSpread", klog.KObj(ws))
-	}
+	logStatusChanges(ws, status, err)
 	return err
 }
 
-func makeStatusChangedLog(ws *appsv1alpha1.WorkloadSpread, status *appsv1alpha1.WorkloadSpreadStatus) string {
+func logStatusChanges(ws *appsv1alpha1.WorkloadSpread, status *appsv1alpha1.WorkloadSpreadStatus, err error) {
+	if err != nil {
+		klog.ErrorS(err, "Failed to update WorkloadSpread status", "workloadSpread", klog.KObj(ws), "status", status)
+		return
+	}
 	oldSubsetStatuses := ws.Status.SubsetStatuses
 	oldSubsetStatusMap := make(map[string]*appsv1alpha1.WorkloadSpreadSubsetStatus, len(oldSubsetStatuses))
 	for i := range oldSubsetStatuses {
 		oldSubsetStatusMap[oldSubsetStatuses[i].Name] = &oldSubsetStatuses[i]
 	}
 
-	log := fmt.Sprintf("WorkloadSpread (%s/%s) changes Status:", ws.Namespace, ws.Name)
+	var log string
 
 	for i, subset := range ws.Spec.Subsets {
 		oldStatus, ok := oldSubsetStatusMap[subset.Name]
 		if !ok {
-			continue
+			oldStatus = &appsv1alpha1.WorkloadSpreadSubsetStatus{
+				Name: subset.Name,
+			}
 		}
 		newStatus := status.SubsetStatuses[i]
 
-		log += fmt.Sprintf(" (<subset name: %s>", subset.Name)
+		log = fmt.Sprintf(" (<subset name: %s>", subset.Name)
 
 		if oldStatus.Replicas != newStatus.Replicas {
 			log += fmt.Sprintf(" <Replicas: %d -> %d>", oldStatus.Replicas, newStatus.Replicas)
@@ -883,8 +889,7 @@ func makeStatusChangedLog(ws *appsv1alpha1.WorkloadSpread, status *appsv1alpha1.
 
 		log += ")"
 	}
-
-	return log
+	klog.V(3).InfoS("WorkloadSpread status changed", "workloadSpread", klog.KObj(ws), "details", log)
 }
 
 func (r *ReconcileWorkloadSpread) writeWorkloadSpreadStatus(ws *appsv1alpha1.WorkloadSpread) error {
