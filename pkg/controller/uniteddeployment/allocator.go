@@ -321,7 +321,7 @@ func (ac *elasticAllocator) validateAndCalculateMinMaxMap(replicas int32, existi
 				minReplicas = integer.Int32Min(runningReplicas, minReplicas)
 				maxReplicas = integer.Int32Min(runningReplicas, maxReplicas)
 			}
-			if ac.Spec.Topology.ScheduleStrategy.IsReservedRescheduleEnabled() {
+			if ac.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
 				countedReplicas += runningReplicasMap[subset.Name]
 				if countedReplicas >= replicas {
 					// only replicas number of running pods are protected
