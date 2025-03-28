@@ -219,7 +219,7 @@ var _ = SIGDescribe("uniteddeployment", func() {
 		udManager.UnitedDeployment.Spec.Topology.ScheduleStrategy = appsv1alpha1.UnitedDeploymentScheduleStrategy{
 			Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
 			Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
-				RescheduleTemporarily:     true,
+				ReserveUnschedulablePods:  true,
 				RescheduleCriticalSeconds: ptr.To(int32(20)),
 				UnschedulableLastSeconds:  ptr.To(int32(1)),
 			},
