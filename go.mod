@@ -3,6 +3,7 @@ module github.com/openkruise/kruise
 go 1.22.0
 
 require (
+	github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6
 	github.com/appscode/jsonpatch v1.0.1
 	github.com/docker/distribution v2.8.2+incompatible
 	github.com/evanphx/json-patch v5.6.0+incompatible
