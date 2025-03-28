@@ -26,7 +26,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
@@ -83,7 +83,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
@@ -136,7 +136,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
@@ -202,7 +202,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
@@ -268,7 +268,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
@@ -334,7 +334,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
@@ -378,7 +378,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
@@ -417,7 +417,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
@@ -474,7 +474,7 @@ jobs:
         with:
           submodules: true
       - name: Setup Go
-        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
         with:
           go-version: ${{ env.GO_VERSION }}
       - name: Setup Kind Cluster
