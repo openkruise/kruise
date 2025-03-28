@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *ReconcileSidecarTerminator) executeKillContainerAction(pod *corev1.Pod, sidecars sets.String) error {
+func (r *ReconcileSidecarTerminator) executeKillContainerAction(pod *corev1.Pod, sidecars sets.Set[string]) error {
 	uncompletedSidecars := filterUncompletedSidecars(pod, sidecars)
 	if uncompletedSidecars.Len() == 0 {
 		return nil
@@ -47,7 +47,7 @@ func (r *ReconcileSidecarTerminator) executeKillContainerAction(pod *corev1.Pod,
 	}
 
 	var sidecarContainers []appsv1alpha1.ContainerRecreateRequestContainer
-	for _, name := range uncompletedSidecars.List() {
+	for _, name := range uncompletedSidecars.UnsortedList() {
 		sidecarContainers = append(sidecarContainers, appsv1alpha1.ContainerRecreateRequestContainer{
 			Name: name,
 		})
@@ -78,14 +78,14 @@ func (r *ReconcileSidecarTerminator) executeKillContainerAction(pod *corev1.Pod,
 		klog.V(3).InfoS("SidecarTerminator -- Creating CRR successfully", "containerRecreateRequest", klog.KObj(crr))
 
 		r.recorder.Eventf(pod, corev1.EventTypeNormal, "SidecarTerminator",
-			"Kruise SidecarTerminator is trying to terminate sidecar %v using crr", uncompletedSidecars.List())
+			"Kruise SidecarTerminator is trying to terminate sidecar %v using crr", uncompletedSidecars.UnsortedList())
 	}
 
 	return err
 }
 
-func filterUncompletedSidecars(pod *corev1.Pod, sidecars sets.String) sets.String {
-	uncompletedSidecars := sets.NewString(sidecars.List()...)
+func filterUncompletedSidecars(pod *corev1.Pod, sidecars sets.Set[string]) sets.Set[string] {
+	uncompletedSidecars := sets.New[string](sidecars.UnsortedList()...)
 	for i := range pod.Status.ContainerStatuses {
 		status := &pod.Status.ContainerStatuses[i]
 		if sidecars.Has(status.Name) && status.State.Terminated != nil {
