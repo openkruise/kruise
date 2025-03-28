@@ -154,7 +154,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for StatefulSet."))
 				} else {
 					set := &appsv1.StatefulSet{}
-					if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, workloadTemplate); getErr == nil {
+					if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
 						workloadTemplate = set
 					}
 				}
