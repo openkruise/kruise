@@ -80,7 +80,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 		getSidecarset func() *appsv1alpha1.SidecarSet
 		// pod.name -> infos []string{Image, Env, volumeMounts}
 		expectedInfo map[*corev1.Pod][]string
-		// MatchedPods, UpdatedPods, ReadyPods, StagingPods, UnavailablePods
+		// MatchedPods, UpdatedPods, ReadyPods, AvailablePods, UnavailablePods
 		expectedStatus []int32
 	}{
 		{
