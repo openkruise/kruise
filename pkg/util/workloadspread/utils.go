@@ -63,7 +63,7 @@ func nestedSlice[T any](obj []any, paths ...string) (T, bool, error) {
 	if err != nil {
 		return *new(T), false, err
 	}
-	if len(obj) < idx+1 {
+	if idx < 0 || len(obj) < idx+1 {
 		return *new(T), false, fmt.Errorf("index %d out of range", idx)
 	}
 	return NestedField[T](obj[idx], paths[1:]...)
