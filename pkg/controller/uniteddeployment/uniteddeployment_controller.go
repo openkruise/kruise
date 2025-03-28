@@ -222,11 +222,11 @@ func (r *ReconcileUnitedDeployment) Reconcile(ctx context.Context, request recon
 		return reconcile.Result{}, err
 	}
 
-	adaptiveTemporarily := instance.Spec.Topology.ScheduleStrategy.IsReservedRescheduleEnabled()
+	shouldReserveUnschedulablePods := instance.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods()
 	if instance.Spec.Topology.ScheduleStrategy.IsAdaptive() {
 		var podsToPatch []podToPatchReservedLabel
 		for name, subset := range *existingSubsets {
-			if adaptiveTemporarily {
+			if shouldReserveUnschedulablePods {
 				podsToPatch = append(podsToPatch, processSubsetsForTemporaryAdaptiveStrategy(name, subset, instance, now)...)
 				if err = r.patchReservedStatusChangedPods(podsToPatch); err != nil {
 					klog.ErrorS(err, "Failed to patch reserved changed pods", "unitedDeployment", klog.KObj(instance))
@@ -247,7 +247,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(ctx context.Context, request recon
 		return reconcile.Result{}, err
 	}
 
-	if adaptiveTemporarily {
+	if shouldReserveUnschedulablePods {
 		var totalReplicas int32
 		if instance.Spec.Replicas != nil {
 			totalReplicas = *instance.Spec.Replicas
@@ -274,7 +274,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(ctx context.Context, request recon
 		return reconcile.Result{}, nil
 	}
 	newStatus.LabelSelector = selector.String()
-	if instance.Spec.Topology.ScheduleStrategy.IsReservedRescheduleEnabled() {
+	if instance.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
 		newStatus.LabelSelector += extraStatusSelector
 	}
 

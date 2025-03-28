@@ -689,7 +689,7 @@ func TestValidateUnitedDeployment(t *testing.T) {
 					ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
 						Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
 						Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
-							RescheduleTemporarily: true,
+							ReserveUnschedulablePods: true,
 						},
 					},
 				},

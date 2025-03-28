@@ -369,7 +369,7 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 					ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
 						Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
 						Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
-							RescheduleTemporarily:     true,
+							ReserveUnschedulablePods:  true,
 							RescheduleCriticalSeconds: ptr.To[int32](10),
 							UnschedulableLastSeconds:  ptr.To[int32](30),
 						},

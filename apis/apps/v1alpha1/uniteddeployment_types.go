@@ -257,12 +257,12 @@ type AdaptiveUnitedDeploymentStrategy struct {
 	// +optional
 	UnschedulableLastSeconds *int32 `json:"unschedulableLastSeconds,omitempty"`
 
-	// RescheduleTemporarily indicates whether to enable temporarily rescheduling, which is disabled by default.
+	// ReserveUnschedulablePods indicates whether to enable temporarily rescheduling, which is disabled by default.
 	// If this feature is enabled, those pending pods that would otherwise be permanently transferred to other subsets
 	// due to scheduling failure will be retained, and a temporary substitute Pod will be created in another subset to take over its work.
 	// When the retained pod is successfully scheduled and ready, its temporary substitute will be deleted.
 	// +optional
-	RescheduleTemporarily bool `json:"rescheduleTemporarily,omitempty"`
+	ReserveUnschedulablePods bool `json:"reserveUnschedulablePods,omitempty"`
 }
 
 // UnitedDeploymentScheduleStrategy defines the schedule performance of UnitedDeployment.
@@ -281,8 +281,8 @@ func (s *UnitedDeploymentScheduleStrategy) IsAdaptive() bool {
 	return s.Type == AdaptiveUnitedDeploymentScheduleStrategyType
 }
 
-func (s *UnitedDeploymentScheduleStrategy) IsReservedRescheduleEnabled() bool {
-	return s.IsAdaptive() && s.Adaptive != nil && s.Adaptive.RescheduleTemporarily
+func (s *UnitedDeploymentScheduleStrategy) ShouldReserveUnschedulablePods() bool {
+	return s.IsAdaptive() && s.Adaptive != nil && s.Adaptive.ReserveUnschedulablePods
 }
 
 func (s *UnitedDeploymentScheduleStrategy) GetRescheduleCriticalDuration() time.Duration {

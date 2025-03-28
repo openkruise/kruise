@@ -56,7 +56,7 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 		}
 	}
 
-	if spec.Topology.ScheduleStrategy.IsReservedRescheduleEnabled() &&
+	if spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() &&
 		(spec.Template.AdvancedStatefulSetTemplate != nil || spec.Template.StatefulSetTemplate != nil) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "scheduleStrategy"), spec.Topology.ScheduleStrategy,
 			"only stateless workloads (Deployment and CloneSet) are supported by reserved rescheduling"))
