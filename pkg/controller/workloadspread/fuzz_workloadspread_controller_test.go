@@ -17,12 +17,12 @@ limitations under the License.
 package workloadspread
 
 import (
-	"encoding/json"
 	"strconv"
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	fuzzutils "github.com/openkruise/kruise/pkg/util/fuzz"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -38,8 +38,6 @@ func init() {
 	_ = appsv1alpha1.AddToScheme(fakeScheme)
 }
 
-// FuzzPatchFavoriteSubsetMetadataToPod tests the metadata patching logic for Pods in WorkloadSpread
-// This fuzzer validates both valid and invalid patch scenarios
 func FuzzPatchFavoriteSubsetMetadataToPod(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cf := fuzz.NewConsumer(data)
@@ -76,7 +74,7 @@ func FuzzPatchFavoriteSubsetMetadataToPod(f *testing.F) {
 		}
 
 		// Generate valid or invalid JSON patch randomly
-		if err := generatePatch(cf, subset); err != nil {
+		if err := fuzzutils.GenerateWorkloadSpreadSubsetPatch(cf, subset); err != nil {
 			return
 		}
 
@@ -88,8 +86,6 @@ func FuzzPatchFavoriteSubsetMetadataToPod(f *testing.F) {
 	})
 }
 
-// FuzzPodPreferredScore tests the scoring logic for Pod scheduling preference
-// This fuzzer validates score calculation under various subset configurations
 func FuzzPodPreferredScore(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cf := fuzz.NewConsumer(data)
@@ -105,40 +101,10 @@ func FuzzPodPreferredScore(f *testing.F) {
 		}
 
 		// Generate valid or invalid JSON patch randomly
-		if err := generatePatch(cf, subset); err != nil {
+		if err := fuzzutils.GenerateWorkloadSpreadSubsetPatch(cf, subset); err != nil {
 			return
 		}
 
 		_ = podPreferredScore(subset, pod)
 	})
-}
-
-// generatePatch creates either valid labeled JSON patches or random byte payloads
-// to test both successful merges and error handling scenarios.
-func generatePatch(cf *fuzz.ConsumeFuzzer, subset *appsv1alpha1.WorkloadSpreadSubset) error {
-	// 50% chance to generate structured label patch
-	if isStructured, err := cf.GetBool(); isStructured && err == nil {
-		labels := make(map[string]string)
-		if err := cf.FuzzMap(&labels); err != nil {
-			return err
-		}
-
-		patch := map[string]interface{}{
-			"metadata": map[string]interface{}{"labels": labels},
-		}
-
-		raw, err := json.Marshal(patch)
-		if err != nil {
-			return err
-		}
-		subset.Patch.Raw = raw
-		return nil
-	}
-
-	raw, err := cf.GetBytes()
-	if err != nil {
-		return err
-	}
-	subset.Patch.Raw = raw
-	return nil
 }
