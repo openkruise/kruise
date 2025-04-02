@@ -17,20 +17,15 @@ limitations under the License.
 package workloadspread
 
 import (
-	"encoding/json"
-	"fmt"
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	fuzzutils "github.com/openkruise/kruise/pkg/util/fuzz"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// FuzzNestedField tests the NestedField function's ability to handle
-// various data structures and access paths through fuzzing.
-// It generates random maps/slices and access paths to validate deep field access.
 func FuzzNestedField(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cf := fuzz.NewConsumer(data)
@@ -62,8 +57,6 @@ func FuzzNestedField(f *testing.F) {
 	})
 }
 
-// FuzzIsPodSelected validates pod selection logic by generating random
-// label selectors and pod labels to test matching/filtering behavior.
 func FuzzIsPodSelected(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cf := fuzz.NewConsumer(data)
@@ -92,8 +85,6 @@ func FuzzIsPodSelected(f *testing.F) {
 	})
 }
 
-// FuzzHasPercentSubset verifies detection of percentage-based subset configurations
-// in WorkloadSpread resources through randomized input generation.
 func FuzzHasPercentSubset(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cf := fuzz.NewConsumer(data)
@@ -103,49 +94,23 @@ func FuzzHasPercentSubset(f *testing.F) {
 			return
 		}
 
-		if len(ws.Spec.Subsets) == 0 {
-			subset := appsv1alpha1.WorkloadSpreadSubset{}
-			if err := cf.GenerateStruct(&subset); err != nil {
-				return
-			}
-			ws.Spec.Subsets = append(ws.Spec.Subsets, subset)
-		}
-
-		for i := range ws.Spec.Subsets {
-			if validPercent, err := cf.GetBool(); err == nil && validPercent {
-				num, err := cf.GetInt()
-				if err != nil {
-					return
-				}
-				ws.Spec.Subsets[i].MaxReplicas = &intstr.IntOrString{
-					Type:   intstr.String,
-					StrVal: fmt.Sprintf("%d%%", num%1000), // Ensure valid percentage format
-				}
-			} else {
-				maxReplicas := &intstr.IntOrString{}
-				if err := cf.GenerateStruct(maxReplicas); err == nil {
-					ws.Spec.Subsets[i].MaxReplicas = maxReplicas
-				}
-			}
+		// Only generate subset replicas for valid test cases
+		if err := fuzzutils.GenerateWorkloadSpreadSubset(cf, ws,
+			fuzzutils.GenerateWorkloadSpreadSubsetReplicas,
+		); err != nil {
+			return
 		}
 
 		_ = hasPercentSubset(ws)
 	})
 }
 
-// FuzzInjectWorkloadSpreadIntoPod tests workload spread injection logic
-// by generating random pod configurations and subset definitions.
 func FuzzInjectWorkloadSpreadIntoPod(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cf := fuzz.NewConsumer(data)
 
 		pod := &corev1.Pod{}
 		if err := cf.GenerateStruct(pod); err != nil {
-			return
-		}
-
-		subsetName, err := cf.GetString()
-		if err != nil {
 			return
 		}
 
@@ -159,52 +124,18 @@ func FuzzInjectWorkloadSpreadIntoPod(f *testing.F) {
 			return
 		}
 
-		if len(ws.Spec.Subsets) == 0 {
-			subset := &appsv1alpha1.WorkloadSpreadSubset{}
-			if err := cf.GenerateStruct(subset); err != nil {
-				return
-			}
-			subset.Name = subsetName
-			ws.Spec.Subsets = append(ws.Spec.Subsets, *subset)
+		// Generate subset configurations for WorkloadSpread.
+		if err := fuzzutils.GenerateWorkloadSpreadSubset(cf, ws); err != nil {
+			return
 		}
 
-		// Configure patches for each subset
-		for i := range ws.Spec.Subsets {
-			if err := generatePatch(cf, &ws.Spec.Subsets[i]); err != nil {
-				return
-			}
+		if len(ws.Spec.Subsets) == 0 {
+			return
 		}
+
+		// Use the first subset's name.
+		subsetName := ws.Spec.Subsets[0].Name
 
 		_, _ = injectWorkloadSpreadIntoPod(ws, pod, subsetName, generatedUID)
 	})
-}
-
-// generatePatch creates either valid labeled JSON patches or random byte payloads
-// to test both successful merges and error handling scenarios.
-func generatePatch(cf *fuzz.ConsumeFuzzer, subset *appsv1alpha1.WorkloadSpreadSubset) error {
-	// 50% chance to generate structured label patch
-	if isStructured, err := cf.GetBool(); isStructured && err == nil {
-		labels := make(map[string]string)
-		if err := cf.FuzzMap(&labels); err != nil {
-			return err
-		}
-
-		patch := map[string]interface{}{
-			"metadata": map[string]interface{}{"labels": labels},
-		}
-
-		raw, err := json.Marshal(patch)
-		if err != nil {
-			return err
-		}
-		subset.Patch.Raw = raw
-		return nil
-	}
-
-	raw, err := cf.GetBytes()
-	if err != nil {
-		return err
-	}
-	subset.Patch.Raw = raw
-	return nil
 }
