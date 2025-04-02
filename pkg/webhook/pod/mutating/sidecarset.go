@@ -158,6 +158,9 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	})
 	pod.Spec.InitContainers = mergeSidecarContainers(pod.Spec.InitContainers, sidecarInitContainers)
 	// 2. inject containers
+	sort.SliceStable(sidecarContainers, func(i, j int) bool {
+		return sidecarContainers[i].Name < sidecarContainers[j].Name
+	})
 	pod.Spec.Containers = mergeSidecarContainers(pod.Spec.Containers, sidecarContainers)
 	// 3. inject volumes
 	pod.Spec.Volumes = util.MergeVolumes(pod.Spec.Volumes, volumesInSidecar)
