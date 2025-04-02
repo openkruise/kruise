@@ -26,8 +26,10 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	"github.com/openkruise/kruise/pkg/util/history"
 	"k8s.io/apimachinery/pkg/labels"
@@ -158,6 +160,11 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	})
 	pod.Spec.InitContainers = mergeSidecarContainers(pod.Spec.InitContainers, sidecarInitContainers)
 	// 2. inject containers
+	if utilfeature.DefaultFeatureGate.Enabled(features.EnableSortSidecarContainerByName) {
+		sort.SliceStable(sidecarContainers, func(i, j int) bool {
+			return sidecarContainers[i].Name < sidecarContainers[j].Name
+		})
+	}
 	pod.Spec.Containers = mergeSidecarContainers(pod.Spec.Containers, sidecarContainers)
 	// 3. inject volumes
 	pod.Spec.Volumes = util.MergeVolumes(pod.Spec.Volumes, volumesInSidecar)

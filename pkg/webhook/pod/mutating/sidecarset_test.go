@@ -1274,13 +1274,13 @@ func TestMergeSidecarContainers(t *testing.T) {
 	sidecarContainers := []*appsv1alpha1.SidecarContainer{
 		{
 			Container: corev1.Container{
-				Name: "sidecar-1",
+				Name: "sidecar-2",
 			},
 			PodInjectPolicy: appsv1alpha1.AfterAppContainerType,
 		},
 		{
 			Container: corev1.Container{
-				Name: "sidecar-2",
+				Name: "sidecar-1",
 			},
 			PodInjectPolicy: appsv1alpha1.AfterAppContainerType,
 		},
@@ -1305,7 +1305,7 @@ func TestMergeSidecarContainers(t *testing.T) {
 				return podContainers[1:2]
 			},
 			getInjected: func() []*appsv1alpha1.SidecarContainer {
-				return sidecarContainers
+				return deepCopyContainers(sidecarContainers)
 			},
 			expectContainerLen: 4,
 			expectedContainers: []string{"new-sidecar-1", "app-container", "sidecar-1", "sidecar-2"},
@@ -1316,7 +1316,7 @@ func TestMergeSidecarContainers(t *testing.T) {
 				return podContainers[1:2]
 			},
 			getInjected: func() []*appsv1alpha1.SidecarContainer {
-				return sidecarContainers[2:]
+				return deepCopyContainers(sidecarContainers[2:])
 			},
 			expectContainerLen: 2,
 			expectedContainers: []string{"new-sidecar-1", "app-container"},
@@ -1327,7 +1327,7 @@ func TestMergeSidecarContainers(t *testing.T) {
 				return podContainers[1:2]
 			},
 			getInjected: func() []*appsv1alpha1.SidecarContainer {
-				return sidecarContainers[:2]
+				return deepCopyContainers(sidecarContainers[:2])
 			},
 			expectContainerLen: 3,
 			expectedContainers: []string{"app-container", "sidecar-1", "sidecar-2"},
@@ -1338,7 +1338,7 @@ func TestMergeSidecarContainers(t *testing.T) {
 				return podContainers
 			},
 			getInjected: func() []*appsv1alpha1.SidecarContainer {
-				return sidecarContainers[:2]
+				return deepCopyContainers(sidecarContainers[:2])
 			},
 			expectContainerLen: 3,
 			expectedContainers: []string{"sidecar-1", "app-container", "sidecar-2"},
@@ -1349,7 +1349,7 @@ func TestMergeSidecarContainers(t *testing.T) {
 				return podContainers
 			},
 			getInjected: func() []*appsv1alpha1.SidecarContainer {
-				return sidecarContainers
+				return deepCopyContainers(sidecarContainers)
 			},
 			expectContainerLen: 4,
 			expectedContainers: []string{"new-sidecar-1", "sidecar-1", "app-container", "sidecar-2"},
@@ -1360,7 +1360,7 @@ func TestMergeSidecarContainers(t *testing.T) {
 				return nil
 			},
 			getInjected: func() []*appsv1alpha1.SidecarContainer {
-				return sidecarContainers
+				return deepCopyContainers(sidecarContainers)
 			},
 			expectContainerLen: 3,
 			expectedContainers: []string{"new-sidecar-1", "sidecar-1", "sidecar-2"},
@@ -1371,6 +1371,9 @@ func TestMergeSidecarContainers(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			origins := cs.getOrigins()
 			injected := cs.getInjected()
+			sort.SliceStable(injected, func(i, j int) bool {
+				return injected[i].Name < injected[j].Name
+			})
 			finals := mergeSidecarContainers(origins, injected)
 			if len(finals) != cs.expectContainerLen {
 				t.Fatalf("expect %d containers but got %v", cs.expectContainerLen, len(finals))
@@ -1382,6 +1385,15 @@ func TestMergeSidecarContainers(t *testing.T) {
 			}
 		})
 	}
+}
+
+func deepCopyContainers(sidecars []*appsv1alpha1.SidecarContainer) []*appsv1alpha1.SidecarContainer {
+	newSidecars := make([]*appsv1alpha1.SidecarContainer, 0)
+	for _, sidecar := range sidecars {
+		obj := sidecar.DeepCopy()
+		newSidecars = append(newSidecars, obj)
+	}
+	return newSidecars
 }
 
 func TestInjectInitContainer(t *testing.T) {
