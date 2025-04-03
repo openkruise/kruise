@@ -345,7 +345,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 			expectResult: expectationDiffs{ScaleUpNum: 1, UseSurge: 1, UpdateNum: 2, UpdateMaxUnavailable: 1, ScaleUpLimit: 1},
 		},
 		{
-			name: "update in-place partition=3 with maxSurge (step 2/4)",
+			name: "update in-place partition=3 with maxSurge step 2/4",
 			set:  createTestCloneSet(5, intstr.FromInt(3), intstr.FromInt(1), intstr.FromInt(1)),
 			pods: []*v1.Pod{
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),

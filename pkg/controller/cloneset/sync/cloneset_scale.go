@@ -112,7 +112,7 @@ func (r *realControl) Scale(
 
 		podsCanDelete := make([]*v1.Pod, 0, len(podsToDelete))
 		for _, pod := range podsToDelete {
-			if !isPodReady(coreControl, pod, updateCS.Spec.MinReadySeconds) {
+			if !IsPodAvailable(coreControl, pod, updateCS.Spec.MinReadySeconds) {
 				podsCanDelete = append(podsCanDelete, pod)
 			} else if diffRes.DeleteReadyLimit > 0 {
 				podsCanDelete = append(podsCanDelete, pod)
@@ -139,7 +139,7 @@ func (r *realControl) Scale(
 		podsPreparingToDelete := r.choosePodsToDelete(updateCS, diffRes.ScaleDownNum, diffRes.ScaleDownNumOldRevision, notUpdatedPods, updatedPods)
 		podsToDelete := make([]*v1.Pod, 0, len(podsPreparingToDelete))
 		for _, pod := range podsPreparingToDelete {
-			if !isPodReady(coreControl, pod, updateCS.Spec.MinReadySeconds) {
+			if !IsPodAvailable(coreControl, pod, updateCS.Spec.MinReadySeconds) {
 				podsToDelete = append(podsToDelete, pod)
 			} else if diffRes.DeleteReadyLimit > 0 {
 				podsToDelete = append(podsToDelete, pod)

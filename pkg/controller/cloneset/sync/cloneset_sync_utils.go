@@ -73,7 +73,7 @@ type expectationDiffs struct {
 	UseSurge int `json:"useSurge"`
 	// UseSurgeOldRevision is part of the UseSurge number
 	// it indicates the above number of old revision Pods
-	UseSurgeOldRevision int `json:"useSurgeOldRevision"`
+	UseSurgeOldRevision int `json:"useSurgeOldRevision"` // only for inner usage
 
 	// UpdateNum is the diff number that should update
 	// '0' means no need to update
@@ -186,14 +186,14 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		}
 	}
 
-	updateOldDiff := oldRevisionActiveCount - partition
-	updateNewDiff := newRevisionActiveCount - (replicas - partition)
+	updateOldDiff := oldRevisionActiveCount - partition              // 多了几个老版本，>= 0
+	updateNewDiff := newRevisionActiveCount - (replicas - partition) // 还差多少个新版本, <= 0
 	totalUnavailable := preDeletingNewRevisionCount + preDeletingOldRevisionCount + unavailableNewRevisionCount + unavailableOldRevisionCount
 	// If the currentRevision and updateRevision are consistent, Pods can only update to this revision
 	// If the CloneSetPartitionRollback is not enabled, Pods can only update to the new revision
 	if updateRevision == currentRevision || !utilfeature.DefaultFeatureGate.Enabled(features.CloneSetPartitionRollback) {
-		updateOldDiff = integer.IntMax(updateOldDiff, 0)
-		updateNewDiff = integer.IntMin(updateNewDiff, 0)
+		updateOldDiff = integer.IntMax(updateOldDiff, 0) // updateOldDiff >= 0
+		updateNewDiff = integer.IntMin(updateNewDiff, 0) // updateNewDiff <= 0
 	}
 
 	// calculate the number of surge to use
@@ -238,7 +238,8 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 		} else {
 			res.UseSurge = integer.IntMin(maxSurge, updateSurge)
 			res.UseSurgeOldRevision = integer.IntMin(res.UseSurge, updateOldRevisionSurge)
-			res.UseSurgeOldRevision = integer.IntMin(res.UseSurgeOldRevision+unavailableNewRevisionCount, oldRevisionActiveCount-partition)
+			// 在不额外创建老 Pod 的前提下（小于 updateOldDiff）针对还没有 Ready 的新 Pod，额外保留一些相同数量的老 Pod
+			res.UseSurgeOldRevision = integer.IntMin(res.UseSurgeOldRevision+unavailableNewRevisionCount, updateOldDiff)
 		}
 	}
 
@@ -293,10 +294,6 @@ func isSpecifiedDelete(cs *appsv1alpha1.CloneSet, pod *v1.Pod) bool {
 		}
 	}
 	return false
-}
-
-func isPodReady(coreControl clonesetcore.Control, pod *v1.Pod, minReadySeconds int32) bool {
-	return IsPodAvailable(coreControl, pod, minReadySeconds)
 }
 
 func IsPodAvailable(coreControl clonesetcore.Control, pod *v1.Pod, minReadySeconds int32) bool {
