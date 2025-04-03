@@ -63,6 +63,31 @@ var _ = SIGDescribe("CloneSet", func() {
 		randStr = rand.String(10)
 	})
 
+	framework.KruiseDescribe("CloneSet Creating", func() {
+
+		framework.ConformanceIt("creates with hostNetwork pod, specified containerPort without specifying hostPort", func() {
+			cs := tester.NewCloneSet("hostnetwork-port-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs.Spec.Template.Spec.HostNetwork = true
+			cs.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 80}}
+			cs, err := tester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "creation should be success")
+
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			pods, err := tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, pod := range pods {
+				ginkgo.By("hostPort should defaults to containerPort")
+				gomega.Expect(pod.Spec.Containers[0].Ports[0].HostPort).To(gomega.Equal(pod.Spec.Containers[0].Ports[0].ContainerPort))
+			}
+		})
+
+	})
+
 	framework.KruiseDescribe("CloneSet Scaling", func() {
 		var err error
 
