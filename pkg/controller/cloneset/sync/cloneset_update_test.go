@@ -1228,10 +1228,10 @@ func TestCalculateUpdateCount(t *testing.T) {
 
 		var waitUpdateIndexes []int
 		var targetRevision string
-		if diffRes.updateNum > 0 {
+		if diffRes.UpdateNum > 0 {
 			waitUpdateIndexes = tc.oldRevisionIndexes
 			targetRevision = updateRevision
-		} else if diffRes.updateNum < 0 {
+		} else if diffRes.UpdateNum < 0 {
 			waitUpdateIndexes = newRevisionIndexes
 			targetRevision = currentRevision
 		}
