@@ -60,9 +60,15 @@ type SubsetUnschedulableStatus struct {
 	// Please refer to the function CheckPodReserved.
 	//
 	// - In normal adaptive strategy, it is the number of Pending Pods.
-	UnavailablePods int32
+	//UnavailablePods int32
+	ReservedPods int32
+	PendingPods  int32
 	// Healthy running pods with old revision and marked as reserved (timeouted)
 	TimeoutLegacyPods int32
+}
+
+func (s SubsetUnschedulableStatus) UnavailablePods() int32 {
+	return s.ReservedPods + s.PendingPods
 }
 
 // SubsetUpdateStrategy stores the strategy detail of the Subset.
