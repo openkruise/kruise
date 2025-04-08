@@ -987,9 +987,9 @@ spec:
                               due to scheduling failure will be retained, and a temporary substitute Pod will be created in another subset to take over its work.
                               When the retained pod is successfully scheduled and ready, its temporary substitute will be deleted.
                             type: boolean
-                          unschedulableLastSeconds:
+                          unschedulableDuration:
                             description: |-
-                              UnschedulableLastSeconds is used to set the number of seconds for a Subset to recover from an unschedulable state,
+                              UnschedulableDuration is used to set the number of seconds for a Subset to recover from an unschedulable state,
                               with a default value of 300 seconds.
                             format: int32
                             type: integer
