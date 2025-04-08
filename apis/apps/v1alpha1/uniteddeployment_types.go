@@ -252,10 +252,10 @@ type AdaptiveUnitedDeploymentStrategy struct {
 	// +optional
 	RescheduleCriticalSeconds *int32 `json:"rescheduleCriticalSeconds,omitempty"`
 
-	// UnschedulableLastSeconds is used to set the number of seconds for a Subset to recover from an unschedulable state,
+	// UnschedulableDuration is used to set the number of seconds for a Subset to recover from an unschedulable state,
 	// with a default value of 300 seconds.
 	// +optional
-	UnschedulableLastSeconds *int32 `json:"unschedulableLastSeconds,omitempty"`
+	UnschedulableDuration *int32 `json:"unschedulableDuration,omitempty"`
 
 	// ReserveUnschedulablePods indicates whether to enable temporarily rescheduling, which is disabled by default.
 	// If this feature is enabled, those pending pods that would otherwise be permanently transferred to other subsets
@@ -293,10 +293,10 @@ func (s *UnitedDeploymentScheduleStrategy) GetRescheduleCriticalDuration() time.
 }
 
 func (s *UnitedDeploymentScheduleStrategy) GetUnschedulableLastDuration() time.Duration {
-	if s.Adaptive == nil || s.Adaptive.UnschedulableLastSeconds == nil {
+	if s.Adaptive == nil || s.Adaptive.UnschedulableDuration == nil {
 		return DefaultUnschedulableStatusLastDuration
 	}
-	return time.Duration(*s.Adaptive.UnschedulableLastSeconds) * time.Second
+	return time.Duration(*s.Adaptive.UnschedulableDuration) * time.Second
 }
 
 // UnitedDeploymentStatus defines the observed state of UnitedDeployment.

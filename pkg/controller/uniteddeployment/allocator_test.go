@@ -311,7 +311,7 @@ func TestCapacityAllocator(t *testing.T) {
 }
 
 func TestAdaptiveElasticAllocator(t *testing.T) {
-	getUnitedDeploymentAndSubsets := func(totalReplicas, minReplicas, maxReplicas, unavailablePods int32) (
+	getUnitedDeploymentAndSubsets := func(totalReplicas, minReplicas, maxReplicas, pendingPods int32) (
 		*appsv1alpha1.UnitedDeployment, map[string]*Subset) {
 		minR, maxR := intstr.FromInt32(minReplicas), intstr.FromInt32(maxReplicas)
 		return &appsv1alpha1.UnitedDeployment{
@@ -337,16 +337,16 @@ func TestAdaptiveElasticAllocator(t *testing.T) {
 				"subset-1": {
 					Status: SubsetStatus{
 						UnschedulableStatus: SubsetUnschedulableStatus{
-							Unschedulable:   true,
-							UnavailablePods: unavailablePods,
+							Unschedulable: true,
+							PendingPods:   pendingPods,
 						},
 						Replicas:             maxReplicas,
-						UpdatedReadyReplicas: maxReplicas - unavailablePods,
-						ReadyReplicas:        maxReplicas - unavailablePods,
+						UpdatedReadyReplicas: maxReplicas - pendingPods,
+						ReadyReplicas:        maxReplicas - pendingPods,
 					},
 					Spec: SubsetSpec{
 						Replicas:   maxReplicas,
-						SubsetPods: generateSubsetPods(maxReplicas, unavailablePods, 0),
+						SubsetPods: generateSubsetPods(maxReplicas, pendingPods, 0),
 					},
 				},
 			}
@@ -393,7 +393,7 @@ func TestAdaptiveElasticAllocator(t *testing.T) {
 				testCase.totalReplicas, testCase.minReplicas, testCase.maxReplicas, testCase.unavailablePods)
 			alloc, err := NewReplicaAllocator(ud).Alloc(&subsets)
 			if err != nil {
-				t.Fatalf("unexpected alloc error %v", err)
+				t.Fatalf("unexpected getNextReplicas error %v", err)
 			} else {
 				subset1Replicas, subset2Replicas := (*alloc)["subset-1"], (*alloc)["subset-2"]
 				if subset1Replicas != testCase.subset1Replicas || subset2Replicas != testCase.subset2Replicas {
@@ -506,7 +506,7 @@ func TestProtectingRunningPodsAdaptive(t *testing.T) {
 			ud, existingSubsets := getUnitedDeploymentAndSubsets(tt.subset1MinReplicas, tt.subset1MaxReplicas, tt.subset1RunningReplicas, tt.subset2RunningReplicas)
 			alloc, err := NewReplicaAllocator(ud).Alloc(&existingSubsets)
 			if err != nil {
-				t.Fatalf("unexpected alloc error %v", err)
+				t.Fatalf("unexpected getNextReplicas error %v", err)
 			} else {
 				subset1Replicas, subset2Replicas := (*alloc)["subset-1"], (*alloc)["subset-2"]
 				if subset1Replicas != tt.subset1Replicas || subset2Replicas != tt.subset2Replicas {
@@ -578,8 +578,8 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 			subset := &Subset{
 				Status: SubsetStatus{
 					UnschedulableStatus: SubsetUnschedulableStatus{
-						Unschedulable:   reserved[i] != 0,
-						UnavailablePods: reserved[i],
+						Unschedulable: reserved[i] != 0,
+						ReservedPods:  reserved[i],
 					},
 					Replicas:             cur[i],
 					UpdatedReadyReplicas: cur[i] - reserved[i],
@@ -761,9 +761,10 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ud, subsets := getUnitedDeploymentAndSubsets(tt.replicas, tt.minReplicas, tt.maxReplicas, tt.staging, tt.cur)
-			result, err := NewReplicaAllocator(ud).Alloc(&subsets)
+			ac := elasticAllocator{ud}
+			result, err := ac.allocate(tt.replicas, &subsets)
 			if err != nil {
-				t.Fatalf("unexpected alloc error %v", err)
+				t.Fatalf("unexpected getNextReplicas error %v", err)
 			}
 			actual := make([]int32, len(tt.next))
 			for i := 0; i < len(tt.next); i++ {

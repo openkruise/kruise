@@ -239,7 +239,7 @@ func TestDefaultAdaptiveStrategy(t *testing.T) {
 					},
 				}
 				subset.Status.ReadyReplicas = 1
-				subset.Status.UnschedulableStatus.UnavailablePods = 0
+				subset.Status.UnschedulableStatus.PendingPods = 0
 				return subset, ud
 			},
 			expectPendingPods: 0,
@@ -283,8 +283,8 @@ func TestDefaultAdaptiveStrategy(t *testing.T) {
 			start := time.Now()
 			processSubsetsForDefaultAdaptiveStrategy(subset.Name, subset, ud)
 			cost := time.Now().Sub(start)
-			if subset.Status.UnschedulableStatus.UnavailablePods != c.expectPendingPods {
-				t.Logf("case %s failed: expect pending pods %d, but got %d", c.name, c.expectPendingPods, subset.Status.UnschedulableStatus.UnavailablePods)
+			if subset.Status.UnschedulableStatus.PendingPods != c.expectPendingPods {
+				t.Logf("case %s failed: expect pending pods %d, but got %d", c.name, c.expectPendingPods, subset.Status.UnschedulableStatus.PendingPods)
 				t.Fail()
 			}
 			requeueAfter := durationStore.Pop(getUnitedDeploymentKey(ud))
@@ -371,7 +371,7 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 						Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
 							ReserveUnschedulablePods:  true,
 							RescheduleCriticalSeconds: ptr.To[int32](10),
-							UnschedulableLastSeconds:  ptr.To[int32](30),
+							UnschedulableDuration:     ptr.To[int32](30),
 						},
 					},
 				},
@@ -380,15 +380,15 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 	}
 
 	cases := []struct {
-		name              string
-		envFactory        func() (*Subset, *appsv1alpha1.UnitedDeployment)
-		requeueAfter      time.Duration
-		expectStagingPods int32
-		unschedulable     bool
-		podsToPatch       int
+		name               string
+		envFactory         func() (*Subset, *appsv1alpha1.UnitedDeployment)
+		requeueAfter       time.Duration
+		expectReservedPods int32
+		unschedulable      bool
+		podsToPatch        int
 	}{
 		// RescheduleCriticalSeconds = 10s
-		// UnschedulableLastSeconds = 30s
+		// UnschedulableDuration = 30s
 		{
 			name: "Pod just created, pending",
 			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
@@ -397,10 +397,10 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 				modifyPod(pod, now, now.Add(-1*time.Second), true, "")
 				return subset, ud
 			},
-			expectStagingPods: 0,
-			unschedulable:     false,
-			requeueAfter:      9 * time.Second,
-			podsToPatch:       1, // should patch to add the reserved
+			expectReservedPods: 0,
+			unschedulable:      false,
+			requeueAfter:       9 * time.Second,
+			podsToPatch:        1, // should patch to add the reserved
 		},
 		{
 			name: "Pod created, running within RescheduleCriticalSeconds",
@@ -410,10 +410,10 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 				modifyPod(pod, now.Add(-5*time.Second), now.Add(-8*time.Second), false, "false")
 				return subset, ud
 			},
-			expectStagingPods: 0,
-			unschedulable:     false,
-			requeueAfter:      0,
-			podsToPatch:       0,
+			expectReservedPods: 0,
+			unschedulable:      false,
+			requeueAfter:       0,
+			podsToPatch:        0,
 		},
 		{
 			name: "Pod created, pending until timeout",
@@ -423,10 +423,10 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 				modifyPod(pod, now.Add(-13*time.Second), now.Add(-13*time.Second), true, "false")
 				return subset, ud
 			},
-			expectStagingPods: 1,
-			unschedulable:     true,
-			requeueAfter:      30 * time.Second,
-			podsToPatch:       1,
+			expectReservedPods: 1,
+			unschedulable:      true,
+			requeueAfter:       30 * time.Second,
+			podsToPatch:        1,
 		},
 		{
 			name: "Pod recovered, but not long enough",
@@ -436,10 +436,10 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 				modifyPod(pod, now.Add(-10*time.Second), now.Add(-25*time.Second), false, "true")
 				return subset, ud
 			},
-			expectStagingPods: 1,
-			unschedulable:     true,
-			requeueAfter:      20 * time.Second,
-			podsToPatch:       0,
+			expectReservedPods: 1,
+			unschedulable:      true,
+			requeueAfter:       20 * time.Second,
+			podsToPatch:        0,
 		},
 		{
 			name: "Pod recovered, long enough",
@@ -449,10 +449,10 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 				modifyPod(pod, now.Add(-35*time.Second), now.Add(-50*time.Second), false, "true")
 				return subset, ud
 			},
-			expectStagingPods: 0,
-			unschedulable:     false,
-			requeueAfter:      0,
-			podsToPatch:       1,
+			expectReservedPods: 0,
+			unschedulable:      false,
+			requeueAfter:       0,
+			podsToPatch:        1,
 		},
 	}
 	for _, c := range cases {
@@ -463,8 +463,8 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 				t.Logf("case %s failed: expect pods to patch %d, but got %d", c.name, c.podsToPatch, len(podsToPatch))
 				t.Fail()
 			}
-			if subset.Status.UnschedulableStatus.UnavailablePods != c.expectStagingPods {
-				t.Logf("case %s failed: expect unavailable pods %d, but got %d", c.name, c.expectStagingPods, subset.Status.UnschedulableStatus.UnavailablePods)
+			if subset.Status.UnschedulableStatus.ReservedPods != c.expectReservedPods {
+				t.Logf("case %s failed: expect unavailable pods %d, but got %d", c.name, c.expectReservedPods, subset.Status.UnschedulableStatus.ReservedPods)
 				t.Fail()
 			}
 			status := ud.Status.GetSubsetStatus(subsetName)
@@ -710,8 +710,8 @@ func TestRescheduleTemporarily(t *testing.T) {
 				existingSubsets[fmt.Sprintf("subset-%d", i)] = &Subset{
 					Status: SubsetStatus{
 						UnschedulableStatus: SubsetUnschedulableStatus{
-							UnavailablePods: tt.unavailable[i],
-							Unschedulable:   tt.unavailable[i] != 0,
+							ReservedPods:  tt.unavailable[i],
+							Unschedulable: tt.unavailable[i] != 0,
 						},
 						UpdatedReadyReplicas: tt.cur[i] - tt.unavailable[i] - tt.newPods[i],
 						ReadyReplicas:        tt.cur[i] - tt.unavailable[i] - tt.newPods[i],
@@ -728,7 +728,7 @@ func TestRescheduleTemporarily(t *testing.T) {
 					Name: fmt.Sprintf("subset-%d", i),
 				}
 			}
-			result := rescheduleTemporarily(&nextReplicas, &existingSubsets, tt.replicas, subsets)
+			result := adjustNextReplicasInReservedStrategy(&nextReplicas, &existingSubsets, tt.replicas, subsets)
 			actual := make([]int32, len(tt.expect))
 			for i := 0; i < len(tt.expect); i++ {
 				actual[i] = (*result)[fmt.Sprintf("subset-%d", i)]

@@ -108,7 +108,7 @@ var _ = SIGDescribe("uniteddeployment", func() {
 			Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
 			Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
 				RescheduleCriticalSeconds: ptr.To(int32(20)),
-				UnschedulableLastSeconds:  ptr.To(int32(15)),
+				UnschedulableDuration:     ptr.To(int32(15)),
 			},
 		}
 		udManager.AddSubset("subset-0", nil, nil, replicas(2))
@@ -221,7 +221,7 @@ var _ = SIGDescribe("uniteddeployment", func() {
 			Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
 				ReserveUnschedulablePods:  true,
 				RescheduleCriticalSeconds: ptr.To(int32(20)),
-				UnschedulableLastSeconds:  ptr.To(int32(1)),
+				UnschedulableDuration:     ptr.To(int32(1)),
 			},
 		}
 		udManager.AddSubset("subset-0", nil, nil, nil)
