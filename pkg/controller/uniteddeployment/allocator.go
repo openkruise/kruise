@@ -83,7 +83,7 @@ func getSubsetRunningReplicas(existingSubsets *map[string]*Subset) map[string]in
 	var result = make(map[string]int32)
 	for name, subset := range *existingSubsets {
 		for _, pod := range subset.Spec.SubsetPods {
-			if reserved, _ := GetPodReserved(pod); !reserved && pod.Status.Phase == corev1.PodRunning {
+			if reserved, _ := IsPodReserved(pod); !reserved && pod.Status.Phase == corev1.PodRunning {
 				result[name]++
 			}
 		}
@@ -285,16 +285,20 @@ type elasticAllocator struct {
 //
 // the results of map will be: {"subset-a": 3, "subset-b": 2}
 func (ac *elasticAllocator) Alloc(existingSubsets *map[string]*Subset) (*map[string]int32, error) {
-	replicas := int32(1)
+	var replicas int32
 	if ac.Spec.Replicas != nil {
 		replicas = *ac.Spec.Replicas
 	}
-
-	minReplicasMap, maxReplicasMap, err := ac.validateAndCalculateMinMaxMap(replicas, existingSubsets)
+	nextReplicas, err := ac.allocate(replicas, existingSubsets)
 	if err != nil {
 		return nil, err
 	}
-	return ac.alloc(replicas, minReplicasMap, maxReplicasMap), nil
+	klog.V(4).InfoS("Got UnitedDeployment next replicas", "unitedDeployment", klog.KObj(ac.UnitedDeployment), "nextReplicas", nextReplicas)
+	if ac.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
+		nextReplicas = adjustNextReplicasInReservedStrategy(nextReplicas, existingSubsets, replicas, ac.Spec.Topology.Subsets)
+		klog.V(4).InfoS("Adjusted UnitedDeployment next replicas for temporary adaptive is enabled", "unitedDeployment", klog.KObj(ac.UnitedDeployment), "nextReplicas", nextReplicas)
+	}
+	return nextReplicas, nil
 }
 
 func (ac *elasticAllocator) validateAndCalculateMinMaxMap(replicas int32, existingSubsets *map[string]*Subset) (map[string]int32, map[string]int32, error) {
@@ -334,7 +338,7 @@ func (ac *elasticAllocator) validateAndCalculateMinMaxMap(replicas int32, existi
 					minReplicas = integer.Int32Min(runningReplicas, maxReplicas)
 				}
 			} else {
-				// All healthy pods are permanently allocated to a subset if rescheduleTemporarily is disabled.
+				// All healthy pods are permanently allocated to a subset if adjustNextReplicasInReservedStrategy is disabled.
 				// We have to prevent them from being deleted
 				if runningReplicas := runningReplicasMap[subset.Name]; !unschedulable && runningReplicas > minReplicas {
 					klog.InfoS("Assign min(runningReplicas, maxReplicas) to minReplicas to avoid deleting running pods",
@@ -355,7 +359,15 @@ func (ac *elasticAllocator) validateAndCalculateMinMaxMap(replicas int32, existi
 	return minReplicasMap, maxReplicasMap, nil
 }
 
-func (ac *elasticAllocator) alloc(replicas int32, minReplicasMap, maxReplicasMap map[string]int32) *map[string]int32 {
+func (ac *elasticAllocator) allocate(replicas int32, existingSubsets *map[string]*Subset) (*map[string]int32, error) {
+	minReplicasMap, maxReplicasMap, err := ac.validateAndCalculateMinMaxMap(replicas, existingSubsets)
+	if err != nil {
+		return nil, err
+	}
+	return ac.getNextReplicas(replicas, minReplicasMap, maxReplicasMap), nil
+}
+
+func (ac *elasticAllocator) getNextReplicas(replicas int32, minReplicasMap, maxReplicasMap map[string]int32) *map[string]int32 {
 	allocated := int32(0)
 	// Step 1: satisfy the minimum replicas of each subset firstly.
 	subsetReplicas := make(map[string]int32, len(ac.Spec.Topology.Subsets))
@@ -381,4 +393,68 @@ func (ac *elasticAllocator) alloc(replicas int32, minReplicasMap, maxReplicasMap
 		allocated += addReplicas
 	}
 	return &subsetReplicas
+}
+
+// adjustNextReplicasInReservedStrategy adjusts the next replicas for each subset based on the temporary adaptive scheduling strategy.
+// It ensures that subsets marked as unschedulable retain their current replicas and that the total number of replicas does not exceed the specified totalReplicas.
+func adjustNextReplicasInReservedStrategy(nextReplicas *map[string]int32, existingSubsets *map[string]*Subset, totalReplicas int32, subsets []appsv1alpha1.Subset) *map[string]int32 {
+	for name, next := range *nextReplicas {
+		if subset := (*existingSubsets)[name]; subset != nil && subset.Status.UnschedulableStatus.Unschedulable {
+			(*nextReplicas)[name] = max(next, subset.Spec.Replicas)
+		}
+	}
+	var countedReplicas int32
+	for _, s := range subsets {
+		name := s.Name
+		// Purge capacity that exceeds the total number of replicas
+		if countedReplicas >= totalReplicas {
+			(*nextReplicas)[name] = 0
+			continue
+		}
+		if subset := (*existingSubsets)[name]; subset != nil {
+			next := (*nextReplicas)[name]
+			countedReplicas += min(subset.Spec.Replicas, next) - subset.Status.UnschedulableStatus.ReservedPods
+		}
+		if countedReplicas > totalReplicas {
+			(*nextReplicas)[name] -= countedReplicas - totalReplicas
+		}
+	}
+	var expectedHealthyReplicas int32
+	for _, subset := range *existingSubsets {
+		expectedHealthyReplicas += subset.Status.ReadyReplicas
+		if expectedHealthyReplicas >= totalReplicas {
+			expectedHealthyReplicas = totalReplicas
+			break
+		}
+	}
+	for _, s := range subsets {
+		if expectedHealthyReplicas <= 0 {
+			break
+		}
+		name := s.Name
+		subset := (*existingSubsets)[name]
+		next := (*nextReplicas)[name]
+		if subset == nil {
+			continue
+		}
+		expectedHealthyReplicas -= min(subset.Status.ReadyReplicas, next)
+	}
+	for _, s := range subsets {
+		if expectedHealthyReplicas <= 0 {
+			break
+		}
+		name := s.Name
+		subset := (*existingSubsets)[name]
+		next := (*nextReplicas)[name]
+		if subset == nil {
+			continue
+		}
+		if subset.Status.ReadyReplicas > next {
+			canAdd := subset.Status.ReadyReplicas - next
+			shouldAdd := min(expectedHealthyReplicas, canAdd)
+			(*nextReplicas)[name] = next + shouldAdd
+			expectedHealthyReplicas -= shouldAdd
+		}
+	}
+	return nextReplicas
 }

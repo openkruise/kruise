@@ -73,11 +73,11 @@ func round(x float64) int {
 func getSubsetNameFrom(metaObj metav1.Object) (string, error) {
 	name, exist := metaObj.GetLabels()[appsv1alpha1.SubSetNameLabelKey]
 	if !exist {
-		return "", fmt.Errorf("fail to get subSet name from reserved of subset %s/%s: no reserved %s found", metaObj.GetNamespace(), metaObj.GetName(), appsv1alpha1.SubSetNameLabelKey)
+		return "", fmt.Errorf("fail to get subSet name from label of subset %s/%s: no label %s found", metaObj.GetNamespace(), metaObj.GetName(), appsv1alpha1.SubSetNameLabelKey)
 	}
 
 	if len(name) == 0 {
-		return "", fmt.Errorf("fail to get subSet name from reserved of subset %s/%s: reserved %s has an empty value", metaObj.GetNamespace(), metaObj.GetName(), appsv1alpha1.SubSetNameLabelKey)
+		return "", fmt.Errorf("fail to get subSet name from label of subset %s/%s: label %s has an empty value", metaObj.GetNamespace(), metaObj.GetName(), appsv1alpha1.SubSetNameLabelKey)
 	}
 
 	return name, nil
@@ -159,7 +159,7 @@ var ResourceVersionExpectation = expectations.NewResourceVersionExpectation()
 func CheckPodReserved(pod *corev1.Pod, subset *Subset, updatedCondition *appsv1alpha1.UnitedDeploymentCondition,
 	pendingTimeout time.Duration, minReadySeconds time.Duration, now time.Time) (isReserved bool, nextCheckAfter time.Duration) {
 	podRevision, _ := GetPodLabel(pod, appsv1alpha1.ControllerRevisionHashLabelKey)
-	if reserved, _ := GetPodReserved(pod); reserved {
+	if reserved, _ := IsPodReserved(pod); reserved {
 		if pod.Status.Phase == corev1.PodRunning && podRevision == subset.Status.UpdatedRevision {
 			readyCondition := getPodCondition(pod, corev1.PodReady)
 			if readyCondition != nil && readyCondition.Status == corev1.ConditionTrue {
@@ -192,7 +192,7 @@ func CheckPodReserved(pod *corev1.Pod, subset *Subset, updatedCondition *appsv1a
 	}
 }
 
-// GetPodReserved checks whether the Pod is in the Reserved state.
+// IsPodReserved checks whether the Pod is in the Reserved state.
 // The Reserved state is defined as: the Pod has the reserved "apps.kruise.io/is-reserved-pod" set to "true".
 //
 // Parameters:
@@ -201,7 +201,7 @@ func CheckPodReserved(pod *corev1.Pod, subset *Subset, updatedCondition *appsv1a
 // Returns:
 //   - reserved: true if the Pod is in the Reserved state; otherwise, false.
 //   - ok: true if the Pod has the "apps.kruise.io/is-reserved-pod" reserved; otherwise, false.
-func GetPodReserved(pod *corev1.Pod) (reserved bool, ok bool) {
+func IsPodReserved(pod *corev1.Pod) (reserved bool, ok bool) {
 	if label, ok := GetPodLabel(pod, appsv1alpha1.ReservedPodLabelKey); ok {
 		return label == "true", true
 	} else {
