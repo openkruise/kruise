@@ -141,6 +141,9 @@ const (
 
 	// EnablePodProbeMarkerOnServerless enable PodProbeMarker on Serverless Pod
 	EnablePodProbeMarkerOnServerless featuregate.Feature = "EnablePodProbeMarkerOnServerless"
+
+	// EnableSortSidecarContainerByName enable sidecarSet to sort by container name when injecting sidecar containers
+	EnableSortSidecarContainerByName featuregate.Feature = "EnableSortSidecarContainerByName"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -179,6 +182,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	ForceDeleteTimeoutExpectationFeatureGate: {Default: false, PreRelease: featuregate.Alpha},
 	InPlaceWorkloadVerticalScaling:           {Default: false, PreRelease: featuregate.Alpha},
 	EnablePodProbeMarkerOnServerless:         {Default: false, PreRelease: featuregate.Alpha},
+	EnableSortSidecarContainerByName:         {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
