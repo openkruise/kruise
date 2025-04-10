@@ -20,21 +20,20 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"sort"
 	"testing"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 const (
@@ -250,24 +249,6 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 			},
 			expectedPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
-				pod.Status.Phase = corev1.PodFailed
-				return pod
-			},
-		},
-		{
-			name: "normal pod with sidecar, restartPolicy=Never, main containers failed and sidecar running",
-			getIn: func() *corev1.Pod {
-				podIn := podDemo.DeepCopy()
-				podIn.Status.ContainerStatuses[0] = failedMainContainerStatus
-				podIn.Status.ContainerStatuses[1] = runningSidecarContainerStatus
-				return podIn
-			},
-			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
-				return crrDemo.DeepCopy()
-			},
-			expectedPod: func() *corev1.Pod {
-				pod := podDemo.DeepCopy()
-				pod.Status.Phase = corev1.PodFailed
 				return pod
 			},
 		},
@@ -302,7 +283,6 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 			},
 			expectedPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
-				pod.Status.Phase = corev1.PodSucceeded
 				return pod
 			},
 		},
@@ -387,7 +367,6 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 			},
 			expectedPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
-				pod.Status.Phase = corev1.PodSucceeded
 				return pod
 			},
 		},
@@ -419,7 +398,6 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 			},
 			expectedPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
-				pod.Status.Phase = corev1.PodSucceeded
 				return pod
 			},
 		},
@@ -451,7 +429,6 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 			},
 			expectedPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
-				pod.Status.Phase = corev1.PodSucceeded
 				return pod
 			},
 		},
@@ -479,6 +456,82 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 			},
 			expectedPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
+				return pod
+			},
+		},
+		{
+			name: "normal pod with sidecar, restartPolicy=OnFailure, 2 succeeded main containers, 3 sidecars uncompleted",
+			getIn: func() *corev1.Pod {
+				podIn := podDemo.DeepCopy()
+				podIn.Spec.Containers = []corev1.Container{
+					mainContainerFactory("main-1"),
+					mainContainerFactory("main-2"),
+					sidecarContainerFactory("sidecar-1", "true"),
+					sidecarContainerFactory("sidecar-2", "true"),
+					sidecarContainerFactory("sidecar-3", "true"),
+				}
+				podIn.Spec.Containers[4].Env = append(podIn.Spec.Containers[4].Env, corev1.EnvVar{
+					Name:  appsv1alpha1.KruiseIgnoreContainerExitCodeEnv,
+					Value: "true",
+				})
+				podIn.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
+				podIn.Status.ContainerStatuses = []corev1.ContainerStatus{
+					rename(succeededMainContainerStatus.DeepCopy(), "main-1"),
+					rename(succeededMainContainerStatus.DeepCopy(), "main-2"),
+					rename(uncompletedSidecarContainerStatus.DeepCopy(), "sidecar-1"),
+					rename(uncompletedSidecarContainerStatus.DeepCopy(), "sidecar-2"),
+					rename(uncompletedSidecarContainerStatus.DeepCopy(), "sidecar-3"),
+				}
+				return podIn
+			},
+			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
+				crr := crrDemo.DeepCopy()
+				crr.Spec.Containers = []appsv1alpha1.ContainerRecreateRequestContainer{
+					{Name: "sidecar-2"},
+					{Name: "sidecar-1"},
+				}
+				return crr
+			},
+			expectedPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				return pod
+			},
+		},
+		{
+			name: "normal pod with sidecar, restartPolicy=OnFailure, 2 succeeded main containers, 2 sidecars completed, 1 uncompleted",
+			getIn: func() *corev1.Pod {
+				podIn := podDemo.DeepCopy()
+				podIn.Spec.Containers = []corev1.Container{
+					mainContainerFactory("main-1"),
+					mainContainerFactory("main-2"),
+					sidecarContainerFactory("sidecar-1", "true"),
+					sidecarContainerFactory("sidecar-2", "true"),
+					sidecarContainerFactory("sidecar-3", "true"),
+				}
+				podIn.Spec.Containers[4].Env = append(podIn.Spec.Containers[4].Env, corev1.EnvVar{
+					Name:  appsv1alpha1.KruiseIgnoreContainerExitCodeEnv,
+					Value: "true",
+				})
+				podIn.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
+				podIn.Status.ContainerStatuses = []corev1.ContainerStatus{
+					rename(succeededMainContainerStatus.DeepCopy(), "main-1"),
+					rename(succeededMainContainerStatus.DeepCopy(), "main-2"),
+					rename(completedSidecarContainerStatus.DeepCopy(), "sidecar-1"),
+					rename(completedSidecarContainerStatus.DeepCopy(), "sidecar-2"),
+					rename(uncompletedSidecarContainerStatus.DeepCopy(), "sidecar-3"),
+				}
+				return podIn
+			},
+			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
+				crr := crrDemo.DeepCopy()
+				crr.Spec.Containers = []appsv1alpha1.ContainerRecreateRequestContainer{
+					{Name: "sidecar-3"},
+				}
+				return crr
+			},
+			expectedPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.Status.Phase = corev1.PodSucceeded
 				return pod
 			},
 		},
@@ -514,9 +567,14 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 			realCRR.TypeMeta.APIVersion = appsv1alpha1.SchemeGroupVersion.String()
 			realCRR.TypeMeta.Kind = "ContainerRecreateRequest"
 
+			if realCRR != nil {
+				sort.Sort(SortContainers(realCRR.Spec.Containers))
+			}
+			if expectCRR != nil {
+				sort.Sort(SortContainers(expectCRR.Spec.Containers))
+			}
 			realBy, _ := json.Marshal(realCRR)
 			expectBy, _ := json.Marshal(expectCRR)
-
 			if !(expectCRR == nil && errors.IsNotFound(err) || reflect.DeepEqual(realBy, expectBy)) {
 				t.Fatal("Get unexpected CRR")
 			}
@@ -559,6 +617,7 @@ func TestInPlaceUpdateStrategy(t *testing.T) {
 				podIn.Spec.Containers[1].Env = []corev1.EnvVar{
 					{Name: appsv1alpha1.KruiseTerminateSidecarWithImageEnv, Value: ExitQuicklyImage},
 				}
+				podIn.Spec.NodeName = vkNode.Name
 				return podIn
 			},
 			expectedNumber: 1,
@@ -734,4 +793,16 @@ func mainContainerFactory(name string) corev1.Container {
 func rename(status *corev1.ContainerStatus, name string) corev1.ContainerStatus {
 	status.Name = name
 	return *status
+}
+
+type SortContainers []appsv1alpha1.ContainerRecreateRequestContainer
+
+func (s SortContainers) Len() int {
+	return len(s)
+}
+func (s SortContainers) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+func (s SortContainers) Less(i, j int) bool {
+	return s[i].Name < s[j].Name
 }

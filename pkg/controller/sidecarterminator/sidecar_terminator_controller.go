@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -38,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -136,22 +134,31 @@ func (r *ReconcileSidecarTerminator) doReconcile(pod *corev1.Pod) (reconcile.Res
 	if !isInterestingPod(pod) {
 		return reconcile.Result{}, nil
 	}
-
-	sidecarNeedToExecuteKillContainer, sidecarNeedToExecuteInPlaceUpdate, err := r.groupSidecars(pod)
-
+	vk, err := IsPodRunningOnVirtualKubelet(pod, r.Client)
 	if err != nil {
+		klog.ErrorS(err, "SidecarTerminator -- Error occurred when try to check if pod is running on virtual-kubelet", "pod", klog.KObj(pod))
 		return reconcile.Result{}, err
 	}
-
-	if err := r.executeInPlaceUpdateAction(pod, sidecarNeedToExecuteInPlaceUpdate); err != nil {
+	normalSidecarNames, ignoreExitCodeSidecarNames, inplaceUpdateSidecarNames := getSidecarContainerNames(pod, vk)
+	if err = r.executeInPlaceUpdateAction(pod, inplaceUpdateSidecarNames); err != nil {
 		return reconcile.Result{}, err
 	}
-
+	if err = r.executeKillContainerAction(pod, normalSidecarNames); err != nil {
+		return reconcile.Result{}, err
+	}
+	if ignoreExitCodeSidecarNames.Len() == 0 || !containersCompleted(pod, normalSidecarNames) || !containersCompleted(pod, inplaceUpdateSidecarNames) {
+		return reconcile.Result{}, nil
+	}
 	if err := r.markJobPodTerminated(pod); err != nil {
 		return reconcile.Result{}, err
 	}
-
-	if err := r.executeKillContainerAction(pod, sidecarNeedToExecuteKillContainer); err != nil {
+	// JobSidecarTerminator relies on the exit code of the sidecar to be zero. If it is non-zero, it will result in a Pod Status of Failed.
+	// To solve this problem, we can set the Pod Status to Completed in advance.
+	// However, the above will also have some problems. For example, there are some CSI and ENI controllers that recycle resources based on Pod completion.
+	// If you set it in advance, the scheduler will think that the resources have been recovered, but the bottom reason is that the resources are still being used by the previous Pod,
+	// which will result in resource conflict, and then the new Pod startup will fail.
+	// Because of this, we open a new ENV KRUISE_TERMINATE_SIDECAR_IGNORE_EXIT_CODE to open this ability, the user also need to understand the risk behind, before deciding whether to use.
+	if err := r.executeKillContainerAction(pod, ignoreExitCodeSidecarNames); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -184,8 +191,9 @@ func (r *ReconcileSidecarTerminator) markJobPodTerminated(pod *corev1.Pod) error
 		},
 	}
 
+	mainContainers, _ := groupMainSidecarContainers(pod)
 	// patch pod phase
-	if containersSucceeded(pod, getMain(pod)) {
+	if containersSucceeded(pod, mainContainers) {
 		status.Phase = corev1.PodSucceeded
 	} else {
 		status.Phase = corev1.PodFailed
@@ -203,32 +211,7 @@ func (r *ReconcileSidecarTerminator) markJobPodTerminated(pod *corev1.Pod) error
 	return nil
 }
 
-func (r *ReconcileSidecarTerminator) groupSidecars(pod *corev1.Pod) (sets.String, sets.String, error) {
-	runningOnVK, err := IsPodRunningOnVirtualKubelet(pod, r.Client)
-	if err != nil {
-		return nil, nil, client.IgnoreNotFound(err)
-	}
-
-	inPlaceUpdate := sets.NewString()
-	killContainer := sets.NewString()
-	for i := range pod.Spec.Containers {
-		container := &pod.Spec.Containers[i]
-		for j := range container.Env {
-			if !runningOnVK && container.Env[j].Name == appsv1alpha1.KruiseTerminateSidecarEnv &&
-				strings.EqualFold(container.Env[j].Value, "true") {
-				killContainer.Insert(container.Name)
-				break
-			}
-			if container.Env[j].Name == appsv1alpha1.KruiseTerminateSidecarWithImageEnv &&
-				container.Env[j].Value != "" {
-				inPlaceUpdate.Insert(container.Name)
-			}
-		}
-	}
-	return killContainer, inPlaceUpdate, nil
-}
-
-func containersCompleted(pod *corev1.Pod, containers sets.String) bool {
+func containersCompleted(pod *corev1.Pod, containers sets.Set[string]) bool {
 	if len(pod.Spec.Containers) != len(pod.Status.ContainerStatuses) {
 		return false
 	}
@@ -242,7 +225,7 @@ func containersCompleted(pod *corev1.Pod, containers sets.String) bool {
 	return true
 }
 
-func containersSucceeded(pod *corev1.Pod, containers sets.String) bool {
+func containersSucceeded(pod *corev1.Pod, containers sets.Set[string]) bool {
 	if len(pod.Spec.Containers) != len(pod.Status.ContainerStatuses) {
 		return false
 	}
