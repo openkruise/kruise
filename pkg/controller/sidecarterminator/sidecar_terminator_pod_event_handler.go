@@ -18,18 +18,14 @@ package sidecarterminator
 
 import (
 	"context"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 var _ handler.EventHandler = &enqueueRequestForPod{}
@@ -74,56 +70,4 @@ func (p *enqueueRequestForPod) handlePodUpdate(q workqueue.RateLimitingInterface
 			},
 		})
 	}
-}
-
-func isInterestingPod(pod *corev1.Pod) bool {
-	if pod.DeletionTimestamp != nil ||
-		pod.Status.Phase == corev1.PodPending ||
-		pod.Spec.RestartPolicy == corev1.RestartPolicyAlways {
-		return false
-	}
-
-	sidecars := getSidecar(pod)
-	if sidecars.Len() == 0 || containersCompleted(pod, sidecars) {
-		return false
-	}
-
-	switch pod.Spec.RestartPolicy {
-	case corev1.RestartPolicyNever:
-		return containersCompleted(pod, getMain(pod))
-	case corev1.RestartPolicyOnFailure:
-		return containersSucceeded(pod, getMain(pod))
-	}
-	return false
-}
-
-func getMain(pod *corev1.Pod) sets.String {
-	mainNames := sets.NewString()
-	for i := range pod.Spec.Containers {
-		if !isSidecar(pod.Spec.Containers[i]) {
-			mainNames.Insert(pod.Spec.Containers[i].Name)
-		}
-	}
-	return mainNames
-}
-
-func getSidecar(pod *corev1.Pod) sets.String {
-	sidecarNames := sets.NewString()
-	for i := range pod.Spec.Containers {
-		if isSidecar(pod.Spec.Containers[i]) {
-			sidecarNames.Insert(pod.Spec.Containers[i].Name)
-		}
-	}
-	return sidecarNames
-}
-
-func isSidecar(container corev1.Container) bool {
-	for _, env := range container.Env {
-		if env.Name == appsv1alpha1.KruiseTerminateSidecarEnv && strings.EqualFold(env.Value, "true") {
-			return true
-		} else if env.Name == appsv1alpha1.KruiseTerminateSidecarWithImageEnv && env.Value != "" {
-			return true
-		}
-	}
-	return false
 }
