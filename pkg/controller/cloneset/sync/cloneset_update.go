@@ -79,13 +79,13 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 
 	// 2. calculate update diff and the revision to update
 	diffRes := calculateDiffsWithExpectation(cs, pods, currentRevision.Name, updateRevision.Name, nil)
-	if diffRes.updateNum == 0 {
+	if diffRes.UpdateNum == 0 {
 		return nil
 	}
 
 	// 3. find all matched pods can update
 	targetRevision := updateRevision
-	if diffRes.updateNum < 0 {
+	if diffRes.UpdateNum < 0 {
 		targetRevision = currentRevision
 	}
 	var waitUpdateIndexes []int
@@ -95,7 +95,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 		}
 
 		var waitUpdate, canUpdate bool
-		if diffRes.updateNum > 0 {
+		if diffRes.UpdateNum > 0 {
 			waitUpdate = !clonesetutils.EqualToRevisionHash("", pod, updateRevision.Name)
 		} else {
 			waitUpdate = clonesetutils.EqualToRevisionHash("", pod, updateRevision.Name)
@@ -347,7 +347,7 @@ func SortUpdateIndexes(coreControl clonesetcore.Control, strategy appsv1alpha1.C
 
 // limitUpdateIndexes limits all pods waiting update by the maxUnavailable policy, and returns the indexes of pods that can finally update
 func limitUpdateIndexes(coreControl clonesetcore.Control, minReadySeconds int32, diffRes expectationDiffs, waitUpdateIndexes []int, pods []*v1.Pod, targetRevisionHash string) []int {
-	updateDiff := util.IntAbs(diffRes.updateNum)
+	updateDiff := util.IntAbs(diffRes.UpdateNum)
 	if updateDiff < len(waitUpdateIndexes) {
 		waitUpdateIndexes = waitUpdateIndexes[:updateDiff]
 	}
@@ -363,14 +363,14 @@ func limitUpdateIndexes(coreControl clonesetcore.Control, minReadySeconds int32,
 	}
 	for _, i := range waitUpdateIndexes {
 		// Make sure unavailable pods in target revision should not be more than maxUnavailable.
-		if targetRevisionUnavailableCount+canUpdateCount >= diffRes.updateMaxUnavailable {
+		if targetRevisionUnavailableCount+canUpdateCount >= diffRes.UpdateMaxUnavailable {
 			break
 		}
 
 		// Make sure unavailable pods in all revisions should not be more than maxUnavailable.
 		// Note that update an old pod that already be unavailable will not increase the unavailable number.
 		if IsPodAvailable(coreControl, pods[i], minReadySeconds) {
-			if unavailableCount >= diffRes.updateMaxUnavailable {
+			if unavailableCount >= diffRes.UpdateMaxUnavailable {
 				break
 			}
 			unavailableCount++
