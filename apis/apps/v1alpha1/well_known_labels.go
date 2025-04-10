@@ -29,4 +29,7 @@ const (
 	// using in-place update strategy to kill sidecar. This image must be given if you want to use in-place update
 	// strategy to terminate sidecar containers.
 	KruiseTerminateSidecarWithImageEnv = "KRUISE_TERMINATE_SIDECAR_WHEN_JOB_EXIT_WITH_IMAGE"
+
+	// KruiseIgnoreContainerExitCodeEnv is an env name, which represents a switch to ignore the exit code of sidecar container.
+	KruiseIgnoreContainerExitCodeEnv = "KRUISE_TERMINATE_SIDECAR_IGNORE_EXIT_CODE"
 )
