@@ -1,3 +1,4 @@
 ignore:
 - "pkg/client/.*"
+- "test/fuzz/.*"
 
