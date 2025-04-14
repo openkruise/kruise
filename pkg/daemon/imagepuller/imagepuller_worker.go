@@ -23,7 +23,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -49,7 +48,7 @@ const (
 	PullImageFailed  = "PullImageFailed"
 )
 
-var workerLimitedPool errgroup.Group
+var workerLimitedPool ImagePullWorkerPool
 
 type puller interface {
 	Sync(obj *appsv1alpha1.NodeImage, ref *v1.ObjectReference) error
@@ -67,16 +66,12 @@ type realPuller struct {
 
 var _ puller = &realPuller{}
 
-func newRealPuller(runtime runtimeimage.ImageService, secretManager daemonutil.SecretManager, eventRecorder record.EventRecorder, MaxWorkersForPullImages int) (*realPuller, error) {
+func newRealPuller(runtime runtimeimage.ImageService, secretManager daemonutil.SecretManager, eventRecorder record.EventRecorder) (*realPuller, error) {
 	p := &realPuller{
 		runtime:       runtime,
 		secretManager: secretManager,
 		eventRecorder: eventRecorder,
 		workerPools:   make(map[string]workerPool),
-	}
-	if MaxWorkersForPullImages > 0 {
-		klog.InfoS("set image pull worker number", "worker", MaxWorkersForPullImages)
-		workerLimitedPool.SetLimit(MaxWorkersForPullImages)
 	}
 	return p, nil
 }
@@ -295,12 +290,21 @@ func newPullWorker(name string, tagSpec appsv1alpha1.ImageTagSpec, sandboxConfig
 		}
 		o.statusUpdater.UpdateStatus(newStatus)
 		klog.V(5).InfoS("pull worker waiting", "image", image)
-		workerLimitedPool.Go(func() error {
+		fn := func() {
 			klog.V(5).InfoS("pull worker start", "image", image)
 			o.Run()
 			klog.V(5).InfoS("pull worker end", "image", image)
-			return nil
-		})
+		}
+		if workerLimitedPool != nil {
+			workerLimitedPool.Submit(func() {
+				fn()
+			})
+		} else {
+			// no limited_pool
+			klog.V(5).InfoS("pull worker without limited_pool", "image", image)
+			fn()
+		}
+
 	}()
 	return o
 }
@@ -469,7 +473,10 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1alpha1.Im
 	// make it asynchronous for CRI runtime will block in pulling image
 	var statusReader runtimeimage.ImagePullStatusReader
 	pullChan := make(chan struct{})
-	// why add this? because directly assign to statusReader will cause race condition
+	// Why add this? Directly assigning to `statusReader` and `err` can cause race conditions.
+	// Case: When a worker is pulling data, stopping the pull worker might lead to concurrent writes to the local parameter `err`.
+	// (line 483 and 503)
+	// To avoid this, we introduce `readerCh` and `errCh` for communication between multiple goroutines.
 	readerCh := make(chan runtimeimage.ImagePullStatusReader, 1)
 	errCh := make(chan error, 1)
 	go func() {

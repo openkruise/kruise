@@ -95,7 +95,12 @@ func NewController(opts daemonoptions.Options, secretManager daemonutil.SecretMa
 		},
 	})
 
-	puller, err := newRealPuller(opts.RuntimeFactory.GetImageService(), secretManager, recorder, opts.MaxWorkersForPullImages)
+	if opts.MaxWorkersForPullImages > 0 {
+		klog.InfoS("set image pull worker number", "worker", opts.MaxWorkersForPullImages)
+		workerLimitedPool = NewChanPool(opts.MaxWorkersForPullImages)
+		go workerLimitedPool.Start()
+	}
+	puller, err := newRealPuller(opts.RuntimeFactory.GetImageService(), secretManager, recorder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to new puller: %v", err)
 	}
@@ -166,6 +171,9 @@ func (c *Controller) Run(stop <-chan struct{}) {
 
 	klog.Info("Started puller controller successfully")
 	<-stop
+	if workerLimitedPool != nil {
+		workerLimitedPool.Stop()
+	}
 }
 
 // processNextWorkItem will read a single work item off the workqueue and

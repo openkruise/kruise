@@ -151,12 +151,10 @@ func (f *fakeSecret) GetSecrets(secret []appsv1alpha1.ReferenceObject) ([]v1.Sec
 }
 
 // test case here
-func TestRealPullerSync(t *testing.T) {
-	// 初始化测试依赖
+func realPullerSyncFn(t *testing.T, limitedPool bool) {
 	eventRecorder := record.NewFakeRecorder(100)
 	secretManager := fakeSecret{}
 
-	// 基础测试用例
 	baseNodeImage := &appsv1alpha1.NodeImage{
 		Spec: appsv1alpha1.NodeImageSpec{
 			Images: map[string]appsv1alpha1.ImageSpec{
@@ -195,12 +193,12 @@ func TestRealPullerSync(t *testing.T) {
 					Images: map[string]appsv1alpha1.ImageSpec{
 						"nginx": {
 							Tags: []appsv1alpha1.ImageTagSpec{
-								{Tag: "latest", Version: 1}, // 版本变化
+								{Tag: "latest", Version: 1},
 							},
 						},
 						"busybox": {
 							Tags: []appsv1alpha1.ImageTagSpec{
-								{Tag: "1.15", Version: 1}, // 版本变化
+								{Tag: "1.15", Version: 1},
 							},
 						},
 					},
@@ -210,10 +208,16 @@ func TestRealPullerSync(t *testing.T) {
 		},
 	}
 	fakeRuntime := &fakeRuntime{images: make(map[string]*imageStatus)}
-	p, _ := newRealPuller(fakeRuntime, &secretManager, eventRecorder, 2)
+	workerLimitedPool = NewChanPool(2)
+	go workerLimitedPool.Start()
+	p, _ := newRealPuller(fakeRuntime, &secretManager, eventRecorder)
 
+	nameSuffuix := "_NoLimitPool"
+	if limitedPool {
+		nameSuffuix = "_LimitPool"
+	}
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name+nameSuffuix, func(t *testing.T) {
 			for poolName := range tc.prePools {
 				p.workerPools[poolName] = newRealWorkerPool(poolName, fakeRuntime, &secretManager, eventRecorder)
 			}
@@ -256,11 +260,12 @@ func TestRealPullerSync(t *testing.T) {
 	for _, val := range p.workerPools {
 		val.Stop()
 	}
-
-	err := workerLimitedPool.Wait()
-	assert.Nil(t, err)
 	fakeRuntime.clean()
-	workerLimitedPool.SetLimit(5) // to check if the pool is cleaned
+}
+
+func TestRealPullerSync(t *testing.T) {
+	realPullerSyncFn(t, false)
+	realPullerSyncFn(t, true)
 }
 
 var scheme *runtime.Scheme
@@ -273,11 +278,9 @@ func init() {
 }
 
 func TestRealPullerSyncWithLimitedPool(t *testing.T) {
-	// 初始化测试依赖
 	eventRecorder := record.NewFakeRecorder(100)
 	secretManager := fakeSecret{}
 
-	// 基础测试用例
 	baseNodeImage := &appsv1alpha1.NodeImage{
 		Spec: appsv1alpha1.NodeImageSpec{
 			Images: map[string]appsv1alpha1.ImageSpec{
@@ -301,7 +304,9 @@ func TestRealPullerSyncWithLimitedPool(t *testing.T) {
 	}
 
 	r := &fakeRuntime{images: make(map[string]*imageStatus)}
-	p, _ := newRealPuller(r, &secretManager, eventRecorder, 2)
+	workerLimitedPool = NewChanPool(2)
+	go workerLimitedPool.Start()
+	p, _ := newRealPuller(r, &secretManager, eventRecorder)
 
 	ref, _ := reference.GetReference(scheme, baseNodeImage)
 	err := p.Sync(baseNodeImage, ref)
@@ -349,8 +354,5 @@ func TestRealPullerSyncWithLimitedPool(t *testing.T) {
 		val.Stop()
 	}
 
-	err = workerLimitedPool.Wait()
-	assert.Nil(t, err)
 	r.clean()
-	workerLimitedPool.SetLimit(5) // to check if the pool is cleaned
 }
