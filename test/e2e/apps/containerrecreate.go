@@ -607,9 +607,11 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
 					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
 				}))
+				klog.Infof("crr(%s/%s) Yaml(%s)", crr.Namespace, crr.Name, util.DumpJSON(crr))
 
 				ginkgo.By("Check Pod containers recreated")
 				pod, err = tester.GetPod(pod.Name)
+				klog.Infof("Pod(%s/%s) Yaml(%s)", pod.Namespace, pod.Name, util.DumpJSON(pod))
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(podutil.IsPodReady(pod)).Should(gomega.Equal(true))
 				appContainerStatus := util.GetContainerStatus("app", pod)
