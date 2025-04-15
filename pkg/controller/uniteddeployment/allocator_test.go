@@ -543,7 +543,7 @@ func generateSubsetPods(total, reserved int32, prefix int) []*corev1.Pod {
 	return pods
 }
 
-// Cases of TestGetTemporaryAdaptiveNext must be aligned with TestRescheduleTemporarily
+// Cases of TestGetTemporaryAdaptiveNext must be aligned with TestAdjustReplicasInReservedStrategy
 func TestGetTemporaryAdaptiveNext(t *testing.T) {
 	getUnitedDeploymentAndSubsets := func(totalReplicas, minReplicas, maxReplicas int32, reserved []int32, cur []int32) (
 		*appsv1alpha1.UnitedDeployment, map[string]*Subset) {
@@ -600,7 +600,7 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 		minReplicas int32   // min replicas of each subset
 		maxReplicas int32   // max replicas of each subset except the last one
 		cur         []int32 // last allocated results, equals to last expect
-		staging     []int32 // current unavailable pod nums of each subset
+		reserved    []int32 // current unavailable pod nums of each subset
 		next        []int32 // allocated replicas calculated this time
 	}{
 		{
@@ -609,7 +609,7 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 			minReplicas: 1,
 			maxReplicas: 2,
 			cur:         []int32{0, 0, 0, 0},
-			staging:     []int32{0, 0, 0, 0},
+			reserved:    []int32{0, 0, 0, 0},
 			next:        []int32{2, 2, 2, 2},
 		},
 		{
@@ -618,7 +618,7 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 			minReplicas: 1,
 			maxReplicas: 2,
 			cur:         []int32{2, 2, 2, 2},
-			staging:     []int32{0, 2, 2, 0},
+			reserved:    []int32{0, 2, 2, 0},
 			next:        []int32{2, 0, 0, 6},
 		},
 		{
@@ -627,7 +627,7 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 			minReplicas: 1,
 			maxReplicas: 2,
 			cur:         []int32{2, 2, 2, 6},
-			staging:     []int32{0, 1, 1, 0},
+			reserved:    []int32{0, 1, 1, 0},
 			next:        []int32{2, 1, 1, 4},
 		},
 		{
@@ -636,7 +636,7 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 			minReplicas: 1,
 			maxReplicas: 2,
 			cur:         []int32{2, 2, 2, 4},
-			staging:     []int32{0, 0, 1, 0},
+			reserved:    []int32{0, 0, 1, 0},
 			next:        []int32{2, 2, 1, 3},
 		},
 		{
@@ -645,7 +645,7 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 			minReplicas: 1,
 			maxReplicas: 2,
 			cur:         []int32{2, 2, 2, 3},
-			staging:     []int32{0, 0, 0, 0},
+			reserved:    []int32{0, 0, 0, 0},
 			next:        []int32{2, 2, 2, 2},
 		},
 		{
@@ -654,7 +654,7 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 			minReplicas: 2,
 			maxReplicas: 4,
 			cur:         []int32{2, 2, 2, 6},
-			staging:     []int32{0, 1, 1, 0},
+			reserved:    []int32{0, 1, 1, 0},
 			next:        []int32{4, 1, 1, 10},
 		},
 		{
@@ -663,7 +663,7 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 			minReplicas: 1,
 			maxReplicas: 2,
 			cur:         []int32{4, 2, 2, 10},
-			staging:     []int32{0, 1, 1, 0},
+			reserved:    []int32{0, 1, 1, 0},
 			next:        []int32{2, 1, 1, 4},
 		},
 		{
@@ -672,7 +672,7 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 			minReplicas: 2,
 			maxReplicas: 4,
 			cur:         []int32{4, 2, 2, 10},
-			staging:     []int32{0, 0, 0, 0},
+			reserved:    []int32{0, 0, 0, 0},
 			next:        []int32{4, 4, 4, 4},
 		},
 		{
@@ -681,86 +681,93 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 			minReplicas: 2,
 			maxReplicas: 4,
 			cur:         []int32{4, 4, 4, 8},
-			staging:     []int32{0, 0, 0, 0},
+			reserved:    []int32{0, 0, 0, 0},
 			next:        []int32{4, 4, 4, 4},
 		},
 		{
-			// this case is same as the previous one in allocate stage, just to align with TestRescheduleTemporarily
+			// this case is same as the previous one in allocate stage, just to align with TestAdjustReplicasInReservedStrategy
 			name:        "4 subsets, all pods started, already scaled to 16 replicas",
 			replicas:    16,
 			minReplicas: 2,
 			maxReplicas: 4,
 			cur:         []int32{4, 4, 4, 8},
-			staging:     []int32{0, 0, 0, 0},
+			reserved:    []int32{0, 0, 0, 0},
 			next:        []int32{4, 4, 4, 4},
 		},
 		{
 			name:     "3 infinity subsets, start",
 			replicas: 2,
 			cur:      []int32{0, 0, 0},
-			staging:  []int32{0, 0, 0},
+			reserved: []int32{0, 0, 0},
 			next:     []int32{2, 0, 0},
 		},
 		{
 			name:     "3 infinity subsets, start",
 			replicas: 2,
 			cur:      []int32{0, 0, 0},
-			staging:  []int32{0, 0, 0},
+			reserved: []int32{0, 0, 0},
 			next:     []int32{2, 0, 0},
 		},
 		{
 			name:     "3 infinity subsets, found subset-0 unschedulable",
 			replicas: 2,
 			cur:      []int32{2, 0, 0},
-			staging:  []int32{2, 0, 0},
+			reserved: []int32{2, 0, 0},
 			next:     []int32{0, 2, 0},
 		},
 		{
 			name:     "3 infinity subsets, found subset-1 unschedulable",
 			replicas: 2,
 			cur:      []int32{2, 2, 0},
-			staging:  []int32{2, 2, 0},
+			reserved: []int32{2, 2, 0},
 			next:     []int32{0, 0, 2},
 		},
 		{
 			name:     "3 infinity subsets, one of subset-1 started",
 			replicas: 2,
 			cur:      []int32{2, 2, 2},
-			staging:  []int32{2, 1, 0},
+			reserved: []int32{2, 1, 0},
 			next:     []int32{0, 1, 1},
 		},
 		{
 			name:     "3 infinity subsets, subset-0 recovered",
 			replicas: 2,
 			cur:      []int32{2, 2, 1},
-			staging:  []int32{0, 1, 0},
+			reserved: []int32{0, 1, 0},
 			next:     []int32{2, 0, 0},
 		},
 		{
 			name:     "3 infinity subsets, too many pods running",
 			replicas: 2,
 			cur:      []int32{2, 2, 0},
-			staging:  []int32{0, 0, 0},
+			reserved: []int32{0, 0, 0},
 			next:     []int32{2, 0, 0},
 		},
 		{
 			name:     "3 infinity subsets, scaled from 2 to 4 and subset-1 recovered",
 			replicas: 4,
 			cur:      []int32{2, 2, 4},
-			staging:  []int32{0, 2, 0},
+			reserved: []int32{0, 2, 0},
 			next:     []int32{4, 0, 0},
 		},
 		{
 			name:     "3 infinity subsets, scaled from 2 to 4 and subset-1 recovered, two new pods just created",
 			replicas: 4,
 			cur:      []int32{4, 2, 2},
-			staging:  []int32{0, 2, 0},
+			reserved: []int32{0, 2, 0},
+			next:     []int32{4, 0, 0},
+		},
+		{
+			name:     "3 infinity subsets, scaled from 2 to 4 and subset-1 recovered, two new created pods ready",
+			replicas: 4,
+			cur:      []int32{4, 2, 2},
+			reserved: []int32{0, 2, 0},
 			next:     []int32{4, 0, 0},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ud, subsets := getUnitedDeploymentAndSubsets(tt.replicas, tt.minReplicas, tt.maxReplicas, tt.staging, tt.cur)
+			ud, subsets := getUnitedDeploymentAndSubsets(tt.replicas, tt.minReplicas, tt.maxReplicas, tt.reserved, tt.cur)
 			ac := elasticAllocator{ud}
 			result, err := ac.allocate(tt.replicas, &subsets)
 			if err != nil {
@@ -772,6 +779,219 @@ func TestGetTemporaryAdaptiveNext(t *testing.T) {
 			}
 			if !reflect.DeepEqual(actual, tt.next) {
 				t.Fatalf("expected %v, got %v", tt.next, actual)
+			}
+		})
+	}
+}
+
+// TestAdjustReplicasInReservedStrategy tests what happened after TestGetTemporaryAdaptiveNext
+// The cases of two tests must be aligned.
+func TestAdjustReplicasInReservedStrategy(t *testing.T) {
+	tests := []struct {
+		name        string
+		replicas    int32   // total replicas of UnitedDeployment
+		next        []int32 // allocated replicas calculated this time
+		cur         []int32 // last allocated results, equals to last expect
+		unavailable []int32 // current unavailable pod nums of each subset
+		newPods     []int32 // newly created and pending pods caused by replica allocation
+		expect      []int32 // final allocated result after reschedule
+	}{
+		{
+			name:        "4 subsets, 2 each, start",
+			replicas:    8,
+			next:        []int32{2, 2, 2, 2},
+			cur:         []int32{0, 0, 0, 0},
+			unavailable: []int32{0, 0, 0, 0},
+			expect:      []int32{2, 2, 2, 2},
+		},
+		{
+			name:        "4 subsets, subset 1 and 2 unschedulable detected",
+			replicas:    8,
+			next:        []int32{2, 0, 0, 6},
+			cur:         []int32{2, 2, 2, 2},
+			unavailable: []int32{0, 2, 2, 0},
+			expect:      []int32{2, 2, 2, 6},
+		},
+		{
+			name:        "4 subsets, subset 1 and 2 starts each 1 pods",
+			replicas:    8,
+			next:        []int32{2, 1, 1, 4},
+			cur:         []int32{2, 2, 2, 6},
+			unavailable: []int32{0, 1, 1, 0},
+			expect:      []int32{2, 2, 2, 4},
+		},
+		{
+			name:        "4 subsets, subset 1 recovered",
+			replicas:    8,
+			next:        []int32{2, 2, 1, 3},
+			cur:         []int32{2, 2, 2, 4},
+			unavailable: []int32{0, 0, 1, 0},
+			expect:      []int32{2, 2, 2, 3},
+		},
+		{
+			name:        "4 subsets, all subset recovered",
+			replicas:    8,
+			next:        []int32{2, 2, 2, 2},
+			cur:         []int32{2, 2, 2, 3},
+			unavailable: []int32{0, 0, 0, 0},
+			expect:      []int32{2, 2, 2, 2},
+		},
+		{
+			name:        "4 subsets, part of subset 1 and 2 started, scaled to 16 replicas",
+			replicas:    16,
+			next:        []int32{4, 1, 1, 10},
+			cur:         []int32{2, 2, 2, 6},
+			unavailable: []int32{0, 1, 1, 0},
+			expect:      []int32{4, 2, 2, 10},
+		},
+		{
+			name:        "4 subsets, part of subset 1 and 2 started, scaled back to 8 replicas",
+			replicas:    8,
+			next:        []int32{2, 1, 1, 4},
+			cur:         []int32{4, 2, 2, 10},
+			unavailable: []int32{0, 1, 1, 0},
+			expect:      []int32{2, 2, 2, 4},
+		},
+		{
+			name:        "4 subsets, all of subset 1 and 2 started, already scaled to 16 replicas",
+			replicas:    16,
+			next:        []int32{4, 4, 4, 4},
+			cur:         []int32{4, 2, 2, 10},
+			unavailable: []int32{0, 0, 0, 0},
+			expect:      []int32{4, 4, 4, 8}, // 4 temp running pods retains for 4 new pods not created
+		},
+		{
+			name:        "4 subsets, all of subset 1 and 2 started, already scaled to 16 replicas, 4 new pods just created",
+			replicas:    16,
+			next:        []int32{4, 4, 4, 4},
+			cur:         []int32{4, 4, 4, 8},
+			unavailable: []int32{0, 0, 0, 0},
+			newPods:     []int32{0, 2, 2, 0},
+			expect:      []int32{4, 4, 4, 8}, // 4 temp running pods retains for 4 new pods not started
+		},
+		{
+			name:        "4 subsets, all of subset 1 and 2 started, already scaled to 16 replicas, 4 new pods just created",
+			replicas:    16,
+			next:        []int32{4, 4, 4, 4},
+			cur:         []int32{4, 4, 4, 8},
+			unavailable: []int32{0, 0, 0, 0},
+			newPods:     []int32{0, 0, 0, 0},
+			expect:      []int32{4, 4, 4, 4}, // 4 temp running pods retains for 4 new pods not started
+		},
+		{
+			name:        "3 infinity subsets, start",
+			replicas:    2,
+			next:        []int32{2, 0, 0},
+			cur:         []int32{0, 0, 0},
+			unavailable: []int32{0, 0, 0},
+			expect:      []int32{2, 0, 0},
+		},
+		{
+			name:        "3 infinity subsets, found subset-0 unschedulable",
+			replicas:    2,
+			next:        []int32{0, 2, 0},
+			cur:         []int32{2, 0, 0},
+			unavailable: []int32{2, 0, 0},
+			expect:      []int32{2, 2, 0},
+		},
+		{
+			name:        "3 infinity subsets, found subset-1 unschedulable",
+			replicas:    2,
+			next:        []int32{0, 0, 2},
+			cur:         []int32{2, 2, 0},
+			unavailable: []int32{2, 2, 0},
+			expect:      []int32{2, 2, 2},
+		},
+		{
+			name:        "3 infinity subsets, one of subset-1 started",
+			replicas:    2,
+			next:        []int32{0, 1, 1},
+			cur:         []int32{2, 2, 2},
+			unavailable: []int32{2, 1, 0},
+			expect:      []int32{2, 2, 1},
+		},
+		{
+			name:        "3 infinity subsets, subset-0 recovered",
+			replicas:    2,
+			next:        []int32{2, 0, 0},
+			cur:         []int32{2, 2, 1},
+			unavailable: []int32{0, 1, 0},
+			expect:      []int32{2, 0, 0},
+		},
+		{
+			name:        "3 infinity subsets, too many pods running",
+			replicas:    2,
+			next:        []int32{2, 0, 0},
+			cur:         []int32{2, 2, 0},
+			unavailable: []int32{0, 0, 0},
+			expect:      []int32{2, 0, 0},
+		},
+		{
+			name:        "3 infinity subsets, scaled from 2 to 4 and subset-1 recovered",
+			replicas:    4,
+			cur:         []int32{2, 2, 4},
+			next:        []int32{4, 0, 0},
+			unavailable: []int32{0, 2, 0},
+			expect:      []int32{4, 2, 2},
+		},
+		{
+			name:        "3 infinity subsets, scaled from 2 to 4 and subset-1 recovered, two new pods just created",
+			replicas:    4,
+			cur:         []int32{4, 2, 2},
+			next:        []int32{4, 0, 0},
+			unavailable: []int32{0, 2, 0},
+			newPods:     []int32{2, 0, 0},
+			expect:      []int32{4, 2, 2},
+		},
+		{
+			name:        "3 infinity subsets, scaled from 2 to 4 and subset-1 recovered, two new created pods ready",
+			replicas:    4,
+			cur:         []int32{4, 2, 2},
+			next:        []int32{4, 0, 0},
+			unavailable: []int32{0, 2, 0},
+			newPods:     []int32{0, 0, 0},
+			expect:      []int32{4, 0, 0},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nextReplicas := make(map[string]int32)
+			for i := 0; i < len(tt.next); i++ {
+				nextReplicas[fmt.Sprintf("subset-%d", i)] = tt.next[i]
+			}
+			if tt.newPods == nil {
+				tt.newPods = make([]int32, len(tt.next))
+			}
+			existingSubsets := make(map[string]*Subset)
+			for i := 0; i < len(tt.cur); i++ {
+				existingSubsets[fmt.Sprintf("subset-%d", i)] = &Subset{
+					Status: SubsetStatus{
+						UnschedulableStatus: SubsetUnschedulableStatus{
+							ReservedPods:  tt.unavailable[i],
+							Unschedulable: tt.unavailable[i] != 0,
+						},
+						UpdatedReadyReplicas: tt.cur[i] - tt.unavailable[i] - tt.newPods[i],
+						ReadyReplicas:        tt.cur[i] - tt.unavailable[i] - tt.newPods[i],
+					},
+					Spec: SubsetSpec{
+						Replicas:   tt.cur[i],
+						SubsetPods: generateSubsetPods(tt.cur[i], tt.unavailable[i], i),
+					},
+				}
+			}
+			subsets := make([]appsv1alpha1.Subset, len(tt.next))
+			for i := range tt.next {
+				subsets[i] = appsv1alpha1.Subset{
+					Name: fmt.Sprintf("subset-%d", i),
+				}
+			}
+			result := adjustNextReplicasInReservedStrategy(&nextReplicas, &existingSubsets, tt.replicas, subsets)
+			actual := make([]int32, len(tt.expect))
+			for i := 0; i < len(tt.expect); i++ {
+				actual[i] = (*result)[fmt.Sprintf("subset-%d", i)]
+			}
+			if !reflect.DeepEqual(actual, tt.expect) {
+				t.Errorf("expected %v, but got %v", tt.expect, actual)
 			}
 		})
 	}
