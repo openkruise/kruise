@@ -54,17 +54,13 @@ type SubsetStatus struct {
 // SubsetUnschedulableStatus stores the unschedulable status of the Subset, which is used by adaptive strategy.
 type SubsetUnschedulableStatus struct {
 	Unschedulable bool
-	// The definition of UnavailablePods differs in different strategies:
-	//
-	// - In temporary adaptive strategy, it is the number of reserved pods in the subset.
-	// Please refer to the function CheckPodReserved.
-	//
-	// - In normal adaptive strategy, it is the number of Pending Pods.
-	//UnavailablePods int32
+	// In reservation adaptive strategy, it is the number of reserved pods in the subset.
+	// Please refer to the function CheckPodReallyInReservedStatus.
 	ReservedPods int32
-	PendingPods  int32
+	// The number of Pending Pods, used by normal adaptive strategy.
+	PendingPods int32
 	// Healthy running pods with old revision and marked as reserved (timeouted)
-	TimeoutLegacyPods int32
+	UpdateTimeoutPods int32
 }
 
 func (s SubsetUnschedulableStatus) UnavailablePods() int32 {

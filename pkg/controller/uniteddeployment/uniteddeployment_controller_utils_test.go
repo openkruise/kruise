@@ -257,16 +257,16 @@ func TestCheckPodStaging(t *testing.T) {
 				Status:             corev1.ConditionFalse,
 				LastTransitionTime: metav1.NewTime(tt.updatedTime),
 			}
-			result, nextCheckAfter := CheckPodReserved(tt.pod, subset, updatedCondition, tt.pendingTimeout, tt.minReadySeconds, now)
+			result, nextCheckAfter := CheckPodReallyInReservedStatus(tt.pod, subset, updatedCondition, tt.pendingTimeout, tt.minReadySeconds, now)
 			if result != tt.expectedResult {
-				t.Errorf("CheckPodReserved() result = %v, want %v", result, tt.expectedResult)
+				t.Errorf("CheckPodReallyInReservedStatus() result = %v, want %v", result, tt.expectedResult)
 			}
 			if nextCheckAfter != tt.expectedNextCheckAfter {
-				t.Errorf("CheckPodReserved() nextCheckAfter = %v, want %v", nextCheckAfter, tt.expectedNextCheckAfter)
+				t.Errorf("CheckPodReallyInReservedStatus() nextCheckAfter = %v, want %v", nextCheckAfter, tt.expectedNextCheckAfter)
 			}
-			if subset.Status.UnschedulableStatus.TimeoutLegacyPods != tt.expectedLegacyPods {
-				t.Errorf("CheckPodReserved() subset.Status.UnschedulableStatus.TimeoutLegacyPods = %v, want %v",
-					subset.Status.UnschedulableStatus.TimeoutLegacyPods, tt.expectedLegacyPods)
+			if subset.Status.UnschedulableStatus.UpdateTimeoutPods != tt.expectedLegacyPods {
+				t.Errorf("CheckPodReallyInReservedStatus() subset.Status.UnschedulableStatus.UpdateTimeoutPods = %v, want %v",
+					subset.Status.UnschedulableStatus.UpdateTimeoutPods, tt.expectedLegacyPods)
 			}
 		})
 	}

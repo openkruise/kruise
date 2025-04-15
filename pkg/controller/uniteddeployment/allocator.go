@@ -22,7 +22,6 @@ import (
 	"sort"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/integer"
 
@@ -82,12 +81,24 @@ func getSubsetRunningReplicas(existingSubsets *map[string]*Subset) map[string]in
 	}
 	var result = make(map[string]int32)
 	for name, subset := range *existingSubsets {
-		for _, pod := range subset.Spec.SubsetPods {
-			if reserved, _ := IsPodReserved(pod); !reserved && pod.Status.Phase == corev1.PodRunning {
-				result[name]++
-			}
-		}
-		result[name] = min(subset.Status.ReadyReplicas, result[name])
+		//for _, pod := range subset.Spec.SubsetPods {
+		//	if reserved, _ := IsPodMarkedAsReserved(pod); !reserved && pod.Status.Phase == corev1.PodRunning {
+		//		result[name]++
+		//	}
+		//}
+		//result[name] = min(subset.Status.ReadyReplicas, result[name])
+		result[name] = subset.Status.ReadyReplicas
+	}
+	return result
+}
+
+func getSubsetReservedReplicas(existingSubsets *map[string]*Subset) map[string]int32 {
+	if existingSubsets == nil {
+		return nil
+	}
+	var result = make(map[string]int32)
+	for name, subset := range *existingSubsets {
+		result[name] = subset.Status.UnschedulableStatus.ReservedPods
 	}
 	return result
 }
@@ -306,7 +317,6 @@ func (ac *elasticAllocator) validateAndCalculateMinMaxMap(replicas int32, existi
 	minReplicasMap := make(map[string]int32, numSubset)
 	maxReplicasMap := make(map[string]int32, numSubset)
 	runningReplicasMap := getSubsetRunningReplicas(existingSubsets)
-	var countedReplicas int32
 	for index, subset := range ac.Spec.Topology.Subsets {
 		minReplicas := int32(0)
 		maxReplicas := int32(math.MaxInt32)
@@ -325,19 +335,7 @@ func (ac *elasticAllocator) validateAndCalculateMinMaxMap(replicas int32, existi
 				minReplicas = integer.Int32Min(runningReplicas, minReplicas)
 				maxReplicas = integer.Int32Min(runningReplicas, maxReplicas)
 			}
-			if ac.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
-				countedReplicas += runningReplicasMap[subset.Name]
-				if countedReplicas >= replicas {
-					// only replicas number of running pods are protected
-					unschedulable = false
-				}
-				// In Temporary mode, running pods in unschedulable subsets are protected.
-				if runningReplicas := runningReplicasMap[subset.Name]; unschedulable && runningReplicas > minReplicas {
-					klog.InfoS("Assign min(runningReplicas, maxReplicas) to minReplicas to avoid deleting unavailable pods",
-						"subset", subset.Name, "minReplicas", minReplicas, "runningReplicas", runningReplicas, "maxReplicas", maxReplicas)
-					minReplicas = integer.Int32Min(runningReplicas, maxReplicas)
-				}
-			} else {
+			if !ac.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
 				// All healthy pods are permanently allocated to a subset if adjustNextReplicasInReservedStrategy is disabled.
 				// We have to prevent them from being deleted
 				if runningReplicas := runningReplicasMap[subset.Name]; !unschedulable && runningReplicas > minReplicas {
@@ -397,64 +395,44 @@ func (ac *elasticAllocator) getNextReplicas(replicas int32, minReplicasMap, maxR
 
 // adjustNextReplicasInReservedStrategy adjusts the next replicas for each subset based on the temporary adaptive scheduling strategy.
 // It ensures that subsets marked as unschedulable retain their current replicas and that the total number of replicas does not exceed the specified totalReplicas.
-func adjustNextReplicasInReservedStrategy(nextReplicas *map[string]int32, existingSubsets *map[string]*Subset, totalReplicas int32, subsets []appsv1alpha1.Subset) *map[string]int32 {
-	for name, next := range *nextReplicas {
-		if subset := (*existingSubsets)[name]; subset != nil && subset.Status.UnschedulableStatus.Unschedulable {
-			(*nextReplicas)[name] = max(next, subset.Spec.Replicas)
-		}
+func adjustNextReplicasInReservedStrategy(expectedReplicas *map[string]int32, existingSubsets *map[string]*Subset, totalReplicas int32, subsets []appsv1alpha1.Subset) *map[string]int32 {
+	runningReplicas := getSubsetRunningReplicas(existingSubsets)
+	reservedReplicas := getSubsetReservedReplicas(existingSubsets)
+
+	var totalRunningPods, totalReservedPods int32
+	for i := 0; i < len(subsets); i++ {
+		totalRunningPods += runningReplicas[subsets[i].Name]
+		totalReservedPods += reservedReplicas[subsets[i].Name]
 	}
-	var countedReplicas int32
-	for _, s := range subsets {
-		name := s.Name
-		// Purge capacity that exceeds the total number of replicas
-		if countedReplicas >= totalReplicas {
-			(*nextReplicas)[name] = 0
-			continue
-		}
-		if subset := (*existingSubsets)[name]; subset != nil {
-			next := (*nextReplicas)[name]
-			countedReplicas += min(subset.Spec.Replicas, next) - subset.Status.UnschedulableStatus.ReservedPods
-		}
-		if countedReplicas > totalReplicas {
-			(*nextReplicas)[name] -= countedReplicas - totalReplicas
-		}
-	}
-	var expectedHealthyReplicas int32
-	for _, subset := range *existingSubsets {
-		expectedHealthyReplicas += subset.Status.ReadyReplicas
-		if expectedHealthyReplicas >= totalReplicas {
-			expectedHealthyReplicas = totalReplicas
+
+	// Step 1: Delete redundant (exceeds the total replicas) running pods in the reverse order of the subset.
+	expectedRunningReplicas := min(totalRunningPods, totalReplicas)
+	for i := len(subsets) - 1; i >= 0; i-- {
+		if totalRunningPods <= expectedRunningReplicas {
 			break
 		}
+		name := subsets[i].Name
+		expected := (*expectedReplicas)[name]
+		// The value of toDelete is the smaller of:
+		//	- the maximum number that can be deleted in the subset
+		//  - and the total number that still needs to be deleted.
+		toDelete := min(runningReplicas[name]-expected, totalRunningPods-totalReplicas)
+		runningReplicas[name] -= toDelete
+		totalRunningPods -= toDelete
 	}
-	for _, s := range subsets {
-		if expectedHealthyReplicas <= 0 {
-			break
-		}
-		name := s.Name
-		subset := (*existingSubsets)[name]
-		next := (*nextReplicas)[name]
-		if subset == nil {
-			continue
-		}
-		expectedHealthyReplicas -= min(subset.Status.ReadyReplicas, next)
-	}
-	for _, s := range subsets {
-		if expectedHealthyReplicas <= 0 {
-			break
-		}
-		name := s.Name
-		subset := (*existingSubsets)[name]
-		next := (*nextReplicas)[name]
-		if subset == nil {
-			continue
-		}
-		if subset.Status.ReadyReplicas > next {
-			canAdd := subset.Status.ReadyReplicas - next
-			shouldAdd := min(expectedHealthyReplicas, canAdd)
-			(*nextReplicas)[name] = next + shouldAdd
-			expectedHealthyReplicas -= shouldAdd
+
+	// Step 2: Delete redundant reserved pods in the order of the subset.
+	var countedRunningPods int32
+	for i := 0; i < len(subsets); i++ {
+		name := subsets[i].Name
+		countedRunningPods += runningReplicas[name]
+		if countedRunningPods >= totalReplicas {
+			reservedReplicas[name] = 0
 		}
 	}
-	return nextReplicas
+
+	for name, expected := range *expectedReplicas {
+		(*expectedReplicas)[name] = max(runningReplicas[name]+reservedReplicas[name], expected)
+	}
+	return expectedReplicas
 }

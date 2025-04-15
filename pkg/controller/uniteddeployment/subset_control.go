@@ -103,7 +103,7 @@ func (m *SubsetControl) UpdateSubset(subset *Subset, ud *alpha1.UnitedDeployment
 		}
 
 		if subset.Status.UnschedulableStatus.Unschedulable && ud.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
-			maxUnavailable := subset.Spec.Replicas - subset.Status.ReadyReplicas + subset.Status.UnschedulableStatus.TimeoutLegacyPods
+			maxUnavailable := subset.Spec.Replicas - subset.Status.ReadyReplicas + subset.Status.UnschedulableStatus.UpdateTimeoutPods
 			klog.V(5).InfoS("overwrite subset max unavailable",
 				"unitedDeployment", klog.KObj(ud), "maxUnavailable", maxUnavailable, "subset", subset.Name)
 			m.adapter.SetMaxUnavailable(workload, maxUnavailable)

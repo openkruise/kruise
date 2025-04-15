@@ -55,8 +55,8 @@ func GetTimeBeforePendingTimeout(pod *v1.Pod, timeout time.Duration, now time.Ti
 	return false, -1
 }
 
-// GetTimeBeforeLegacyTimeout is used during updating. when the updating lasts longer than timeout, all pods will be considered as timeout.
-func GetTimeBeforeLegacyTimeout(pod *v1.Pod, updatedCondition *appsv1alpha1.UnitedDeploymentCondition, timeout time.Duration, now time.Time) (timeouted bool, nextCheckAfter time.Duration) {
+// GetTimeBeforeUpdateTimeout is used during updating. when the updating lasts longer than timeout, all pods will be considered as timeout.
+func GetTimeBeforeUpdateTimeout(pod *v1.Pod, updatedCondition *appsv1alpha1.UnitedDeploymentCondition, timeout time.Duration, now time.Time) (timeouted bool, nextCheckAfter time.Duration) {
 	if pod.DeletionTimestamp != nil {
 		return false, -1
 	}

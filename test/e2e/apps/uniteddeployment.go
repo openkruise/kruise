@@ -197,8 +197,7 @@ var _ = SIGDescribe("uniteddeployment", func() {
 		fmt.Println()
 	})
 
-	ginkgo.It("adaptive united deployment with temporary rescheduling enabled", func() {
-		//replicas := func(r int) *intstr.IntOrString { p := intstr.FromInt32(int32(r)); return &p }
+	ginkgo.It("adaptive united deployment with unschedulable pods reserved", func() {
 		replicasMap := func(replicas ...int32) map[string]int32 {
 			replicaMap := make(map[string]int32)
 			for i, r := range replicas {

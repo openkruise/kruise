@@ -142,7 +142,7 @@ func getUnitedDeploymentKey(ud *appsv1alpha1.UnitedDeployment) string {
 
 var ResourceVersionExpectation = expectations.NewResourceVersionExpectation()
 
-// CheckPodReserved checks whether the Pod is in the Reserved state.
+// CheckPodReallyInReservedStatus checks whether the Pod is in the Reserved state.
 // The Reserved state is defined as: the Pod enters Reserved after being in the Pending state for a specified duration,
 // and exits Reserved after remaining in the Ready state for a certain period.
 //
@@ -156,10 +156,10 @@ var ResourceVersionExpectation = expectations.NewResourceVersionExpectation()
 // Returns:
 //   - isReserved: true if the Pod is in the Reserved state; otherwise, false.
 //   - nextCheckAfter: the duration until the next check if the Pod has not reached the Reserved state; otherwise, -1.
-func CheckPodReserved(pod *corev1.Pod, subset *Subset, updatedCondition *appsv1alpha1.UnitedDeploymentCondition,
+func CheckPodReallyInReservedStatus(pod *corev1.Pod, subset *Subset, updatedCondition *appsv1alpha1.UnitedDeploymentCondition,
 	pendingTimeout time.Duration, minReadySeconds time.Duration, now time.Time) (isReserved bool, nextCheckAfter time.Duration) {
 	podRevision, _ := GetPodLabel(pod, appsv1alpha1.ControllerRevisionHashLabelKey)
-	if reserved, _ := IsPodReserved(pod); reserved {
+	if reserved, _ := IsPodMarkedAsReserved(pod); reserved {
 		if pod.Status.Phase == corev1.PodRunning && podRevision == subset.Status.UpdatedRevision {
 			readyCondition := getPodCondition(pod, corev1.PodReady)
 			if readyCondition != nil && readyCondition.Status == corev1.ConditionTrue {
@@ -178,11 +178,11 @@ func CheckPodReserved(pod *corev1.Pod, subset *Subset, updatedCondition *appsv1a
 		if podRevision == subset.Status.UpdatedRevision {
 			timeouted, after = util.GetTimeBeforePendingTimeout(pod, pendingTimeout, now)
 		} else {
-			timeouted, after = util.GetTimeBeforeLegacyTimeout(pod, updatedCondition, pendingTimeout, now)
+			timeouted, after = util.GetTimeBeforeUpdateTimeout(pod, updatedCondition, pendingTimeout, now)
 			if timeouted {
-				subset.Status.UnschedulableStatus.TimeoutLegacyPods++
+				subset.Status.UnschedulableStatus.UpdateTimeoutPods++
 			}
-			klog.InfoS("GetTimeBeforeLegacyTimeout", "pod", pod.Name, "after", after, "timeouted", timeouted)
+			klog.InfoS("GetTimeBeforeUpdateTimeout", "pod", pod.Name, "after", after, "timeouted", timeouted)
 		}
 		if timeouted {
 			return true, minReadySeconds
@@ -192,7 +192,7 @@ func CheckPodReserved(pod *corev1.Pod, subset *Subset, updatedCondition *appsv1a
 	}
 }
 
-// IsPodReserved checks whether the Pod is in the Reserved state.
+// IsPodMarkedAsReserved checks whether the Pod is in the Reserved state.
 // The Reserved state is defined as: the Pod has the reserved "apps.kruise.io/is-reserved-pod" set to "true".
 //
 // Parameters:
@@ -201,7 +201,7 @@ func CheckPodReserved(pod *corev1.Pod, subset *Subset, updatedCondition *appsv1a
 // Returns:
 //   - reserved: true if the Pod is in the Reserved state; otherwise, false.
 //   - ok: true if the Pod has the "apps.kruise.io/is-reserved-pod" reserved; otherwise, false.
-func IsPodReserved(pod *corev1.Pod) (reserved bool, ok bool) {
+func IsPodMarkedAsReserved(pod *corev1.Pod) (reserved bool, ok bool) {
 	if label, ok := GetPodLabel(pod, appsv1alpha1.ReservedPodLabelKey); ok {
 		return label == "true", true
 	} else {
