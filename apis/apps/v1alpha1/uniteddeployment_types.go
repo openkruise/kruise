@@ -292,7 +292,7 @@ func (s *UnitedDeploymentScheduleStrategy) GetRescheduleCriticalDuration() time.
 	return time.Duration(*s.Adaptive.RescheduleCriticalSeconds) * time.Second
 }
 
-func (s *UnitedDeploymentScheduleStrategy) GetUnschedulableLastDuration() time.Duration {
+func (s *UnitedDeploymentScheduleStrategy) GetUnschedulableDuration() time.Duration {
 	if s.Adaptive == nil || s.Adaptive.UnschedulableDuration == nil {
 		return DefaultUnschedulableStatusLastDuration
 	}
