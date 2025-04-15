@@ -291,7 +291,7 @@ func (m *UnitedDeploymentManager) CheckReservedPods(replicas map[string]int32, r
 			g.Expect(err).NotTo(gomega.HaveOccurred())
 			gotReplicas[subset.Name] = int32(len(podList.Items))
 			for _, pod := range podList.Items {
-				if podReserved, _ := uniteddeployment.IsPodReserved(&pod); podReserved {
+				if podReserved, _ := uniteddeployment.IsPodMarkedAsReserved(&pod); podReserved {
 					gotReserved[subset.Name]++
 				}
 			}
