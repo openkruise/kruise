@@ -173,7 +173,7 @@ type ReconcileUnitedDeployment struct {
 
 // Reconcile reads that state of the cluster for a UnitedDeployment object and makes changes based on the state read
 // and what is in the UnitedDeployment.Spec
-func (r *ReconcileUnitedDeployment) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
 	klog.V(4).InfoS("Reconcile UnitedDeployment", "unitedDeployment", request)
 	// Fetch the UnitedDeployment instance
 	instance := &appsv1alpha1.UnitedDeployment{}
@@ -227,13 +227,13 @@ func (r *ReconcileUnitedDeployment) Reconcile(ctx context.Context, request recon
 		var podsToPatch []podToPatchReservedLabel
 		for name, subset := range *existingSubsets {
 			if shouldReserveUnschedulablePods {
-				podsToPatch = append(podsToPatch, processSubsetsForReservedAdaptiveStrategy(name, subset, instance, now)...)
+				podsToPatch = append(podsToPatch, calculateSubsetsStatusForReservedAdaptiveStrategy(name, subset, instance, now)...)
 				if err = r.patchReservedStatusChangedPods(podsToPatch); err != nil {
 					klog.ErrorS(err, "Failed to patch reserved changed pods", "unitedDeployment", klog.KObj(instance))
 					return reconcile.Result{}, err
 				}
 			} else {
-				processSubsetsForDefaultAdaptiveStrategy(name, subset, instance)
+				calculateSubsetsStatusForDefaultAdaptiveStrategy(name, subset, instance)
 			}
 		}
 	}
@@ -322,8 +322,8 @@ func setUpdatedCondition(status *appsv1alpha1.UnitedDeploymentStatus, currentRev
 	}
 }
 
-// processSubsetsForDefaultAdaptiveStrategy manages subset unscheduable status and store them in the Subset.Status.UnschedulableStatus field.
-func processSubsetsForDefaultAdaptiveStrategy(name string, subset *Subset, ud *appsv1alpha1.UnitedDeployment) {
+// calculateSubsetsStatusForDefaultAdaptiveStrategy manages subset unscheduable status and store them in the Subset.Status.UnschedulableStatus field.
+func calculateSubsetsStatusForDefaultAdaptiveStrategy(name string, subset *Subset, ud *appsv1alpha1.UnitedDeployment) {
 	now := time.Now()
 	unitedDeploymentKey := getUnitedDeploymentKey(ud)
 	status := ud.Status.GetSubsetStatus(name)
@@ -364,7 +364,7 @@ func processSubsetsForDefaultAdaptiveStrategy(name string, subset *Subset, ud *a
 		}
 		if subset.Status.UnschedulableStatus.PendingPods > 0 {
 			klog.InfoS("subset has unavailable pods", "subset", subset.Name,
-				"unavailablePods", subset.Status.UnschedulableStatus.UnavailablePods, "unitedDeployment", klog.KObj(ud))
+				"pendingPods", subset.Status.UnschedulableStatus.PendingPods, "unitedDeployment", klog.KObj(ud))
 			subset.Status.UnschedulableStatus.Unschedulable = true
 			status.SetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable, corev1.ConditionFalse, "reschedule",
 				"timeout available pods found")
@@ -374,7 +374,7 @@ func processSubsetsForDefaultAdaptiveStrategy(name string, subset *Subset, ud *a
 	klog.InfoS("subset status", "status", status, "unitedDeployment", klog.KObj(ud))
 }
 
-func processSubsetsForReservedAdaptiveStrategy(name string, subset *Subset, ud *appsv1alpha1.UnitedDeployment, now time.Time) (podsToPatch []podToPatchReservedLabel) {
+func calculateSubsetsStatusForReservedAdaptiveStrategy(name string, subset *Subset, ud *appsv1alpha1.UnitedDeployment, now time.Time) (podsToPatch []podToPatchReservedLabel) {
 	unitedDeploymentKey := getUnitedDeploymentKey(ud)
 	status := ud.Status.GetSubsetStatus(name)
 	if status == nil {
@@ -419,7 +419,7 @@ func processSubsetsForReservedAdaptiveStrategy(name string, subset *Subset, ud *
 	}
 	if subset.Status.UnschedulableStatus.ReservedPods > 0 {
 		klog.V(5).InfoS("subset has some reserved pods", "subset", name,
-			"reservedPods", subset.Status.UnschedulableStatus.UnavailablePods,
+			"reservedPods", subset.Status.UnschedulableStatus.ReservedPods,
 			"totalPods", len(subset.Spec.SubsetPods), "unitedDeployment", klog.KObj(ud))
 		subset.Status.UnschedulableStatus.Unschedulable = true
 		status.SetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable, corev1.ConditionFalse, "reschedule",
@@ -580,7 +580,7 @@ func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.Unit
 	// sync from status
 	for name, subset := range *existingSubsets {
 		subsetReplicas, subsetReadyReplicas, subsetUpdatedReplicas, subsetUpdatedReadyReplicas := replicasStatusFn(subset)
-		newStatus.Replicas += subsetReplicas - subset.Status.UnschedulableStatus.UnavailablePods()
+		newStatus.Replicas += subsetReplicas - subset.Status.UnschedulableStatus.PendingPods - subset.Status.UnschedulableStatus.ReservedPods
 		newStatus.ReservedPods += subset.Status.UnschedulableStatus.ReservedPods
 		newStatus.ReadyReplicas += subsetReadyReplicas
 		newStatus.UpdatedReplicas += subsetUpdatedReplicas
@@ -589,7 +589,7 @@ func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.Unit
 		ss.Replicas = subset.Status.Replicas
 		ss.ReadyReplicas = subset.Status.ReadyReplicas
 		ss.Partition = (*nextPartition)[name]
-		ss.ReservedPods = subset.Status.UnschedulableStatus.UnavailablePods()
+		ss.ReservedPods = subset.Status.UnschedulableStatus.ReservedPods
 	}
 
 	// Legacy field "SubsetReplicas" status still exists in ud status, consider remove them in v1beta1.
