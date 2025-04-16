@@ -63,10 +63,6 @@ type SubsetUnschedulableStatus struct {
 	UpdateTimeoutPods int32
 }
 
-func (s SubsetUnschedulableStatus) UnavailablePods() int32 {
-	return s.ReservedPods + s.PendingPods
-}
-
 // SubsetUpdateStrategy stores the strategy detail of the Subset.
 type SubsetUpdateStrategy struct {
 	Partition int32

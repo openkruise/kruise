@@ -352,45 +352,45 @@ func TestAdaptiveElasticAllocator(t *testing.T) {
 			}
 	}
 	cases := []struct {
-		name                                                     string
-		totalReplicas, minReplicas, maxReplicas, unavailablePods int32
-		subset1Replicas, subset2Replicas                         int32
+		name                                                 string
+		totalReplicas, minReplicas, maxReplicas, pendingPods int32
+		subset1Replicas, subset2Replicas                     int32
 	}{
 		{
 			name:          "5 pending pods > maxReplicas -> 0, 10",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, unavailablePods: 5,
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 5,
 			subset1Replicas: 0, subset2Replicas: 10,
 		},
 		{
 			name:          "4 pending pods = maxReplicas -> 0, 10",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, unavailablePods: 4,
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 4,
 			subset1Replicas: 0, subset2Replicas: 10,
 		},
 		{
 			name:          "3 pending pods < maxReplicas -> 1, 9",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, unavailablePods: 3,
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 3,
 			subset1Replicas: 1, subset2Replicas: 9,
 		},
 		{
 			name:          "2 pending pods = minReplicas -> 2, 8",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, unavailablePods: 2,
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 2,
 			subset1Replicas: 2, subset2Replicas: 8,
 		},
 		{
 			name:          "1 pending pods < minReplicas -> 3, 7",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, unavailablePods: 1,
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 1,
 			subset1Replicas: 3, subset2Replicas: 7,
 		},
 		{
 			name:          "no pending pods -> 4, 6",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, unavailablePods: 0,
+			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 0,
 			subset1Replicas: 4, subset2Replicas: 6,
 		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			ud, subsets := getUnitedDeploymentAndSubsets(
-				testCase.totalReplicas, testCase.minReplicas, testCase.maxReplicas, testCase.unavailablePods)
+				testCase.totalReplicas, testCase.minReplicas, testCase.maxReplicas, testCase.pendingPods)
 			alloc, err := NewReplicaAllocator(ud).Alloc(&subsets)
 			if err != nil {
 				t.Fatalf("unexpected getNextReplicas error %v", err)
@@ -405,127 +405,62 @@ func TestAdaptiveElasticAllocator(t *testing.T) {
 	}
 }
 
-func TestProtectingRunningPodsAdaptive(t *testing.T) {
-	getUnitedDeploymentAndSubsets := func(subset1MinReplicas, subset1MaxReplicas, subset1RunningReplicas, subset2RunningReplicas int32) (
-		*appsv1alpha1.UnitedDeployment, map[string]*Subset) {
-		minR, maxR := intstr.FromInt32(subset1MinReplicas), intstr.FromInt32(subset1MaxReplicas)
-		totalReplicas := subset1RunningReplicas + subset2RunningReplicas
-		return &appsv1alpha1.UnitedDeployment{
-				Spec: appsv1alpha1.UnitedDeploymentSpec{
-					Replicas: &totalReplicas,
-					Topology: appsv1alpha1.Topology{
-						Subsets: []appsv1alpha1.Subset{
-							{
-								Name:        "subset-1",
-								MinReplicas: &minR,
-								MaxReplicas: &maxR,
-							},
-							{
-								Name: "subset-2",
-							},
-						},
-						ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
-							Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
-						},
-					},
-				},
-			}, map[string]*Subset{
-				"subset-1": {
-					Status: SubsetStatus{
-						UpdatedReadyReplicas: subset1RunningReplicas,
-						ReadyReplicas:        subset1RunningReplicas,
-					},
-					Spec: SubsetSpec{
-						SubsetPods: generateSubsetPods(subset1RunningReplicas, 0, 0),
-					},
-				},
-				"subset-2": {
-					Status: SubsetStatus{
-						UpdatedReadyReplicas: subset2RunningReplicas,
-						ReadyReplicas:        subset2RunningReplicas,
-					},
-					Spec: SubsetSpec{
-						SubsetPods: generateSubsetPods(subset2RunningReplicas, 0, 0),
-					},
-				},
-			}
-	}
-	cases := []struct {
-		name                                                                                   string
-		subset1MinReplicas, subset1MaxReplicas, subset1RunningReplicas, subset2RunningReplicas int32
-		subset1Replicas, subset2Replicas                                                       int32
+func TestAdjustReplicasInDefaultAdaptiveStrategy(t *testing.T) {
+	tests := map[string]struct {
+		expectedReplicas []int32
+		runningPods      []int32
+		want             []int32
 	}{
-		{
-			name:                   "subset1: [2,4], 1,1 -> 2,0",
-			subset1MinReplicas:     2,
-			subset1MaxReplicas:     4,
-			subset1RunningReplicas: 1,
-			subset2RunningReplicas: 1,
-			subset1Replicas:        2,
-			subset2Replicas:        0,
+		"no pods running": {
+			expectedReplicas: []int32{3, 2, 1},
+			runningPods:      []int32{0, 0, 0},
+			want:             []int32{3, 2, 1},
 		},
-		{
-			name:                   "subset1: [2,4], 2,1 -> 2,1",
-			subset1MinReplicas:     2,
-			subset1MaxReplicas:     4,
-			subset1RunningReplicas: 2,
-			subset2RunningReplicas: 1,
-			subset1Replicas:        2,
-			subset2Replicas:        1,
+		"less pods running": {
+			expectedReplicas: []int32{3, 2, 1},
+			runningPods:      []int32{0, 0, 1},
+			want:             []int32{3, 2, 1},
 		},
-		{
-			name:                   "subset1: [2,4], 1,2 -> 2,1",
-			subset1MinReplicas:     2,
-			subset1MaxReplicas:     4,
-			subset1RunningReplicas: 1,
-			subset2RunningReplicas: 2,
-			subset1Replicas:        2,
-			subset2Replicas:        1,
-		},
-		{
-			name:                   "subset1: [2,4], 0,4 -> 2,2",
-			subset1MinReplicas:     2,
-			subset1MaxReplicas:     4,
-			subset1RunningReplicas: 0,
-			subset2RunningReplicas: 4,
-			subset1Replicas:        2,
-			subset2Replicas:        2,
-		},
-		{
-			name:                   "subset1: [2,4], 3,1 -> 3,1",
-			subset1MinReplicas:     2,
-			subset1MaxReplicas:     4,
-			subset1RunningReplicas: 3,
-			subset2RunningReplicas: 1,
-			subset1Replicas:        3,
-			subset2Replicas:        1,
+		"typical adaptive recovery scenario: replicas 8, all subsets [0,2]": {
+			expectedReplicas: []int32{2, 2, 2, 2},
+			runningPods:      []int32{2, 0, 0, 6},
+			want:             []int32{2, 0, 0, 6},
 		},
 	}
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			ud, existingSubsets := getUnitedDeploymentAndSubsets(tt.subset1MinReplicas, tt.subset1MaxReplicas, tt.subset1RunningReplicas, tt.subset2RunningReplicas)
-			alloc, err := NewReplicaAllocator(ud).Alloc(&existingSubsets)
-			if err != nil {
-				t.Fatalf("unexpected getNextReplicas error %v", err)
-			} else {
-				subset1Replicas, subset2Replicas := (*alloc)["subset-1"], (*alloc)["subset-2"]
-				if subset1Replicas != tt.subset1Replicas || subset2Replicas != tt.subset2Replicas {
-					t.Logf("subset1Replicas got %d, expect %d, subset1Replicas got %d, expect %d", subset1Replicas, tt.subset1Replicas, subset2Replicas, tt.subset2Replicas)
-					t.Fail()
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			expectedReplicas := make(map[string]int32)
+			for i := 0; i < len(tt.expectedReplicas); i++ {
+				expectedReplicas[fmt.Sprintf("subset-%d", i)] = tt.expectedReplicas[i]
+			}
+			existingSubsets := make(map[string]*Subset)
+			for i := 0; i < len(tt.runningPods); i++ {
+				existingSubsets[fmt.Sprintf("subset-%d", i)] = &Subset{
+					Status: SubsetStatus{
+						Replicas:      tt.runningPods[i],
+						ReadyReplicas: tt.runningPods[i],
+					},
 				}
+			}
+			var subsets []appsv1alpha1.Subset
+			for i := 0; i < len(tt.expectedReplicas); i++ {
+				subsets = append(subsets, appsv1alpha1.Subset{
+					Name: fmt.Sprintf("subset-%d", i),
+				})
+			}
+			result := adjustNextReplicasInDefaultStrategy(&expectedReplicas, &existingSubsets, subsets)
+			actual := make([]int32, len(tt.want))
+			for i := 0; i < len(tt.want); i++ {
+				actual[i] = (*result)[fmt.Sprintf("subset-%d", i)]
+			}
+			if !reflect.DeepEqual(actual, tt.want) {
+				t.Errorf("expected %v, but got %v", tt.want, actual)
 			}
 		})
 	}
-	// invalid inputs
-	ud, existingSubsets := getUnitedDeploymentAndSubsets(4, 2, 0, 0)
-	_, err := NewReplicaAllocator(ud).Alloc(&existingSubsets)
-	if err == nil {
-		t.Logf("expected error not happen")
-		t.Fail()
-	}
 }
 
-func generateSubsetPods(total, reserved int32, prefix int) []*corev1.Pod {
+func generateSubsetPods(total, pending int32, prefix int) []*corev1.Pod {
 	var pods []*corev1.Pod
 	for i := int32(0); i < total; i++ {
 		pod := &corev1.Pod{
@@ -533,7 +468,7 @@ func generateSubsetPods(total, reserved int32, prefix int) []*corev1.Pod {
 				Name: fmt.Sprintf("pod-%d-%d", prefix, i),
 			},
 		}
-		if i < reserved {
+		if i < pending {
 			pod.Status.Phase = corev1.PodPending
 		} else {
 			pod.Status.Phase = corev1.PodRunning

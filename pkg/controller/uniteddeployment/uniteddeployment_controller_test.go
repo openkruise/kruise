@@ -279,7 +279,7 @@ func TestDefaultAdaptiveStrategy(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			subset, ud := c.envFactory()
 			start := time.Now()
-			processSubsetsForDefaultAdaptiveStrategy(subset.Name, subset, ud)
+			calculateSubsetsStatusForDefaultAdaptiveStrategy(subset.Name, subset, ud)
 			cost := time.Now().Sub(start)
 			if subset.Status.UnschedulableStatus.PendingPods != c.expectPendingPods {
 				t.Logf("case %s failed: expect pending pods %d, but got %d", c.name, c.expectPendingPods, subset.Status.UnschedulableStatus.PendingPods)
@@ -456,7 +456,7 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			subset, ud := c.envFactory()
-			podsToPatch := processSubsetsForReservedAdaptiveStrategy(subset.Name, subset, ud, now)
+			podsToPatch := calculateSubsetsStatusForReservedAdaptiveStrategy(subset.Name, subset, ud, now)
 			if len(podsToPatch) != c.podsToPatch {
 				t.Logf("case %s failed: expect pods to patch %d, but got %d", c.name, c.podsToPatch, len(podsToPatch))
 				t.Fail()

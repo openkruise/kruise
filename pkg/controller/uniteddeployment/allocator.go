@@ -81,12 +81,6 @@ func getSubsetRunningReplicas(existingSubsets *map[string]*Subset) map[string]in
 	}
 	var result = make(map[string]int32)
 	for name, subset := range *existingSubsets {
-		//for _, pod := range subset.Spec.SubsetPods {
-		//	if reserved, _ := IsPodMarkedAsReserved(pod); !reserved && pod.Status.Phase == corev1.PodRunning {
-		//		result[name]++
-		//	}
-		//}
-		//result[name] = min(subset.Status.ReadyReplicas, result[name])
 		result[name] = subset.Status.ReadyReplicas
 	}
 	return result
@@ -305,9 +299,13 @@ func (ac *elasticAllocator) Alloc(existingSubsets *map[string]*Subset) (*map[str
 		return nil, err
 	}
 	klog.V(4).InfoS("Got UnitedDeployment next replicas", "unitedDeployment", klog.KObj(ac.UnitedDeployment), "nextReplicas", nextReplicas)
-	if ac.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
-		nextReplicas = adjustNextReplicasInReservedStrategy(nextReplicas, existingSubsets, replicas, ac.Spec.Topology.Subsets)
-		klog.V(4).InfoS("Adjusted UnitedDeployment next replicas for temporary adaptive is enabled", "unitedDeployment", klog.KObj(ac.UnitedDeployment), "nextReplicas", nextReplicas)
+	if ac.Spec.Topology.ScheduleStrategy.IsAdaptive() {
+		if ac.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
+			nextReplicas = adjustNextReplicasInReservedStrategy(nextReplicas, existingSubsets, replicas, ac.Spec.Topology.Subsets)
+		} else {
+			nextReplicas = adjustNextReplicasInDefaultStrategy(nextReplicas, existingSubsets, ac.Spec.Topology.Subsets)
+		}
+		klog.V(4).InfoS("Adjusted UnitedDeployment next replicas for adaptive strategy", "unitedDeployment", klog.KObj(ac.UnitedDeployment), "nextReplicas", nextReplicas)
 	}
 	return nextReplicas, nil
 }
@@ -334,15 +332,6 @@ func (ac *elasticAllocator) validateAndCalculateMinMaxMap(replicas int32, existi
 					"subset", subset.Name)
 				minReplicas = integer.Int32Min(runningReplicas, minReplicas)
 				maxReplicas = integer.Int32Min(runningReplicas, maxReplicas)
-			}
-			if !ac.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
-				// All healthy pods are permanently allocated to a subset if adjustNextReplicasInReservedStrategy is disabled.
-				// We have to prevent them from being deleted
-				if runningReplicas := runningReplicasMap[subset.Name]; !unschedulable && runningReplicas > minReplicas {
-					klog.InfoS("Assign min(runningReplicas, maxReplicas) to minReplicas to avoid deleting running pods",
-						"subset", subset.Name, "minReplicas", minReplicas, "runningReplicas", runningReplicas, "maxReplicas", maxReplicas)
-					minReplicas = integer.Int32Min(runningReplicas, maxReplicas)
-				}
 			}
 		}
 
@@ -393,6 +382,26 @@ func (ac *elasticAllocator) getNextReplicas(replicas int32, minReplicasMap, maxR
 	return &subsetReplicas
 }
 
+func adjustNextReplicasInDefaultStrategy(expectedReplicas *map[string]int32, existingSubsets *map[string]*Subset, subsets []appsv1alpha1.Subset) *map[string]int32 {
+	// All healthy pods are permanently allocated to a subset in default adaptive strategy.
+	// We have to prevent them from being deleted
+	runningReplicas := getSubsetRunningReplicas(existingSubsets)
+	var balance int32
+	for i := len(subsets) - 1; i >= 0; i-- {
+		name := subsets[i].Name
+		diff := runningReplicas[name] - (*expectedReplicas)[name]
+		if diff > 0 {
+			(*expectedReplicas)[name] = runningReplicas[name]
+			balance += diff
+		} else if balance > 0 && diff < 0 {
+			toDelete := min(balance, -diff)
+			(*expectedReplicas)[name] -= toDelete
+			balance += diff // balance -= (-diff)
+		}
+	}
+	return expectedReplicas
+}
+
 // adjustNextReplicasInReservedStrategy adjusts the next replicas for each subset based on the temporary adaptive scheduling strategy.
 // It ensures that subsets marked as unschedulable retain their current replicas and that the total number of replicas does not exceed the specified totalReplicas.
 func adjustNextReplicasInReservedStrategy(expectedReplicas *map[string]int32, existingSubsets *map[string]*Subset, totalReplicas int32, subsets []appsv1alpha1.Subset) *map[string]int32 {
@@ -414,7 +423,7 @@ func adjustNextReplicasInReservedStrategy(expectedReplicas *map[string]int32, ex
 		name := subsets[i].Name
 		expected := (*expectedReplicas)[name]
 		// The value of toDelete is the smaller of:
-		//	- the maximum number that can be deleted in the subset
+		//  - the maximum number that can be deleted in the subset
 		//  - and the total number that still needs to be deleted.
 		toDelete := min(runningReplicas[name]-expected, totalRunningPods-totalReplicas)
 		runningReplicas[name] -= toDelete
@@ -431,6 +440,7 @@ func adjustNextReplicasInReservedStrategy(expectedReplicas *map[string]int32, ex
 		}
 	}
 
+	// Step 3: Fulfill subsets to expected, which creates new reserved pods.
 	for name, expected := range *expectedReplicas {
 		(*expectedReplicas)[name] = max(runningReplicas[name]+reservedReplicas[name], expected)
 	}
