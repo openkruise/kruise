@@ -24,13 +24,6 @@ import (
 	"reflect"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/client"
-	kruiseclient "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
-	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
-	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,6 +38,14 @@ import (
 	"k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/client"
+	kruiseclient "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 )
 
 type Controller struct {
@@ -65,12 +66,12 @@ func NewController(opts daemonoptions.Options, secretManager daemonutil.SecretMa
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: genericClient.KubeClient.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(opts.Scheme, v1.EventSource{Component: "kruise-daemon-imagepuller", Host: opts.NodeName})
 
-	queue := workqueue.NewNamedRateLimitingQueue(
-		// Backoff duration from 500ms to 50~55s
-		// For nodeimage controller will mark a image:tag task failed (not responded for a long time) if daemon does not report status in 60s.
-		workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 50*time.Second+time.Millisecond*time.Duration(rand.Intn(5000))),
-		"imagepuller",
-	)
+	// Backoff duration from 500ms to 50~55s
+	// For nodeimage controller will mark an image:tag task failed (not responded for a long time) if daemon does not report status in 60s.
+	rateLimiter := workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 50*time.Second+time.Millisecond*time.Duration(rand.Intn(5000)))
+	queue := workqueue.NewRateLimitingQueueWithConfig(rateLimiter, workqueue.RateLimitingQueueConfig{
+		Name: "imagepuller",
+	})
 
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -94,6 +95,11 @@ func NewController(opts daemonoptions.Options, secretManager daemonutil.SecretMa
 		},
 	})
 
+	if opts.MaxWorkersForPullImages > 0 {
+		klog.InfoS("set image pull worker number", "worker", opts.MaxWorkersForPullImages)
+		workerLimitedPool = NewChanPool(opts.MaxWorkersForPullImages)
+		go workerLimitedPool.Start()
+	}
 	puller, err := newRealPuller(opts.RuntimeFactory.GetImageService(), secretManager, recorder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to new puller: %v", err)
@@ -165,6 +171,9 @@ func (c *Controller) Run(stop <-chan struct{}) {
 
 	klog.Info("Started puller controller successfully")
 	<-stop
+	if workerLimitedPool != nil {
+		workerLimitedPool.Stop()
+	}
 }
 
 // processNextWorkItem will read a single work item off the workqueue and
@@ -244,6 +253,8 @@ func (c *Controller) sync(key string) (retErr error) {
 				newStatus.Failed++
 			case appsv1alpha1.ImagePhasePulling:
 				newStatus.Pulling++
+			case appsv1alpha1.ImagePhaseWaiting:
+				newStatus.Waiting++
 			}
 		}
 	}

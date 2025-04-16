@@ -23,15 +23,16 @@ import (
 	"sync"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
-	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 const (
@@ -46,6 +47,8 @@ const (
 	PullImageSucceed = "PullImageSucceed"
 	PullImageFailed  = "PullImageFailed"
 )
+
+var workerLimitedPool ImagePullWorkerPool
 
 type puller interface {
 	Sync(obj *appsv1alpha1.NodeImage, ref *v1.ObjectReference) error
@@ -264,6 +267,8 @@ func (w *realWorkerPool) UpdateStatus(status *appsv1alpha1.ImageTagStatus) {
 }
 
 func newPullWorker(name string, tagSpec appsv1alpha1.ImageTagSpec, sandboxConfig *appsv1alpha1.SandboxConfig, secrets []v1.Secret, runtime runtimeimage.ImageService, statusUpdater imageStatusUpdater, ref *v1.ObjectReference, eventRecorder record.EventRecorder) *pullWorker {
+	image := name + ":" + tagSpec.Tag
+	klog.V(5).InfoS("new pull worker", "image", image)
 	o := &pullWorker{
 		name:          name,
 		tagSpec:       tagSpec,
@@ -276,7 +281,31 @@ func newPullWorker(name string, tagSpec appsv1alpha1.ImageTagSpec, sandboxConfig
 		active:        true,
 		stopCh:        make(chan struct{}),
 	}
-	go o.Run()
+
+	go func() {
+		newStatus := &appsv1alpha1.ImageTagStatus{
+			Tag:     tagSpec.Tag,
+			Phase:   appsv1alpha1.ImagePhaseWaiting,
+			Version: tagSpec.Version,
+		}
+		o.statusUpdater.UpdateStatus(newStatus)
+		klog.V(5).InfoS("pull worker waiting", "image", image)
+		fn := func() {
+			klog.V(5).InfoS("pull worker start", "image", image)
+			o.Run()
+			klog.V(5).InfoS("pull worker end", "image", image)
+		}
+		if workerLimitedPool != nil {
+			workerLimitedPool.Submit(func() {
+				fn()
+			})
+		} else {
+			// no limited_pool
+			klog.V(5).InfoS("pull worker without limited_pool", "image", image)
+			fn()
+		}
+
+	}()
 	return o
 }
 
@@ -444,8 +473,16 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1alpha1.Im
 	// make it asynchronous for CRI runtime will block in pulling image
 	var statusReader runtimeimage.ImagePullStatusReader
 	pullChan := make(chan struct{})
+	// Why add this? Directly assigning to `statusReader` and `err` can cause race conditions.
+	// Case: When a worker is pulling data, stopping the pull worker might lead to concurrent writes to the local parameter `err`.
+	// (line 483 and 503)
+	// To avoid this, we introduce `readerCh` and `errCh` for communication between multiple goroutines.
+	readerCh := make(chan runtimeimage.ImagePullStatusReader, 1)
+	errCh := make(chan error, 1)
 	go func() {
-		statusReader, err = w.runtime.PullImage(ctx, w.name, tag, w.secrets, w.sandboxConfig)
+		statusReader, err := w.runtime.PullImage(ctx, w.name, tag, w.secrets, w.sandboxConfig)
+		readerCh <- statusReader
+		errCh <- err
 		close(pullChan)
 	}()
 
@@ -453,6 +490,7 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1alpha1.Im
 		select {
 		case <-pullChan:
 		}
+		statusReader := <-readerCh
 		if statusReader != nil {
 			statusReader.Close()
 		}
@@ -468,6 +506,8 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1alpha1.Im
 		klog.V(2).InfoS("Pulling image canceled", "name", w.name, "tag", tag)
 		return fmt.Errorf("pulling image %s:%s is canceled", w.name, tag)
 	case <-pullChan:
+		statusReader = <-readerCh
+		err = <-errCh
 		if err != nil {
 			return err
 		}

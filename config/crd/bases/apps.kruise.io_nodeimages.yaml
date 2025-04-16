@@ -312,6 +312,10 @@ spec:
                 description: The number of pulling tasks which reached phase Succeeded.
                 format: int32
                 type: integer
+              waiting:
+                description: The number of pulling tasks which are waiting.
+                format: int32
+                type: integer
             required:
             - desired
             type: object
