@@ -1,12 +1,10 @@
 name: E2E-1.18
 
 on:
-  push:
-    branches:
-      - master
-      - release-*
-  pull_request: {}
-  workflow_dispatch: {}
+  # no longer run e2e in 1.18
+  # errors in ubuntu24.04 to install kind cluster
+  workflow_dispatch:
+
 
 # Declare default permissions as read only.
 permissions: read-all
@@ -20,7 +18,7 @@ env:
 
 jobs:
   astatefulset-storage:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -103,7 +101,7 @@ jobs:
           exit $retVal
 
   astatefulset:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -195,7 +193,7 @@ jobs:
           exit $retVal
 
   pullimages-containerrecreate:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -286,7 +284,7 @@ jobs:
           exit $retVal
 
   advanced-daemonset:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -377,7 +375,7 @@ jobs:
           exit $retVal
 
   sidecarset:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -468,7 +466,7 @@ jobs:
           exit $retVal
 
   podUnavailableBudget:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -533,7 +531,7 @@ jobs:
           fi      
           exit $retVal
   other:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
