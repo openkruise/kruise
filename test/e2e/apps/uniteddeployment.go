@@ -3,6 +3,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -32,7 +33,7 @@ var _ = SIGDescribe("uniteddeployment", func() {
 
 	ginkgo.It("united deployment with elastic allocator", func() {
 		replicas := func(r int) *intstr.IntOrString { p := intstr.FromInt(r); return &p }
-		udManager := tester.NewUnitedDeploymentManager("ud-elastic-test")
+		udManager := tester.NewUnitedDeploymentManager("ud-elastic-test", false)
 		udManager.AddSubset("subset-0", nil, replicas(1), replicas(2))
 		udManager.AddSubset("subset-1", nil, replicas(1), replicas(2))
 		udManager.AddSubset("subset-2", nil, replicas(1), nil)
@@ -59,7 +60,7 @@ var _ = SIGDescribe("uniteddeployment", func() {
 
 	ginkgo.It("united deployment with specific allocator", func() {
 		replicas := func(p string) *intstr.IntOrString { x := intstr.FromString(p); return &x }
-		udManager := tester.NewUnitedDeploymentManager("ud-specific-test")
+		udManager := tester.NewUnitedDeploymentManager("ud-specific-test", false)
 		udManager.AddSubset("subset-0", replicas("25%"), nil, nil)
 		udManager.AddSubset("subset-1", replicas("25%"), nil, nil)
 		udManager.AddSubset("subset-2", nil, nil, nil)
@@ -101,13 +102,13 @@ var _ = SIGDescribe("uniteddeployment", func() {
 			return resultMap
 		}
 
-		udManager := tester.NewUnitedDeploymentManager("adaptive-ud-elastic-test")
+		udManager := tester.NewUnitedDeploymentManager("adaptive-ud-elastic-test", false)
 		// enable adaptive scheduling
 		udManager.UnitedDeployment.Spec.Topology.ScheduleStrategy = appsv1alpha1.UnitedDeploymentScheduleStrategy{
 			Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
 			Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
 				RescheduleCriticalSeconds: ptr.To(int32(20)),
-				UnschedulableLastSeconds:  ptr.To(int32(15)),
+				UnschedulableDuration:     ptr.To(int32(15)),
 			},
 		}
 		udManager.AddSubset("subset-0", nil, nil, replicas(2))
@@ -119,11 +120,12 @@ var _ = SIGDescribe("uniteddeployment", func() {
 			MatchExpressions: []corev1.NodeSelectorRequirement{
 				{
 					Key:      nodeKey,
-					Operator: corev1.NodeSelectorOpExists,
+					Operator: corev1.NodeSelectorOpIn,
+					Values:   []string{"haha"},
 				},
 			},
 		}
-
+		udManager.SetNodeLabel(nodeKey, "")
 		ginkgo.By("creating united deployment")
 		udManager.Spec.Replicas = ptr.To(int32(3))
 		_, err := f.KruiseClientSet.AppsV1alpha1().UnitedDeployments(udManager.Namespace).Create(context.Background(),
@@ -156,7 +158,7 @@ var _ = SIGDescribe("uniteddeployment", func() {
 
 		ginkgo.By("scale down after recovery")
 		udManager.Scale(3)
-		udManager.CheckSubsetPods(replicasMap([]int32{2, 1, 0})) // even pods in subset-1 are not ready
+		udManager.CheckSubsetPods(replicasMap([]int32{2, 0, 1}))
 		fmt.Println()
 
 		ginkgo.By("create new subset")
@@ -171,21 +173,18 @@ var _ = SIGDescribe("uniteddeployment", func() {
 		fmt.Println()
 
 		ginkgo.By("fix subset-1 and wait recover")
-		nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		someNode := nodeList.Items[1]
-		someNode.Labels[nodeKey] = "haha"
-		_, err = f.ClientSet.CoreV1().Nodes().Update(context.Background(), &someNode, metav1.UpdateOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		udManager.CheckUnschedulableStatus(unschedulableMap([]bool{false, false, false}))
+		udManager.SetNodeLabel(nodeKey, "haha")
+		udManager.CheckUnschedulableStatus(unschedulableMap([]bool{false, false, false, false}))
 
 		ginkgo.By("waiting final status after deleting new subset")
 		udManager.Spec.Topology.Subsets = udManager.Spec.Topology.Subsets[:3]
 		udManager.Update()
+		udManager.CheckUnschedulableStatus(unschedulableMap([]bool{false, false, false}))
 		udManager.CheckSubsetPods(replicasMap([]int32{2, 2, 2}))
 		fmt.Println()
 
 		ginkgo.By("scale down after fixed")
+		time.Sleep(10 * time.Second)
 		udManager.Scale(3)
 		udManager.CheckUnschedulableStatus(unschedulableMap([]bool{false, false, false}))
 		udManager.CheckSubsetPods(replicasMap([]int32{2, 1, 0}))
@@ -195,6 +194,101 @@ var _ = SIGDescribe("uniteddeployment", func() {
 		udManager.Scale(5)
 		udManager.CheckUnschedulableStatus(unschedulableMap([]bool{false, false, false}))
 		udManager.CheckSubsetPods(replicasMap([]int32{2, 2, 1}))
+		fmt.Println()
+	})
+
+	ginkgo.It("adaptive united deployment with unschedulable pods reserved", func() {
+		replicasMap := func(replicas ...int32) map[string]int32 {
+			replicaMap := make(map[string]int32)
+			for i, r := range replicas {
+				replicaMap[fmt.Sprintf("subset-%d", i)] = r
+			}
+			return replicaMap
+		}
+		unschedulableMap := func(unschedulables []bool) map[string]bool {
+			resultMap := make(map[string]bool)
+			for i, r := range unschedulables {
+				resultMap[fmt.Sprintf("subset-%d", i)] = r
+			}
+			return resultMap
+		}
+
+		udManager := tester.NewUnitedDeploymentManager("adaptive-ud-tr-test", true)
+		// enable adaptive scheduling
+		udManager.UnitedDeployment.Spec.Topology.ScheduleStrategy = appsv1alpha1.UnitedDeploymentScheduleStrategy{
+			Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
+			Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
+				ReserveUnschedulablePods:  true,
+				RescheduleCriticalSeconds: ptr.To(int32(20)),
+				UnschedulableDuration:     ptr.To(int32(1)),
+			},
+		}
+		udManager.AddSubset("subset-0", nil, nil, nil)
+		udManager.AddSubset("subset-1", nil, nil, nil)
+		udManager.AddSubset("subset-2", nil, nil, nil)
+		subset0EnabledKey := "ud-e2e/temp-adaptive-subset-0"
+		subset1EnabledKey := "ud-e2e/temp-adaptive-subset-1"
+		udManager.UnitedDeployment.Spec.Topology.Subsets[0].NodeSelectorTerm = corev1.NodeSelectorTerm{
+			MatchExpressions: []corev1.NodeSelectorRequirement{
+				{
+					Key:      subset0EnabledKey,
+					Operator: corev1.NodeSelectorOpIn,
+					Values:   []string{"true"},
+				},
+			},
+		}
+		udManager.UnitedDeployment.Spec.Topology.Subsets[1].NodeSelectorTerm = corev1.NodeSelectorTerm{
+			MatchExpressions: []corev1.NodeSelectorRequirement{
+				{
+					Key:      subset1EnabledKey,
+					Operator: corev1.NodeSelectorOpIn,
+					Values:   []string{"true"},
+				},
+			},
+		}
+		ginkgo.By("initializing node labels")
+		udManager.SetNodeLabel(subset0EnabledKey, "false")
+		udManager.SetNodeLabel(subset1EnabledKey, "false")
+		ginkgo.By("creating united deployment")
+		udManager.Spec.Replicas = ptr.To(int32(2))
+		_, err := f.KruiseClientSet.AppsV1alpha1().UnitedDeployments(udManager.Namespace).Create(context.Background(),
+			udManager.UnitedDeployment, metav1.CreateOptions{})
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		ginkgo.By("wait for rescheduling, will take long")
+		udManager.CheckUnschedulableStatus(unschedulableMap([]bool{true, true, false}))
+		udManager.CheckReservedPods(replicasMap(2, 2, 2), replicasMap(2, 2, 0))
+		fmt.Println()
+
+		ginkgo.By("scale up while unschedulable")
+		udManager.Scale(4)
+		udManager.CheckReservedPods(replicasMap(2, 2, 4), replicasMap(2, 2, 0))
+		fmt.Println()
+
+		ginkgo.By("scale down while unschedulable")
+		udManager.Scale(2)
+		udManager.CheckReservedPods(replicasMap(2, 2, 2), replicasMap(2, 2, 0))
+		fmt.Println()
+
+		ginkgo.By("scale up again")
+		udManager.Scale(4)
+		udManager.CheckReservedPods(replicasMap(2, 2, 4), replicasMap(2, 2, 0))
+		fmt.Println()
+
+		ginkgo.By("update")
+		udManager.SetImage("busybox:1.33")
+		udManager.Update()
+		udManager.CheckReservedPods(replicasMap(2, 2, 4), replicasMap(2, 2, 0))
+		udManager.CheckPodImage("busybox:1.33")
+
+		ginkgo.By("recover subset-0")
+		udManager.SetNodeLabel(subset0EnabledKey, "true")
+		udManager.CheckReservedPods(replicasMap(4, 0, 0), replicasMap(0, 0, 0))
+		fmt.Println()
+
+		ginkgo.By("scale up after recovery")
+		udManager.Scale(5)
+		udManager.CheckReservedPods(replicasMap(5, 0, 0), replicasMap(0, 0, 0))
 		fmt.Println()
 	})
 })
