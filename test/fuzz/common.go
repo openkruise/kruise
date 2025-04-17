@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kruise Authors.
+Copyright 2025 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -323,6 +324,41 @@ func GeneratePatch(cf *fuzz.ConsumeFuzzer, rawExtension *runtime.RawExtension) e
 	return nil
 }
 
+func GenerateUnstructured(cf *fuzz.ConsumeFuzzer, resource *unstructured.Unstructured) error {
+	isStructured, err := cf.GetBool()
+	if err != nil {
+		return err
+	}
+
+	if !isStructured {
+		obj := make(map[string]interface{})
+		if err = cf.GenerateStruct(&obj); err != nil {
+			return err
+		}
+		resource.Object = obj
+		return nil
+	}
+
+	labels := make(map[string]string)
+	if err := cf.FuzzMap(&labels); err != nil {
+		return err
+	}
+	resource.SetLabels(labels)
+
+	annotations := make(map[string]string)
+	if err := cf.FuzzMap(&annotations); err != nil {
+		return err
+	}
+	resource.SetAnnotations(annotations)
+
+	finalizers := make([]string, 0)
+	if err := cf.CreateSlice(&finalizers); err != nil {
+		return err
+	}
+	resource.SetFinalizers(finalizers)
+	return nil
+}
+
 func GenerateLabelPart() string {
 	length := rand.Intn(63) + 1
 	b := make([]byte, length)
@@ -361,4 +397,26 @@ func GenerateValidValue() string {
 		parts[i] = GenerateLabelPart()
 	}
 	return strings.Join(parts, ".")
+}
+
+func GenerateValidNamespaceName(cf *fuzz.ConsumeFuzzer) string {
+	name, err := cf.GetStringFrom(alphaNum, 63)
+	if err != nil {
+		return alphaNum
+	}
+	return name
+}
+
+func GenerateInvalidNamespaceName(cf *fuzz.ConsumeFuzzer) string {
+	invalidChars := []rune{'$', '_', ' '}
+	validName := GenerateValidNamespaceName(cf)
+	runes := []rune(validName)
+
+	choice, err := cf.GetInt()
+	if err != nil {
+		return "_invalid"
+	}
+	// Make sure the first character is illegal
+	runes[0] = invalidChars[choice%(len(invalidChars))]
+	return string(runes)
 }
