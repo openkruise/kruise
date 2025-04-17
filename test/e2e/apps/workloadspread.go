@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -30,7 +31,6 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -48,7 +48,6 @@ var (
 	KruiseKindCloneSet    = appsv1alpha1.SchemeGroupVersion.WithKind("CloneSet")
 	KruiseKindStatefulSet = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
 	controllerKindDep     = appsv1.SchemeGroupVersion.WithKind("Deployment")
-	//controllerKindJob  = batchv1.SchemeGroupVersion.WithKind("Job")
 )
 
 var _ = SIGDescribe("workloadspread", func() {
@@ -104,6 +103,9 @@ var _ = SIGDescribe("workloadspread", func() {
 			}
 			workers = append(workers, &node)
 		}
+		sort.Slice(workers, func(i, j int) bool {
+			return workers[i].Name < workers[j].Name
+		})
 		gomega.Expect(len(workers) > 2).Should(gomega.Equal(true))
 		// subset-a
 		worker0 := workers[0]
@@ -114,22 +116,6 @@ var _ = SIGDescribe("workloadspread", func() {
 		worker2 := workers[2]
 		tester.SetNodeLabel(c, worker2, WorkloadSpreadFakeZoneKey, "zone-b")
 	})
-
-	f.AfterEachActions = []func(){
-		func() {
-			nodeList, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			patchBody := fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, WorkloadSpreadFakeZoneKey)
-			for i := range nodeList.Items {
-				node := nodeList.Items[i]
-				if _, exist := node.GetLabels()[WorkloadSpreadFakeZoneKey]; !exist {
-					continue
-				}
-				_, err = c.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, []byte(patchBody), metav1.PatchOptions{})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			}
-		},
-	}
 
 	framework.KruiseDescribe("WorkloadSpread functionality", func() {
 		ginkgo.AfterEach(func() {
