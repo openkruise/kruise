@@ -430,7 +430,7 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 			name: "Pod recovered, but not long enough",
 			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
 				subset, ud, pod := baseEnvFactory()
-				// create -> 15s check as unavailable -> 10s running, check
+				// create -> 15s check as reserved -> 10s running, check
 				modifyPod(pod, now.Add(-10*time.Second), now.Add(-25*time.Second), false, "true")
 				return subset, ud
 			},
@@ -443,7 +443,7 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 			name: "Pod recovered, long enough",
 			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
 				subset, ud, pod := baseEnvFactory()
-				// create -> 15s check as unavailable -> 35s running
+				// create -> 15s check as reserved -> 35s running
 				modifyPod(pod, now.Add(-35*time.Second), now.Add(-50*time.Second), false, "true")
 				return subset, ud
 			},
@@ -461,8 +461,8 @@ func TestProcessSubsetForTemporaryAdaptiveStrategy(t *testing.T) {
 				t.Logf("case %s failed: expect pods to patch %d, but got %d", c.name, c.podsToPatch, len(podsToPatch))
 				t.Fail()
 			}
-			if subset.Status.UnschedulableStatus.ReservedPods != c.expectReservedPods {
-				t.Logf("case %s failed: expect unavailable pods %d, but got %d", c.name, c.expectReservedPods, subset.Status.UnschedulableStatus.ReservedPods)
+			if subset.Status.UnschedulableStatus.ReservedPodNum != c.expectReservedPods {
+				t.Logf("case %s failed: expect reserved pods %d, but got %d", c.name, c.expectReservedPods, subset.Status.UnschedulableStatus.ReservedPodNum)
 				t.Fail()
 			}
 			status := ud.Status.GetSubsetStatus(subsetName)

@@ -225,7 +225,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 	shouldReserveUnschedulablePods := instance.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods()
 	if instance.Spec.Topology.ScheduleStrategy.IsAdaptive() {
 		var podsToPatch []podToPatchReservedLabel
-		for name, subset := range *existingSubsets {
+		for name, subset := range existingSubsets {
 			if shouldReserveUnschedulablePods {
 				podsToPatch = append(podsToPatch, calculateSubsetsStatusForReservedAdaptiveStrategy(name, subset, instance, now)...)
 				if err = r.patchReservedStatusChangedPods(podsToPatch); err != nil {
@@ -278,7 +278,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 
 // getExistingSubsets fetches all subset workloads in cluster managed by this UnitedDeployment
 // if adaptive scheduling strategy is used, existing subset unscheduable status will be set true here (newly created subsets are default false)
-func (r *ReconcileUnitedDeployment) getExistingSubsets(instance *appsv1alpha1.UnitedDeployment, control ControlInterface, expectedRevision string) (name2Subset *map[string]*Subset, err error) {
+func (r *ReconcileUnitedDeployment) getExistingSubsets(instance *appsv1alpha1.UnitedDeployment, control ControlInterface, expectedRevision string) (existingSubsets map[string]*Subset, err error) {
 	subSets, err := control.GetAllSubsets(instance, expectedRevision)
 	if err != nil {
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeFindSubsets), err.Error())
@@ -288,7 +288,7 @@ func (r *ReconcileUnitedDeployment) getExistingSubsets(instance *appsv1alpha1.Un
 	klog.V(4).InfoS("Classify UnitedDeployment by subSet name", "unitedDeployment", klog.KObj(instance))
 	allSubsets := r.classifySubsetBySubsetName(subSets)
 
-	existingSubsets, err := r.deleteDupSubset(allSubsets, control)
+	existingSubsets, err = r.deleteDupSubset(allSubsets, control)
 	if err != nil {
 		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeDupSubsetsDelete), err.Error())
 		return nil, fmt.Errorf("fail to manage duplicate Subset of UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
@@ -363,7 +363,7 @@ func calculateSubsetsStatusForDefaultAdaptiveStrategy(name string, subset *Subse
 			durationStore.Push(unitedDeploymentKey, requeueAfter)
 		}
 		if subset.Status.UnschedulableStatus.PendingPods > 0 {
-			klog.InfoS("subset has unavailable pods", "subset", subset.Name,
+			klog.InfoS("subset has reserved pods", "subset", subset.Name,
 				"pendingPods", subset.Status.UnschedulableStatus.PendingPods, "unitedDeployment", klog.KObj(ud))
 			subset.Status.UnschedulableStatus.Unschedulable = true
 			status.SetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable, corev1.ConditionFalse, "reschedule",
@@ -381,9 +381,8 @@ func calculateSubsetsStatusForReservedAdaptiveStrategy(name string, subset *Subs
 		klog.ErrorS(nil, "SubsetStatus not found", "subset", name, "unitedDeployment", klog.KObj(ud))
 		return
 	}
-	var previouslyUnschedulable bool
 	if condition := status.GetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable); condition != nil {
-		previouslyUnschedulable = condition.Status == corev1.ConditionFalse
+		subset.Status.UnschedulableStatus.PreviouslyUnschedulable = condition.Status == corev1.ConditionFalse
 	}
 	var requeueAfter time.Duration = math.MaxInt64
 	unschedulableDuration := ud.Spec.Topology.ScheduleStrategy.GetUnschedulableDuration()
@@ -391,9 +390,10 @@ func calculateSubsetsStatusForReservedAdaptiveStrategy(name string, subset *Subs
 		oldReserved, ok := IsPodMarkedAsReserved(pod)
 		var reserved bool
 		var checkAfter time.Duration
-		if previouslyUnschedulable && !ok {
+		if subset.Status.UnschedulableStatus.PreviouslyUnschedulable && !ok {
 			klog.V(5).InfoS("pod created in unschedulable subset", "pod", klog.KObj(pod), "unitedDeployment", klog.KObj(ud), "subset", name)
-			subset.Status.UnschedulableStatus.ReservedPods++
+			subset.Status.UnschedulableStatus.ReservedPodNum++
+			subset.Status.UnschedulableStatus.ReservedPods[pod.Name] = struct{}{}
 			podsToPatch = append(podsToPatch, podToPatchReservedLabel{pod, true})
 			if requeueAfter < unschedulableDuration {
 				requeueAfter = unschedulableDuration
@@ -403,7 +403,8 @@ func calculateSubsetsStatusForReservedAdaptiveStrategy(name string, subset *Subs
 				ud.Spec.Topology.ScheduleStrategy.GetRescheduleCriticalDuration(), unschedulableDuration, now)
 			if reserved {
 				klog.V(5).InfoS("pod is reserved", "pod", klog.KObj(pod), "unitedDeployment", klog.KObj(ud), "subset", name)
-				subset.Status.UnschedulableStatus.ReservedPods++
+				subset.Status.UnschedulableStatus.ReservedPodNum++
+				subset.Status.UnschedulableStatus.ReservedPods[pod.Name] = struct{}{}
 			}
 			if checkAfter > 0 && checkAfter < requeueAfter {
 				requeueAfter = checkAfter
@@ -417,9 +418,9 @@ func calculateSubsetsStatusForReservedAdaptiveStrategy(name string, subset *Subs
 	if requeueAfter < math.MaxInt64 {
 		durationStore.Push(unitedDeploymentKey, requeueAfter)
 	}
-	if subset.Status.UnschedulableStatus.ReservedPods > 0 {
+	if subset.Status.UnschedulableStatus.ReservedPodNum > 0 {
 		klog.V(5).InfoS("subset has some reserved pods", "subset", name,
-			"reservedPods", subset.Status.UnschedulableStatus.ReservedPods,
+			"reservedPods", subset.Status.UnschedulableStatus.ReservedPodNum,
 			"totalPods", len(subset.Spec.SubsetPods), "unitedDeployment", klog.KObj(ud))
 		subset.Status.UnschedulableStatus.Unschedulable = true
 		status.SetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable, corev1.ConditionFalse, "reschedule",
@@ -461,7 +462,7 @@ func (r *ReconcileUnitedDeployment) patchPodReservedLabel(pod *corev1.Pod, value
 	return r.Patch(context.TODO(), patch, client.RawPatch(types.StrategicMergePatchType, []byte(patchStr)))
 }
 
-func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[string]int32) *map[string]int32 {
+func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas map[string]int32) map[string]int32 {
 	partitions := map[string]int32{}
 	for _, subset := range ud.Spec.Topology.Subsets {
 		var subsetPartition int32
@@ -471,22 +472,22 @@ func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[str
 			}
 		}
 
-		if subsetReplicas, exist := (*nextReplicas)[subset.Name]; exist && subsetPartition > subsetReplicas {
+		if subsetReplicas, exist := nextReplicas[subset.Name]; exist && subsetPartition > subsetReplicas {
 			subsetPartition = subsetReplicas
 		}
 
 		partitions[subset.Name] = subsetPartition
 	}
 
-	return &partitions
+	return partitions
 }
 
-func getNextUpdate(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[string]int32, nextPartitions *map[string]int32) map[string]SubsetUpdate {
+func getNextUpdate(ud *appsv1alpha1.UnitedDeployment, nextReplicas map[string]int32, nextPartitions map[string]int32) map[string]SubsetUpdate {
 	next := make(map[string]SubsetUpdate)
 	for _, subset := range ud.Spec.Topology.Subsets {
 		t := SubsetUpdate{}
-		t.Replicas = (*nextReplicas)[subset.Name]
-		t.Partition = (*nextPartitions)[subset.Name]
+		t.Replicas = nextReplicas[subset.Name]
+		t.Partition = nextPartitions[subset.Name]
 		t.Patch = string(subset.Patch.Raw)
 
 		next[subset.Name] = t
@@ -494,7 +495,7 @@ func getNextUpdate(ud *appsv1alpha1.UnitedDeployment, nextReplicas *map[string]i
 	return next
 }
 
-func (r *ReconcileUnitedDeployment) deleteDupSubset(allSubsets map[string][]*Subset, control ControlInterface) (*map[string]*Subset, error) {
+func (r *ReconcileUnitedDeployment) deleteDupSubset(allSubsets map[string][]*Subset, control ControlInterface) (map[string]*Subset, error) {
 	existingSubsets := map[string]*Subset{}
 	for name, subsets := range allSubsets {
 		if len(subsets) > 1 {
@@ -505,7 +506,7 @@ func (r *ReconcileUnitedDeployment) deleteDupSubset(allSubsets map[string][]*Sub
 						continue
 					}
 
-					return &existingSubsets, err
+					return existingSubsets, err
 				}
 			}
 		}
@@ -515,7 +516,7 @@ func (r *ReconcileUnitedDeployment) deleteDupSubset(allSubsets map[string][]*Sub
 		}
 	}
 
-	return &existingSubsets, nil
+	return existingSubsets, nil
 }
 
 func (r *ReconcileUnitedDeployment) getSubsetControls(instance *appsv1alpha1.UnitedDeployment) (ControlInterface, subSetType) {
@@ -565,7 +566,8 @@ func (r *ReconcileUnitedDeployment) updateStatus(instance *appsv1alpha1.UnitedDe
 
 var extraStatusSelector = fmt.Sprintf(",%s=false", appsv1alpha1.ReservedPodLabelKey)
 
-func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.UnitedDeploymentStatus, existingSubsets *map[string]*Subset, nextReplicas, nextPartition *map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, control ControlInterface) *appsv1alpha1.UnitedDeploymentStatus {
+func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.UnitedDeploymentStatus, existingSubsets map[string]*Subset,
+	nextReplicas, nextPartition map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, control ControlInterface) *appsv1alpha1.UnitedDeploymentStatus {
 	expectedRevision := currentRevision.Name
 	if updatedRevision != nil {
 		expectedRevision = updatedRevision.Name
@@ -578,22 +580,22 @@ func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.Unit
 	newStatus.UpdatedReadyReplicas = 0
 
 	// sync from status
-	for name, subset := range *existingSubsets {
-		subsetReplicas, subsetReadyReplicas, subsetUpdatedReplicas, subsetUpdatedReadyReplicas := replicasStatusFn(subset)
-		newStatus.Replicas += subsetReplicas - subset.Status.UnschedulableStatus.PendingPods - subset.Status.UnschedulableStatus.ReservedPods
-		newStatus.ReservedPods += subset.Status.UnschedulableStatus.ReservedPods
+	for name, subset := range existingSubsets {
+		subsetReplicas, subsetReadyReplicas, subsetUpdatedReplicas, subsetUpdatedReadyReplicas := replicasStatus(subset)
+		newStatus.Replicas += subsetReplicas - subset.Status.UnschedulableStatus.ReservedPodNum
+		newStatus.ReservedPods += subset.Status.UnschedulableStatus.ReservedPodNum
 		newStatus.ReadyReplicas += subsetReadyReplicas
 		newStatus.UpdatedReplicas += subsetUpdatedReplicas
 		newStatus.UpdatedReadyReplicas += subsetUpdatedReadyReplicas
 		ss := newStatus.GetSubsetStatus(name)
 		ss.Replicas = subset.Status.Replicas
 		ss.ReadyReplicas = subset.Status.ReadyReplicas
-		ss.Partition = (*nextPartition)[name]
-		ss.ReservedPods = subset.Status.UnschedulableStatus.ReservedPods
+		ss.Partition = nextPartition[name]
+		ss.ReservedPods = subset.Status.UnschedulableStatus.ReservedPodNum
 	}
 
 	// Legacy field "SubsetReplicas" status still exists in ud status, consider remove them in v1beta1.
-	newStatus.SubsetReplicas = *nextReplicas
+	newStatus.SubsetReplicas = nextReplicas
 
 	if newStatus.CurrentRevision == "" {
 		// init with current revision
@@ -605,14 +607,14 @@ func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.Unit
 	}
 
 	newStatus.UpdateStatus.UpdatedRevision = expectedRevision
-	newStatus.UpdateStatus.CurrentPartitions = *nextPartition
+	newStatus.UpdateStatus.CurrentPartitions = nextPartition
 
 	if newStatus.UpdateStatus.UpdatedRevision != newStatus.CurrentRevision && newStatus.UpdatedReadyReplicas >= newStatus.Replicas {
 		newStatus.CurrentRevision = newStatus.UpdateStatus.UpdatedRevision
 	}
 
 	var subsetFailure *string
-	for _, subset := range *existingSubsets {
+	for _, subset := range existingSubsets {
 		failureMessage := control.GetSubsetFailure(subset)
 		if failureMessage != nil {
 			subsetFailure = failureMessage
@@ -628,8 +630,6 @@ func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.Unit
 
 	return newStatus
 }
-
-var replicasStatusFn = replicasStatus
 
 func replicasStatus(subset *Subset) (replicas, readyReplicas, updatedReplicas, updatedReadyReplicas int32) {
 	replicas = subset.Status.Replicas
