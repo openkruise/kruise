@@ -429,6 +429,23 @@ var _ = SIGDescribe("InplaceVPA", func() {
 					return cs.Status.UpdatedAvailableReplicas
 				}, 600*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
 
+				// add this to avoid the situation where the pod status keeps changing
+				// TODO: Remove this for status change optimization, maybe in Kubernetes 1.33.
+				ginkgo.By("Wait for the pod status to be consistent")
+				gomega.Eventually(func() string {
+					pods, err = tester.ListPodsForCloneSet(cs.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					a1, b1, c1 := getResourcesInfo(pods[0])
+					if a1 != a || b1 != b || c1 != c {
+						framework.Logf("updateSpec %v", a1)
+						framework.Logf("spec %v", b1)
+						framework.Logf("container status %v ", c1)
+						a, b, c = a1, b1, c1
+					}
+					SkipTestWhenCgroupError(pods[0])
+					return pods[0].Status.ContainerStatuses[0].ContainerID
+				}, 120*time.Second, 3*time.Second).Should(gomega.Not(gomega.Equal(oldContainerStatus.ContainerID)))
+
 				ginkgo.By("Verify the containerID changed and restartCount should not be 0")
 				pods, err = tester.ListPodsForCloneSet(cs.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -587,6 +604,23 @@ var _ = SIGDescribe("InplaceVPA", func() {
 					SkipTestWhenCgroupError(pods[0])
 					return cs.Status.UpdatedAvailableReplicas
 				}, 600*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+				// add this to avoid the situation where the pod status keeps changing
+				// TODO: Remove this for status change optimization, maybe in Kubernetes 1.33.
+				ginkgo.By("Wait for the pod status to be consistent")
+				gomega.Eventually(func() string {
+					pods, err = tester.ListPodsForCloneSet(cs.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					a1, b1, c1 := getResourcesInfo(pods[0])
+					if a1 != a || b1 != b || c1 != c {
+						framework.Logf("updateSpec %v", a1)
+						framework.Logf("spec %v", b1)
+						framework.Logf("container status %v ", c1)
+						a, b, c = a1, b1, c1
+					}
+					SkipTestWhenCgroupError(pods[0])
+					return pods[0].Status.ContainerStatuses[0].ContainerID
+				}, 120*time.Second, 3*time.Second).Should(gomega.Not(gomega.Equal(oldContainerStatus.ContainerID)))
 
 				ginkgo.By("Verify the containerID changed and restartCount should be 1")
 				pods, err = tester.ListPodsForCloneSet(cs.Name)
@@ -899,7 +933,14 @@ var _ = SIGDescribe("InplaceVPA", func() {
 				gomega.Expect(redisContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 
 				ginkgo.By("Verify nginx should be stopped after new redis has started")
-				gomega.Expect(nginxContainerStatus.LastTerminationState.Terminated.FinishedAt.After(redisContainerStatus.State.Running.StartedAt.Time.Add(time.Second*10))).
+				var t time.Time
+				if nginxContainerStatus.LastTerminationState.Terminated != nil {
+					t = nginxContainerStatus.LastTerminationState.Terminated.FinishedAt.Time
+				} else {
+					// fix https://github.com/openkruise/kruise/issues/1925
+					t = nginxContainerStatus.State.Running.StartedAt.Time
+				}
+				gomega.Expect(t.After(redisContainerStatus.State.Running.StartedAt.Time.Add(time.Second*10))).
 					Should(gomega.Equal(true), fmt.Sprintf("nginx finish at %v is not after redis start %v + 10s",
 						nginxContainerStatus.LastTerminationState.Terminated.FinishedAt,
 						redisContainerStatus.State.Running.StartedAt))
