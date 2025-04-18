@@ -42,7 +42,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator := sortToAllocator(infos)
-	_, _ = allocator.AllocateReplicas(5, &map[string]int32{})
+	_, _ = allocator.AllocateReplicas(5, map[string]int32{})
 	if " t1 -> 1; t3 -> 1; t4 -> 1; t2 -> 2;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -51,7 +51,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t1", 2),
 	}
 	allocator = sortToAllocator(infos)
-	_, _ = allocator.AllocateReplicas(0, &map[string]int32{})
+	_, _ = allocator.AllocateReplicas(0, map[string]int32{})
 	if " t1 -> 0;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -63,7 +63,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator = sortToAllocator(infos)
-	_, _ = allocator.AllocateReplicas(17, &map[string]int32{})
+	_, _ = allocator.AllocateReplicas(17, map[string]int32{})
 	if " t1 -> 4; t3 -> 4; t4 -> 4; t2 -> 5;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -75,7 +75,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator = sortToAllocator(infos)
-	_, _ = allocator.AllocateReplicas(9, &map[string]int32{})
+	_, _ = allocator.AllocateReplicas(9, map[string]int32{})
 	if " t1 -> 2; t3 -> 2; t4 -> 2; t2 -> 3;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -85,7 +85,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t2", 10),
 	}
 	allocator = sortToAllocator(infos)
-	_, _ = allocator.AllocateReplicas(19, &map[string]int32{})
+	_, _ = allocator.AllocateReplicas(19, map[string]int32{})
 	if " t1 -> 9; t2 -> 10;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -95,7 +95,7 @@ func TestScaleReplicas(t *testing.T) {
 		createSubset("t2", 10),
 	}
 	allocator = sortToAllocator(infos)
-	_, _ = allocator.AllocateReplicas(21, &map[string]int32{})
+	_, _ = allocator.AllocateReplicas(21, map[string]int32{})
 	if " t1 -> 10; t2 -> 11;" != allocator.String() {
 		t.Fatalf("unexpected %s", allocator)
 	}
@@ -109,7 +109,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator := sortToAllocator(infos)
-	_, _ = allocator.AllocateReplicas(27, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(27, map[string]int32{
 		"t1": 4,
 		"t3": 4,
 	})
@@ -124,7 +124,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator = sortToAllocator(infos)
-	_, _ = allocator.AllocateReplicas(8, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(8, map[string]int32{
 		"t1": 4,
 		"t3": 4,
 	})
@@ -139,7 +139,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator = sortToAllocator(infos)
-	_, _ = allocator.AllocateReplicas(16, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(16, map[string]int32{
 		"t1": 4,
 		"t2": 4,
 		"t3": 4,
@@ -156,7 +156,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator = sortToAllocator(infos)
-	_, _ = allocator.AllocateReplicas(10, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(10, map[string]int32{
 		"t1": 1,
 		"t2": 2,
 		"t3": 3,
@@ -172,7 +172,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator = sortToAllocator(infos)
-	_, _ = allocator.AllocateReplicas(10, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(10, map[string]int32{
 		"t1": 1,
 		"t2": 2,
 		"t3": 3,
@@ -189,7 +189,7 @@ func TestSpecifyValidReplicas(t *testing.T) {
 		createSubset("t4", 2),
 	}
 	allocator = sortToAllocator(infos)
-	_, _ = allocator.AllocateReplicas(-1, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(-1, map[string]int32{
 		"t1": 1,
 		"t2": 2,
 		"t3": 3,
@@ -206,7 +206,7 @@ func TestSpecifyInvalidReplicas(t *testing.T) {
 		createSubset("t2", 4),
 	}
 	allocator := sortToAllocator(infos)
-	_, _ = allocator.AllocateReplicas(14, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(14, map[string]int32{
 		"t1": 6,
 		"t2": 6,
 	})
@@ -219,7 +219,7 @@ func TestSpecifyInvalidReplicas(t *testing.T) {
 		createSubset("t2", 4),
 	}
 	allocator = sortToAllocator(infos)
-	_, _ = allocator.AllocateReplicas(14, &map[string]int32{
+	_, _ = allocator.AllocateReplicas(14, map[string]int32{
 		"t1": 10,
 		"t2": 11,
 	})
@@ -302,7 +302,7 @@ func TestCapacityAllocator(t *testing.T) {
 				t.Fatalf("unexpected error %v", err)
 			}
 			for index := range cs.desiredReplicas {
-				if (*result)[fmt.Sprintf("subset-%d", index)] != cs.desiredReplicas[index] {
+				if result[fmt.Sprintf("subset-%d", index)] != cs.desiredReplicas[index] {
 					t.Fatalf("unexpected result %v", result)
 				}
 			}
@@ -310,151 +310,555 @@ func TestCapacityAllocator(t *testing.T) {
 	}
 }
 
-func TestAdaptiveElasticAllocator(t *testing.T) {
-	getUnitedDeploymentAndSubsets := func(totalReplicas, minReplicas, maxReplicas, pendingPods int32) (
+func TestDefaultAdaptiveAllocation(t *testing.T) {
+	parseInt32 := func(x int32) *intstr.IntOrString {
+		if x == -1 {
+			return nil
+		}
+		xx := intstr.FromInt32(x)
+		return &xx
+	}
+	getUnitedDeploymentAndSubsets := func(totalReplicas int32,
+		minReplicas, maxReplicas, subsetPods, pendingPods []int32) (
 		*appsv1alpha1.UnitedDeployment, map[string]*Subset) {
-		minR, maxR := intstr.FromInt32(minReplicas), intstr.FromInt32(maxReplicas)
-		return &appsv1alpha1.UnitedDeployment{
-				Spec: appsv1alpha1.UnitedDeploymentSpec{
-					Replicas: &totalReplicas,
-					Topology: appsv1alpha1.Topology{
-						Subsets: []appsv1alpha1.Subset{
-							{
-								Name:        "subset-1",
-								MinReplicas: &minR,
-								MaxReplicas: &maxR,
-							},
-							{
-								Name: "subset-2",
-							},
-						},
-						ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
-							Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
-						},
+		ud := &appsv1alpha1.UnitedDeployment{
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Replicas: &totalReplicas,
+				Topology: appsv1alpha1.Topology{
+					ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
+						Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
 					},
 				},
-			}, map[string]*Subset{
-				"subset-1": {
-					Status: SubsetStatus{
-						UnschedulableStatus: SubsetUnschedulableStatus{
-							Unschedulable: true,
-							PendingPods:   pendingPods,
-						},
-						Replicas:             maxReplicas,
-						UpdatedReadyReplicas: maxReplicas - pendingPods,
-						ReadyReplicas:        maxReplicas - pendingPods,
+			},
+		}
+		existingSubsets := map[string]*Subset{}
+		for i := range subsetPods {
+			subsetName := fmt.Sprintf("subset-%d", i)
+			minR, maxR := parseInt32(minReplicas[i]), parseInt32(maxReplicas[i])
+			pending := max(0, pendingPods[i])
+			ud.Spec.Topology.Subsets = append(ud.Spec.Topology.Subsets, appsv1alpha1.Subset{
+				Name:        subsetName,
+				MinReplicas: minR,
+				MaxReplicas: maxR,
+			})
+			existingSubsets[subsetName] = &Subset{
+				Status: SubsetStatus{
+					UnschedulableStatus: SubsetUnschedulableStatus{
+						Unschedulable: pendingPods[i] != 0,
+						PendingPods:   pending,
 					},
-					Spec: SubsetSpec{
-						Replicas:   maxReplicas,
-						SubsetPods: generateSubsetPods(maxReplicas, pendingPods, 0),
-					},
+					Replicas:             subsetPods[i],
+					UpdatedReadyReplicas: subsetPods[i] - pending,
+					ReadyReplicas:        subsetPods[i] - pending,
+				},
+				Spec: SubsetSpec{
+					Replicas:   subsetPods[i],
+					SubsetPods: generateSubsetPods(subsetPods[i], pending, 0),
 				},
 			}
+		}
+		return ud, existingSubsets
 	}
 	cases := []struct {
-		name                                                 string
-		totalReplicas, minReplicas, maxReplicas, pendingPods int32
-		subset1Replicas, subset2Replicas                     int32
+		name         string
+		specReplicas int32   // ud.spec.replicas
+		subsetPods   []int32 // pods in each subset
+		minReplicas  []int32 // minReplicas in each subset, -1 means nil
+		maxReplicas  []int32 // maxReplicas in each subset, -1 means nil
+		pendingPods  []int32 // pendingPods in each subset. set to -1 means no pods but unschedulable
+		results      []int32 // result expected
 	}{
 		{
-			name:          "5 pending pods > maxReplicas -> 0, 10",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 5,
-			subset1Replicas: 0, subset2Replicas: 10,
+			name:         "5 pending pods = maxReplicas -> 3, 7",
+			specReplicas: 10,
+			subsetPods:   []int32{5, 5},
+			minReplicas:  []int32{3, -1},
+			maxReplicas:  []int32{5, -1},
+			pendingPods:  []int32{5, 0},
+			results:      []int32{3, 7},
 		},
 		{
-			name:          "4 pending pods = maxReplicas -> 0, 10",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 4,
-			subset1Replicas: 0, subset2Replicas: 10,
+			name:         "4 pending pods < maxReplicas -> 3, 7",
+			specReplicas: 10,
+			subsetPods:   []int32{5, 5},
+			minReplicas:  []int32{3, -1},
+			maxReplicas:  []int32{5, -1},
+			pendingPods:  []int32{4, 0},
+			results:      []int32{3, 7},
 		},
 		{
-			name:          "3 pending pods < maxReplicas -> 1, 9",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 3,
-			subset1Replicas: 1, subset2Replicas: 9,
+			name:         "3 pending pods = minReplicas -> 3, 7",
+			specReplicas: 10,
+			subsetPods:   []int32{5, 5},
+			minReplicas:  []int32{3, -1},
+			maxReplicas:  []int32{5, -1},
+			pendingPods:  []int32{3, 0},
+			results:      []int32{3, 7},
 		},
 		{
-			name:          "2 pending pods = minReplicas -> 2, 8",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 2,
-			subset1Replicas: 2, subset2Replicas: 8,
+			name:         "2 pending pods < minReplicas -> 3, 7",
+			specReplicas: 10,
+			subsetPods:   []int32{5, 5},
+			minReplicas:  []int32{3, -1},
+			maxReplicas:  []int32{5, -1},
+			pendingPods:  []int32{2, 0},
+			results:      []int32{3, 7},
 		},
 		{
-			name:          "1 pending pods < minReplicas -> 3, 7",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 1,
-			subset1Replicas: 3, subset2Replicas: 7,
+			name:         "no pending pods -> 5, 5",
+			specReplicas: 10,
+			subsetPods:   []int32{5, 5},
+			minReplicas:  []int32{3, -1},
+			maxReplicas:  []int32{5, -1},
+			pendingPods:  []int32{0, 0},
+			results:      []int32{5, 5},
 		},
 		{
-			name:          "no pending pods -> 4, 6",
-			totalReplicas: 10, minReplicas: 2, maxReplicas: 4, pendingPods: 0,
-			subset1Replicas: 4, subset2Replicas: 6,
+			name:         "normal scale up 2-> 4",
+			specReplicas: 4,
+			subsetPods:   []int32{1, 1},
+			minReplicas:  []int32{1, -1},
+			maxReplicas:  []int32{2, -1},
+			pendingPods:  []int32{0, 0},
+			results:      []int32{2, 2},
+		},
+		{
+			name:         "normal scale down 4 -> 3",
+			specReplicas: 3,
+			subsetPods:   []int32{2, 2},
+			minReplicas:  []int32{1, -1},
+			maxReplicas:  []int32{2, -1},
+			pendingPods:  []int32{0, 0},
+			results:      []int32{2, 1},
+		},
+		{
+			name:         "normal scale down 3 -> 1",
+			specReplicas: 1,
+			subsetPods:   []int32{2, 1},
+			minReplicas:  []int32{1, -1},
+			maxReplicas:  []int32{2, -1},
+			pendingPods:  []int32{0, 0},
+			results:      []int32{1, 0},
+		},
+		{
+			name:         "scale down with min and pending",
+			specReplicas: 3,
+			subsetPods:   []int32{1, 3},
+			minReplicas:  []int32{1, -1},
+			maxReplicas:  []int32{2, -1},
+			pendingPods:  []int32{1, 0},
+			results:      []int32{1, 2},
+		},
+		{
+			name:         "scale down with only pending",
+			specReplicas: 3,
+			subsetPods:   []int32{1, 3},
+			minReplicas:  []int32{0, -1},
+			maxReplicas:  []int32{2, -1},
+			pendingPods:  []int32{1, 0},
+			results:      []int32{0, 3},
+		},
+		{
+			name:         "complex: start",
+			specReplicas: 4,
+			subsetPods:   []int32{0, 0, 0, 0},
+			minReplicas:  []int32{0, 0, 0, 0},
+			maxReplicas:  []int32{2, -1, -1, -1},
+			pendingPods:  []int32{0, 0, 0, 0},
+			results:      []int32{2, 2, 0, 0},
+		},
+		{
+			name:         "complex: found subset-1 unschedulable",
+			specReplicas: 4,
+			subsetPods:   []int32{2, 2, 0, 0},
+			minReplicas:  []int32{0, 0, 0, 0},
+			maxReplicas:  []int32{2, -1, -1, -1},
+			pendingPods:  []int32{0, 2, 0, 0},
+			results:      []int32{2, 0, 2, 0},
+		},
+		{
+			name:         "complex: found subset-2 unschedulable",
+			specReplicas: 4,
+			subsetPods:   []int32{2, 0, 2, 0},
+			minReplicas:  []int32{0, 0, 0, 0},
+			maxReplicas:  []int32{2, -1, -1, -1},
+			pendingPods:  []int32{0, -1, 2, 0},
+			results:      []int32{2, 0, 0, 2},
+		},
+		{
+			name:         "complex: scale up 4 -> 8 when unschedulable",
+			specReplicas: 8,
+			subsetPods:   []int32{2, 0, 0, 2},
+			minReplicas:  []int32{0, 0, 0, 0},
+			maxReplicas:  []int32{2, -1, -1, -1},
+			pendingPods:  []int32{0, -1, -1, 0},
+			results:      []int32{2, 0, 0, 6},
+		},
+		{
+			name:         "complex: scale up 4 -> 8 after recovered",
+			specReplicas: 8,
+			subsetPods:   []int32{2, 0, 0, 2},
+			minReplicas:  []int32{0, 0, 0, 0},
+			maxReplicas:  []int32{2, -1, -1, -1},
+			pendingPods:  []int32{0, 0, 0, 0},
+			results:      []int32{2, 4, 0, 2},
+		},
+		{
+			name:         "complex: scale down 8 -> 4 when unschedulable",
+			specReplicas: 4,
+			subsetPods:   []int32{2, 0, 0, 6},
+			minReplicas:  []int32{0, 0, 0, 0},
+			maxReplicas:  []int32{-1, -1, -1, -1},
+			pendingPods:  []int32{0, 0, 0, 0},
+			results:      []int32{2, 0, 0, 2},
+		},
+		{
+			name:         "complex: scale down 8 -> 4 after recovered",
+			specReplicas: 4,
+			subsetPods:   []int32{2, 0, 0, 6},
+			minReplicas:  []int32{0, 0, 0, 0},
+			maxReplicas:  []int32{-1, -1, -1, -1},
+			pendingPods:  []int32{0, 0, 0, 0},
+			results:      []int32{2, 0, 0, 2},
 		},
 	}
-	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			ud, subsets := getUnitedDeploymentAndSubsets(
-				testCase.totalReplicas, testCase.minReplicas, testCase.maxReplicas, testCase.pendingPods)
-			alloc, err := NewReplicaAllocator(ud).Alloc(&subsets)
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			ud, subsets := getUnitedDeploymentAndSubsets(tt.specReplicas, tt.minReplicas, tt.maxReplicas,
+				tt.subsetPods, tt.pendingPods)
+			alloc, err := NewReplicaAllocator(ud).Alloc(subsets)
 			if err != nil {
 				t.Fatalf("unexpected getNextReplicas error %v", err)
-			} else {
-				subset1Replicas, subset2Replicas := (*alloc)["subset-1"], (*alloc)["subset-2"]
-				if subset1Replicas != testCase.subset1Replicas || subset2Replicas != testCase.subset2Replicas {
-					t.Fatalf("subset1Replicas = %d, subset2Replicas = %d,  test case is %+v",
-						subset1Replicas, subset2Replicas, testCase)
-				}
+			}
+			actual := make([]int32, len(tt.results))
+			for i := 0; i < len(tt.results); i++ {
+				actual[i] = alloc[fmt.Sprintf("subset-%d", i)]
+			}
+			if !reflect.DeepEqual(actual, tt.results) {
+				t.Errorf("expected %v, but got %v", tt.results, actual)
 			}
 		})
 	}
 }
 
-func TestAdjustReplicasInDefaultAdaptiveStrategy(t *testing.T) {
-	tests := map[string]struct {
-		expectedReplicas []int32
-		runningPods      []int32
-		want             []int32
+func TestReservedAdaptiveAllocation(t *testing.T) {
+	getUnitedDeploymentAndSubsets := func(totalReplicas int32, minReplicas, maxReplicas, reserved, cur, newPods []int32) (
+		*appsv1alpha1.UnitedDeployment, map[string]*Subset) {
+		ud := &appsv1alpha1.UnitedDeployment{
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Replicas: &totalReplicas,
+				Topology: appsv1alpha1.Topology{
+					ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
+						Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
+						Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
+							ReserveUnschedulablePods: true,
+						},
+					},
+				},
+			},
+		}
+		existingSubsets := map[string]*Subset{}
+		for i := range reserved {
+			name := fmt.Sprintf("subset-%d", i)
+			var minR, maxR *intstr.IntOrString
+			if minReplicas != nil && minReplicas[i] >= 0 {
+				minR = &intstr.IntOrString{Type: intstr.Int, IntVal: minReplicas[i]}
+			}
+			if maxReplicas != nil && maxReplicas[i] >= 0 {
+				maxR = &intstr.IntOrString{Type: intstr.Int, IntVal: maxReplicas[i]}
+			}
+			ud.Spec.Topology.Subsets = append(ud.Spec.Topology.Subsets, appsv1alpha1.Subset{
+				Name:        name,
+				MinReplicas: minR,
+				MaxReplicas: maxR,
+			})
+			var previouslyUnschedulable bool
+			if reserved[i] != 0 {
+				previouslyUnschedulable = true
+				reserved[i] = max(0, reserved[i])
+			}
+			subset := &Subset{
+				Status: SubsetStatus{
+					UnschedulableStatus: SubsetUnschedulableStatus{
+						Unschedulable:           reserved[i] != 0,
+						PreviouslyUnschedulable: previouslyUnschedulable,
+						ReservedPodNum:          reserved[i],
+					},
+					Replicas:             cur[i],
+					UpdatedReadyReplicas: cur[i] - reserved[i] - newPods[i],
+					ReadyReplicas:        cur[i] - reserved[i] - newPods[i],
+				},
+				Spec: SubsetSpec{
+					SubsetPods: generateSubsetPods(cur[i], reserved[i], i),
+					Replicas:   cur[i],
+				},
+			}
+			existingSubsets[name] = subset
+		}
+		ud.Spec.Topology.Subsets[len(ud.Spec.Topology.Subsets)-1].MaxReplicas = nil
+		return ud, existingSubsets
+	}
+	tests := []struct {
+		name        string
+		replicas    int32   // total replicas of UnitedDeployment
+		minReplicas []int32 // min replicas of each subset, -1 means nil
+		maxReplicas []int32 // max replicas of each subset, -1 means nil
+		cur         []int32 // last allocated results, equals to last expect
+		reserved    []int32 // current reserved pod nums of each subset, set -1 to make condition unschedulable anyway
+		newPods     []int32 // newly created and pending pods caused by replica allocation
+		expect      []int32 // final allocated result after reschedule
 	}{
-		"no pods running": {
-			expectedReplicas: []int32{3, 2, 1},
-			runningPods:      []int32{0, 0, 0},
-			want:             []int32{3, 2, 1},
+		{
+			name:        "4 subsets, 2 each, start",
+			replicas:    8,
+			minReplicas: []int32{1, 1, 1, 1},
+			maxReplicas: []int32{2, 2, 2, -1},
+			cur:         []int32{0, 0, 0, 0},
+			reserved:    []int32{0, 0, 0, 0},
+			expect:      []int32{2, 2, 2, 2},
 		},
-		"less pods running": {
-			expectedReplicas: []int32{3, 2, 1},
-			runningPods:      []int32{0, 0, 1},
-			want:             []int32{3, 2, 1},
+		{
+			name:        "4 subsets, subset 1 and 2 unschedulable detected",
+			replicas:    8,
+			minReplicas: []int32{1, 1, 1, 1},
+			maxReplicas: []int32{2, 2, 2, -1},
+			cur:         []int32{2, 2, 2, 2},
+			reserved:    []int32{0, 2, 2, 0},
+			expect:      []int32{2, 2, 2, 6},
 		},
-		"typical adaptive recovery scenario: replicas 8, all subsets [0,2]": {
-			expectedReplicas: []int32{2, 2, 2, 2},
-			runningPods:      []int32{2, 0, 0, 6},
-			want:             []int32{2, 0, 0, 6},
+		{
+			name:        "4 subsets, subset 1 and 2 starts each 1 pods",
+			replicas:    8,
+			minReplicas: []int32{1, 1, 1, 1},
+			maxReplicas: []int32{2, 2, 2, -1},
+			cur:         []int32{2, 2, 2, 6},
+			reserved:    []int32{0, 1, 1, 0},
+			expect:      []int32{2, 2, 2, 4},
+		},
+		{
+			name:        "4 subsets, subset 1 recovered",
+			replicas:    8,
+			minReplicas: []int32{1, 1, 1, 1},
+			maxReplicas: []int32{2, 2, 2, -1},
+			cur:         []int32{2, 2, 2, 4},
+			reserved:    []int32{0, -1, 1, 0},
+			expect:      []int32{2, 2, 2, 3},
+		},
+		{
+			name:        "4 subsets, all subset recovered",
+			replicas:    8,
+			minReplicas: []int32{1, 1, 1, 1},
+			maxReplicas: []int32{2, 2, 2, -1},
+			cur:         []int32{2, 2, 2, 3},
+			reserved:    []int32{0, 0, -1, 0},
+			expect:      []int32{2, 2, 2, 2},
+		},
+		{
+			name:        "4 subsets, part of subset 1 and 2 started, scaled to 16 replicas",
+			replicas:    16,
+			minReplicas: []int32{2, 2, 2, 2},
+			maxReplicas: []int32{4, 4, 4, -1},
+			cur:         []int32{2, 2, 2, 6},
+			reserved:    []int32{0, 1, 1, 0},
+			expect:      []int32{4, 4, 4, 10},
+		},
+		{
+			name:        "4 subsets, part of subset 1 and 2 started, scaled to 16, new pods of subset 1 and 2 started",
+			replicas:    16,
+			minReplicas: []int32{2, 2, 2, 2},
+			maxReplicas: []int32{4, 4, 4, -1},
+			cur:         []int32{4, 4, 4, 10},
+			reserved:    []int32{0, 1, 1, 0},
+			expect:      []int32{4, 4, 4, 6},
+		},
+		{
+			name:        "4 subsets, part of subset 1 and 2 started, scaled to 16, new pods of subset 1 and 2 failed",
+			replicas:    16,
+			minReplicas: []int32{2, 2, 2, 2},
+			maxReplicas: []int32{4, 4, 4, -1},
+			cur:         []int32{4, 4, 4, 10},
+			reserved:    []int32{0, 3, 3, 0},
+			expect:      []int32{4, 4, 4, 10},
+		},
+		{
+			name:        "4 subsets, part of subset 1 and 2 started, scaled back to 8 if new pods failed",
+			replicas:    8,
+			minReplicas: []int32{1, 1, 1, 1},
+			maxReplicas: []int32{2, 2, 2, -1},
+			cur:         []int32{4, 4, 4, 10},
+			reserved:    []int32{0, 3, 3, 0},
+			expect:      []int32{2, 2, 2, 4},
+		},
+		{
+			name:        "4 subsets, part of subset 1 and 2 started, scaled back to 8 if new pods started",
+			replicas:    8,
+			minReplicas: []int32{1, 1, 1, 1},
+			maxReplicas: []int32{2, 2, 2, -1},
+			cur:         []int32{4, 4, 4, 6},
+			reserved:    []int32{0, 1, 1, 0},
+			expect:      []int32{2, 2, 2, 2},
+		},
+		{
+			name:        "4 subsets, all of subset 1 and 2 started, already scaled to 16 replicas",
+			replicas:    16,
+			minReplicas: []int32{2, 2, 2, 2},
+			maxReplicas: []int32{4, 4, 4, -1},
+			cur:         []int32{4, 4, 4, 10},
+			reserved:    []int32{0, -1, -1, 0},
+			expect:      []int32{4, 4, 4, 4},
+		},
+		{
+			name:        "4 subsets, scaled to 16, new pods of subset 1 2 already started, the last old pod starts",
+			replicas:    16,
+			minReplicas: []int32{2, 2, 2, 2},
+			maxReplicas: []int32{4, 4, 4, -1},
+			cur:         []int32{4, 4, 4, 6},
+			reserved:    []int32{0, -1, -1, 0},
+			expect:      []int32{4, 4, 4, 4}, // 4 temp running pods retains for 4 new pods not started
+		},
+		{
+			name:     "3 infinity subsets, start",
+			replicas: 2,
+			cur:      []int32{0, 0, 0},
+			reserved: []int32{0, 0, 0},
+			expect:   []int32{2, 0, 0},
+		},
+		{
+			name:     "3 infinity subsets, found subset-0 unschedulable",
+			replicas: 2,
+			cur:      []int32{2, 0, 0},
+			reserved: []int32{2, 0, 0},
+			expect:   []int32{2, 2, 0},
+		},
+		{
+			name:     "3 infinity subsets, found subset-1 unschedulable",
+			replicas: 2,
+			cur:      []int32{2, 2, 0},
+			reserved: []int32{2, 2, 0},
+			expect:   []int32{2, 2, 2}, // FIXME
+		},
+		{
+			name:     "3 infinity subsets, 2 unschedulable, scale up to 4",
+			replicas: 4,
+			cur:      []int32{2, 2, 2},
+			reserved: []int32{2, 2, 0},
+			expect:   []int32{4, 4, 4}, // FIXME
+		},
+		{
+			name:     "3 infinity subsets, scaled, 2 unschedulable, subset-1 started",
+			replicas: 4,
+			cur:      []int32{4, 2, 4},
+			reserved: []int32{4, -1, 0},
+			expect:   []int32{4, 4, 2}, // FIXME
+		},
+		{
+			name:     "3 infinity subsets, one of subset-1 started",
+			replicas: 2,
+			cur:      []int32{2, 2, 2},
+			reserved: []int32{2, 1, 0},
+			expect:   []int32{2, 2, 1},
+		},
+		{
+			name:     "3 infinity subsets, subset-0 recovered",
+			replicas: 2,
+			cur:      []int32{2, 2, 1},
+			reserved: []int32{0, 1, 0},
+			expect:   []int32{2, 0, 0},
+		},
+		{
+			name:     "3 infinity subsets, too many pods running",
+			replicas: 2,
+			cur:      []int32{2, 2, 0},
+			reserved: []int32{0, 0, 0},
+			expect:   []int32{2, 0, 0},
+		},
+		{
+			name:     "3 infinity subsets, scaled from 2 to 4 and subset-1 recovered",
+			replicas: 4,
+			cur:      []int32{2, 2, 4},
+			reserved: []int32{0, 2, 0},
+			expect:   []int32{4, 2, 2},
+		},
+		{
+			name:     "3 infinity subsets, scaled from 2 to 4 and subset-1 recovered, two new pods just created",
+			replicas: 4,
+			cur:      []int32{4, 2, 2},
+			reserved: []int32{0, 2, 0},
+			newPods:  []int32{2, 0, 0},
+			expect:   []int32{4, 2, 2},
+		},
+		{
+			name:     "3 infinity subsets, scaled from 2 to 4 and subset-1 recovered, two new created pods ready",
+			replicas: 4,
+			cur:      []int32{4, 2, 2},
+			reserved: []int32{0, 2, 0},
+			expect:   []int32{4, 0, 0},
+		},
+		{
+			name:        "3 subsets, 2 with minReplicas, start",
+			replicas:    2,
+			minReplicas: []int32{1, 1, 0},
+			cur:         []int32{0, 0, 0},
+			reserved:    []int32{0, 0, 0},
+			expect:      []int32{1, 1, 0},
+		},
+		{
+			name:        "3 subsets, 2 with minReplicas, two subsets unschedulable",
+			replicas:    2,
+			minReplicas: []int32{1, 1, 0},
+			cur:         []int32{1, 1, 0},
+			reserved:    []int32{1, 1, 0},
+			expect:      []int32{1, 1, 2},
+		},
+		{
+			name:        "3 subsets, 2 with minReplicas, subset-0 recovered",
+			replicas:    2,
+			minReplicas: []int32{1, 1, 0},
+			cur:         []int32{1, 1, 2},
+			reserved:    []int32{0, 1, 0},
+			expect:      []int32{2, 1, 1},
+		},
+		{
+			name:        "3 subsets, 2 with minReplicas, subset-0 recovered, new pod not started",
+			replicas:    2,
+			minReplicas: []int32{1, 1, 0},
+			cur:         []int32{2, 1, 1},
+			reserved:    []int32{0, 1, 0},
+			newPods:     []int32{1, 0, 0},
+			expect:      []int32{2, 1, 1},
+		},
+		{
+			name:        "3 subsets, 2 with minReplicas, subset-0 recovered, new pod started",
+			replicas:    2,
+			minReplicas: []int32{1, 1, 0},
+			cur:         []int32{2, 1, 1},
+			reserved:    []int32{0, 1, 0},
+			expect:      []int32{2, 0, 0},
 		},
 	}
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			expectedReplicas := make(map[string]int32)
-			for i := 0; i < len(tt.expectedReplicas); i++ {
-				expectedReplicas[fmt.Sprintf("subset-%d", i)] = tt.expectedReplicas[i]
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.newPods == nil {
+				tt.newPods = make([]int32, len(tt.expect))
 			}
-			existingSubsets := make(map[string]*Subset)
-			for i := 0; i < len(tt.runningPods); i++ {
-				existingSubsets[fmt.Sprintf("subset-%d", i)] = &Subset{
-					Status: SubsetStatus{
-						Replicas:      tt.runningPods[i],
-						ReadyReplicas: tt.runningPods[i],
-					},
-				}
+			ud, subsets := getUnitedDeploymentAndSubsets(tt.replicas, tt.minReplicas, tt.maxReplicas,
+				tt.reserved, tt.cur, tt.newPods)
+			ac := NewReplicaAllocator(ud)
+			ra, ok := ac.(*reservationAllocator)
+			if !ok {
+				t.Fatalf("unexpected allocator type %T", ac)
 			}
-			var subsets []appsv1alpha1.Subset
-			for i := 0; i < len(tt.expectedReplicas); i++ {
-				subsets = append(subsets, appsv1alpha1.Subset{
-					Name: fmt.Sprintf("subset-%d", i),
-				})
+
+			nextReplicas, err := ra.Alloc(subsets)
+			if err != nil {
+				t.Fatalf("unexpected Alloc error %v", err)
 			}
-			result := adjustNextReplicasInDefaultStrategy(&expectedReplicas, &existingSubsets, subsets)
-			actual := make([]int32, len(tt.want))
-			for i := 0; i < len(tt.want); i++ {
-				actual[i] = (*result)[fmt.Sprintf("subset-%d", i)]
+			actual := make([]int32, len(tt.expect))
+			for i := 0; i < len(tt.expect); i++ {
+				actual[i] = nextReplicas[fmt.Sprintf("subset-%d", i)]
 			}
-			if !reflect.DeepEqual(actual, tt.want) {
-				t.Errorf("expected %v, but got %v", tt.want, actual)
+			if !reflect.DeepEqual(actual, tt.expect) {
+				t.Fatalf("expected %v, got %v", tt.expect, actual)
 			}
 		})
 	}
@@ -476,460 +880,6 @@ func generateSubsetPods(total, pending int32, prefix int) []*corev1.Pod {
 		pods = append(pods, pod)
 	}
 	return pods
-}
-
-// Cases of TestGetTemporaryAdaptiveNext must be aligned with TestAdjustReplicasInReservedStrategy
-func TestGetTemporaryAdaptiveNext(t *testing.T) {
-	getUnitedDeploymentAndSubsets := func(totalReplicas, minReplicas, maxReplicas int32, reserved []int32, cur []int32) (
-		*appsv1alpha1.UnitedDeployment, map[string]*Subset) {
-		var minR, maxR *intstr.IntOrString
-		if minReplicas != 0 {
-			minR = &intstr.IntOrString{Type: intstr.Int, IntVal: minReplicas}
-		}
-		if maxReplicas != 0 {
-			maxR = &intstr.IntOrString{Type: intstr.Int, IntVal: maxReplicas}
-		}
-		ud := &appsv1alpha1.UnitedDeployment{
-			Spec: appsv1alpha1.UnitedDeploymentSpec{
-				Replicas: &totalReplicas,
-				Topology: appsv1alpha1.Topology{
-					ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
-						Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
-						Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
-							ReserveUnschedulablePods: true,
-						},
-					},
-				},
-			},
-		}
-		existingSubsets := map[string]*Subset{}
-		for i := range reserved {
-			name := fmt.Sprintf("subset-%d", i)
-			ud.Spec.Topology.Subsets = append(ud.Spec.Topology.Subsets, appsv1alpha1.Subset{
-				Name:        name,
-				MinReplicas: minR,
-				MaxReplicas: maxR,
-			})
-			subset := &Subset{
-				Status: SubsetStatus{
-					UnschedulableStatus: SubsetUnschedulableStatus{
-						Unschedulable: reserved[i] != 0,
-						ReservedPods:  reserved[i],
-					},
-					Replicas:             cur[i],
-					UpdatedReadyReplicas: cur[i] - reserved[i],
-					ReadyReplicas:        cur[i] - reserved[i],
-				},
-				Spec: SubsetSpec{
-					SubsetPods: generateSubsetPods(cur[i], reserved[i], i),
-				},
-			}
-			existingSubsets[name] = subset
-		}
-		ud.Spec.Topology.Subsets[len(ud.Spec.Topology.Subsets)-1].MaxReplicas = nil
-		return ud, existingSubsets
-	}
-	tests := []struct {
-		name        string
-		replicas    int32   // total replicas of UnitedDeployment
-		minReplicas int32   // min replicas of each subset
-		maxReplicas int32   // max replicas of each subset except the last one
-		cur         []int32 // last allocated results, equals to last expect
-		reserved    []int32 // current unavailable pod nums of each subset
-		next        []int32 // allocated replicas calculated this time
-	}{
-		{
-			name:        "4 subsets, 2 each, start",
-			replicas:    8,
-			minReplicas: 1,
-			maxReplicas: 2,
-			cur:         []int32{0, 0, 0, 0},
-			reserved:    []int32{0, 0, 0, 0},
-			next:        []int32{2, 2, 2, 2},
-		},
-		{
-			name:        "4 subsets, subset 1 and 2 unschedulable detected",
-			replicas:    8,
-			minReplicas: 1,
-			maxReplicas: 2,
-			cur:         []int32{2, 2, 2, 2},
-			reserved:    []int32{0, 2, 2, 0},
-			next:        []int32{2, 0, 0, 6},
-		},
-		{
-			name:        "4 subsets, subset 1 and 2 starts each 1 pods",
-			replicas:    8,
-			minReplicas: 1,
-			maxReplicas: 2,
-			cur:         []int32{2, 2, 2, 6},
-			reserved:    []int32{0, 1, 1, 0},
-			next:        []int32{2, 1, 1, 4},
-		},
-		{
-			name:        "4 subsets, subset 1 recovered",
-			replicas:    8,
-			minReplicas: 1,
-			maxReplicas: 2,
-			cur:         []int32{2, 2, 2, 4},
-			reserved:    []int32{0, 0, 1, 0},
-			next:        []int32{2, 2, 1, 3},
-		},
-		{
-			name:        "4 subsets, all subset recovered",
-			replicas:    8,
-			minReplicas: 1,
-			maxReplicas: 2,
-			cur:         []int32{2, 2, 2, 3},
-			reserved:    []int32{0, 0, 0, 0},
-			next:        []int32{2, 2, 2, 2},
-		},
-		{
-			name:        "4 subsets, part of subset 1 and 2 started, scaled to 16 replicas",
-			replicas:    16,
-			minReplicas: 2,
-			maxReplicas: 4,
-			cur:         []int32{2, 2, 2, 6},
-			reserved:    []int32{0, 1, 1, 0},
-			next:        []int32{4, 1, 1, 10},
-		},
-		{
-			name:        "4 subsets, part of subset 1 and 2 started, scaled back to 8 replicas",
-			replicas:    8,
-			minReplicas: 1,
-			maxReplicas: 2,
-			cur:         []int32{4, 2, 2, 10},
-			reserved:    []int32{0, 1, 1, 0},
-			next:        []int32{2, 1, 1, 4},
-		},
-		{
-			name:        "4 subsets, all of subset 1 and 2 started, already scaled to 16 replicas",
-			replicas:    16,
-			minReplicas: 2,
-			maxReplicas: 4,
-			cur:         []int32{4, 2, 2, 10},
-			reserved:    []int32{0, 0, 0, 0},
-			next:        []int32{4, 4, 4, 4},
-		},
-		{
-			name:        "4 subsets, all of subset 1 and 2 started, already scaled to 16 replicas, 4 new pods just created",
-			replicas:    16,
-			minReplicas: 2,
-			maxReplicas: 4,
-			cur:         []int32{4, 4, 4, 8},
-			reserved:    []int32{0, 0, 0, 0},
-			next:        []int32{4, 4, 4, 4},
-		},
-		{
-			// this case is same as the previous one in allocate stage, just to align with TestAdjustReplicasInReservedStrategy
-			name:        "4 subsets, all pods started, already scaled to 16 replicas",
-			replicas:    16,
-			minReplicas: 2,
-			maxReplicas: 4,
-			cur:         []int32{4, 4, 4, 8},
-			reserved:    []int32{0, 0, 0, 0},
-			next:        []int32{4, 4, 4, 4},
-		},
-		{
-			name:     "3 infinity subsets, start",
-			replicas: 2,
-			cur:      []int32{0, 0, 0},
-			reserved: []int32{0, 0, 0},
-			next:     []int32{2, 0, 0},
-		},
-		{
-			name:     "3 infinity subsets, start",
-			replicas: 2,
-			cur:      []int32{0, 0, 0},
-			reserved: []int32{0, 0, 0},
-			next:     []int32{2, 0, 0},
-		},
-		{
-			name:     "3 infinity subsets, found subset-0 unschedulable",
-			replicas: 2,
-			cur:      []int32{2, 0, 0},
-			reserved: []int32{2, 0, 0},
-			next:     []int32{0, 2, 0},
-		},
-		{
-			name:     "3 infinity subsets, found subset-1 unschedulable",
-			replicas: 2,
-			cur:      []int32{2, 2, 0},
-			reserved: []int32{2, 2, 0},
-			next:     []int32{0, 0, 2},
-		},
-		{
-			name:     "3 infinity subsets, one of subset-1 started",
-			replicas: 2,
-			cur:      []int32{2, 2, 2},
-			reserved: []int32{2, 1, 0},
-			next:     []int32{0, 1, 1},
-		},
-		{
-			name:     "3 infinity subsets, subset-0 recovered",
-			replicas: 2,
-			cur:      []int32{2, 2, 1},
-			reserved: []int32{0, 1, 0},
-			next:     []int32{2, 0, 0},
-		},
-		{
-			name:     "3 infinity subsets, too many pods running",
-			replicas: 2,
-			cur:      []int32{2, 2, 0},
-			reserved: []int32{0, 0, 0},
-			next:     []int32{2, 0, 0},
-		},
-		{
-			name:     "3 infinity subsets, scaled from 2 to 4 and subset-1 recovered",
-			replicas: 4,
-			cur:      []int32{2, 2, 4},
-			reserved: []int32{0, 2, 0},
-			next:     []int32{4, 0, 0},
-		},
-		{
-			name:     "3 infinity subsets, scaled from 2 to 4 and subset-1 recovered, two new pods just created",
-			replicas: 4,
-			cur:      []int32{4, 2, 2},
-			reserved: []int32{0, 2, 0},
-			next:     []int32{4, 0, 0},
-		},
-		{
-			name:     "3 infinity subsets, scaled from 2 to 4 and subset-1 recovered, two new created pods ready",
-			replicas: 4,
-			cur:      []int32{4, 2, 2},
-			reserved: []int32{0, 2, 0},
-			next:     []int32{4, 0, 0},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ud, subsets := getUnitedDeploymentAndSubsets(tt.replicas, tt.minReplicas, tt.maxReplicas, tt.reserved, tt.cur)
-			ac := elasticAllocator{ud}
-			result, err := ac.allocate(tt.replicas, &subsets)
-			if err != nil {
-				t.Fatalf("unexpected getNextReplicas error %v", err)
-			}
-			actual := make([]int32, len(tt.next))
-			for i := 0; i < len(tt.next); i++ {
-				actual[i] = (*result)[fmt.Sprintf("subset-%d", i)]
-			}
-			if !reflect.DeepEqual(actual, tt.next) {
-				t.Fatalf("expected %v, got %v", tt.next, actual)
-			}
-		})
-	}
-}
-
-// TestAdjustReplicasInReservedStrategy tests what happened after TestGetTemporaryAdaptiveNext
-// The cases of two tests must be aligned.
-func TestAdjustReplicasInReservedStrategy(t *testing.T) {
-	tests := []struct {
-		name        string
-		replicas    int32   // total replicas of UnitedDeployment
-		next        []int32 // allocated replicas calculated this time
-		cur         []int32 // last allocated results, equals to last expect
-		unavailable []int32 // current unavailable pod nums of each subset
-		newPods     []int32 // newly created and pending pods caused by replica allocation
-		expect      []int32 // final allocated result after reschedule
-	}{
-		{
-			name:        "4 subsets, 2 each, start",
-			replicas:    8,
-			next:        []int32{2, 2, 2, 2},
-			cur:         []int32{0, 0, 0, 0},
-			unavailable: []int32{0, 0, 0, 0},
-			expect:      []int32{2, 2, 2, 2},
-		},
-		{
-			name:        "4 subsets, subset 1 and 2 unschedulable detected",
-			replicas:    8,
-			next:        []int32{2, 0, 0, 6},
-			cur:         []int32{2, 2, 2, 2},
-			unavailable: []int32{0, 2, 2, 0},
-			expect:      []int32{2, 2, 2, 6},
-		},
-		{
-			name:        "4 subsets, subset 1 and 2 starts each 1 pods",
-			replicas:    8,
-			next:        []int32{2, 1, 1, 4},
-			cur:         []int32{2, 2, 2, 6},
-			unavailable: []int32{0, 1, 1, 0},
-			expect:      []int32{2, 2, 2, 4},
-		},
-		{
-			name:        "4 subsets, subset 1 recovered",
-			replicas:    8,
-			next:        []int32{2, 2, 1, 3},
-			cur:         []int32{2, 2, 2, 4},
-			unavailable: []int32{0, 0, 1, 0},
-			expect:      []int32{2, 2, 2, 3},
-		},
-		{
-			name:        "4 subsets, all subset recovered",
-			replicas:    8,
-			next:        []int32{2, 2, 2, 2},
-			cur:         []int32{2, 2, 2, 3},
-			unavailable: []int32{0, 0, 0, 0},
-			expect:      []int32{2, 2, 2, 2},
-		},
-		{
-			name:        "4 subsets, part of subset 1 and 2 started, scaled to 16 replicas",
-			replicas:    16,
-			next:        []int32{4, 1, 1, 10},
-			cur:         []int32{2, 2, 2, 6},
-			unavailable: []int32{0, 1, 1, 0},
-			expect:      []int32{4, 2, 2, 10},
-		},
-		{
-			name:        "4 subsets, part of subset 1 and 2 started, scaled back to 8 replicas",
-			replicas:    8,
-			next:        []int32{2, 1, 1, 4},
-			cur:         []int32{4, 2, 2, 10},
-			unavailable: []int32{0, 1, 1, 0},
-			expect:      []int32{2, 2, 2, 4},
-		},
-		{
-			name:        "4 subsets, all of subset 1 and 2 started, already scaled to 16 replicas",
-			replicas:    16,
-			next:        []int32{4, 4, 4, 4},
-			cur:         []int32{4, 2, 2, 10},
-			unavailable: []int32{0, 0, 0, 0},
-			expect:      []int32{4, 4, 4, 8}, // 4 temp running pods retains for 4 new pods not created
-		},
-		{
-			name:        "4 subsets, all of subset 1 and 2 started, already scaled to 16 replicas, 4 new pods just created",
-			replicas:    16,
-			next:        []int32{4, 4, 4, 4},
-			cur:         []int32{4, 4, 4, 8},
-			unavailable: []int32{0, 0, 0, 0},
-			newPods:     []int32{0, 2, 2, 0},
-			expect:      []int32{4, 4, 4, 8}, // 4 temp running pods retains for 4 new pods not started
-		},
-		{
-			name:        "4 subsets, all of subset 1 and 2 started, already scaled to 16 replicas, 4 new pods just created",
-			replicas:    16,
-			next:        []int32{4, 4, 4, 4},
-			cur:         []int32{4, 4, 4, 8},
-			unavailable: []int32{0, 0, 0, 0},
-			newPods:     []int32{0, 0, 0, 0},
-			expect:      []int32{4, 4, 4, 4}, // 4 temp running pods retains for 4 new pods not started
-		},
-		{
-			name:        "3 infinity subsets, start",
-			replicas:    2,
-			next:        []int32{2, 0, 0},
-			cur:         []int32{0, 0, 0},
-			unavailable: []int32{0, 0, 0},
-			expect:      []int32{2, 0, 0},
-		},
-		{
-			name:        "3 infinity subsets, found subset-0 unschedulable",
-			replicas:    2,
-			next:        []int32{0, 2, 0},
-			cur:         []int32{2, 0, 0},
-			unavailable: []int32{2, 0, 0},
-			expect:      []int32{2, 2, 0},
-		},
-		{
-			name:        "3 infinity subsets, found subset-1 unschedulable",
-			replicas:    2,
-			next:        []int32{0, 0, 2},
-			cur:         []int32{2, 2, 0},
-			unavailable: []int32{2, 2, 0},
-			expect:      []int32{2, 2, 2},
-		},
-		{
-			name:        "3 infinity subsets, one of subset-1 started",
-			replicas:    2,
-			next:        []int32{0, 1, 1},
-			cur:         []int32{2, 2, 2},
-			unavailable: []int32{2, 1, 0},
-			expect:      []int32{2, 2, 1},
-		},
-		{
-			name:        "3 infinity subsets, subset-0 recovered",
-			replicas:    2,
-			next:        []int32{2, 0, 0},
-			cur:         []int32{2, 2, 1},
-			unavailable: []int32{0, 1, 0},
-			expect:      []int32{2, 0, 0},
-		},
-		{
-			name:        "3 infinity subsets, too many pods running",
-			replicas:    2,
-			next:        []int32{2, 0, 0},
-			cur:         []int32{2, 2, 0},
-			unavailable: []int32{0, 0, 0},
-			expect:      []int32{2, 0, 0},
-		},
-		{
-			name:        "3 infinity subsets, scaled from 2 to 4 and subset-1 recovered",
-			replicas:    4,
-			cur:         []int32{2, 2, 4},
-			next:        []int32{4, 0, 0},
-			unavailable: []int32{0, 2, 0},
-			expect:      []int32{4, 2, 2},
-		},
-		{
-			name:        "3 infinity subsets, scaled from 2 to 4 and subset-1 recovered, two new pods just created",
-			replicas:    4,
-			cur:         []int32{4, 2, 2},
-			next:        []int32{4, 0, 0},
-			unavailable: []int32{0, 2, 0},
-			newPods:     []int32{2, 0, 0},
-			expect:      []int32{4, 2, 2},
-		},
-		{
-			name:        "3 infinity subsets, scaled from 2 to 4 and subset-1 recovered, two new created pods ready",
-			replicas:    4,
-			cur:         []int32{4, 2, 2},
-			next:        []int32{4, 0, 0},
-			unavailable: []int32{0, 2, 0},
-			newPods:     []int32{0, 0, 0},
-			expect:      []int32{4, 0, 0},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			nextReplicas := make(map[string]int32)
-			for i := 0; i < len(tt.next); i++ {
-				nextReplicas[fmt.Sprintf("subset-%d", i)] = tt.next[i]
-			}
-			if tt.newPods == nil {
-				tt.newPods = make([]int32, len(tt.next))
-			}
-			existingSubsets := make(map[string]*Subset)
-			for i := 0; i < len(tt.cur); i++ {
-				existingSubsets[fmt.Sprintf("subset-%d", i)] = &Subset{
-					Status: SubsetStatus{
-						UnschedulableStatus: SubsetUnschedulableStatus{
-							ReservedPods:  tt.unavailable[i],
-							Unschedulable: tt.unavailable[i] != 0,
-						},
-						UpdatedReadyReplicas: tt.cur[i] - tt.unavailable[i] - tt.newPods[i],
-						ReadyReplicas:        tt.cur[i] - tt.unavailable[i] - tt.newPods[i],
-					},
-					Spec: SubsetSpec{
-						Replicas:   tt.cur[i],
-						SubsetPods: generateSubsetPods(tt.cur[i], tt.unavailable[i], i),
-					},
-				}
-			}
-			subsets := make([]appsv1alpha1.Subset, len(tt.next))
-			for i := range tt.next {
-				subsets[i] = appsv1alpha1.Subset{
-					Name: fmt.Sprintf("subset-%d", i),
-				}
-			}
-			result := adjustNextReplicasInReservedStrategy(&nextReplicas, &existingSubsets, tt.replicas, subsets)
-			actual := make([]int32, len(tt.expect))
-			for i := 0; i < len(tt.expect); i++ {
-				actual[i] = (*result)[fmt.Sprintf("subset-%d", i)]
-			}
-			if !reflect.DeepEqual(actual, tt.expect) {
-				t.Errorf("expected %v, but got %v", tt.expect, actual)
-			}
-		})
-	}
 }
 
 func createSubset(name string, replicas int32) *nameToReplicas {

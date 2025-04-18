@@ -30,7 +30,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeployment, existingSubsets *map[string]*Subset, nextUpdate map[string]SubsetUpdate, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (newStatus *appsv1alpha1.UnitedDeploymentStatus, allErrors error) {
+func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeployment, existingSubsets map[string]*Subset,
+	nextUpdate map[string]SubsetUpdate, currentRevision, updatedRevision *appsv1.ControllerRevision,
+	subsetType subSetType) (newStatus *appsv1alpha1.UnitedDeploymentStatus, allErrors error) {
 	newStatus = ud.Status.DeepCopy()
 	exists, provisioned, err := r.manageSubsetProvision(ud, existingSubsets, nextUpdate, currentRevision, updatedRevision, subsetType)
 	if err != nil {
@@ -49,7 +51,7 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 
 	var needUpdate []string
 	for _, name := range exists.List() {
-		subset := (*existingSubsets)[name]
+		subset := existingSubsets[name]
 		if revision := subset.GetLabels()[appsv1alpha1.ControllerRevisionHashLabelKey]; revision != expectedRevision.Name {
 			klog.V(5).InfoS("UnitedDeployment subset needs update: revision changed",
 				"unitedDeployment", klog.KObj(ud), "subset", klog.KObj(subset),
@@ -79,7 +81,7 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 	if len(needUpdate) > 0 {
 		_, updateErr := util.SlowStartBatch(len(needUpdate), slowStartInitialBatchSize, func(index int) error {
 			cell := needUpdate[index]
-			subset := (*existingSubsets)[cell]
+			subset := existingSubsets[cell]
 			replicas := nextUpdate[cell].Replicas
 			partition := nextUpdate[cell].Partition
 
@@ -102,7 +104,7 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 		// future potential scheduling failures need to be checked for rescheduling.
 		var newPodCreated = false
 		for _, cell := range needUpdate {
-			subset := (*existingSubsets)[cell]
+			subset := existingSubsets[cell]
 			replicas := nextUpdate[cell].Replicas
 			newPodCreated = newPodCreated || subset.Spec.Replicas < replicas
 		}
@@ -114,7 +116,7 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 	return
 }
 
-func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.UnitedDeployment, existingSubsets *map[string]*Subset, nextUpdate map[string]SubsetUpdate, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (sets.String, bool, error) {
+func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.UnitedDeployment, existingSubsets map[string]*Subset, nextUpdate map[string]SubsetUpdate, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (sets.String, bool, error) {
 	expectedSubsets := sets.String{}
 	gotSubsets := sets.String{}
 
@@ -122,7 +124,7 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 		expectedSubsets.Insert(subset.Name)
 	}
 
-	for subsetName := range *existingSubsets {
+	for subsetName := range existingSubsets {
 		gotSubsets.Insert(subsetName)
 	}
 	klog.V(4).InfoS("UnitedDeployment subsets information", "unitedDeployment", klog.KObj(ud), "subsets", gotSubsets.List(), "expectedSubsets", expectedSubsets.List())
@@ -178,7 +180,7 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1alpha1.Unite
 		klog.InfoS("UnitedDeployment needed deleting subset with name", "unitedDeployment", klog.KObj(ud), "subsetType", subsetType, "subsetNames", deletes)
 		var deleteErrs []error
 		for _, subsetName := range deletes {
-			subset := (*existingSubsets)[subsetName]
+			subset := existingSubsets[subsetName]
 			if err := r.subSetControls[subsetType].DeleteSubset(subset); err != nil {
 				deleteErrs = append(deleteErrs, fmt.Errorf("fail to delete Subset (%s) %s/%s for %s: %s", subsetType, subset.Namespace, subset.Name, subsetName, err))
 			}
