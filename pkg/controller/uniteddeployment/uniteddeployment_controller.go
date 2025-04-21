@@ -222,11 +222,11 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 		return reconcile.Result{}, err
 	}
 
-	shouldReserveUnschedulablePods := instance.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods()
+	// Preprocess subset status for replicas allocation
 	if instance.Spec.Topology.ScheduleStrategy.IsAdaptive() {
 		var podsToPatch []podToPatchReservedLabel
 		for name, subset := range existingSubsets {
-			if shouldReserveUnschedulablePods {
+			if instance.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
 				podsToPatch = append(podsToPatch, calculateSubsetsStatusForReservedAdaptiveStrategy(name, subset, instance, now)...)
 				if err = r.patchReservedStatusChangedPods(podsToPatch); err != nil {
 					klog.ErrorS(err, "Failed to patch reserved changed pods", "unitedDeployment", klog.KObj(instance))
@@ -244,6 +244,13 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 		r.recorder.Eventf(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed %s",
 			eventTypeSpecifySubsetReplicas), "Specified subset replicas is ineffective: %s", err.Error())
 		return reconcile.Result{}, err
+	}
+
+	// Postprocess subset status after replicas allocation
+	if instance.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
+		for name, subset := range existingSubsets {
+			postProcessSubsetStatusForReservedAdaptiveStrategy(name, subset, instance, nextReplicas[name])
+		}
 	}
 
 	nextPartitions := calcNextPartitions(instance, nextReplicas)
@@ -386,6 +393,7 @@ func calculateSubsetsStatusForReservedAdaptiveStrategy(name string, subset *Subs
 	}
 	var requeueAfter time.Duration = math.MaxInt64
 	unschedulableDuration := ud.Spec.Topology.ScheduleStrategy.GetUnschedulableDuration()
+	subset.Status.UnschedulableStatus.ReservedPods = make(map[string]struct{})
 	for _, pod := range subset.Spec.SubsetPods {
 		oldReserved, ok := IsPodMarkedAsReserved(pod)
 		var reserved bool
@@ -433,6 +441,23 @@ func calculateSubsetsStatusForReservedAdaptiveStrategy(name string, subset *Subs
 			"no reserved pods")
 	}
 	return
+}
+
+func postProcessSubsetStatusForReservedAdaptiveStrategy(name string, subset *Subset, ud *appsv1alpha1.UnitedDeployment, nextReplicas int32) {
+	status := ud.Status.GetSubsetStatus(name)
+	if !subset.Status.UnschedulableStatus.Unschedulable &&
+		subset.Status.UnschedulableStatus.PreviouslyUnschedulable &&
+		nextReplicas > subset.Spec.Replicas {
+		// This subset is just recovered (reserved pods started), and allocated with more replicas.
+		// The Pods that are going to be created will be considered non-reserved in the next Reconcile, which will
+		// cause the temporary Pods to be deleted regardless of whether they are successfully scheduled or started.
+		// Therefore, we need to mark the subset as unschedulable again, so that these Pods are directly marked as
+		// reserved after they are created, and then delete the temporary Pods after they are truly healthy.
+		klog.V(5).InfoS("subset just recovered scaled up", "subset", name,
+			"unitedDeployment", klog.KObj(ud), "old", subset.Spec.Replicas, "new", nextReplicas)
+		status.SetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable, corev1.ConditionFalse, "reschedule",
+			"subset just recovered scaled up")
+	}
 }
 
 type podToPatchReservedLabel struct {

@@ -360,230 +360,6 @@ func (ac *adaptiveAllocator) Alloc(existingSubsets map[string]*Subset) (map[stri
 	return nextReplicas, nil
 }
 
-// reservationAllocator is an allocator for reservation adaptive strategy
-type reservationAllocator struct {
-	*appsv1alpha1.UnitedDeployment
-}
-
-func (ac *reservationAllocator) Alloc(existingSubsets map[string]*Subset) (map[string]int32, error) {
-	var replicas int32
-	if ac.Spec.Replicas != nil {
-		replicas = *ac.Spec.Replicas
-	}
-	minReplicasMap, maxReplicasMap, err := calculateRawMinMaxMap(replicas, ac.Spec.Topology.Subsets)
-	if err != nil {
-		return nil, err
-	}
-	info := ac.gatherInformation(existingSubsets)
-	klog.V(4).InfoS("current allocation", "unitedDeployment", klog.KObj(ac.UnitedDeployment),
-		"allocation", info.currentAllocation, "reserved", info.reservedMap, "normal", info.normalMap)
-	// manage normal replicas
-	var normalReplicasDiff = make(map[string]int32)
-	// TODO：扩缩容的时候也有可能调整上下限，因而不能确定一定是向可分配subset中创建 Pod，需要继续设计
-	if info.normalReplicas < replicas {
-		// scale up
-		var diffMinMap, diffMaxMap = make(map[string]int32), make(map[string]int32)
-		for _, subset := range info.allocatableSubsets {
-			diffMinMap[subset.Name] = max(0, minReplicasMap[subset.Name]-info.currentAllocation[subset.Name])
-			diffMaxMap[subset.Name] = max(0, maxReplicasMap[subset.Name]-info.currentAllocation[subset.Name])
-		}
-		toCreate := replicas - info.normalReplicas
-		normalReplicasDiff = allocateByMinMaxMap(toCreate, diffMinMap, diffMaxMap, info.allocatableSubsets)
-	} else if info.normalReplicas > replicas {
-		// scale down
-		totalNormalPodsToDelete := info.normalReplicas - replicas
-		for i := len(ac.Spec.Topology.Subsets) - 1; i >= 0; i-- {
-			name := ac.Spec.Topology.Subsets[i].Name
-			normal := info.normalMap[name]
-			minimum := minReplicasMap[name]
-			toDelete := min(normal-minimum, totalNormalPodsToDelete)
-			normalReplicasDiff[name] = -toDelete
-			totalNormalPodsToDelete -= toDelete
-		}
-	}
-	// manage reserved replicas
-	var reservedReplicasDiff = make(map[string]int32)
-	for _, specSubset := range ac.Spec.Topology.Subsets {
-		name := specSubset.Name
-		subset := existingSubsets[name]
-		if subset == nil || subset.Allocatable() {
-			continue
-		}
-		if normalReplicasDiff[name] < 0 {
-			// if a subset has to delete some normal pods,
-			// it is obvious that all reserved pods shall be removed.
-			reservedReplicasDiff[name] = -info.reservedMap[name] // reduced to 0
-			continue
-		}
-		allocated := info.currentAllocation[name] + normalReplicasDiff[name]
-		if allocated > replicas {
-			reservedReplicasDiff[name] = replicas - allocated
-		}
-		minimum := minReplicasMap[name]
-		maximum := maxReplicasMap[name]
-		if allocated < minimum {
-			reservedReplicasDiff[name] += minimum - allocated
-		} else if allocated > maximum {
-			reservedReplicasDiff[name] -= allocated - maximum
-		}
-	}
-	var nextReplicas = make(map[string]int32)
-	for _, subset := range ac.Spec.Topology.Subsets {
-		nextReplicas[subset.Name] = info.currentAllocation[subset.Name] + normalReplicasDiff[subset.Name] + reservedReplicasDiff[subset.Name]
-	}
-	klog.V(4).InfoS("got replicas diff", "unitedDeployment", klog.KObj(ac.UnitedDeployment),
-		"replicasDiff", normalReplicasDiff, "reservedReplicasDiff", reservedReplicasDiff, "nextReplicas", nextReplicas)
-	return nextReplicas, nil
-}
-
-type reservationAllocatorInformation struct {
-	currentAllocation  map[string]int32
-	allocatableSubsets []appsv1alpha1.Subset
-	normalMap          map[string]int32
-	reservedMap        map[string]int32
-	normalReplicas     int32
-}
-
-func (ac *reservationAllocator) gatherInformation(existingSubsets map[string]*Subset) reservationAllocatorInformation {
-	info := reservationAllocatorInformation{
-		currentAllocation: make(map[string]int32),
-		normalMap:         make(map[string]int32),
-		reservedMap:       make(map[string]int32),
-	}
-	allReservedPods := make(map[string]struct{})
-	for _, subset := range existingSubsets {
-		for name := range subset.Status.UnschedulableStatus.ReservedPods {
-			allReservedPods[name] = struct{}{}
-		}
-	}
-	for _, specSubset := range ac.Spec.Topology.Subsets {
-		name := specSubset.Name
-		subset := existingSubsets[name]
-		if subset == nil {
-			info.allocatableSubsets = append(info.allocatableSubsets, specSubset)
-			continue
-		}
-		if subset.Allocatable() {
-			info.allocatableSubsets = append(info.allocatableSubsets, specSubset)
-		}
-		info.currentAllocation[name] = subset.Spec.Replicas
-		for _, pod := range subset.Spec.SubsetPods {
-			if _, ok := allReservedPods[pod.Name]; ok {
-				info.reservedMap[name]++
-			} else {
-				info.normalMap[name]++
-			}
-		}
-		info.normalReplicas += info.normalMap[name]
-	}
-	return info
-}
-
-func (ac *reservationAllocator) allocateStaticReplicas(replicas int32) (map[string]int32, map[string]int32, map[string]int32, error) {
-	minReplicasMap, maxReplicasMap, err := calculateRawMinMaxMap(replicas, ac.Spec.Topology.Subsets)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	klog.V(4).InfoS("before allocating static replicas", "unitedDeployment", klog.KObj(ac.UnitedDeployment),
-		"minReplicasMap", minReplicasMap, "maxReplicasMap", maxReplicasMap)
-	staticAllocation := allocateByMinMaxMap(replicas, minReplicasMap, maxReplicasMap, ac.Spec.Topology.Subsets)
-	klog.V(4).InfoS("got static allocation",
-		"unitedDeployment", klog.KObj(ac.UnitedDeployment), "nextReplicas", staticAllocation)
-	return staticAllocation, minReplicasMap, maxReplicasMap, nil
-}
-
-func (ac *reservationAllocator) allocateTemporaryAndReservedReplicas(replicas int32, minReplicasMap, maxReplicasMap,
-	staticAllocation map[string]int32, existingSubsets map[string]*Subset, reservedReplicas map[string]int32) map[string]int32 {
-	var temporaryPods int32
-	for _, subset := range ac.Spec.Topology.Subsets {
-		reserved := reservedReplicas[subset.Name]
-		allocated := staticAllocation[subset.Name]
-		temporaryPods = min(replicas, reserved+temporaryPods)
-		minimum := minReplicasMap[subset.Name]
-		maximum := maxReplicasMap[subset.Name]
-		if es := existingSubsets[subset.Name]; es != nil && !es.Allocatable() {
-			minReplicasMap[subset.Name] = 0
-			maxReplicasMap[subset.Name] = 0
-		} else {
-			minReplicasMap[subset.Name] = max(0, minimum-allocated)
-			maxReplicasMap[subset.Name] = max(0, maximum-allocated)
-		}
-	}
-	klog.V(4).InfoS("before allocating temporary replicas", "unitedDeployment", klog.KObj(ac.UnitedDeployment),
-		"minReplicasMap", minReplicasMap, "maxReplicasMap", maxReplicasMap)
-	temporaryAllocation := allocateByMinMaxMap(temporaryPods, minReplicasMap, maxReplicasMap, ac.Spec.Topology.Subsets)
-	klog.V(4).InfoS("got temporary allocation",
-		"unitedDeployment", klog.KObj(ac.UnitedDeployment), "nextReplicas", temporaryAllocation)
-	return temporaryAllocation
-}
-
-func (ac *reservationAllocator) allocateReservedReplicas(reservedPods int32, minReplicasMap, maxReplicasMap,
-	staticAllocation, reservedReplicas map[string]int32) map[string]int32 {
-	for _, subset := range ac.Spec.Topology.Subsets {
-		reserved := reservedReplicas[subset.Name]
-		allocated := staticAllocation[subset.Name]
-		minReplicasMap[subset.Name] = min(reserved, allocated)
-		maxReplicasMap[subset.Name] = max(reserved, allocated)
-	}
-	klog.V(4).InfoS("before allocating reserved replicas", "unitedDeployment", klog.KObj(ac.UnitedDeployment),
-		"minReplicasMap", minReplicasMap, "maxReplicasMap", maxReplicasMap)
-	reservedAllocation := allocateByMinMaxMap(reservedPods, minReplicasMap, maxReplicasMap, ac.Spec.Topology.Subsets)
-	klog.V(4).InfoS("got reserved allocation",
-		"unitedDeployment", klog.KObj(ac.UnitedDeployment), "nextReplicas", reservedAllocation)
-	return reservedAllocation
-}
-
-// The sum of getSubsetReservedReplicas result is the number of temporary pods.
-func (ac *reservationAllocator) getSubsetReservedReplicas(existingSubsets map[string]*Subset, staticAllocation map[string]int32) map[string]int32 {
-	readyReplicas := getSubsetReadyReplicas(existingSubsets)
-	var result = make(map[string]int32)
-	for name, subset := range existingSubsets {
-		if subset.Allocatable() {
-			continue
-		}
-		if allocation := staticAllocation[name]; allocation > subset.Spec.Replicas {
-			// When scaling up, all newly-created pods are considered as reserved.
-			// Due to the high risk of their inability to start, it will be necessary to
-			// simultaneously create temporary Pods with a higher probability of successful startup.
-			result[name] = allocation - readyReplicas[name]
-		} else if allocation < subset.Spec.Replicas {
-			// it's necessary to take into consideration in advance that
-			// when scaling down, reserved pods will be deleted first
-			result[name] = max(0, subset.Status.UnschedulableStatus.ReservedPodNum-(subset.Spec.Replicas-allocation))
-		} else {
-			result[name] = subset.Status.UnschedulableStatus.ReservedPodNum
-		}
-	}
-	return result
-}
-
-func calculateRawMinMaxMap(replicas int32, subsets []appsv1alpha1.Subset) (map[string]int32, map[string]int32, error) {
-	numSubset := len(subsets)
-	minReplicasMap := make(map[string]int32, numSubset)
-	maxReplicasMap := make(map[string]int32, numSubset)
-	for index, subset := range subsets {
-		minReplicas, maxReplicas := parseMinMaxReplicas(replicas, subset)
-		if minReplicas > maxReplicas {
-			return nil, nil, fmt.Errorf("subset[%d].maxReplicas(%d) must be more than or equal to minReplicas(%d)", index, maxReplicas, minReplicas)
-		}
-		minReplicasMap[subset.Name] = minReplicas
-		maxReplicasMap[subset.Name] = maxReplicas
-	}
-	return minReplicasMap, maxReplicasMap, nil
-}
-
-func parseMinMaxReplicas(replicas int32, subset appsv1alpha1.Subset) (int32, int32) {
-	minReplicas := int32(0)
-	maxReplicas := int32(math.MaxInt32)
-	if subset.MinReplicas != nil {
-		minReplicas, _ = ParseSubsetReplicas(replicas, *subset.MinReplicas)
-	}
-	if subset.MaxReplicas != nil {
-		maxReplicas, _ = ParseSubsetReplicas(replicas, *subset.MaxReplicas)
-	}
-	return minReplicas, maxReplicas
-}
-
 func allocateByMinMaxMap(replicas int32, minReplicasMap, maxReplicasMap map[string]int32, subsets []appsv1alpha1.Subset) map[string]int32 {
 	allocated := int32(0)
 	// Step 1: satisfy the minimum replicas of each subset firstly.
@@ -612,128 +388,111 @@ func allocateByMinMaxMap(replicas int32, minReplicasMap, maxReplicasMap map[stri
 	return subsetReplicas
 }
 
-// minMaxAdjustFunc adjusts the min/max map for each subset based on different adaptive scheduling algorithms.
-//type minMaxAdjustFunc func(minReplicasMap, maxReplicasMap map[string]int32, existingSubsets *map[string]*Subset,
-//	subsets []appsv1alpha1.Subset) (map[string]int32, map[string]int32)
+// reservationAllocator is an allocator for reservation adaptive strategy
+type reservationAllocator struct {
+	*appsv1alpha1.UnitedDeployment
+}
 
-//func adjustMinMaxMapInDefaultStrategy(minReplicasMap, maxReplicasMap map[string]int32,
-//	existingSubsets *map[string]*Subset, subsets []appsv1alpha1.Subset) (map[string]int32, map[string]int32) {
-//	readyReplicas := getSubsetReadyReplicas(existingSubsets)
-//	for _, subset := range subsets {
-//		minReplicas, maxReplicas := minReplicasMap[subset.Name], maxReplicasMap[subset.Name]
-//		unschedulable := isSubSetUnschedulable(subset.Name, existingSubsets)
-//		if runningReplicas, ok := readyReplicas[subset.Name]; unschedulable && ok {
-//			minReplicas = max(runningReplicas, minReplicas)
-//			maxReplicas = min(runningReplicas, maxReplicas)
-//			klog.V(4).InfoS("adjusted min/max maps for unschedulable subset", "subset", subset.Name,
-//				"minReplicas", minReplicasMap[subset.Name], "maxReplicas", maxReplicasMap[subset.Name])
-//		}
-//		// All healthy pods are permanently allocated to a subset. We have to prevent them from being deleted
-//		if runningReplicas := readyReplicas[subset.Name]; !unschedulable && runningReplicas > minReplicas {
-//			klog.V(4).InfoS("Assign min(runningReplicas, maxReplicas) to minReplicas to avoid deleting running pods",
-//				"subset", subset.Name, "minReplicas", minReplicas, "runningReplicas", runningReplicas, "maxReplicas", maxReplicas)
-//			minReplicas = min(runningReplicas, maxReplicas)
-//		}
-//		minReplicasMap[subset.Name] = minReplicas
-//		maxReplicasMap[subset.Name] = maxReplicas
-//	}
-//	return minReplicasMap, maxReplicasMap
-//}
+func (ac *reservationAllocator) Alloc(existingSubsets map[string]*Subset) (map[string]int32, error) {
+	var replicas int32
+	if ac.Spec.Replicas != nil {
+		replicas = *ac.Spec.Replicas
+	}
+	minReplicasMap, maxReplicasMap, err := calculateRawMinMaxMap(replicas, ac.Spec.Topology.Subsets)
+	if err != nil {
+		return nil, err
+	}
+	var subsets []string
+	for _, subset := range ac.Spec.Topology.Subsets {
+		subsets = append(subsets, subset.Name)
+	}
+	nextReplicas := allocateByMinMaxMapAndReservation(replicas, minReplicasMap, maxReplicasMap, existingSubsets, subsets)
+	klog.V(4).InfoS("got UnitedDeployment next replicas", "unitedDeployment",
+		klog.KObj(ac.UnitedDeployment), "nextReplicas", nextReplicas)
+	return nextReplicas, nil
+}
 
-//func adjustMinMaxMapInReservedStrategy(minReplicasMap, maxReplicasMap map[string]int32,
-//	existingSubsets *map[string]*Subset, subsets []appsv1alpha1.Subset) (map[string]int32, map[string]int32) {
-//	readyReplicas := getSubsetReadyReplicas(existingSubsets)
-//	for _, subset := range subsets {
-//		minReplicas, maxReplicas := minReplicasMap[subset.Name], maxReplicasMap[subset.Name]
-//		unschedulable := isSubSetUnschedulable(subset.Name, existingSubsets)
-//		if runningReplicas, ok := readyReplicas[subset.Name]; unschedulable && ok {
-//			minReplicasMap[subset.Name] = min(runningReplicas, minReplicas)
-//			maxReplicasMap[subset.Name] = min(runningReplicas, maxReplicas)
-//			klog.V(4).InfoS("adjusted min/max maps for unschedulable subset", "subset", subset.Name,
-//				"runningReplicas", runningReplicas, "minReplicas", minReplicas, "maxReplicas", maxReplicas)
-//		}
-//	}
-//	return minReplicasMap, maxReplicasMap
-//}
+type reservationAllocatorSubsetRecord struct {
+	maxAlloc int32
+	replicas int32
+}
 
-// replicasAdjustFunc adjusts the next replicas for each subset based on different adaptive scheduling algorithms.
-//type replicasAdjustFunc func(expectedReplicas *map[string]int32, existingSubsets *map[string]*Subset, totalReplicas int32,
-//	minReplicasMap map[string]int32, subsets []appsv1alpha1.Subset) *map[string]int32
+// allocate allocates a subset to the 'to' replicas and returns how many replicas is really consumed.
+//   - param to: will scale up the subset to the value
+//   - param rest: rest replicas can be allocated
+func (ar *reservationAllocatorSubsetRecord) allocate(to, rest int32) (allocated int32) {
+	toAdd := min(to-ar.replicas, rest)
+	ar.replicas += toAdd
+	ar.maxAlloc -= toAdd
+	return max(0, min(0, ar.maxAlloc)+toAdd)
+}
 
-// adjustNextReplicasInReservedStrategy adjusts the next replicas for each subset based on the temporary adaptive scheduling strategy.
-// It ensures that subsets marked as unschedulable retain their current replicas and that the total number of replicas does not exceed the specified totalReplicas.
-//func adjustNextReplicasInReservedStrategy(expectedReplicas *map[string]int32, existingSubsets *map[string]*Subset,
-//	totalReplicas int32, minReplicasMap map[string]int32, subsets []appsv1alpha1.Subset) *map[string]int32 {
-//	runningReplicas := getSubsetReadyReplicas(existingSubsets)
-//	reservedReplicas := getSubsetReservedReplicas(existingSubsets)
-//
-//	var totalRunningPods, totalReservedPods int32
-//	for i := 0; i < len(subsets); i++ {
-//		totalRunningPods += runningReplicas[subsets[i].Name]
-//		totalReservedPods += reservedReplicas[subsets[i].Name]
-//	}
-//
-//	// Step 1: Delete redundant (exceeds the total replicas) running pods in the reverse order of the subset.
-//	expectedRunningReplicas := min(totalRunningPods, totalReplicas)
-//	for i := len(subsets) - 1; i >= 0; i-- {
-//		if totalRunningPods <= expectedRunningReplicas {
-//			break
-//		}
-//		name := subsets[i].Name
-//		expected := (*expectedReplicas)[name]
-//		// The value of toDelete is the smaller of:
-//		//  - the maximum number that can be deleted in the subset
-//		//  - and the total number that still needs to be deleted.
-//		toDelete := min(runningReplicas[name]-expected, totalRunningPods-totalReplicas)
-//		runningReplicas[name] -= toDelete
-//		totalRunningPods -= toDelete
-//	}
-//
-//	// Step 2: Delete redundant reserved pods in the order of the subset.
-//	var countedRunningPods int32
-//	for i := 0; i < len(subsets); i++ {
-//		name := subsets[i].Name
-//		countedRunningPods += runningReplicas[name]
-//		if countedRunningPods >= totalReplicas {
-//			reservedReplicas[name] = 0
-//		}
-//	}
-//
-//	// Step 3: Fulfill subsets to expected, which creates new reserved pods.
-//	for name, expected := range *expectedReplicas {
-//		(*expectedReplicas)[name] = max(runningReplicas[name]+reservedReplicas[name], expected)
-//	}
-//	return expectedReplicas
-//}
+func exportReservationRecords(records map[string]*reservationAllocatorSubsetRecord) map[string]int32 {
+	var nextReplicas = make(map[string]int32, len(records))
+	for name, record := range records {
+		nextReplicas[name] = record.replicas
+	}
+	return nextReplicas
+}
 
-//func calculateMinMaxMapAdaptively(replicas int32, ud *appsv1alpha1.UnitedDeployment, existingSubsets *map[string]*Subset,
-//	adjustFunc minMaxAdjustFunc) (map[string]int32, map[string]int32, error) {
-//	minReplicasMap, maxReplicasMap, err := calculateRawMinMaxMap(replicas, ud.Spec.Topology.Subsets)
-//	if err != nil {
-//		return nil, nil, err
-//	}
-//	klog.V(4).InfoS("raw min/max maps calculated", "minReplicasMap", minReplicasMap, "maxReplicasMap", maxReplicasMap, "unitedDeployment", klog.KObj(ud))
-//	minReplicasMap, maxReplicasMap = adjustFunc(minReplicasMap, maxReplicasMap, existingSubsets, ud.Spec.Topology.Subsets)
-//	return minReplicasMap, maxReplicasMap, nil
-//}
+func allocateByMinMaxMapAndReservation(replicas int32, minReplicasMap, maxReplicasMap map[string]int32,
+	existingSubsets map[string]*Subset, subsetNames []string) map[string]int32 {
+	// Prepare for the records
+	records := make(map[string]*reservationAllocatorSubsetRecord, len(subsetNames))
+	for _, name := range subsetNames {
+		if subset := existingSubsets[name]; subset == nil || subset.Allocatable() {
+			records[name] = &reservationAllocatorSubsetRecord{maxAlloc: math.MaxInt32}
+		} else {
+			records[name] = &reservationAllocatorSubsetRecord{maxAlloc: subset.Spec.Replicas - subset.Status.UnschedulableStatus.ReservedPodNum}
+		}
+	}
+	// Step 1: satisfy the minimum replicas of each subset firstly.
+	for _, name := range subsetNames {
+		replicas -= records[name].allocate(minReplicasMap[name], replicas)
+		if replicas <= 0 {
+			return exportReservationRecords(records)
+		}
+	}
 
-//func allocateReplicasAdaptively(ud *appsv1alpha1.UnitedDeployment, existingSubsets *map[string]*Subset,
-//	preFunc minMaxAdjustFunc, postFunc replicasAdjustFunc) (*map[string]int32, error) {
-//	var replicas int32
-//	if ud.Spec.Replicas != nil {
-//		replicas = *ud.Spec.Replicas
-//	}
-//	minReplicasMap, maxReplicasMap, err := calculateMinMaxMapAdaptively(replicas, ud, existingSubsets, preFunc)
-//	if err != nil {
-//		return nil, err
-//	}
-//	nextReplicas := allocateByMinMaxMap(replicas, minReplicasMap, maxReplicasMap, ud.Spec.Topology.Subsets)
-//	klog.V(4).InfoS("got UnitedDeployment next replicas", "unitedDeployment",
-//		klog.KObj(ud), "nextReplicas", nextReplicas)
-//	if postFunc != nil {
-//		nextReplicas = postFunc(nextReplicas, existingSubsets, replicas, minReplicasMap, ud.Spec.Topology.Subsets)
-//		klog.V(4).InfoS("adjusted UnitedDeployment next replicas for adaptive strategy",
-//			"unitedDeployment", klog.KObj(ud), "nextReplicas", nextReplicas)
-//	}
-//	return nextReplicas, nil
-//}
+	// Step 2: satisfy the reserved replicas of each unschedulable subset
+	for _, name := range subsetNames {
+		subset := existingSubsets[name]
+		if subset == nil || !subset.Status.UnschedulableStatus.Unschedulable {
+			replicas -= records[name].allocate(maxReplicasMap[name], replicas)
+		} else {
+			replicas -= records[name].allocate(subset.Spec.Replicas, replicas)
+		}
+		if replicas <= 0 {
+			return exportReservationRecords(records)
+		}
+	}
+
+	return exportReservationRecords(records)
+}
+
+func calculateRawMinMaxMap(replicas int32, subsets []appsv1alpha1.Subset) (map[string]int32, map[string]int32, error) {
+	numSubset := len(subsets)
+	minReplicasMap := make(map[string]int32, numSubset)
+	maxReplicasMap := make(map[string]int32, numSubset)
+	for index, subset := range subsets {
+		minReplicas, maxReplicas := parseMinMaxReplicas(replicas, subset)
+		if minReplicas > maxReplicas {
+			return nil, nil, fmt.Errorf("subset[%d].maxReplicas(%d) must be more than or equal to minReplicas(%d)", index, maxReplicas, minReplicas)
+		}
+		minReplicasMap[subset.Name] = minReplicas
+		maxReplicasMap[subset.Name] = maxReplicas
+	}
+	return minReplicasMap, maxReplicasMap, nil
+}
+
+func parseMinMaxReplicas(replicas int32, subset appsv1alpha1.Subset) (int32, int32) {
+	minReplicas := int32(0)
+	maxReplicas := int32(math.MaxInt32)
+	if subset.MinReplicas != nil {
+		minReplicas, _ = ParseSubsetReplicas(replicas, *subset.MinReplicas)
+	}
+	if subset.MaxReplicas != nil {
+		maxReplicas, _ = ParseSubsetReplicas(replicas, *subset.MaxReplicas)
+	}
+	return minReplicas, maxReplicas
+}
