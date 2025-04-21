@@ -21,13 +21,19 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"strconv"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	criapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
+	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 	tcpprobe "k8s.io/kubernetes/pkg/probe/tcp"
 	"k8s.io/utils/exec"
 
@@ -39,6 +45,7 @@ const maxProbeMessageLength = 1024
 // Prober helps to check the probe(exec, http, tcp) of a container.
 type prober struct {
 	exec           execprobe.Prober
+	http           httpprobe.Prober
 	tcp            tcpprobe.Prober
 	runtimeService criapi.RuntimeService
 }
@@ -46,8 +53,10 @@ type prober struct {
 // NewProber creates a Prober, it takes a command runner and
 // several container info managers.
 func newProber(runtimeService criapi.RuntimeService) *prober {
+	const followNonLocalRedirects = false
 	return &prober{
 		exec:           execprobe.New(),
+		http:           httpprobe.New(followNonLocalRedirects),
 		tcp:            tcpprobe.New(),
 		runtimeService: runtimeService,
 	}
@@ -71,13 +80,25 @@ func (pb *prober) runProbe(p *appsv1alpha1.ContainerProbeSpec, probeKey probeKey
 		timeSecond = 1
 	}
 	timeout := time.Duration(timeSecond) * time.Second
-	// current only support exec
-	// todo: http
-	if p.Exec != nil {
+	// TODO: support grpc prober
+	switch {
+	case p.Exec != nil:
 		return pb.exec.Probe(pb.newExecInContainer(containerID, p.Exec.Command, timeout))
-	}
-	// support tcp socket probe handler
-	if p.TCPSocket != nil {
+	case p.HTTPGet != nil:
+		req, err := newRequestForHTTPGetAction(p.HTTPGet, probeKey.podIP, "probe")
+		if err != nil {
+			return probe.Unknown, "", err
+		}
+		if klogV4 := klog.V(4); klogV4.Enabled() {
+			port := req.URL.Port()
+			host := req.URL.Hostname()
+			path := req.URL.Path
+			scheme := req.URL.Scheme
+			headers := p.HTTPGet.HTTPHeaders
+			klogV4.InfoS("HTTP-Probe", "scheme", scheme, "host", host, "port", port, "path", path, "timeout", timeout, "headers", headers)
+		}
+		return pb.http.Probe(req, timeout)
+	case p.TCPSocket != nil:
 		port := p.TCPSocket.Port.IntValue()
 		host := p.TCPSocket.Host
 		if host == "" {
@@ -86,8 +107,89 @@ func (pb *prober) runProbe(p *appsv1alpha1.ContainerProbeSpec, probeKey probeKey
 		klog.InfoS("TCP-Probe Host", "host", host, "port", port, "timeout", timeout)
 		return pb.tcp.Probe(host, port, timeout)
 	}
+
 	klog.InfoS("Failed to find probe builder for container", "containerName", containerRuntimeStatus.Metadata.Name)
 	return probe.Unknown, "", fmt.Errorf("missing probe handler for %s", containerRuntimeStatus.Metadata.Name)
+}
+
+func newRequestForHTTPGetAction(httpGet *v1.HTTPGetAction, podIP string, userAgentFragment string) (*http.Request, error) {
+	scheme := string(httpGet.Scheme)
+	if scheme == "" {
+		scheme = "http"
+	}
+
+	host := httpGet.Host
+	if host == "" {
+		host = podIP
+	}
+
+	port := httpGet.Port.IntValue()
+	if port <= 0 || port >= 65536 {
+		return nil, fmt.Errorf("invalid port number: %v", port)
+	}
+	path := httpGet.Path
+	url := formatURL(scheme, host, port, path)
+	headers := v1HeaderToHTTPHeader(httpGet.HTTPHeaders)
+
+	return newProbeRequest(url, headers, userAgentFragment)
+}
+
+// formatURL formats a URL from args.  For testability.
+func formatURL(scheme string, host string, port int, path string) *url.URL {
+	u, err := url.Parse(path)
+	// Something is busted with the path, but it's too late to reject it. Pass it along as is.
+	//
+	// This construction of a URL may be wrong in some cases, but it preserves
+	// legacy prober behavior.
+	if err != nil {
+		u = &url.URL{
+			Path: path,
+		}
+	}
+	u.Scheme = scheme
+	u.Host = net.JoinHostPort(host, strconv.Itoa(port))
+	return u
+}
+
+func userAgent(purpose string) string {
+	// TODO: get kruise daemon version
+	return fmt.Sprintf("kube-%s", purpose)
+}
+
+// v1HeaderToHTTPHeader takes a list of HTTPHeader <name, value> string pairs
+// and returns a populated string->[]string http.Header map.
+func v1HeaderToHTTPHeader(headerList []v1.HTTPHeader) http.Header {
+	headers := make(http.Header)
+	for _, header := range headerList {
+		headers.Add(header.Name, header.Value)
+	}
+	return headers
+}
+
+func newProbeRequest(url *url.URL, headers http.Header, userAgentFragment string) (*http.Request, error) {
+	req, err := http.NewRequest("GET", url.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if headers == nil {
+		headers = http.Header{}
+	}
+	if _, ok := headers["User-Agent"]; !ok {
+		// User-Agent header was not defined, set it
+		headers.Set("User-Agent", userAgent(userAgentFragment))
+	}
+	if _, ok := headers["Accept"]; !ok {
+		// Accept header was not defined. accept all
+		headers.Set("Accept", "*/*")
+	} else if headers.Get("Accept") == "" {
+		// Accept header was overridden but is empty. removing
+		headers.Del("Accept")
+	}
+	req.Header = headers
+	req.Host = headers.Get("Host")
+
+	return req, nil
 }
 
 type execInContainer struct {

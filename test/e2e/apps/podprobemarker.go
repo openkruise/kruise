@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -89,7 +89,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 					WhenUnsatisfiable: v1.ScheduleAnyway,
 				},
 			}
-			sts.Spec.Replicas = utilpointer.Int32Ptr(int32(nodeLen))
+			sts.Spec.Replicas = ptr.To(int32(nodeLen))
 			ginkgo.By(fmt.Sprintf("Create statefulset(%s/%s)", sts.Namespace, sts.Name))
 			tester.CreateStatefulSet(sts)
 
@@ -205,7 +205,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			// scale down
 			sts, err = kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			sts.Spec.Replicas = utilpointer.Int32Ptr(1)
+			sts.Spec.Replicas = ptr.To[int32](1)
 			_, err = kc.AppsV1beta1().StatefulSets(ns).Update(context.TODO(), sts, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			time.Sleep(time.Second * 10)
@@ -241,7 +241,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			// scale up
 			sts, err = kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			sts.Spec.Replicas = utilpointer.Int32Ptr(int32(nodeLen))
+			sts.Spec.Replicas = ptr.To(int32(nodeLen))
 			_, err = kc.AppsV1beta1().StatefulSets(ns).Update(context.TODO(), sts, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			tester.WaitForStatefulSetRunning(sts)
@@ -311,7 +311,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 					WhenUnsatisfiable: v1.ScheduleAnyway,
 				},
 			}
-			sts.Spec.Replicas = utilpointer.Int32Ptr(int32(nodeLen))
+			sts.Spec.Replicas = ptr.To(int32(nodeLen))
 			ginkgo.By(fmt.Sprintf("Create statefulset(%s/%s)", sts.Namespace, sts.Name))
 			tester.CreateStatefulSet(sts)
 
@@ -423,7 +423,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 
 			// create statefulset
 			sts := tester.NewBaseStatefulSet(ns, randStr)
-			// For heterogeneous scenario like edge cluster, I want to deploy a Pod for each Node to verify that the functionality works
+			// For heterogeneous scenario like edge cluster, I want to deploy a Pod for each Node to verify that the functionality worksd
 			sts.Spec.Template.Spec.TopologySpreadConstraints = []v1.TopologySpreadConstraint{
 				{
 					LabelSelector:     sts.Spec.Selector,
@@ -432,7 +432,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 					WhenUnsatisfiable: v1.ScheduleAnyway,
 				},
 			}
-			sts.Spec.Replicas = utilpointer.Int32Ptr(int32(nodeLen))
+			sts.Spec.Replicas = ptr.To(int32(nodeLen))
 			ginkgo.By(fmt.Sprintf("Create statefulset(%s/%s)", sts.Namespace, sts.Name))
 			tester.CreateStatefulSet(sts)
 
@@ -516,7 +516,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			// scale down
 			sts, err = kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			sts.Spec.Replicas = utilpointer.Int32Ptr(1)
+			sts.Spec.Replicas = ptr.To[int32](1)
 			_, err = kc.AppsV1beta1().StatefulSets(ns).Update(context.TODO(), sts, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			time.Sleep(time.Second * 60)
@@ -547,7 +547,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			// scale up
 			sts, err = kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			sts.Spec.Replicas = utilpointer.Int32Ptr(int32(nodeLen))
+			sts.Spec.Replicas = ptr.To(int32(nodeLen))
 			_, err = kc.AppsV1beta1().StatefulSets(ns).Update(context.TODO(), sts, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			tester.WaitForStatefulSetRunning(sts)
@@ -587,6 +587,89 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			for _, npp := range nppList.Items {
 				for _, podProbe := range npp.Spec.PodProbes {
 					gomega.Expect(podProbe.Namespace).NotTo(gomega.Equal(ns))
+				}
+			}
+		})
+	})
+
+	framework.KruiseDescribe("PodProbeMarker with httpCheck functionality", func() {
+		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentGinkgoTestDescription().Failed {
+				framework.DumpDebugInfo(c, ns)
+			}
+		})
+
+		ginkgo.It("pod probe marker httpCheck test", func() {
+			nodeList, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			nodeLen := len(nodeList.Items)
+			if nodeLen == 0 {
+				ginkgo.By("pod probe markers list nodeList is zero")
+				return
+			}
+			nppList, err := kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(nppList.Items).To(gomega.HaveLen(nodeLen))
+
+			// create statefulset
+			sts := tester.NewBaseStatefulSet(ns, randStr)
+			sts.Spec.Template.Spec.TopologySpreadConstraints = []v1.TopologySpreadConstraint{
+				{
+					LabelSelector:     sts.Spec.Selector,
+					MaxSkew:           1,
+					TopologyKey:       "kubernetes.io/hostname",
+					WhenUnsatisfiable: v1.ScheduleAnyway,
+				},
+			}
+			sts.Spec.Replicas = ptr.To(int32(nodeLen))
+			ginkgo.By(fmt.Sprintf("Create statefulset(%s/%s)", sts.Namespace, sts.Name))
+			tester.CreateStatefulSet(sts)
+
+			// create pod probe marker
+			ppmList := tester.NewPodProbeMarkerForHttpCheck(ns, randStr)
+			ppm1 := &ppmList[0]
+			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Create(context.TODO(), ppm1, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			time.Sleep(time.Second * 10)
+
+			// check finalizer
+			ppm1, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Expect(controllerutil.ContainsFinalizer(ppm1, podprobemarker.PodProbeMarkerFinalizer)).To(gomega.BeTrue())
+			pods, err := tester.ListActivePods(ns)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
+			validPods := sets.NewString()
+			for _, pod := range pods {
+				validPods.Insert(string(pod.UID))
+				npp, err := kc.AppsV1alpha1().NodePodProbes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				var podProbe *appsv1alpha1.PodProbe
+				for i := range npp.Spec.PodProbes {
+					obj := &npp.Spec.PodProbes[i]
+					if obj.UID == string(pod.UID) {
+						podProbe = obj
+						break
+					}
+				}
+				gomega.Expect(podProbe).NotTo(gomega.BeNil())
+				gomega.Expect(pod.Labels["nginx"]).To(gomega.Equal("healthy"))
+				condition := util.GetCondition(pod, "game.kruise.io/healthy")
+				gomega.Expect(condition).NotTo(gomega.BeNil())
+				gomega.Expect(string(condition.Status)).To(gomega.Equal(string(v1.ConditionTrue)))
+				condition = util.GetCondition(pod, "game.kruise.io/check")
+				gomega.Expect(condition).To(gomega.BeNil())
+			}
+			nppList, err = kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, npp := range nppList.Items {
+				for _, podProbe := range npp.Spec.PodProbes {
+					if podProbe.Namespace != ns {
+						// skip other namespace
+						continue
+					}
+					gomega.Expect(validPods.Has(podProbe.UID)).To(gomega.BeTrue())
 				}
 			}
 		})
