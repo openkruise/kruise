@@ -82,8 +82,8 @@ var _ = SIGDescribe("uniteddeployment", func() {
 		udManager.UnitedDeployment.Spec.Topology.ScheduleStrategy = appsv1alpha1.UnitedDeploymentScheduleStrategy{
 			Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
 			Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
-				RescheduleCriticalSeconds: ptr.To(int32(20)),
-				UnschedulableDuration:     ptr.To(int32(15)),
+				RescheduleCriticalSeconds: ptr.To(int32(10)),
+				UnschedulableDuration:     ptr.To(int32(10)),
 			},
 		}
 		udManager.AddSubset("subset-0", nil, nil, getReplicas("2"))
@@ -273,7 +273,7 @@ var _ = SIGDescribe("uniteddeployment", func() {
 			Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
 			Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
 				ReserveUnschedulablePods:  true,
-				RescheduleCriticalSeconds: ptr.To(int32(20)),
+				RescheduleCriticalSeconds: ptr.To(int32(10)),
 				UnschedulableDuration:     ptr.To(int32(1)),
 			},
 		}
@@ -369,7 +369,7 @@ var _ = SIGDescribe("uniteddeployment", func() {
 			Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
 			Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
 				ReserveUnschedulablePods:  true,
-				RescheduleCriticalSeconds: ptr.To(int32(20)),
+				RescheduleCriticalSeconds: ptr.To(int32(10)),
 				UnschedulableDuration:     ptr.To(int32(1)),
 			},
 		}
@@ -407,39 +407,39 @@ var _ = SIGDescribe("uniteddeployment", func() {
 
 		ginkgo.By("wait for rescheduling, will take long")
 		udManager.CheckUnschedulableStatus(unschedulableMap(true, true, false))
-		udManager.CheckReservedPods(replicasMap(2, 2, 2), replicasMap(2, 2, 0))
+		udManager.CheckReservedPods(replicasMap(1, 1, 2), replicasMap(1, 1, 0))
 		fmt.Println()
 
 		ginkgo.By("scale up while unschedulable")
 		udManager.Scale(4)
-		udManager.CheckReservedPods(replicasMap(2, 2, 4), replicasMap(2, 2, 0))
+		udManager.CheckReservedPods(replicasMap(1, 1, 4), replicasMap(1, 1, 0))
 		fmt.Println()
 
 		ginkgo.By("scale down while unschedulable")
 		udManager.Scale(2)
-		udManager.CheckReservedPods(replicasMap(2, 2, 2), replicasMap(2, 2, 0))
+		udManager.CheckReservedPods(replicasMap(1, 1, 2), replicasMap(1, 1, 0))
 		fmt.Println()
 
 		ginkgo.By("scale up again")
 		udManager.Scale(4)
-		udManager.CheckReservedPods(replicasMap(2, 2, 4), replicasMap(2, 2, 0))
+		udManager.CheckReservedPods(replicasMap(1, 1, 4), replicasMap(1, 1, 0))
 		fmt.Println()
 
 		ginkgo.By("update")
 		udManager.SetImage("busybox:1.33")
 		udManager.Update()
-		udManager.CheckReservedPods(replicasMap(2, 2, 4), replicasMap(2, 2, 0))
+		udManager.CheckReservedPods(replicasMap(1, 1, 4), replicasMap(1, 1, 0))
 		udManager.CheckPodImage("busybox:1.33")
 
 		ginkgo.By("recover subset-0")
 		udManager.SetNodeLabel(subset0EnabledKey, "true")
-		udManager.CheckUnschedulableStatus(unschedulableMap(false, false, false))
-		udManager.CheckReservedPods(replicasMap(4, 0, 0), replicasMap(0, 0, 0))
+		udManager.CheckUnschedulableStatus(unschedulableMap(false, true, false))
+		udManager.CheckReservedPods(replicasMap(4, 1, 0), replicasMap(0, 1, 0))
 		fmt.Println()
 
 		ginkgo.By("scale up after recovery")
 		udManager.Scale(5)
-		udManager.CheckReservedPods(replicasMap(5, 0, 0), replicasMap(0, 0, 0))
+		udManager.CheckReservedPods(replicasMap(5, 1, 0), replicasMap(0, 1, 0))
 		fmt.Println()
 	})
 })
@@ -453,6 +453,7 @@ func replicasMap(replicas ...int32) map[string]int32 {
 	}
 	return replicaMap
 }
+
 func unschedulableMap(nonscheduled ...bool) map[string]bool {
 	resultMap := make(map[string]bool)
 	for i, r := range nonscheduled {
