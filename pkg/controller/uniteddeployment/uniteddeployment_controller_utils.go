@@ -229,9 +229,15 @@ func getPodCondition(pod *corev1.Pod, tp corev1.PodConditionType) *corev1.PodCon
 }
 
 func initStatus(u *appsv1alpha1.UnitedDeployment) {
+	update := len(u.Status.SubsetStatuses) > 0 // subset list changed
 	for _, subset := range u.Spec.Topology.Subsets {
 		if u.Status.GetSubsetStatus(subset.Name) == nil {
-			u.Status.SubsetStatuses = append(u.Status.SubsetStatuses, appsv1alpha1.UnitedDeploymentSubsetStatus{Name: subset.Name})
+			status := appsv1alpha1.UnitedDeploymentSubsetStatus{Name: subset.Name}
+			if update && u.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
+				status.SetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable, corev1.ConditionFalse, "created",
+					"newly-created subsets in reservation strategy")
+			}
+			u.Status.SubsetStatuses = append(u.Status.SubsetStatuses, status)
 		}
 	}
 	return
