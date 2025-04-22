@@ -184,8 +184,8 @@ var _ = SIGDescribe("uniteddeployment", func() {
 		udManager.UnitedDeployment.Spec.Topology.ScheduleStrategy = appsv1alpha1.UnitedDeploymentScheduleStrategy{
 			Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
 			Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
-				RescheduleCriticalSeconds: ptr.To(int32(20)),
-				UnschedulableDuration:     ptr.To(int32(1)),
+				RescheduleCriticalSeconds: ptr.To(int32(10)),
+				UnschedulableDuration:     ptr.To(int32(20)),
 			},
 		}
 		udManager.AddSubset("subset-0", nil, getReplicas("1"), getReplicas("2"))
