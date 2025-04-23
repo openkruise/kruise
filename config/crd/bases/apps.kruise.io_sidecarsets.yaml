@@ -73,10 +73,19 @@ spec:
                         otherwise it will be injected into the back.
                         default BeforeAppContainerType
                       type: string
+                    shareVolumeDevicePolicy:
+                      description: |-
+                        If ShareVolumeDevicePolicy is enabled, the sidecar container will share the other container's VolumeDevices
+                        in the pod(don't contain the injected sidecar container).
+                        This is a pointer to ensure that the sidecarset-hash does not change if the user does not configure this field, mainly for compatibility with older versions.
+                      properties:
+                        type:
+                          type: string
+                      type: object
                     shareVolumePolicy:
                       description: |-
                         If ShareVolumePolicy is enabled, the sidecar container will share the other container's VolumeMounts
-                        in the pod(don't contains the injected sidecar container).
+                        in the pod(not including the injected sidecar container).
                       properties:
                         type:
                           type: string
@@ -173,10 +182,19 @@ spec:
                         otherwise it will be injected into the back.
                         default BeforeAppContainerType
                       type: string
+                    shareVolumeDevicePolicy:
+                      description: |-
+                        If ShareVolumeDevicePolicy is enabled, the sidecar container will share the other container's VolumeDevices
+                        in the pod(don't contain the injected sidecar container).
+                        This is a pointer to ensure that the sidecarset-hash does not change if the user does not configure this field, mainly for compatibility with older versions.
+                      properties:
+                        type:
+                          type: string
+                      type: object
                     shareVolumePolicy:
                       description: |-
                         If ShareVolumePolicy is enabled, the sidecar container will share the other container's VolumeMounts
-                        in the pod(don't contains the injected sidecar container).
+                        in the pod(not including the injected sidecar container).
                       properties:
                         type:
                           type: string

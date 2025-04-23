@@ -434,20 +434,26 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 				transferEnvs := sidecarcontrol.GetSidecarTransferEnvs(initContainer, pod)
 				// append volumeMounts SubPathExpr environments
 				transferEnvs = util.MergeEnvVar(transferEnvs, injectedEnvs)
-				klog.InfoS("try to inject initContainer sidecar",
-					"containerName", initContainer.Name, "namespace", pod.Namespace, "podName", pod.Name, "envs", transferEnvs, "volumeMounts", injectedMounts)
 				// insert volumes that initContainers used
 				for _, mount := range initContainer.VolumeMounts {
 					volumesInSidecars = append(volumesInSidecars, *volumesMap[mount.Name])
 				}
+				for _, mount := range initContainer.VolumeDevices {
+					volumesInSidecars = append(volumesInSidecars, *volumesMap[mount.Name])
+				}
 				// merge VolumeMounts from sidecar.VolumeMounts and shared VolumeMounts
-				initContainer.VolumeMounts = util.MergeVolumeMounts(initContainer.VolumeMounts, injectedMounts)
+				initContainer.VolumeMounts = util.MergeVolumeMounts(initContainer.Container, injectedMounts)
 				// add "IS_INJECTED" env in initContainer's envs
 				initContainer.Env = append(initContainer.Env, corev1.EnvVar{Name: sidecarcontrol.SidecarEnvKey, Value: "true"})
 				// merged Env from sidecar.Env and transfer envs
 				initContainer.Env = util.MergeEnvVar(initContainer.Env, transferEnvs)
 				isInjecting = true
 
+				// merge volumeDevice
+				injectedDevices := sidecarcontrol.GetInjectedVolumeDevices(initContainer, pod)
+				initContainer.VolumeDevices = util.MergeVolumeDevices(initContainer.Container, injectedDevices)
+				klog.InfoS("try to inject initContainer sidecar",
+					"containerName", initContainer.Name, "namespace", pod.Namespace, "podName", pod.Name, "envs", transferEnvs, "volumeMounts", injectedMounts, "volumeDevices", injectedDevices)
 				// when sidecar container UpgradeStrategy is HotUpgrade
 				if sidecarcontrol.IsSidecarContainer(initContainer.Container) && sidecarcontrol.IsHotUpgradeContainer(initContainer) {
 					hotContainers, annotations := injectHotUpgradeContainers(hotUpgradeWorkInfo, initContainer)
@@ -474,8 +480,6 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			transferEnvs := sidecarcontrol.GetSidecarTransferEnvs(sidecarContainer, pod)
 			// append volumeMounts SubPathExpr environments
 			transferEnvs = util.MergeEnvVar(transferEnvs, injectedEnvs)
-			klog.InfoS("try to inject Container sidecar",
-				"containerName", sidecarContainer.Name, "namespace", pod.Namespace, "podName", pod.Name, "envs", transferEnvs, "volumeMounts", injectedMounts)
 			//when update pod object
 			if isUpdated {
 				// judge whether inject sidecar container into pod
@@ -498,13 +502,21 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			for _, mount := range sidecarContainer.VolumeMounts {
 				volumesInSidecars = append(volumesInSidecars, *volumesMap[mount.Name])
 			}
+			for _, mount := range sidecarContainer.VolumeDevices {
+				volumesInSidecars = append(volumesInSidecars, *volumesMap[mount.Name])
+			}
 			// merge VolumeMounts from sidecar.VolumeMounts and shared VolumeMounts
-			sidecarContainer.VolumeMounts = util.MergeVolumeMounts(sidecarContainer.VolumeMounts, injectedMounts)
+			sidecarContainer.VolumeMounts = util.MergeVolumeMounts(sidecarContainer.Container, injectedMounts)
 			// add the "Injected" env to the sidecar container
 			sidecarContainer.Env = append(sidecarContainer.Env, corev1.EnvVar{Name: sidecarcontrol.SidecarEnvKey, Value: "true"})
 			// merged Env from sidecar.Env and transfer envs
 			sidecarContainer.Env = util.MergeEnvVar(sidecarContainer.Env, transferEnvs)
 
+			// merge volumeDevice
+			injectedDevices := sidecarcontrol.GetInjectedVolumeDevices(sidecarContainer, pod)
+			sidecarContainer.VolumeDevices = util.MergeVolumeDevices(sidecarContainer.Container, injectedDevices)
+			klog.InfoS("try to inject Container sidecar",
+				"containerName", sidecarContainer.Name, "namespace", pod.Namespace, "podName", pod.Name, "envs", transferEnvs, "volumeMounts", injectedMounts, "volumeDevices", injectedDevices)
 			// when sidecar container UpgradeStrategy is HotUpgrade
 			if sidecarcontrol.IsHotUpgradeContainer(sidecarContainer) {
 				hotContainers, annotations := injectHotUpgradeContainers(hotUpgradeWorkInfo, sidecarContainer)

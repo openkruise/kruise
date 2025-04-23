@@ -104,7 +104,18 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 		return reconcile.Result{RequeueAfter: time.Second}, nil
 	}
 
-	// 3. If sidecar container hot upgrade complete, then set the other one(empty sidecar container) image to HotUpgradeEmptyImage
+	// 3. SidecarSet upgrade strategy type is NotUpdate
+	if isSidecarSetNotUpdate(sidecarSet) {
+		return reconcile.Result{}, nil
+	}
+
+	// 4. Paused indicates that the SidecarSet is paused to update matched pods
+	if sidecarSet.Spec.UpdateStrategy.Paused {
+		klog.V(3).InfoS("SidecarSet was paused", "sidecarSet", klog.KObj(sidecarSet))
+		return reconcile.Result{}, nil
+	}
+
+	// 5. If sidecar container hot upgrade complete, then set the other one(empty sidecar container) image to HotUpgradeEmptyImage
 	if isSidecarSetHasHotUpgradeContainer(sidecarSet) {
 		var podsInHotUpgrading []*corev1.Pod
 		for _, pod := range pods {
@@ -131,20 +142,9 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 		}
 	}
 
-	// 4. SidecarSet upgrade strategy type is NotUpdate
-	if isSidecarSetNotUpdate(sidecarSet) {
-		return reconcile.Result{}, nil
-	}
-
-	// 5. sidecarset already updates all matched pods, then return
+	// 6. sidecarset already updates all matched pods, then return
 	if isSidecarSetUpdateFinish(status) {
 		klog.V(3).InfoS("SidecarSet matched pods were latest, and don't need update", "sidecarSet", klog.KObj(sidecarSet), "matchedPodCount", len(pods))
-		return reconcile.Result{}, nil
-	}
-
-	// 6. Paused indicates that the SidecarSet is paused to update matched pods
-	if sidecarSet.Spec.UpdateStrategy.Paused {
-		klog.V(3).InfoS("SidecarSet was paused", "sidecarSet", klog.KObj(sidecarSet))
 		return reconcile.Result{}, nil
 	}
 
@@ -571,7 +571,7 @@ func updatePodSidecarContainer(control sidecarcontrol.SidecarControl, pod *corev
 		// when volumeMounts SubPathExpr contains expansions, then need copy container EnvVars(injectEnvs)
 		injectedMounts, injectedEnvs := sidecarcontrol.GetInjectedVolumeMountsAndEnvs(control, &sidecarContainer, pod)
 		// merge VolumeMounts from sidecar.VolumeMounts and shared VolumeMounts
-		sidecarContainer.VolumeMounts = util.MergeVolumeMounts(sidecarContainer.VolumeMounts, injectedMounts)
+		sidecarContainer.VolumeMounts = util.MergeVolumeMounts(sidecarContainer.Container, injectedMounts)
 
 		// get injected env & mounts explicitly so that can be compared with old ones in pod
 		transferEnvs := sidecarcontrol.GetSidecarTransferEnvs(&sidecarContainer, pod)
@@ -579,6 +579,10 @@ func updatePodSidecarContainer(control sidecarcontrol.SidecarControl, pod *corev
 		transferEnvs = util.MergeEnvVar(transferEnvs, injectedEnvs)
 		// merged Env from sidecar.Env and transfer envs
 		sidecarContainer.Env = util.MergeEnvVar(sidecarContainer.Env, transferEnvs)
+
+		// merge volumeDevice
+		injectedDevices := sidecarcontrol.GetInjectedVolumeDevices(&sidecarContainer, pod)
+		sidecarContainer.VolumeDevices = util.MergeVolumeDevices(sidecarContainer.Container, injectedDevices)
 
 		// upgrade sidecar container to latest
 		newContainer := control.UpgradeSidecarContainer(&sidecarContainer, pod)

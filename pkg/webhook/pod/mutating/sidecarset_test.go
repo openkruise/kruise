@@ -1646,3 +1646,196 @@ func newAdmissionRequest(op admissionv1.Operation, object, oldObject runtime.Raw
 		SubResource: subResource,
 	}
 }
+
+func TestPodVolumeDevicesAppend(t *testing.T) {
+	cases := []struct {
+		name                    string
+		getPod                  func() *corev1.Pod
+		getSidecarSet           func() *appsv1alpha1.SidecarSet
+		exceptInitVolumeDevices []corev1.VolumeDevice
+		exceptVolumeDevices     []corev1.VolumeDevice
+		exceptVolumes           []corev1.Volume
+	}{
+		{
+			name: "append normal volumeDevices, ShareVolumeDevicePolicy=disable",
+			getPod: func() *corev1.Pod {
+				// /a/b、/e/f
+				podIn := podWithStaragent.DeepCopy()
+				podIn.Spec.Containers[0].VolumeDevices = []corev1.VolumeDevice{
+					{
+						Name:       "origin-pvc-1",
+						DevicePath: "/origin-1",
+					},
+					{
+						Name:       "origin-pvc-share",
+						DevicePath: "/share",
+					},
+				}
+				podIn.Spec.Volumes = append(podIn.Spec.Volumes, corev1.Volume{Name: "origin-pvc-1"})
+				podIn.Spec.Volumes = append(podIn.Spec.Volumes, corev1.Volume{Name: "origin-pvc-share"})
+				return podIn
+			},
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				sidecarSetIn := sidecarSetWithStaragent.DeepCopy()
+				sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
+				sidecarSetIn.Spec.InitContainers[0].VolumeDevices = []corev1.VolumeDevice{
+					{
+						Name:       "disk0",
+						DevicePath: "/dev/nvme0",
+					},
+				}
+				sidecarSetIn.Spec.InitContainers[0].VolumeMounts = nil
+				sidecarSetIn.Spec.InitContainers[0].ShareVolumePolicy = appsv1alpha1.ShareVolumePolicy{}
+				sidecarSetIn.Spec.Containers[0].VolumeDevices = []corev1.VolumeDevice{
+					{
+						Name:       "disk0",
+						DevicePath: "/dev/nvme1",
+					},
+				}
+				sidecarSetIn.Spec.Containers[0].VolumeMounts = nil
+				sidecarSetIn.Spec.Containers[0].ShareVolumePolicy = appsv1alpha1.ShareVolumePolicy{}
+				sidecarSetIn.Spec.Volumes = []corev1.Volume{{Name: "disk0"}}
+
+				return sidecarSetIn
+			},
+			exceptInitVolumeDevices: []corev1.VolumeDevice{
+				{
+					Name:       "disk0",
+					DevicePath: "/dev/nvme0",
+				},
+			},
+			exceptVolumeDevices: []corev1.VolumeDevice{
+				{
+					Name:       "disk0",
+					DevicePath: "/dev/nvme1",
+				},
+			},
+			exceptVolumes: []corev1.Volume{
+				{Name: "volume-a"},
+				{Name: "volume-b"},
+				{Name: "volume-staragent"},
+				{Name: "origin-pvc-1"},
+				{Name: "origin-pvc-share"},
+				{Name: "disk0"},
+			},
+		},
+		{
+			name: "append normal volumeDevices, ShareVolumeDevicePolicy=enable",
+			getPod: func() *corev1.Pod {
+				// /a/b、/e/f
+				podIn := podWithStaragent.DeepCopy()
+				podIn.Spec.Containers[0].VolumeDevices = []corev1.VolumeDevice{
+					{
+						Name:       "origin-pvc-1",
+						DevicePath: "/origin-1",
+					},
+					{
+						Name:       "origin-pvc-share",
+						DevicePath: "/share",
+					},
+				}
+				podIn.Spec.Volumes = append(podIn.Spec.Volumes, corev1.Volume{Name: "origin-pvc-1"})
+				podIn.Spec.Volumes = append(podIn.Spec.Volumes, corev1.Volume{Name: "origin-pvc-share"})
+				return podIn
+			},
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				sidecarSetIn := sidecarSetWithStaragent.DeepCopy()
+				sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
+				sidecarSetIn.Spec.InitContainers[0].VolumeDevices = []corev1.VolumeDevice{
+					{
+						Name:       "disk0",
+						DevicePath: "/dev/nvme0",
+					},
+				}
+				sidecarSetIn.Spec.InitContainers[0].ShareVolumePolicy = appsv1alpha1.ShareVolumePolicy{}
+				sidecarSetIn.Spec.InitContainers[0].ShareVolumeDevicePolicy = &appsv1alpha1.ShareVolumePolicy{
+					Type: appsv1alpha1.ShareVolumePolicyEnabled,
+				}
+				sidecarSetIn.Spec.Containers[0].VolumeDevices = []corev1.VolumeDevice{
+					{
+						Name:       "disk0",
+						DevicePath: "/dev/nvme1",
+					},
+				}
+				sidecarSetIn.Spec.Containers[0].VolumeMounts = nil
+				sidecarSetIn.Spec.Containers[0].ShareVolumePolicy = appsv1alpha1.ShareVolumePolicy{}
+				sidecarSetIn.Spec.Containers[0].ShareVolumeDevicePolicy = &appsv1alpha1.ShareVolumePolicy{
+					Type: appsv1alpha1.ShareVolumePolicyEnabled,
+				}
+				sidecarSetIn.Spec.Volumes = []corev1.Volume{
+					{Name: "volume-3"},
+					{Name: "volume-4"},
+					{Name: "volume-staragent"},
+					{Name: "disk0"},
+				}
+
+				return sidecarSetIn
+			},
+			exceptInitVolumeDevices: []corev1.VolumeDevice{
+				{
+					Name:       "disk0",
+					DevicePath: "/dev/nvme0",
+				},
+				{
+					Name:       "origin-pvc-1",
+					DevicePath: "/origin-1",
+				},
+				{
+					Name:       "origin-pvc-share",
+					DevicePath: "/share",
+				},
+			},
+			exceptVolumeDevices: []corev1.VolumeDevice{
+				{
+					Name:       "disk0",
+					DevicePath: "/dev/nvme1",
+				},
+				{
+					Name:       "origin-pvc-1",
+					DevicePath: "/origin-1",
+				},
+				{
+					Name:       "origin-pvc-share",
+					DevicePath: "/share",
+				},
+			},
+			exceptVolumes: []corev1.Volume{
+				{Name: "volume-a"},
+				{Name: "volume-b"},
+				{Name: "volume-staragent"},
+				{Name: "origin-pvc-1"},
+				{Name: "origin-pvc-share"},
+				{Name: "volume-3"},
+				{Name: "volume-4"},
+				{Name: "disk0"},
+			},
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			podIn := cs.getPod()
+			decoder := admission.NewDecoder(scheme.Scheme)
+			c := fake.NewClientBuilder().WithObjects(cs.getSidecarSet()).WithIndex(
+				&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+			).Build()
+			podOut := podIn.DeepCopy()
+			podHandler := &PodCreateHandler{Decoder: decoder, Client: c}
+			req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+			_, err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+			if err != nil {
+				t.Fatalf("inject sidecar into pod failed, err: %v", err)
+			}
+
+			if !reflect.DeepEqual(cs.exceptInitVolumeDevices, podOut.Spec.InitContainers[0].VolumeDevices) {
+				t.Fatalf("expect(%v), but get(%v)", cs.exceptInitVolumeDevices, podOut.Spec.InitContainers[0].VolumeDevices)
+			}
+			if !reflect.DeepEqual(cs.exceptVolumeDevices, podOut.Spec.Containers[1].VolumeDevices) {
+				t.Fatalf("expect(%v), but get(%v)", cs.exceptVolumeDevices, podOut.Spec.Containers[1].VolumeDevices)
+			}
+			if !reflect.DeepEqual(cs.exceptVolumes, podOut.Spec.Volumes) {
+				t.Fatalf("expect(%v), but get(%v)", util.DumpJSON(cs.exceptVolumes), util.DumpJSON(podOut.Spec.Volumes))
+			}
+		})
+	}
+}

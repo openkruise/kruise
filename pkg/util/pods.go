@@ -76,18 +76,44 @@ func DiffPods(pods1, pods2 []*v1.Pod) (ret []*v1.Pod) {
 	return
 }
 
-func MergeVolumeMounts(original, additional []v1.VolumeMount) []v1.VolumeMount {
-	mountpoints := sets.NewString()
-	for _, mount := range original {
-		mountpoints.Insert(mount.MountPath)
+func MergeVolumeMounts(container v1.Container, additional []v1.VolumeMount) []v1.VolumeMount {
+	mountPoints := sets.NewString()
+	var original []v1.VolumeMount
+	for _, mount := range container.VolumeMounts {
+		mountPoints.Insert(mount.MountPath)
+		original = append(original, mount)
+	}
+	for _, mount := range container.VolumeDevices {
+		mountPoints.Insert(mount.DevicePath)
 	}
 
 	for _, mount := range additional {
-		if mountpoints.Has(mount.MountPath) {
+		if mountPoints.Has(mount.MountPath) {
 			continue
 		}
 		original = append(original, mount)
-		mountpoints.Insert(mount.MountPath)
+		mountPoints.Insert(mount.MountPath)
+	}
+	return original
+}
+
+func MergeVolumeDevices(container v1.Container, additional []v1.VolumeDevice) []v1.VolumeDevice {
+	mountPoints := sets.NewString()
+	var original []v1.VolumeDevice
+	for _, mount := range container.VolumeDevices {
+		mountPoints.Insert(mount.DevicePath)
+		original = append(original, mount)
+	}
+	for _, mount := range container.VolumeMounts {
+		mountPoints.Insert(mount.MountPath)
+	}
+
+	for _, mount := range additional {
+		if mountPoints.Has(mount.DevicePath) {
+			continue
+		}
+		original = append(original, mount)
+		mountPoints.Insert(mount.DevicePath)
 	}
 	return original
 }
