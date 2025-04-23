@@ -33,13 +33,13 @@ func (p *chanPool) Submit(task Task) {
 
 func (p *chanPool) Start() {
 	for i := 0; i < p.maxWorks; i++ {
+		p.wg.Add(1)
 		go func() {
 			defer p.wg.Done()
 			for task := range p.queue {
 				task()
 			}
 		}()
-		p.wg.Add(1)
 	}
 }
 
