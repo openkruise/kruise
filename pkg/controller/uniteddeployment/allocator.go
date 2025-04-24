@@ -435,6 +435,12 @@ func exportReservationRecords(records map[string]*reservationAllocatorSubsetReco
 	return nextReplicas
 }
 
+// The explanation of this allocation algorithm is as follows.
+// When X replicas are assigned to a normal subset, the total number of replicas will normally decrease by X;
+// whereas when assigned to an unschedulable subset (subsets where all reserved pods have just started are still considered as unschedulable),
+// the total number will only reduce by at most the number of non-reserved Pods in the subset.
+// During allocation, each subset is first assigned a number of replicas equal to minReplicas in sequence.
+// Then, each subset is allocated up to maxReplicas (schedulable) or its allocated number (unschedulable) in sequence again.
 func allocateByMinMaxMapAndReservation(replicas int32, minReplicasMap, maxReplicasMap map[string]int32,
 	existingSubsets map[string]*Subset, subsetNames []string) map[string]int32 {
 	// Prepare for the records
