@@ -63,7 +63,7 @@ func (m *resultManager) listResults() []Update {
 func (m *resultManager) set(id string, key probeKey, result appsv1alpha1.ProbeState, msg string) {
 	currentTime := metav1.Now()
 	prev, exists := m.cache.Load(id)
-	if !exists || prev.(Update).State != result || currentTime.Sub(prev.(Update).LastProbeTime.Time) >= maxSyncProbeTime {
+	if !exists || prev.(Update).State != result || prev.(Update).Msg != msg || currentTime.Sub(prev.(Update).LastProbeTime.Time).Seconds() >= maxSyncProbeTime {
 		m.cache.Store(id, Update{id, key, result, msg, currentTime})
 		m.queue.Add("updateStatus")
 	}
