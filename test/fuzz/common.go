@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kruise Authors.
+Copyright 2025 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,21 +19,16 @@ package fuzz
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
-	"sort"
-	"strings"
-
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-)
-
-const (
-	alphaNum     = "abcdefghijklmnopqrstuvwxyz0123456789"
-	allowedChars = alphaNum + "-." // Allowed characters: letters, numbers, hyphens, dots
+	"math/rand"
+	"sort"
+	"strings"
 )
 
 func GenerateSubsetReplicas(cf *fuzz.ConsumeFuzzer) (intstr.IntOrString, error) {
@@ -323,42 +318,125 @@ func GeneratePatch(cf *fuzz.ConsumeFuzzer, rawExtension *runtime.RawExtension) e
 	return nil
 }
 
-func GenerateLabelPart() string {
-	length := rand.Intn(63) + 1
-	b := make([]byte, length)
-
-	// Make sure the first and last characters are letters or numbers
-	b[0] = alphaNum[rand.Intn(len(alphaNum))]
-	b[length-1] = alphaNum[rand.Intn(len(alphaNum))]
-
-	// The middle character can be any character allowed
-	for i := 1; i < length-1; i++ {
-		b[i] = allowedChars[rand.Intn(len(allowedChars))]
+func GenerateUnstructured(cf *fuzz.ConsumeFuzzer, resource *unstructured.Unstructured) error {
+	isStructured, err := cf.GetBool()
+	if err != nil {
+		return err
 	}
-	return string(b)
+
+	if !isStructured {
+		obj := make(map[string]interface{})
+		if err = cf.GenerateStruct(&obj); err != nil {
+			return err
+		}
+		resource.Object = obj
+		return nil
+	}
+
+	labels := make(map[string]string)
+	if err := cf.FuzzMap(&labels); err != nil {
+		return err
+	}
+	resource.SetLabels(labels)
+
+	annotations := make(map[string]string)
+	if err := cf.FuzzMap(&annotations); err != nil {
+		return err
+	}
+	resource.SetAnnotations(annotations)
+
+	finalizers := make([]string, 0)
+	if err := cf.CreateSlice(&finalizers); err != nil {
+		return err
+	}
+	resource.SetFinalizers(finalizers)
+	return nil
 }
 
 func GenerateValidKey() string {
-	partsCount := rand.Intn(3) + 1
-	parts := make([]string, partsCount)
-
-	for i := range parts {
-		parts[i] = GenerateLabelPart()
-	}
-
-	return strings.Join(parts, ".")
+	return randomLabelKey()
 }
 
 func GenerateValidValue() string {
-	// 5% probability of generating a null value
-	if rand.Intn(100) < 5 {
-		return ""
-	}
-	partsCount := rand.Intn(3) + 1
-	parts := make([]string, partsCount)
+	return randomLabelPart(true)
+}
 
-	for i := range parts {
-		parts[i] = GenerateLabelPart()
+func GenerateValidNamespaceName() string {
+	return randomRFC1123()
+}
+
+func GenerateInvalidNamespaceName() string {
+	invalidChars := []rune{'$', '_', ' '}
+	validName := GenerateValidNamespaceName()
+	runes := []rune(validName)
+	// Make sure the first character is illegal
+	runes[0] = invalidChars[rand.Intn(len(invalidChars))]
+	return string(runes)
+}
+
+type charRange struct {
+	first, last rune
+}
+
+func (c *charRange) choose() rune {
+	count := int64(c.last - c.first + 1)
+	ch := c.first + rune(rand.Int63n(count))
+
+	return ch
+}
+
+func randomLabelKey() string {
+	namePart := randomLabelPart(false)
+	prefixPart := ""
+
+	if rand.Intn(10) < 5 {
+		prefixPartsLen := rand.Intn(2) + 1
+		prefixParts := make([]string, prefixPartsLen)
+		for i := range prefixParts {
+			prefixParts[i] = randomRFC1123()
+		}
+		prefixPart = strings.Join(prefixParts, ".") + "/"
 	}
-	return strings.Join(parts, ".")
+
+	return prefixPart + namePart
+}
+
+func randomLabelPart(canBeEmpty bool) string {
+	validStartEnd := []charRange{{'0', '9'}, {'a', 'z'}, {'A', 'Z'}}
+	validMiddle := []charRange{{'0', '9'}, {'a', 'z'}, {'A', 'Z'},
+		{'.', '.'}, {'-', '-'}, {'_', '_'}}
+
+	partLen := rand.Intn(64) // len is [0, 63]
+	if !canBeEmpty {
+		partLen = rand.Intn(63) + 1 // len is [1, 63]
+	}
+
+	runes := make([]rune, partLen)
+	if partLen == 0 {
+		return string(runes)
+	}
+
+	runes[0] = validStartEnd[rand.Intn(len(validStartEnd))].choose()
+	for i := range runes[1:] {
+		runes[i+1] = validMiddle[rand.Intn(len(validMiddle))].choose()
+	}
+	runes[len(runes)-1] = validStartEnd[rand.Intn(len(validStartEnd))].choose()
+
+	return string(runes)
+}
+
+func randomRFC1123() string {
+	validStartEnd := []charRange{{'0', '9'}, {'a', 'z'}}
+	validMiddle := []charRange{{'0', '9'}, {'a', 'z'}, {'-', '-'}}
+
+	partLen := rand.Intn(63) + 1 // len is [1, 63]
+	runes := make([]rune, partLen)
+
+	runes[0] = validStartEnd[rand.Intn(len(validStartEnd))].choose()
+	for i := range runes[1:] {
+		runes[i+1] = validMiddle[rand.Intn(len(validMiddle))].choose()
+	}
+	runes[len(runes)-1] = validStartEnd[rand.Intn(len(validStartEnd))].choose()
+
+	return string(runes)
 }
