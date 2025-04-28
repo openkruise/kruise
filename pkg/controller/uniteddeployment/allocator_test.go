@@ -296,7 +296,7 @@ func TestCapacityAllocator(t *testing.T) {
 				})
 			}
 
-			ca := elasticAllocator{&ud}
+			ca := minMaxAllocator{&ud}
 			result, err := ca.Alloc(nil)
 			if err != nil {
 				t.Fatalf("unexpected error %v", err)
@@ -582,7 +582,7 @@ func TestReservedAdaptiveAllocation(t *testing.T) {
 					UnschedulableStatus: SubsetUnschedulableStatus{
 						Unschedulable:           reserved[i] != 0,
 						PreviouslyUnschedulable: previouslyUnschedulable,
-						ReservedPodNum:          reserved[i],
+						ReservedPods:            reserved[i],
 					},
 					Replicas:             cur[i],
 					UpdatedReadyReplicas: cur[i] - reserved[i] - newPods[i],

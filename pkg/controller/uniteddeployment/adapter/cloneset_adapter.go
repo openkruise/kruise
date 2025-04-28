@@ -76,6 +76,7 @@ func (a *CloneSetAdapter) SetMaxUnavailable(obj metav1.Object, val int32) metav1
 	set.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{Type: intstr.Int, IntVal: val}
 	return set
 }
+
 func (a *CloneSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subsetName, revision string, replicas, partition int32, obj runtime.Object) error {
 
 	set := obj.(*alpha1.CloneSet)

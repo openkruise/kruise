@@ -474,8 +474,8 @@ func TestCalculateSubsetsStatusForReservedAdaptiveStrategy(t *testing.T) {
 				t.Logf("case %s failed: expect pods to patch %d, but got %d", c.name, c.podsToPatch, len(podsToPatch))
 				t.Fail()
 			}
-			if subset.Status.UnschedulableStatus.ReservedPodNum != c.expectReservedPods {
-				t.Logf("case %s failed: expect reserved pods %d, but got %d", c.name, c.expectReservedPods, subset.Status.UnschedulableStatus.ReservedPodNum)
+			if subset.Status.UnschedulableStatus.ReservedPods != c.expectReservedPods {
+				t.Logf("case %s failed: expect reserved pods %d, but got %d", c.name, c.expectReservedPods, subset.Status.UnschedulableStatus.ReservedPods)
 				t.Fail()
 			}
 			status := ud.Status.GetSubsetStatus(subsetName)
