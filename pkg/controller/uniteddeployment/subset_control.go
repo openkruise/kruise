@@ -85,7 +85,7 @@ func (m *SubsetControl) CreateSubset(ud *alpha1.UnitedDeployment, subsetName str
 	}
 
 	klog.V(4).InfoS("Replicas when creating Subset for UnitedDeployment", "replicas", replicas, "unitedDeployment", klog.KObj(ud))
-	return m.Create(context.Background(), set)
+	return m.Create(context.TODO(), set)
 }
 
 // UpdateSubset is used to update the subset. The target Subset workload can be found with the input subset.
@@ -93,7 +93,7 @@ func (m *SubsetControl) UpdateSubset(subset *Subset, ud *alpha1.UnitedDeployment
 	workload := m.adapter.NewResourceObject()
 	var updateError error
 	for i := 0; i < updateRetries; i++ {
-		getError := m.Client.Get(context.Background(), m.objectKey(&subset.ObjectMeta), workload)
+		getError := m.Client.Get(context.TODO(), m.objectKey(&subset.ObjectMeta), workload)
 		if getError != nil {
 			return getError
 		}

@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -68,7 +67,7 @@ func NewReplicaAllocator(ud *appsv1alpha1.UnitedDeployment) ReplicaAllocator {
 	}
 	for _, subset := range ud.Spec.Topology.Subsets {
 		if subset.MinReplicas != nil || subset.MaxReplicas != nil {
-			return &elasticAllocator{ud}
+			return &minMaxAllocator{ud}
 		}
 	}
 	return &specificAllocator{UnitedDeployment: ud}
@@ -80,12 +79,7 @@ func NewReplicaAllocator(ud *appsv1alpha1.UnitedDeployment) ReplicaAllocator {
 func getSubsetReadyReplicas(existingSubsets map[string]*Subset) map[string]int32 {
 	var result = make(map[string]int32)
 	for name, subset := range existingSubsets {
-		for _, pod := range subset.Spec.SubsetPods {
-			if reserved, _ := IsPodMarkedAsReserved(pod); !reserved && pod.Status.Phase == corev1.PodRunning {
-				result[name]++
-			}
-		}
-		result[name] = min(subset.Status.ReadyReplicas, result[name])
+		result[name] = subset.Status.ReadyReplicas
 	}
 	return result
 }
@@ -264,12 +258,12 @@ func (s *specificAllocator) String() string {
 	return result
 }
 
-type elasticAllocator struct {
+type minMaxAllocator struct {
 	*appsv1alpha1.UnitedDeployment
 }
 
 // Alloc returns a mapping from subset to next replicas.
-// Next replicas is allocated by elasticAllocator, which will consider the current minReplicas and maxReplicas
+// Next replicas is allocated by minMaxAllocator, which will consider the current minReplicas and maxReplicas
 // of each subset and spec.replicas of UnitedDeployment. For example:
 // spec.replicas: 5
 // subsets:
@@ -281,7 +275,7 @@ type elasticAllocator struct {
 //     maxReplicas: nil  # will be satisfied with 4th priority
 //
 // the results of map will be: {"subset-a": 3, "subset-b": 2}
-func (ac *elasticAllocator) Alloc(_ map[string]*Subset) (map[string]int32, error) {
+func (ac *minMaxAllocator) Alloc(_ map[string]*Subset) (map[string]int32, error) {
 	var replicas int32
 	if ac.Spec.Replicas != nil {
 		replicas = *ac.Spec.Replicas
@@ -295,7 +289,7 @@ func (ac *elasticAllocator) Alloc(_ map[string]*Subset) (map[string]int32, error
 	return nextReplicas, nil
 }
 
-func (ac *elasticAllocator) validateAndCalculateMinMaxMap(replicas int32) (map[string]int32, map[string]int32, error) {
+func (ac *minMaxAllocator) validateAndCalculateMinMaxMap(replicas int32) (map[string]int32, map[string]int32, error) {
 	numSubset := len(ac.Spec.Topology.Subsets)
 	minReplicasMap := make(map[string]int32, numSubset)
 	maxReplicasMap := make(map[string]int32, numSubset)
@@ -413,18 +407,43 @@ func (ac *reservationAllocator) Alloc(existingSubsets map[string]*Subset) (map[s
 }
 
 type reservationAllocatorSubsetRecord struct {
-	maxAlloc int32
-	replicas int32
+	maxAllocatable int32 // Refer to `allocateByMinMaxMapAndReservation` for it's usage
+	replicas       int32 // Allocated replicas of the subset, which will be set to the value of the workload's spec.replicas
 }
 
-// allocate allocates a subset to the 'to' replicas and returns how many replicas is really consumed.
-//   - param to: will scale up the subset to the value
-//   - param rest: rest replicas can be allocated
+// allocate allocates `to` replicas to a subset and returns how many replicas is really allocated.
+//
+// Under normal circumstances, if X replicas are allocated to a subset, the number of remaining unassigned replicas
+// should obviously decrease by X. However, if they are assigned to an unschedulable subset that only has Y healthy Pods,
+// which is stored in field maxAllocatable, then starting from the (Y+1)th replica, they will certainly be reserved Pods
+// that cannot be scheduled. Therefore, when X (X > Y) replicas are allocated to such an unschedulable subset, the number
+// of remaining unassigned replicas can only decrease by Y. This means that the X-Y reserved replicas, which are expected
+// to fail to start, will be redundantly assigned in other subsets to create temporary Pods as their substitutes.
+// As the reserved Pods gradually recover, Y will gradually increase, and the number of temporary Pods, X-Y, will gradually
+// decrease until all work is handed back to the recovered reserved Pods.
+//
+// Following are some examples (Assume there are 5 replicas remaining to be allocated in total):
+//
+//  1. Trying to allocate 3 replicas to a subset with 0 healthy Pods and 2 reserved Pods (typical unschedulable):
+//     allocate(3, 5), -> 0,
+//     the number of remaining unassigned replicas is decreased by 0, 3-0=3 temporary pods will be created.
+//
+//  2. Trying to allocate 3 replicas to a subset with 3 healthy Pods and no reserved Pods (schedulable):
+//     allocate(3, 5), -> 3,
+//     the number of remaining unassigned replicas is decreased by 3, 3-3=0 temporary pods will be created.
+//
+//  3. Trying to allocate 3 replicas to a subset with 1 healthy Pod and 1 reserved Pod:
+//     allocate(3, 5), -> 1,
+//     the number of remaining unassigned replicas is decreased by 1, 3-1=2 temporary pod will be created
+//
+//     - param to: will scale up the subset to the value
+//     - param rest: rest replicas can be allocated
+//     - return allocated: the number of replicas that should be decreased. if not decreased, temporary pods will be created.
 func (ar *reservationAllocatorSubsetRecord) allocate(to, rest int32) (allocated int32) {
 	toAdd := min(to-ar.replicas, rest)
 	ar.replicas += toAdd
-	ar.maxAlloc -= toAdd
-	return max(0, min(0, ar.maxAlloc)+toAdd)
+	ar.maxAllocatable -= toAdd
+	return max(0, min(0, ar.maxAllocatable)+toAdd)
 }
 
 func exportReservationRecords(records map[string]*reservationAllocatorSubsetRecord) map[string]int32 {
@@ -435,10 +454,8 @@ func exportReservationRecords(records map[string]*reservationAllocatorSubsetReco
 	return nextReplicas
 }
 
-// The explanation of this allocation algorithm is as follows.
-// When X replicas are assigned to a normal subset, the total number of replicas will normally decrease by X;
-// whereas when assigned to an unschedulable subset (subsets where all reserved pods have just started are still considered as unschedulable),
-// the total number will only reduce by at most the number of non-reserved Pods in the subset.
+// allocateByMinMaxMapAndReservation allocates replicas to each subset through a unique allocate method
+// (refer to the allocate method of reservationAllocatorSubsetRecord).
 // During allocation, each subset is first assigned a number of replicas equal to minReplicas in sequence.
 // Then, each subset is allocated up to maxReplicas (schedulable) or its allocated number (unschedulable) in sequence again.
 func allocateByMinMaxMapAndReservation(replicas int32, minReplicasMap, maxReplicasMap map[string]int32,
@@ -447,9 +464,9 @@ func allocateByMinMaxMapAndReservation(replicas int32, minReplicasMap, maxReplic
 	records := make(map[string]*reservationAllocatorSubsetRecord, len(subsetNames))
 	for _, name := range subsetNames {
 		if subset := existingSubsets[name]; subset == nil || subset.Allocatable() {
-			records[name] = &reservationAllocatorSubsetRecord{maxAlloc: math.MaxInt32}
+			records[name] = &reservationAllocatorSubsetRecord{maxAllocatable: math.MaxInt32}
 		} else {
-			records[name] = &reservationAllocatorSubsetRecord{maxAlloc: subset.Spec.Replicas - subset.Status.UnschedulableStatus.ReservedPodNum}
+			records[name] = &reservationAllocatorSubsetRecord{maxAllocatable: subset.Spec.Replicas - subset.Status.UnschedulableStatus.ReservedPods}
 		}
 	}
 	// Step 1: satisfy the minimum replicas of each subset firstly.
@@ -460,7 +477,7 @@ func allocateByMinMaxMapAndReservation(replicas int32, minReplicasMap, maxReplic
 		}
 	}
 
-	// Step 2: satisfy the reserved replicas of each unschedulable subset
+	// Step 2: allocate the rest replicas into subsets sequentially
 	for _, name := range subsetNames {
 		subset := existingSubsets[name]
 		if subset == nil || !subset.Status.UnschedulableStatus.Unschedulable {
