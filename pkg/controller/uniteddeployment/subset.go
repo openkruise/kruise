@@ -57,8 +57,7 @@ type SubsetUnschedulableStatus struct {
 	PreviouslyUnschedulable bool // has condition Schedulable == False
 	// In reservation adaptive strategy, it is the number of reserved pods in the subset.
 	// Please refer to the function CheckPodReallyInReservedStatus.
-	ReservedPodNum int32
-	ReservedPods   map[string]struct{} // set of names of reserved pods
+	ReservedPods int32
 	// The number of Pending Pods, used by normal adaptive strategy.
 	PendingPods int32
 	// Healthy running pods with old revision and marked as reserved (timeouted)
