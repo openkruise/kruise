@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestCheckPodStaging(t *testing.T) {
+func TestCheckPodReserved(t *testing.T) {
 	now := time.Now()
 	tests := []struct {
 		name                   string
@@ -244,6 +244,34 @@ func TestCheckPodStaging(t *testing.T) {
 			expectedResult:         false,
 			expectedNextCheckAfter: 6 * time.Second,
 			expectedLegacyPods:     0,
+		},
+		{
+			name: "Normal pod deleted",
+			pod: &corev1.Pod{
+				Status: corev1.PodStatus{
+					Phase: corev1.PodRunning,
+					Conditions: []corev1.PodCondition{
+						{
+							Type:               corev1.PodReady,
+							Status:             corev1.ConditionTrue,
+							LastTransitionTime: metav1.Time{Time: now.Add(-99 * time.Second)},
+						},
+						{
+							Type:   corev1.PodScheduled,
+							Status: corev1.ConditionTrue,
+						},
+					},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					CreationTimestamp: metav1.Time{Time: now.Add(-100 * time.Second)},
+					DeletionTimestamp: &metav1.Time{Time: now.Add(-1 * time.Second)},
+				},
+			},
+			pendingTimeout:         10 * time.Second,
+			minReadySeconds:        5 * time.Second,
+			updatedTime:            now.Add(-99 * time.Second),
+			expectedResult:         false,
+			expectedNextCheckAfter: -1,
 		},
 	}
 
