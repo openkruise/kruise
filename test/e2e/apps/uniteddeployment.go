@@ -236,6 +236,7 @@ var _ = SIGDescribe("uniteddeployment", func() {
 		fmt.Println()
 
 		ginkgo.By("scale down after recovery")
+		time.Sleep(10 * time.Second)
 		udManager.Scale(4)
 		udManager.CheckSubsetPods(replicasMap(2, 2))
 		fmt.Println()
