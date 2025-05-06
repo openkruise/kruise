@@ -20,13 +20,14 @@ import (
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
-	fuzzutils "github.com/openkruise/kruise/test/fuzz"
 	v1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
+	fuzzutils "github.com/openkruise/kruise/test/fuzz"
 )
 
 var fakeScheme = runtime.NewScheme()

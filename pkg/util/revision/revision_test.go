@@ -19,12 +19,13 @@ package revision
 import (
 	"testing"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	"github.com/openkruise/kruise/pkg/features"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 func TestIsPodUpdate(t *testing.T) {

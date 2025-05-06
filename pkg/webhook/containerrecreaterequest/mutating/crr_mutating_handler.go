@@ -140,11 +140,11 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 	if reflect.DeepEqual(obj, copy) {
 		return admission.Allowed("")
 	}
-	marshalled, err := json.Marshal(obj)
+	marshaled, err := json.Marshal(obj)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
+	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
 }
 
 func isTerminatedBySidecarTerminator(pod *v1.Pod) bool {

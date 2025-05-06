@@ -24,14 +24,15 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/util/configuration"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/configuration"
 )
 
 func init() {

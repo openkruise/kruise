@@ -51,11 +51,11 @@ func (h *ImageListPullJobCreateUpdateHandler) Handle(ctx context.Context, req ad
 	if reflect.DeepEqual(obj, copy) {
 		return admission.Allowed("")
 	}
-	marshalled, err := json.Marshal(obj)
+	marshaled, err := json.Marshal(obj)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
+	resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
 	if len(resp.Patches) > 0 {
 		klog.V(5).InfoS("Admit ImageListPullJob patches", "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
 	}

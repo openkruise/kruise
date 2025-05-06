@@ -19,12 +19,13 @@ package podreadiness
 import (
 	"encoding/json"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/util/podadapter"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/podadapter"
 )
 
 func addNotReadyKey(adp podadapter.Adapter, pod *v1.Pod, msg Message, condType v1.PodConditionType) error {

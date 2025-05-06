@@ -21,12 +21,13 @@ import (
 	"testing"
 
 	"github.com/onsi/gomega"
-	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
-	"github.com/openkruise/kruise/pkg/webhook/util/generator"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
+
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
+	"github.com/openkruise/kruise/pkg/webhook/util/generator"
 )
 
 func TestEnsureCert(t *testing.T) {

@@ -24,6 +24,9 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/features"
@@ -32,8 +35,6 @@ import (
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	"github.com/openkruise/kruise/pkg/util/history"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	apps "k8s.io/api/apps/v1"

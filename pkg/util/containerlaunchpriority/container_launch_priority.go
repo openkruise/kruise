@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"strconv"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	v1 "k8s.io/api/core/v1"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 )
 
 const (

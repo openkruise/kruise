@@ -23,8 +23,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/openkruise/kruise/pkg/util/configuration"
 	"k8s.io/utils/ptr"
+
+	"github.com/openkruise/kruise/pkg/util/configuration"
 
 	ctrlUtil "github.com/openkruise/kruise/pkg/controller/util"
 

@@ -24,11 +24,12 @@ import (
 	"regexp"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"

@@ -21,9 +21,6 @@ import (
 	"strings"
 	"time"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	"github.com/openkruise/kruise/pkg/util/podadapter"
-	"github.com/openkruise/kruise/pkg/util/podreadiness"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -31,6 +28,10 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/util/podadapter"
+	"github.com/openkruise/kruise/pkg/util/podreadiness"
 )
 
 const (

@@ -17,12 +17,13 @@ limitations under the License.
 package pubcontrol
 
 import (
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 )
 
 var PubControl pubControl

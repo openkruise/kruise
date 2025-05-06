@@ -24,12 +24,6 @@ import (
 	"testing"
 	"time"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	clonesettest "github.com/openkruise/kruise/pkg/controller/cloneset/test"
-	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/util/expectations"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -45,6 +39,13 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	clonesettest "github.com/openkruise/kruise/pkg/controller/cloneset/test"
+	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 )
 
 var (

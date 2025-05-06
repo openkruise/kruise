@@ -20,16 +20,17 @@ import (
 	"context"
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
-	"github.com/openkruise/kruise/pkg/controller/cloneset/sync"
-	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
-	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
+	"github.com/openkruise/kruise/pkg/controller/cloneset/sync"
+	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 // StatusUpdater is interface for updating CloneSet status.

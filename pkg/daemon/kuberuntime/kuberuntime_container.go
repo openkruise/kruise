@@ -189,7 +189,7 @@ func (m *genericRuntimeManager) KillContainer(pod *v1.Pod, containerID kubeletco
 // kubelet restart.
 // To solve this problem, we've already written necessary information into container labels. Here we
 // just need to retrieve them from container labels and restore the specs.
-// TODO(random-liu): Add a node e2e test to test this behaviour.
+// TODO(random-liu): Add a node e2e test to test this behavior.
 // TODO(random-liu): Change the lifecycle handler to just accept information needed, so that we can
 // just pass the needed function not create the fake object.
 func (m *genericRuntimeManager) restoreSpecsFromContainerLabels(containerID kubeletcontainer.ContainerID) (*v1.Pod, *v1.Container, error) {

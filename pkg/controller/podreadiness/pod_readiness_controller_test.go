@@ -20,14 +20,15 @@ import (
 	"context"
 	"testing"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	utilpodreadiness "github.com/openkruise/kruise/pkg/util/podreadiness"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	utilpodreadiness "github.com/openkruise/kruise/pkg/util/podreadiness"
 )
 
 func TestReconcile(t *testing.T) {

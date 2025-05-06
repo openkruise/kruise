@@ -22,10 +22,11 @@ import (
 	"strconv"
 	"strings"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
 	"k8s.io/apimachinery/pkg/labels"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 func hasPercentSubset(ws *appsv1alpha1.WorkloadSpread) (has bool) {

@@ -20,9 +20,10 @@ import (
 	"context"
 	"log"
 
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 )
 
 func main() {

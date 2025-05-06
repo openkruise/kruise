@@ -22,10 +22,11 @@ import (
 	"testing"
 	"time"
 
-	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
+
+	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 func TestResultManagerSet(t *testing.T) {

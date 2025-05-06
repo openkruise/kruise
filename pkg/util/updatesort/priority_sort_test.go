@@ -19,8 +19,9 @@ package updatesort
 import (
 	"testing"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 )
 
 func TestCompare(t *testing.T) {

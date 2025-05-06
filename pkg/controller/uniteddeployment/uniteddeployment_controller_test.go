@@ -22,8 +22,6 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,6 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
 )
 
 var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}

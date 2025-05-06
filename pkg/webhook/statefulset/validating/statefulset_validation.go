@@ -7,7 +7,6 @@ import (
 	"regexp"
 
 	"github.com/appscode/jsonpatch"
-	apiutil "github.com/openkruise/kruise/pkg/util/api"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -22,6 +21,7 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	apiutil "github.com/openkruise/kruise/pkg/util/api"
 	"github.com/openkruise/kruise/pkg/util/pvc"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"

@@ -21,8 +21,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"k8s.io/apimachinery/pkg/util/rand"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 // SidecarSetHash returns a hash of the SidecarSet.

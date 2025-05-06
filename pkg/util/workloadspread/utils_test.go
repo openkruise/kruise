@@ -4,11 +4,12 @@ import (
 	"reflect"
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 func TestNestedField(t *testing.T) {

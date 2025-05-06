@@ -25,8 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/util/configuration"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -43,6 +41,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/configuration"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
