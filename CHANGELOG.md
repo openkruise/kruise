@@ -1,5 +1,20 @@
 # Change Log
 
+## v1.8.1
+> Change log since v1.8.0
+
+### Bug fixes
+- JobSidecarTerminator support ignore exit code capability via env. ([#1949](https://github.com/openkruise/kruise/pull/1949), [@zmberg](https://github.com/zmberg))
+
+### Performance Improvements
+- Performance optimized PodProbeMarker to reduce many invalid patch operations ([#2007](https://github.com/openkruise/kruise/pull/2007), [@zmberg](https://github.com/zmberg))
+
+## v1.7.4
+> Change log since v1.7.3
+
+### Bug fixes
+- JobSidecarTerminator support ignore exit code capability via env. ([#1949](https://github.com/openkruise/kruise/pull/1949), [@zmberg](https://github.com/zmberg))
+
 ## v1.8.0
 
 > Change log since v1.7.3
