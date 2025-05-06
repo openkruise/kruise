@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
@@ -251,6 +252,9 @@ func validateHTTPGetAction(http *corev1.HTTPGetAction, fldPath *field.Path) fiel
 	allErrors := field.ErrorList{}
 	if len(http.Path) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("path"), ""))
+	}
+	if _, err := url.Parse(http.Path); err != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("path"), http.Path, "must be a valid URL path"))
 	}
 	allErrors = append(allErrors, ValidatePortNumOrName(http.Port, fldPath.Child("port"))...)
 	if !supportedHTTPSchemes.Has(http.Scheme) {

@@ -537,6 +537,21 @@ func TestValidateHTTPGetAction(t *testing.T) {
 			},
 			expectErrs: 4, // missing path, invalid port, unsupported scheme, invalid header
 		},
+		{
+			name: "invalid path",
+			httpGet: &corev1.HTTPGetAction{
+				Path:   "path%notvalid",
+				Port:   intstr.FromInt(8080),
+				Scheme: corev1.URISchemeHTTP,
+				HTTPHeaders: []corev1.HTTPHeader{
+					{
+						Name:  "Valid-Header",
+						Value: "value",
+					},
+				},
+			},
+			expectErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {

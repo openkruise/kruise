@@ -423,7 +423,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 
 			// create statefulset
 			sts := tester.NewBaseStatefulSet(ns, randStr)
-			// For heterogeneous scenario like edge cluster, I want to deploy a Pod for each Node to verify that the functionality worksd
+			// For heterogeneous scenario like edge cluster, I want to deploy a Pod for each Node to verify that the functionality works
 			sts.Spec.Template.Spec.TopologySpreadConstraints = []v1.TopologySpreadConstraint{
 				{
 					LabelSelector:     sts.Spec.Selector,

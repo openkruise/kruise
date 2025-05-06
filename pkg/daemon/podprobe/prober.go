@@ -128,27 +128,24 @@ func newRequestForHTTPGetAction(httpGet *v1.HTTPGetAction, podIP string, userAge
 		return nil, fmt.Errorf("invalid port number: %v", port)
 	}
 	path := httpGet.Path
-	url := formatURL(scheme, host, port, path)
+	url, err := formatURL(scheme, host, port, path)
+	if err != nil {
+		return nil, err
+	}
 	headers := v1HeaderToHTTPHeader(httpGet.HTTPHeaders)
 
 	return newProbeRequest(url, headers, userAgentFragment)
 }
 
 // formatURL formats a URL from args.  For testability.
-func formatURL(scheme string, host string, port int, path string) *url.URL {
+func formatURL(scheme string, host string, port int, path string) (*url.URL, error) {
 	u, err := url.Parse(path)
-	// Something is busted with the path, but it's too late to reject it. Pass it along as is.
-	//
-	// This construction of a URL may be wrong in some cases, but it preserves
-	// legacy prober behavior.
 	if err != nil {
-		u = &url.URL{
-			Path: path,
-		}
+		return nil, err
 	}
 	u.Scheme = scheme
 	u.Host = net.JoinHostPort(host, strconv.Itoa(port))
-	return u
+	return u, nil
 }
 
 func userAgent(purpose string) string {

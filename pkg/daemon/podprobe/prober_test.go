@@ -220,7 +220,7 @@ func TestFormatURL(t *testing.T) {
 		{"http", "localhost", 93, "/path#foo", "http://localhost:93/path#foo"},
 	}
 	for _, test := range testCases {
-		url := formatURL(test.scheme, test.host, test.port, test.path)
+		url, _ := formatURL(test.scheme, test.host, test.port, test.path)
 		if url.String() != test.result {
 			t.Errorf("Expected %s, got %s", test.result, url.String())
 		}
@@ -422,6 +422,18 @@ func TestNewRequestForHTTPGetAction(t *testing.T) {
 			httpGet: &corev1.HTTPGetAction{
 				Port:   intstr.FromInt(65536),
 				Path:   "/health",
+				Host:   "localhost",
+				Scheme: corev1.URISchemeHTTP,
+			},
+			podIP:             "192.168.1.1",
+			userAgentFragment: "test",
+			expectError:       true,
+		},
+		{
+			name: "invalid path",
+			httpGet: &corev1.HTTPGetAction{
+				Port:   intstr.FromInt(8080),
+				Path:   "path%notvalid",
 				Host:   "localhost",
 				Scheme: corev1.URISchemeHTTP,
 			},
