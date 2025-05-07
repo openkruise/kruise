@@ -20,10 +20,11 @@ import (
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	fuzzutils "github.com/openkruise/kruise/test/fuzz"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	fuzzutils "github.com/openkruise/kruise/test/fuzz"
 )
 
 func FuzzMatchFunctions(f *testing.F) {

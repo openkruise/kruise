@@ -17,10 +17,11 @@ limitations under the License.
 package configuration
 
 import (
-	"github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 const (

@@ -17,13 +17,14 @@ limitations under the License.
 package mutating
 
 import (
+	admissionv1 "k8s.io/api/admission/v1"
+	v1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	admissionv1 "k8s.io/api/admission/v1"
-	v1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 func injectPodReadinessGate(req admission.Request, pod *v1.Pod) (skip bool) {

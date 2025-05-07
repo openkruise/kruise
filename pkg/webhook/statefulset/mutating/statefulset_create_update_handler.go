@@ -101,17 +101,17 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req admissi
 	obj.Status = appsv1beta1.StatefulSetStatus{}
 
 	var err error
-	var marshalled []byte
+	var marshaled []byte
 	if objv1alpha1 != nil {
 		if err := objv1alpha1.ConvertFrom(obj); err != nil {
 			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to convert v1beta1->v1alpha1: %v", err))
 		}
-		marshalled, err = json.Marshal(objv1alpha1)
+		marshaled, err = json.Marshal(objv1alpha1)
 		if err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
 	} else {
-		marshalled, err = json.Marshal(obj)
+		marshaled, err = json.Marshal(obj)
 		if err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
@@ -119,7 +119,7 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req admissi
 	if reflect.DeepEqual(obj, copy) {
 		return admission.Allowed("")
 	}
-	resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
+	resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
 	if len(resp.Patches) > 0 {
 		klog.V(5).InfoS("Admit StatefulSet patches", "namespace", obj.Namespace, "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
 	}

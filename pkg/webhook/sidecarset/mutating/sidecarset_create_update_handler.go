@@ -87,11 +87,11 @@ func (h *SidecarSetCreateHandler) Handle(ctx context.Context, req admission.Requ
 	if reflect.DeepEqual(obj, copy) {
 		return admission.Allowed("")
 	}
-	marshalled, err := json.Marshal(obj)
+	marshaled, err := json.Marshal(obj)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshalled)
+	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
 }
 
 //var _ inject.Client = &SidecarSetCreateHandler{}

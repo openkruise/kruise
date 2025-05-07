@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/openkruise/kruise/apis/apps/pub"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/openkruise/kruise/apis/apps/pub"
 )
 
 func TestIsPodUnavailableChanged(t *testing.T) {

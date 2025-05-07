@@ -120,7 +120,7 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 	if !changed {
 		return admission.Allowed("")
 	}
-	marshalled, err := json.Marshal(obj)
+	marshaled, err := json.Marshal(obj)
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
@@ -128,5 +128,5 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	return admission.PatchResponseFromRaw(original, marshalled)
+	return admission.PatchResponseFromRaw(original, marshaled)
 }

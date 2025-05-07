@@ -20,9 +20,10 @@ import (
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	corev1 "k8s.io/api/core/v1"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	fuzzutils "github.com/openkruise/kruise/test/fuzz"
-	corev1 "k8s.io/api/core/v1"
 )
 
 func FuzzNestedField(f *testing.F) {

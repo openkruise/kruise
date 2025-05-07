@@ -19,10 +19,11 @@ package podreadiness
 import (
 	"sort"
 
+	v1 "k8s.io/api/core/v1"
+
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/podadapter"
-	v1 "k8s.io/api/core/v1"
 )
 
 type Interface interface {

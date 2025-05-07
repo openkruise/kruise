@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	credentialprovidersecrets "k8s.io/kubernetes/pkg/credentialprovider/secrets"
+
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 )
 
 func AuthInfos(ctx context.Context, imageName, tag string, pullSecrets []corev1.Secret) []daemonutil.AuthInfo {
