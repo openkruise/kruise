@@ -147,7 +147,7 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 				})
 				return ppm
 			},
-			expectErrList: 1,
+			expectErrList: 0,
 		},
 		{
 			name: "test5, invalid ppm",
@@ -452,5 +452,114 @@ func TestValidateTCPSocketAction(t *testing.T) {
 		if getErrs := validateTCPSocketAction(cs.tcp, cs.fldPath); len(getErrs) == 0 {
 			t.Errorf("expect failure for %#v", util.DumpJSON(cs))
 		}
+	}
+}
+
+func TestValidateHTTPGetAction(t *testing.T) {
+	path := field.NewPath("test")
+	testCases := []struct {
+		name       string
+		httpGet    *corev1.HTTPGetAction
+		expectErrs int
+	}{
+		{
+			name: "valid http get action",
+			httpGet: &corev1.HTTPGetAction{
+				Path:   "/healthz",
+				Port:   intstr.FromInt(8080),
+				Scheme: corev1.URISchemeHTTP,
+			},
+			expectErrs: 0,
+		},
+		{
+			name: "missing path",
+			httpGet: &corev1.HTTPGetAction{
+				Path:   "",
+				Port:   intstr.FromInt(8080),
+				Scheme: corev1.URISchemeHTTP,
+			},
+			expectErrs: 1,
+		},
+		{
+			name: "invalid port number",
+			httpGet: &corev1.HTTPGetAction{
+				Path:   "/healthz",
+				Port:   intstr.FromInt(65536),
+				Scheme: corev1.URISchemeHTTP,
+			},
+			expectErrs: 1,
+		},
+		{
+			name: "invalid port name",
+			httpGet: &corev1.HTTPGetAction{
+				Path:   "/healthz",
+				Port:   intstr.FromString("invalid-port-name-!@#"),
+				Scheme: corev1.URISchemeHTTP,
+			},
+			expectErrs: 2,
+		},
+		{
+			name: "unsupported scheme",
+			httpGet: &corev1.HTTPGetAction{
+				Path:   "/healthz",
+				Port:   intstr.FromInt(8080),
+				Scheme: "FTP",
+			},
+			expectErrs: 1,
+		},
+		{
+			name: "invalid header name",
+			httpGet: &corev1.HTTPGetAction{
+				Path:   "/healthz",
+				Port:   intstr.FromInt(8080),
+				Scheme: corev1.URISchemeHTTPS,
+				HTTPHeaders: []corev1.HTTPHeader{
+					{
+						Name:  "Invalid Header:Name",
+						Value: "value",
+					},
+				},
+			},
+			expectErrs: 1,
+		},
+		{
+			name: "multiple errors",
+			httpGet: &corev1.HTTPGetAction{
+				Path:   "",
+				Port:   intstr.FromInt(99999),
+				Scheme: "FTP",
+				HTTPHeaders: []corev1.HTTPHeader{
+					{
+						Name:  "Invalid:Header",
+						Value: "value",
+					},
+				},
+			},
+			expectErrs: 4, // missing path, invalid port, unsupported scheme, invalid header
+		},
+		{
+			name: "invalid path",
+			httpGet: &corev1.HTTPGetAction{
+				Path:   "path%notvalid",
+				Port:   intstr.FromInt(8080),
+				Scheme: corev1.URISchemeHTTP,
+				HTTPHeaders: []corev1.HTTPHeader{
+					{
+						Name:  "Valid-Header",
+						Value: "value",
+					},
+				},
+			},
+			expectErrs: 1,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateHTTPGetAction(tc.httpGet, path)
+			if len(errs) != tc.expectErrs {
+				t.Errorf("Expected %d errors, got %d: %v", tc.expectErrs, len(errs), errs)
+			}
+		})
 	}
 }

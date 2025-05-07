@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
@@ -215,7 +216,7 @@ func validateHandler(handler *corev1.ProbeHandler, fldPath *field.Path) field.Er
 			allErrors = append(allErrors, field.Forbidden(fldPath.Child("httpGet"), "may not specify more than 1 handler type"))
 		} else {
 			numHandlers++
-			allErrors = append(allErrors, field.Forbidden(fldPath.Child("probe"), "current no support http probe"))
+			allErrors = append(allErrors, validateHTTPGetAction(handler.HTTPGet, fldPath.Child("httpGet"))...)
 		}
 	}
 	if handler.TCPSocket != nil {
@@ -243,6 +244,28 @@ func validateExecAction(exec *corev1.ExecAction, fldPath *field.Path) field.Erro
 
 func validateTCPSocketAction(tcp *corev1.TCPSocketAction, fldPath *field.Path) field.ErrorList {
 	return ValidatePortNumOrName(tcp.Port, fldPath.Child("port"))
+}
+
+var supportedHTTPSchemes = sets.New(corev1.URISchemeHTTP, corev1.URISchemeHTTPS)
+
+func validateHTTPGetAction(http *corev1.HTTPGetAction, fldPath *field.Path) field.ErrorList {
+	allErrors := field.ErrorList{}
+	if len(http.Path) == 0 {
+		allErrors = append(allErrors, field.Required(fldPath.Child("path"), ""))
+	}
+	if _, err := url.Parse(http.Path); err != nil {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("path"), http.Path, "must be a valid URL path"))
+	}
+	allErrors = append(allErrors, ValidatePortNumOrName(http.Port, fldPath.Child("port"))...)
+	if !supportedHTTPSchemes.Has(http.Scheme) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("scheme"), http.Scheme, sets.List(supportedHTTPSchemes)))
+	}
+	for _, header := range http.HTTPHeaders {
+		for _, msg := range validationutil.IsHTTPHeaderName(header.Name) {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("httpHeaders"), header.Name, msg))
+		}
+	}
+	return allErrors
 }
 
 func ValidatePortNumOrName(port intstr.IntOrString, fldPath *field.Path) field.ErrorList {
