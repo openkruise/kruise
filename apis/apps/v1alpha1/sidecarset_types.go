@@ -132,8 +132,13 @@ type SidecarContainer struct {
 	UpgradeStrategy SidecarContainerUpgradeStrategy `json:"upgradeStrategy,omitempty"`
 
 	// If ShareVolumePolicy is enabled, the sidecar container will share the other container's VolumeMounts
-	// in the pod(don't contains the injected sidecar container).
+	// in the pod(not including the injected sidecar container).
 	ShareVolumePolicy ShareVolumePolicy `json:"shareVolumePolicy,omitempty"`
+
+	// If ShareVolumeDevicePolicy is enabled, the sidecar container will share the other container's VolumeDevices
+	// in the pod(don't contain the injected sidecar container).
+	// This is a pointer to ensure that the sidecarset-hash does not change if the user does not configure this field, mainly for compatibility with older versions.
+	ShareVolumeDevicePolicy *ShareVolumePolicy `json:"shareVolumeDevicePolicy,omitempty"`
 
 	// TransferEnv will transfer env info from other container
 	// SourceContainerName is pod.spec.container[x].name; EnvName is pod.spec.container[x].Env.name

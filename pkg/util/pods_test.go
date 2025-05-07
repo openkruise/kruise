@@ -21,36 +21,138 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestMergeVolumeMounts(t *testing.T) {
-	original := []v1.VolumeMount{
+	tests := []struct {
+		name            string
+		getContainer    func() v1.Container
+		getVolumeMounts func() []v1.VolumeMount
+		expect          []v1.VolumeMount
+	}{
 		{
-			MountPath: "/origin-1",
-		},
-		{
-			MountPath: "/share",
+			name: "test1",
+			getContainer: func() v1.Container {
+				obj := v1.Container{
+					VolumeMounts: []v1.VolumeMount{
+						{
+							MountPath: "/origin-1",
+						},
+						{
+							Name:      "origin-share",
+							MountPath: "/share",
+						},
+					},
+					VolumeDevices: []v1.VolumeDevice{
+						{
+							DevicePath: "/device-1",
+						},
+					},
+				}
+				return obj
+			},
+			getVolumeMounts: func() []v1.VolumeMount {
+				return []v1.VolumeMount{
+					{
+						MountPath: "/addition-1",
+					},
+					{
+						Name:      "addition-share",
+						MountPath: "/share",
+					},
+					{
+						MountPath: "/device-1",
+					},
+				}
+			},
+			expect: []v1.VolumeMount{
+				{
+					MountPath: "/origin-1",
+				},
+				{
+					Name:      "origin-share",
+					MountPath: "/share",
+				},
+				{
+					MountPath: "/addition-1",
+				},
+			},
 		},
 	}
-	additional := []v1.VolumeMount{
+	for i, test := range tests {
+		obj := MergeVolumeMounts(test.getContainer(), test.getVolumeMounts())
+		if !reflect.DeepEqual(obj, test.expect) {
+			t.Fatalf("case %d: expect(%v), but get(%v)", i, test.expect, obj)
+		}
+	}
+}
+
+func TestMergeVolumeDevices(t *testing.T) {
+	tests := []struct {
+		name             string
+		getContainer     func() v1.Container
+		getVolumeDevices func() []v1.VolumeDevice
+		expect           []v1.VolumeDevice
+	}{
 		{
-			MountPath: "/addition-1",
-		},
-		{
-			MountPath: "/share",
+			name: "inject test1",
+			getContainer: func() v1.Container {
+				obj := v1.Container{
+					VolumeMounts: []v1.VolumeMount{
+						{
+							MountPath: "/log",
+						},
+					},
+					VolumeDevices: []v1.VolumeDevice{
+						{
+							DevicePath: "/origin-1",
+						},
+						{
+							Name:       "origin-pvc",
+							DevicePath: "/share",
+						},
+					},
+				}
+				return obj
+			},
+			getVolumeDevices: func() []v1.VolumeDevice {
+				additional := []v1.VolumeDevice{
+					{
+						DevicePath: "/addition-1",
+					},
+					{
+						Name:       "target-pvc",
+						DevicePath: "/share",
+					},
+					{
+						DevicePath: "/log",
+					},
+				}
+				return additional
+			},
+			expect: []v1.VolumeDevice{
+				{
+					DevicePath: "/origin-1",
+				},
+				{
+					Name:       "origin-pvc",
+					DevicePath: "/share",
+				},
+				{
+					DevicePath: "/addition-1",
+				},
+			},
 		},
 	}
 
-	volumeMounts := MergeVolumeMounts(original, additional)
-	excepts := []string{"/origin-1", "/share", "/addition-1"}
-	for i, except := range excepts {
-		if volumeMounts[i].MountPath != except {
-			t.Fatalf("except VolumeMount(%s), but get %s", except, volumeMounts[i].MountPath)
+	for i, test := range tests {
+		obj := MergeVolumeDevices(test.getContainer(), test.getVolumeDevices())
+		if !reflect.DeepEqual(obj, test.expect) {
+			t.Fatalf("case %d: expect(%v), but get(%v)", i, test.expect, obj)
 		}
 	}
 }

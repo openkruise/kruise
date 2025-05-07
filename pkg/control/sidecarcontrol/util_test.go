@@ -1265,3 +1265,130 @@ func TestPodMatchedSidecarSet(t *testing.T) {
 		})
 	}
 }
+
+func TestGetInjectedVolumeDevices(t *testing.T) {
+	cases := []struct {
+		name                string
+		getSidecarContainer func() *appsv1alpha1.SidecarContainer
+		getPod              func() *corev1.Pod
+		expect              []corev1.VolumeDevice
+	}{
+		{
+			name: "ShareVolumeDevicePolicy, disable",
+			getSidecarContainer: func() *appsv1alpha1.SidecarContainer {
+				obj := &appsv1alpha1.SidecarContainer{}
+				return obj
+			},
+			getPod: func() *corev1.Pod {
+				obj := &corev1.Pod{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								VolumeDevices: []corev1.VolumeDevice{
+									{
+										Name:       "vd-1",
+										DevicePath: "/data/volume-1",
+									},
+								},
+							},
+							{
+								VolumeDevices: []corev1.VolumeDevice{
+									{
+										Name:       "vd-2",
+										DevicePath: "/data/volume-2",
+									},
+								},
+							},
+							{
+								VolumeDevices: []corev1.VolumeDevice{
+									{
+										Name:       "vd-3",
+										DevicePath: "/data/volume-3",
+									},
+								},
+								Env: []corev1.EnvVar{
+									{
+										Name:  SidecarEnvKey,
+										Value: "true",
+									},
+								},
+							},
+						},
+					},
+				}
+
+				return obj
+			},
+		},
+		{
+			name: "ShareVolumeDevicePolicy, disable",
+			getSidecarContainer: func() *appsv1alpha1.SidecarContainer {
+				obj := &appsv1alpha1.SidecarContainer{
+					ShareVolumeDevicePolicy: &appsv1alpha1.ShareVolumePolicy{
+						Type: appsv1alpha1.ShareVolumePolicyEnabled,
+					},
+				}
+				return obj
+			},
+			getPod: func() *corev1.Pod {
+				obj := &corev1.Pod{
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								VolumeDevices: []corev1.VolumeDevice{
+									{
+										Name:       "vd-1",
+										DevicePath: "/data/volume-1",
+									},
+								},
+							},
+							{
+								VolumeDevices: []corev1.VolumeDevice{
+									{
+										Name:       "vd-2",
+										DevicePath: "/data/volume-2",
+									},
+								},
+							},
+							{
+								VolumeDevices: []corev1.VolumeDevice{
+									{
+										Name:       "vd-3",
+										DevicePath: "/data/volume-3",
+									},
+								},
+								Env: []corev1.EnvVar{
+									{
+										Name:  SidecarEnvKey,
+										Value: "true",
+									},
+								},
+							},
+						},
+					},
+				}
+
+				return obj
+			},
+			expect: []corev1.VolumeDevice{
+				{
+					Name:       "vd-1",
+					DevicePath: "/data/volume-1",
+				},
+				{
+					Name:       "vd-2",
+					DevicePath: "/data/volume-2",
+				},
+			},
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			vd := GetInjectedVolumeDevices(cs.getSidecarContainer(), cs.getPod())
+			if !reflect.DeepEqual(vd, cs.expect) {
+				t.Fatalf("expect(%v), but get(%v)", cs.expect, vd)
+			}
+		})
+	}
+}

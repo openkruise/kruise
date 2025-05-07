@@ -2711,6 +2711,11 @@ func (in *SidecarContainer) DeepCopyInto(out *SidecarContainer) {
 	in.Container.DeepCopyInto(&out.Container)
 	out.UpgradeStrategy = in.UpgradeStrategy
 	out.ShareVolumePolicy = in.ShareVolumePolicy
+	if in.ShareVolumeDevicePolicy != nil {
+		in, out := &in.ShareVolumeDevicePolicy, &out.ShareVolumeDevicePolicy
+		*out = new(ShareVolumePolicy)
+		**out = **in
+	}
 	if in.TransferEnv != nil {
 		in, out := &in.TransferEnv, &out.TransferEnv
 		*out = make([]TransferEnvVar, len(*in))

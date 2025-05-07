@@ -380,6 +380,152 @@ func TestValidateSidecarSet(t *testing.T) {
 			expectErrs: 1,
 		},
 		{
+			caseName: "wrong-volumeDevice-volumes",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					},
+					Containers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+								VolumeDevices: []corev1.VolumeDevice{
+									{
+										Name:       "disk0",
+										DevicePath: "/dev/nvme1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErrs: 1,
+		},
+		{
+			caseName: "right-volumeDevice-volumes",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					},
+					Containers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+								VolumeDevices: []corev1.VolumeDevice{
+									{
+										Name:       "disk0",
+										DevicePath: "/dev/nvme1",
+									},
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "disk0",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "pvc-0",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErrs: 0,
+		},
+		{
+			caseName: "volumeDevice-volumeMount-path-conflict",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"a": "b"},
+					},
+					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					},
+					Containers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+								VolumeDevices: []corev1.VolumeDevice{
+									{
+										Name:       "disk0",
+										DevicePath: "/home/admin/log",
+									},
+								},
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "log",
+										MountPath: "/home/admin/log",
+									},
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "disk0",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "pvc-0",
+								},
+							},
+						},
+						{
+							Name: "log",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+				},
+			},
+			expectErrs: 2,
+		},
+		{
 			caseName: "wrong-metadata",
 			sidecarSet: appsv1alpha1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
