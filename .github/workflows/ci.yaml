@@ -134,3 +134,35 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unittests
           file: cover.out
+  # See: https://google.github.io/oss-fuzz/getting-started/continuous-integration/
+  Fuzzing:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - name: Build Fuzzers
+        id: build
+        uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@abe2c06d0e162320403dd10e8268adbb0b8923f8 # master
+        with:
+          oss-fuzz-project-name: 'openkruise'
+          language: go
+      - name: Run Fuzzers
+        uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@abe2c06d0e162320403dd10e8268adbb0b8923f8 # master
+        with:
+          oss-fuzz-project-name: 'openkruise'
+          language: go
+          fuzz-seconds: 1200
+          output-sarif: true
+      - name: Upload Crash
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        if: failure() && steps.build.outcome == 'success'
+        with:
+          name: artifacts
+          path: ./out/artifacts
+      - name: Upload Sarif
+        if: always() && steps.build.outcome == 'success'
+        uses: github/codeql-action/upload-sarif@45775bd8235c68ba998cffa5171334d58593da47 # v3.28.15
+        with:
+          # Path to SARIF file relative to the root of the repository
+          sarif_file: cifuzz-sarif/results.sarif
+          checkout_path: cifuzz-sarif
