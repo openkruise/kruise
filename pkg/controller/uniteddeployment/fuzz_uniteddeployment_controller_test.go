@@ -47,7 +47,7 @@ func FuzzParseSubsetReplicas(f *testing.F) {
 		}
 		udReplicas := int32(udReplicasInt)
 
-		subsetReplicas, err := fuzzutils.GenerateSubsetReplicas(cf)
+		subsetReplicas, err := fuzzutils.GenerateIntOrString(cf)
 		if err != nil {
 			return
 		}
