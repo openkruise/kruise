@@ -52,6 +52,7 @@ Then you could finish the preparation in the following steps:
 3. **Set remote** upstream to be `https://github.com/openkruise/<project>.git` using the following two commands:
 
 ```bash
+cd <project>
 git remote add upstream https://github.com/openkruise/<project>.git
 git remote set-url --push upstream no-pushing
 ```
