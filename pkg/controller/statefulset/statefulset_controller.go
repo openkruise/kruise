@@ -136,7 +136,10 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	statefulSetLister := kruiseappslisters.NewStatefulSetLister(statefulSetInformer.(toolscache.SharedIndexInformer).GetIndexer())
 	podLister := corelisters.NewPodLister(podInformer.(toolscache.SharedIndexInformer).GetIndexer())
 	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcInformer.(toolscache.SharedIndexInformer).GetIndexer())
-	scLister := storagelisters.NewStorageClassLister(scInformer.(toolscache.SharedIndexInformer).GetIndexer())
+	var scLister storagelisters.StorageClassLister
+	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoResizePVCGate) {
+		scLister = storagelisters.NewStorageClassLister(scInformer.(toolscache.SharedIndexInformer).GetIndexer())
+	}
 
 	genericClient := client.GetGenericClientWithName("statefulset-controller")
 	eventBroadcaster := record.NewBroadcaster()
