@@ -17,9 +17,14 @@ limitations under the License.
 package validating
 
 import (
+	"encoding/json"
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/configuration"
+	fuzzutils "github.com/openkruise/kruise/test/fuzz"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -28,9 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	fuzzutils "github.com/openkruise/kruise/test/fuzz"
 )
 
 var (
@@ -64,15 +66,13 @@ func FuzzValidateWorkloadSpreadSpec(f *testing.F) {
 			return
 		}
 
-		whiteList, err := cf.GetString()
-		if err != nil {
+		whiteList := &configuration.WSCustomWorkloadWhiteList{}
+		if err := fuzzutils.GenerateWorkloadSpreadWhiteList(cf, whiteList); err != nil {
 			return
 		}
-		if validWhiteList, err := cf.GetBool(); err == nil && validWhiteList {
-			whiteList = "{\"workloads\":[{\"Group\":\"test\",\"Kind\":\"TFJob\"}]}"
-			if matched, err := cf.GetBool(); err == nil && matched {
-				whiteList = "{\"workloads\":[{\"Group\":\"training.kubedl.io\",\"Kind\":\"TFJob\"}]}"
-			}
+		whiteListJson, err := json.Marshal(whiteList)
+		if err != nil {
+			return
 		}
 
 		fakeClient := fake.NewClientBuilder().
@@ -82,8 +82,8 @@ func FuzzValidateWorkloadSpreadSpec(f *testing.F) {
 				&appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{Name: "valid-target", Namespace: "default"}},
 				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "valid-target", Namespace: "default"}},
 				&appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Name: "valid-target", Namespace: "default"}},
-				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "kruise-configuration", Namespace: "kruise-system"},
-					Data: map[string]string{"WorkloadSpread_Watch_Custom_Workload_WhiteList": whiteList}},
+				&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: configuration.KruiseConfigurationName, Namespace: util.GetKruiseNamespace()},
+					Data: map[string]string{configuration.WSWatchCustomWorkloadWhiteList: string(whiteListJson)}},
 			).Build()
 
 		h := &WorkloadSpreadCreateUpdateHandler{Client: fakeClient}

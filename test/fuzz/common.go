@@ -19,6 +19,11 @@ package fuzz
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"sort"
+	"strings"
+	"time"
+
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -26,12 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"math/rand"
-	"sort"
-	"strings"
 )
 
-func GenerateSubsetReplicas(cf *fuzz.ConsumeFuzzer) (intstr.IntOrString, error) {
+var (
+	r = rand.New(rand.NewSource(time.Now().UnixNano()))
+)
+
+func GenerateIntOrString(cf *fuzz.ConsumeFuzzer) (intstr.IntOrString, error) {
 	isInt, err := cf.GetBool()
 	if err != nil {
 		return intstr.IntOrString{}, err
@@ -79,10 +85,10 @@ func GenerateNodeSelectorTerm(cf *fuzz.ConsumeFuzzer, term *corev1.NodeSelectorT
 	}
 
 	if len(term.MatchExpressions) == 0 {
-		term.MatchExpressions = make([]corev1.NodeSelectorRequirement, rand.Intn(2)+1)
+		term.MatchExpressions = make([]corev1.NodeSelectorRequirement, r.Intn(2)+1)
 	}
 	if len(term.MatchFields) == 0 {
-		term.MatchFields = make([]corev1.NodeSelectorRequirement, rand.Intn(2)+1)
+		term.MatchFields = make([]corev1.NodeSelectorRequirement, r.Intn(2)+1)
 	}
 	validOperators := []corev1.NodeSelectorOperator{
 		corev1.NodeSelectorOpIn,
@@ -103,7 +109,7 @@ func GenerateNodeSelectorTerm(cf *fuzz.ConsumeFuzzer, term *corev1.NodeSelectorT
 			req.Operator = validOperators[choice%len(validOperators)]
 			if req.Operator == corev1.NodeSelectorOpIn || req.Operator == corev1.NodeSelectorOpNotIn {
 				if len(req.Values) == 0 {
-					req.Values = make([]string, rand.Intn(2)+1)
+					req.Values = make([]string, r.Intn(2)+1)
 				}
 				for i := range req.Values {
 					req.Values[i] = GenerateValidValue()
@@ -143,10 +149,10 @@ func GenerateLabelSelector(cf *fuzz.ConsumeFuzzer, selector *metav1.LabelSelecto
 	}
 
 	if len(selector.MatchExpressions) == 0 {
-		selector.MatchExpressions = make([]metav1.LabelSelectorRequirement, rand.Intn(2)+1)
+		selector.MatchExpressions = make([]metav1.LabelSelectorRequirement, r.Intn(2)+1)
 	}
 	if len(selector.MatchLabels) == 0 {
-		selector.MatchLabels = make(map[string]string, rand.Intn(2)+1)
+		selector.MatchLabels = make(map[string]string, r.Intn(2)+1)
 	}
 
 	if selector.MatchLabels != nil {
@@ -175,7 +181,7 @@ func GenerateLabelSelector(cf *fuzz.ConsumeFuzzer, selector *metav1.LabelSelecto
 			req.Operator = validOperators[choice%len(validOperators)]
 			if req.Operator == metav1.LabelSelectorOpIn || req.Operator == metav1.LabelSelectorOpNotIn {
 				if len(req.Values) == 0 {
-					req.Values = make([]string, rand.Intn(2)+1)
+					req.Values = make([]string, r.Intn(2)+1)
 				}
 				for i := range req.Values {
 					req.Values[i] = GenerateValidValue()
@@ -247,12 +253,12 @@ func GeneratePatch(cf *fuzz.ConsumeFuzzer, rawExtension *runtime.RawExtension) e
 	switch choice % 2 {
 	case 0: // patch metadata labels and annotations
 		fuzzedLabels := make(map[string]string)
-		for i := 0; i < rand.Intn(2)+1; i++ {
+		for i := 0; i < r.Intn(2)+1; i++ {
 			fuzzedLabels[GenerateValidKey()] = GenerateValidValue()
 		}
 
 		fuzzedAnnotations := make(map[string]string)
-		for i := 0; i < rand.Intn(2)+1; i++ {
+		for i := 0; i < r.Intn(2)+1; i++ {
 			fuzzedAnnotations[GenerateValidKey()] = GenerateValidValue()
 		}
 
@@ -370,7 +376,7 @@ func GenerateInvalidNamespaceName() string {
 	validName := GenerateValidNamespaceName()
 	runes := []rune(validName)
 	// Make sure the first character is illegal
-	runes[0] = invalidChars[rand.Intn(len(invalidChars))]
+	runes[0] = invalidChars[r.Intn(len(invalidChars))]
 	return string(runes)
 }
 
@@ -389,8 +395,8 @@ func randomLabelKey() string {
 	namePart := randomLabelPart(false)
 	prefixPart := ""
 
-	if rand.Intn(10) < 5 {
-		prefixPartsLen := rand.Intn(2) + 1
+	if r.Intn(10) < 5 {
+		prefixPartsLen := r.Intn(2) + 1
 		prefixParts := make([]string, prefixPartsLen)
 		for i := range prefixParts {
 			prefixParts[i] = randomRFC1123()
@@ -406,9 +412,9 @@ func randomLabelPart(canBeEmpty bool) string {
 	validMiddle := []charRange{{'0', '9'}, {'a', 'z'}, {'A', 'Z'},
 		{'.', '.'}, {'-', '-'}, {'_', '_'}}
 
-	partLen := rand.Intn(64) // len is [0, 63]
+	partLen := r.Intn(64) // len is [0, 63]
 	if !canBeEmpty {
-		partLen = rand.Intn(63) + 1 // len is [1, 63]
+		partLen = r.Intn(63) + 1 // len is [1, 63]
 	}
 
 	runes := make([]rune, partLen)
@@ -416,11 +422,11 @@ func randomLabelPart(canBeEmpty bool) string {
 		return string(runes)
 	}
 
-	runes[0] = validStartEnd[rand.Intn(len(validStartEnd))].choose()
+	runes[0] = validStartEnd[r.Intn(len(validStartEnd))].choose()
 	for i := range runes[1:] {
-		runes[i+1] = validMiddle[rand.Intn(len(validMiddle))].choose()
+		runes[i+1] = validMiddle[r.Intn(len(validMiddle))].choose()
 	}
-	runes[len(runes)-1] = validStartEnd[rand.Intn(len(validStartEnd))].choose()
+	runes[len(runes)-1] = validStartEnd[r.Intn(len(validStartEnd))].choose()
 
 	return string(runes)
 }
@@ -429,14 +435,14 @@ func randomRFC1123() string {
 	validStartEnd := []charRange{{'0', '9'}, {'a', 'z'}}
 	validMiddle := []charRange{{'0', '9'}, {'a', 'z'}, {'-', '-'}}
 
-	partLen := rand.Intn(63) + 1 // len is [1, 63]
+	partLen := r.Intn(63) + 1 // len is [1, 63]
 	runes := make([]rune, partLen)
 
-	runes[0] = validStartEnd[rand.Intn(len(validStartEnd))].choose()
+	runes[0] = validStartEnd[r.Intn(len(validStartEnd))].choose()
 	for i := range runes[1:] {
-		runes[i+1] = validMiddle[rand.Intn(len(validMiddle))].choose()
+		runes[i+1] = validMiddle[r.Intn(len(validMiddle))].choose()
 	}
-	runes[len(runes)-1] = validStartEnd[rand.Intn(len(validStartEnd))].choose()
+	runes[len(runes)-1] = validStartEnd[r.Intn(len(validStartEnd))].choose()
 
 	return string(runes)
 }
