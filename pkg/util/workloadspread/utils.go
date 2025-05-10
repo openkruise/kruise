@@ -60,13 +60,23 @@ func NestedField[T any](obj any, paths ...string) (T, bool, error) {
 }
 
 func nestedSlice[T any](obj []any, paths ...string) (T, bool, error) {
+	if len(paths) == 0 {
+		val, ok := any(obj).(T)
+		if !ok {
+			return *new(T), false, errors.New("type conversion error")
+		}
+		return val, true, nil
+	}
+
 	idx, err := strconv.Atoi(paths[0])
 	if err != nil {
-		return *new(T), false, err
+		return *new(T), false, fmt.Errorf("invalid index: %v", err)
 	}
-	if idx < 0 || len(obj) <= idx {
-		return *new(T), false, fmt.Errorf("index %d out of range", idx)
+
+	if idx < 0 || idx >= len(obj) {
+		return *new(T), false, fmt.Errorf("index %d out of range with length %d", idx, len(obj))
 	}
+
 	return NestedField[T](obj[idx], paths[1:]...)
 }
 
