@@ -90,7 +90,7 @@ func (h *Healthz) Unregister(name string) {
 	delete(h.checks, name)
 }
 
-// SetInfo set the information when /heathz returns
+// SetInfo set the information when /healthz returns
 func (h *Healthz) SetInfo(info string) {
 	h.info = info
 }

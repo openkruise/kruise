@@ -32,7 +32,7 @@ It consists of several controllers which extend and complement the [Kubernetes c
 
 - **Sidecar container Management**
 
-  Kruise simplify sidecar injection and enable sidecar in-place update. Kruise also enhance the sidecar startup and termination control.
+  Kruise simplifies sidecar injection and enables sidecar in-place update. Kruise also enhances the sidecar startup and termination control.
 
   - [**SidecarSet** for defining and upgrading your own sidecars](https://openkruise.io/docs/user-manuals/sidecarset)
   - [**Container Launch Priority** to control the container startup orders](https://openkruise.io/docs/user-manuals/containerlaunchpriority)

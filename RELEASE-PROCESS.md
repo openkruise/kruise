@@ -15,7 +15,7 @@ Look at [the last release](https://github.com/openkruise/kruise/releases/latest)
 
 Add a new section in [CHANGELOG.md](./CHANGELOG.md) for the new version that is being released along with the new features, patches and deprecations it introduces.
 
-It should not include every single change but solely what matters to our customers, for example issue template that has changed is not important.
+It should not include every single change but solely what matters to our customers, for example, an issue template that has changed is not important.
 
 ## 2. Publish documentation for new version
 
