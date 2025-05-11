@@ -82,8 +82,8 @@ build-win-daemon: ## Build Windows daemon binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
-docker-build: ## Build docker image with the manager.
-	docker build --pull --no-cache . -t ${IMG}
+docker-build: test
+	docker build . -t ${IMG}
 
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
