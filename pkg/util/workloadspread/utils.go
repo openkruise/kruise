@@ -60,17 +60,41 @@ func NestedField[T any](obj any, paths ...string) (T, bool, error) {
 }
 
 func nestedSlice[T any](obj []any, paths ...string) (T, bool, error) {
+	if len(paths) == 0 {
+		// Return the entire slice if it can be cast to T
+		val, ok := any(obj).(T)
+		if !ok {
+			return *new(T), false, fmt.Errorf("type assertion to %T failed", *new(T))
+		}
+		return val, true, nil
+	}
 	idx, err := strconv.Atoi(paths[0])
 	if err != nil {
-		return *new(T), false, err
+		return *new(T), false, fmt.Errorf("invalid index '%s': %w", paths[0], err)
 	}
-	if idx < 0 || len(obj) <= idx {
+	if idx < 0 || idx >= len(obj) {
 		return *new(T), false, fmt.Errorf("index %d out of range", idx)
 	}
-	return NestedField[T](obj[idx], paths[1:]...)
+	val := obj[idx]
+	if len(paths) > 1 {
+		return NestedField[T](val, paths[1:]...)
+	}
+	typedVal, ok := val.(T)
+	if !ok {
+		return *new(T), false, fmt.Errorf("type assertion to %T failed", typedVal)
+	}
+	return typedVal, true, nil
 }
 
 func nestedMap[T any](obj map[string]any, paths ...string) (T, bool, error) {
+	if len(paths) == 0 {
+		// Return the entire map if it can be cast to T
+		val, ok := any(obj).(T)
+		if !ok {
+			return *new(T), false, fmt.Errorf("type assertion to %T failed", *new(T))
+		}
+		return val, true, nil
+	}
 	if val, ok := obj[paths[0]]; ok {
 		return NestedField[T](val, paths[1:]...)
 	} else {
