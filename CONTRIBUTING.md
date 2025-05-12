@@ -1,6 +1,6 @@
 # Contributing to Openkruise
 
-Welcome to Openkruise! Openkruise consists several repositories under the organization.
+Welcome to Openkruise! Openkruise consists of several repositories under the organization.
 We encourage you to help out by reporting issues, improving documentation, fixing bugs, or adding new features.
 Please also take a look at our code of conduct, which details how contributors are expected to conduct themselves as part of the Openkruise community.
 
@@ -10,7 +10,7 @@ To be honest, we regard every user of Openkruise as a very kind contributor.
 After experiencing Openkruise, you may have some feedback for the project.
 Then feel free to open an issue.
 
-There are lot of cases when you could open an issue:
+There are a lot of cases when you could open an issue:
 
 - bug report
 - feature request
@@ -20,11 +20,11 @@ There are lot of cases when you could open an issue:
 - help wanted
 - doc incomplete
 - test improvement
-- any questions on project
+- any questions on the project
 - and so on
 
-Also we must remind that when filing a new issue, please remember to remove the sensitive data from your post.
-Sensitive data could be password, secret key, network locations, private business data and so on.
+Also, we must remind you that when filing a new issue, please remember to remove the sensitive data from your post.
+Sensitive data could be passwords, secret keys, network locations, private business data, and so on.
 
 ## Code and doc contribution
 
@@ -45,10 +45,10 @@ On GitHub, every improvement for Openkruise could be via a PR (short for pull re
 ### Workspace Preparation
 
 To put forward a PR, we assume you have registered a GitHub ID.
-Then you could finish the preparation in the following steps:
+Then you can finish the preparation in the following steps:
 
-1. **Fork** Fork the repository you wish to work on. You just need to click the button Fork in right-left of project repository main page. Then you will end up with your repository in your GitHub username.
-2. **Clone** your own repository to develop locally. Use `git clone https://github.com/<your-username>/<project>.git` to clone repository to your local machine. Then you can create new branches to finish the change you wish to make.
+1. **Fork** Fork the repository you wish to work on. You just need to click the button Fork in the right-left of the project repository main page. Then you will end up with your repository in your GitHub username.
+2. **Clone** your own repository to develop locally. Use `git clone https://github.com/<your-username>/<project>.git` to clone the repository to your local machine. Then you can create new branches to finish the change you wish to make.
 3. **Set remote** upstream to be `https://github.com/openkruise/<project>.git` using the following two commands:
 
 ```bash
@@ -61,7 +61,7 @@ Adding this, we can easily synchronize local branches with upstream branches.
 
 4. **Create a branch** to add a new feature or fix issues
 
-Update local working directory:
+Update the local working directory:
 
 ```bash
 cd <project>
@@ -80,14 +80,14 @@ Make any change on the new-branch then build and test your codes.
 
 ### PR Description
 
-PR is the only way to make change to Kruise project files.
-To help reviewers better get your purpose, PR description could not be too detailed.
+PR is the only way to make changes to Kruise project files.
+To help reviewers better understand your purpose, PR description could not be too detailed.
 We encourage contributors to follow the [PR template](./.github/PULL_REQUEST_TEMPLATE.md) to finish the pull request.
 
 ### Developing Environment
 
-As a contributor, if you want to make any contribution to Kruise project, we should reach an agreement on the version of tools used in the development environment.
-Here are some dependents with specific version:
+As a contributor, if you want to make any contribution to the Kruise project, we should reach an agreement on the version of tools used in the development environment.
+Here are some dependencies with specific versions:
 
 - Golang : v1.18+
 - Kubernetes: v1.16+
@@ -107,14 +107,14 @@ make build
 make test
 ```
 
-**There are some guide documents for contributors in [./docs/contributing/](./docs/contributing), such as debug guide to help you test your own branch in a Kubernetes cluster.**
+**There are some guide documents for contributors in [./docs/contributing/](./docs/contributing), such as a debug guide to help you test your own branch in a Kubernetes cluster.**
 
 ### Proposals
 
-If you are going to contribute a feature with new API or needs significant effort, please submit a proposal in [./docs/proposals/](./docs/proposals) first.
+If you are going to contribute a feature with a new API or need significant effort, please submit a proposal in [./docs/proposals/](./docs/proposals) first.
 
 ### Kruise Helm Charts
-[kruise charts](https://github.com/openkruise/charts) is openKruise charts repo, include kruise, kruise rollout, kruise game.
+[kruise charts](https://github.com/openkruise/charts) is the openKruise charts repo, including kruise, kruise rollout, and kruise game.
 You can add the corresponding charts package in the versions directory as follows:
 ```
  versions
@@ -134,13 +134,13 @@ You can add the corresponding charts package in the versions directory as follow
 
 We choose GitHub as the primary place for Openkruise to collaborate.
 So the latest updates of Openkruise are always here.
-Although contributions via PR is an explicit way to help, we still call for any other ways.
+Although contributions via PR are an explicit way to help, we still call for any other ways.
 
 - reply to other's issues if you could;
 - help solve other user's problems;
 - help review other's PR design;
 - help review other's codes in PR;
-- discuss about Openkruise to make things clearer;
+- discuss Openkruise to make things clearer;
 - advocate Openkruise technology beyond GitHub;
 - write blogs on Openkruise and so on.
 
@@ -148,5 +148,5 @@ In a word, **ANY HELP IS CONTRIBUTION**.
 
 ## Join Openkruise as a member
 
-It is also welcomed to join Openkruise team if you are willing to participate in Openkruise community continuously and keep active.
+It is also welcomed to join the Openkruise team if you are willing to participate in the Openkruise community continuously and keep active.
 Please read and follow the [Community Membership](https://github.com/openkruise/community/blob/master/community-membership.md).

@@ -5,11 +5,11 @@ like StatefulSet, Deployment, DaemonSet for instances. While at the same time, m
 express more and more diverse requirements for workload upgrade and deployment, which
 in many cases, cannot be satisfied by the default workload controllers.
 
-Kruise attempts to fill such gap by offering a set of controllers as the supplement
+Kruise attempts to fill such a gap by offering a set of controllers as the supplement
 to manage new workloads in Kubernetes. The target use cases are representative,
 originally collected from the users of Alibaba cloud container services and the
 developers of the in-house large scale on-line/off-line container applications.
-Most of the use cases can be easily applied to other similar cloud user scenarios.
+Most of the use cases can be easily applied to other similar scenarios for cloud users.
 
 Currently, Kruise supports the following workloads.
 
