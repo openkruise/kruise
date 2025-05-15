@@ -473,6 +473,11 @@ func (in *CloneSetSpec) DeepCopyInto(out *CloneSetSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.ProgressDeadlineSeconds != nil {
+		in, out := &in.ProgressDeadlineSeconds, &out.ProgressDeadlineSeconds
+		*out = new(int32)
+		**out = **in
+	}
 	if in.Lifecycle != nil {
 		in, out := &in.Lifecycle, &out.Lifecycle
 		*out = new(pub.Lifecycle)
