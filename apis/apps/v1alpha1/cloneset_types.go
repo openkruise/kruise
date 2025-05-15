@@ -37,6 +37,15 @@ const (
 	CloneSetScalingExcludePreparingDeleteKey = "apps.kruise.io/cloneset-scaling-exclude-preparing-delete"
 )
 
+// CloneSet condition reasons
+type CloneSetConditionReason string
+
+// CloneSet condition reasons
+const (
+	// CloneSetProgressDeadlineExceeded indicates the CloneSet progress exceeded the deadline
+	CloneSetProgressDeadlineExceeded CloneSetConditionReason = "ProgressDeadlineExceeded"
+)
+
 // CloneSetSpec defines the desired state of CloneSet
 type CloneSetSpec struct {
 	// Replicas is the desired number of replicas of the given Template.
@@ -79,6 +88,15 @@ type CloneSetSpec struct {
 	// without any of its container crashing, for it to be considered available.
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
+
+	// ProgressDeadlineSeconds specifies the maximum time in seconds for a CloneSet to
+	// make progress before it is considered to be failed. Kruise will continue to
+	// process failed CloneSet and a condition with a ProgressDeadlineExceeded reason will be
+	// surfaced in the CloneSet status. Note that progress will not be estimated during the
+	// time a CloneSet is paused or when CloneSet reaches the desired replicas.
+	// Defaults to 600s.
+	// +optional
+	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty"`
 
 	// Lifecycle defines the lifecycle hooks for Pods pre-available(pre-normal), pre-delete, in-place update.
 	Lifecycle *appspub.Lifecycle `json:"lifecycle,omitempty"`
@@ -213,6 +231,9 @@ const (
 	CloneSetConditionFailedScale CloneSetConditionType = "FailedScale"
 	// CloneSetConditionFailedUpdate indicates cloneset controller failed to update pods.
 	CloneSetConditionFailedUpdate CloneSetConditionType = "FailedUpdate"
+
+	// CloneSetConditionTypeProgressing indicates the status of CloneSet progress
+	CloneSetConditionTypeProgressing CloneSetConditionType = "Progressing"
 )
 
 // CloneSetCondition describes the state of a CloneSet at a certain point.
