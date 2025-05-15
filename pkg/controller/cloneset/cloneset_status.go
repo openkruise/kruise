@@ -19,9 +19,13 @@ package cloneset
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -53,6 +57,82 @@ func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newS
 	}
 	if !r.inconsistentStatus(cs, newStatus) {
 		return nil
+	}
+	// Check for progress deadline exceeded condition
+	if cs.Spec.ProgressDeadlineSeconds != nil {
+		// Find the Progressing condition
+		var progressingCondition *appsv1alpha1.CloneSetCondition
+		for i := range newStatus.Conditions {
+			if newStatus.Conditions[i].Type == appsv1alpha1.CloneSetConditionTypeProgressing {
+				progressingCondition = &newStatus.Conditions[i]
+				break
+			}
+		}
+		if progressingCondition == nil {
+			// Initialize the Progressing condition if it doesn't exist
+			progressingCondition = &appsv1alpha1.CloneSetCondition{
+				Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
+				Status:             v1.ConditionTrue,
+				LastTransitionTime: metav1.Now(),
+				Message:            "CloneSet is progressing.",
+			}
+			newStatus.Conditions = append(newStatus.Conditions, *progressingCondition)
+		}
+		// Check if the CloneSet has reached completion
+		isCompleted := newStatus.UpdatedReadyReplicas == *cs.Spec.Replicas
+
+		// Check if paused due to partition
+		isPaused := false
+		if cs.Spec.UpdateStrategy.Partition != nil {
+			updatedReplicas := newStatus.UpdatedReplicas
+			desiredReplicas := *cs.Spec.Replicas
+
+			// Handle IntOrString type properly
+			var targetPartitionValue int32
+			if cs.Spec.UpdateStrategy.Partition.Type == intstr.Int {
+				targetPartitionValue = int32(cs.Spec.UpdateStrategy.Partition.IntVal)
+			} else {
+				// For percentage-based partition, calculate the actual number
+				// Assuming percentage is of the total replicas
+				percentage, _ := strconv.Atoi(cs.Spec.UpdateStrategy.Partition.StrVal)
+				targetPartitionValue = int32(float64(desiredReplicas) * float64(percentage) / 100.0)
+			}
+
+			if desiredReplicas-updatedReplicas == targetPartitionValue {
+				isPaused = true
+			}
+		}
+		if isCompleted || isPaused {
+			// Reset any deadline condition if we're complete or paused
+			for i := range newStatus.Conditions {
+				if newStatus.Conditions[i].Type == appsv1alpha1.CloneSetConditionTypeProgressing {
+					if newStatus.Conditions[i].Status != v1.ConditionTrue {
+						newStatus.Conditions[i].Status = v1.ConditionTrue
+						newStatus.Conditions[i].LastTransitionTime = metav1.Now()
+						newStatus.Conditions[i].Reason = ""
+						newStatus.Conditions[i].Message = "CloneSet is progressing."
+					}
+					break
+				}
+			}
+		} else {
+			// Check for deadline exceeded
+			for i := range newStatus.Conditions {
+				if newStatus.Conditions[i].Type == appsv1alpha1.CloneSetConditionTypeProgressing {
+					// Get when the condition was last updated
+					lastUpdateTime := newStatus.Conditions[i].LastTransitionTime.Time
+					deadline := lastUpdateTime.Add(time.Duration(*cs.Spec.ProgressDeadlineSeconds) * time.Second)
+
+					if time.Now().After(deadline) && newStatus.Conditions[i].Status != v1.ConditionFalse {
+						newStatus.Conditions[i].Status = v1.ConditionFalse
+						newStatus.Conditions[i].LastTransitionTime = metav1.Now()
+						newStatus.Conditions[i].Reason = string(appsv1alpha1.CloneSetProgressDeadlineExceeded)
+						newStatus.Conditions[i].Message = "CloneSet progress deadline exceeded."
+					}
+					break
+				}
+			}
+		}
 	}
 	klog.InfoS("To update CloneSet status", "cloneSet", klog.KObj(cs), "replicas", newStatus.Replicas, "ready", newStatus.ReadyReplicas, "available", newStatus.AvailableReplicas,
 		"updated", newStatus.UpdatedReplicas, "updatedReady", newStatus.UpdatedReadyReplicas, "currentRevision", newStatus.CurrentRevision, "updateRevision", newStatus.UpdateRevision)
