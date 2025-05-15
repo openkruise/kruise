@@ -241,3 +241,18 @@ func TestIsPodSelected(t *testing.T) {
 		})
 	}
 }
+
+func TestNestedSlice_EmptyPaths_ExpectFullSlice(t *testing.T) {
+	input := []any{"hello", "world"}
+	val, ok, err := nestedSlice[[]any](input) // Expecting full slice as T
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ok {
+		t.Fatalf("expected ok to be true, got false")
+	}
+	if len(val) != 2 || val[0] != "hello" || val[1] != "world" {
+		t.Errorf("unexpected value: %v", val)
+	}
+}
