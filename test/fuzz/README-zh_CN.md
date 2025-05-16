@@ -64,7 +64,7 @@ func FuzzParseYAML(f *testing.F) {
 - `f.Add` 用来添加种子输入。
 - `f.Fuzz` 自动生成随机输入（基于种子）并调用目标函数。
 - 通过 `t.Logf` 记录异常情况（如解析失败）。
-- 通过 `t.Errorf 可以中断执行并记录异常情况。
+- 通过 `t.Errorf` 可以中断执行并记录异常情况。
 - 同时也可以忽略错误以检查目标函数是否会崩溃。
 
 
@@ -110,7 +110,7 @@ func FuzzHandlePodEvent(f *testing.F) {
 
 ### **3.1 目录结构规范**
 
-在 OpenKruise 项目中，编写好的模糊测试需添加到以下脚本与 [oss-fuzz](https://github.com/google/oss-fuzz) 集成：
+在 OpenKruise 项目中，编写好的模糊测试需添加到以下脚本与 [OSS-Fuzz](https://github.com/google/oss-fuzz) 集成：
 
 ```
 openkruise/test/fuzz/oss_fuzz_build.sh 
