@@ -17,7 +17,7 @@ limitations under the License.
 
 package policy
 
-import "github.com/onsi/ginkgo"
+import "github.com/onsi/ginkgo/v2"
 
 // SIGDescribe describes SIG information
 func SIGDescribe(text string, body func()) bool {

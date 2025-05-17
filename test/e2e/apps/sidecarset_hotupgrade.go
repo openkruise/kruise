@@ -26,7 +26,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
