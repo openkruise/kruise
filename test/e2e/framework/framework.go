@@ -129,7 +129,7 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 func (f *Framework) BeforeEach() {
 	// The fact that we need this feels like a bug in ginkgo.
 	// https://github.com/onsi/ginkgo/issues/222
-	f.cleanupHandle = AddCleanupAction(f.AfterEach)	ginkgo version
+	f.cleanupHandle = AddCleanupAction(f.AfterEach)
 	if f.ClientSet == nil {
 		ginkgo.By("Creating a kubernetes client")
 		config, err := LoadConfig()
@@ -321,7 +321,7 @@ func KruisePDescribe(text string, body func()) bool {
 }
 
 // ConformanceIt is a wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
-//this needed to be changed due to timeout incompatibility with ginkgo v2
+// this needed to be changed due to timeout incompatibility with ginkgo v2
 func ConformanceIt(text string, body func()) bool {
 	return ginkgo.It(text+" [Conformance]", body)
 }
