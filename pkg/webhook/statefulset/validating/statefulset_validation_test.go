@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/stretchr/testify/assert"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/component-base/featuregate"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	utilpointer "k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
@@ -763,10 +766,11 @@ func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(testScheme).WithObjects(allowExpandSC, disallowExpandSC).Build()
 
 	tests := []struct {
-		name           string
-		sts            *appsv1beta1.StatefulSet
-		oldSts         *appsv1beta1.StatefulSet
-		expectedErrors bool
+		name               string
+		sts                *appsv1beta1.StatefulSet
+		oldSts             *appsv1beta1.StatefulSet
+		enableFeatureGates []featuregate.Feature
+		expectedErrors     bool
 	}{
 		{
 			name: "no update strategy and change sc",
@@ -1052,10 +1056,76 @@ func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
 			},
 			expectedErrors: true,
 		},
+		{
+			name: "on pod rolling update strategy and add vct",
+			sts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimUpdateStrategy: appsv1beta1.VolumeClaimUpdateStrategy{
+						Type: appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+					},
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &allowExpandSC.Name},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-2"},
+							Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &allowExpandSC.Name},
+						},
+					},
+				},
+			},
+			oldSts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &allowExpandSC.Name},
+						},
+					},
+				},
+			},
+			expectedErrors: true,
+		},
+		{
+			name: "on pod rolling update strategy and add vct with RecreatePodWhenChangeVCTInStatefulSetGate feature",
+			sts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimUpdateStrategy: appsv1beta1.VolumeClaimUpdateStrategy{
+						Type: appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType,
+					},
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &allowExpandSC.Name},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-2"},
+							Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &allowExpandSC.Name},
+						},
+					},
+				},
+			},
+			oldSts: &appsv1beta1.StatefulSet{
+				Spec: appsv1beta1.StatefulSetSpec{
+					VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
+							Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &allowExpandSC.Name},
+						},
+					},
+				},
+			},
+			expectedErrors:     false,
+			enableFeatureGates: []featuregate.Feature{features.RecreatePodWhenChangeVCTInStatefulSetGate},
+		},
 		// Add more test cases here
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			for _, feature := range tt.enableFeatureGates {
+				defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, true)()
+			}
 			errs := ValidateVolumeClaimTemplateUpdate(fakeClient, tt.sts, tt.oldSts)
 			hasErrors := len(errs) > 0
 			if hasErrors {

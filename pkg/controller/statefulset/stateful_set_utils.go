@@ -22,8 +22,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
@@ -124,7 +126,8 @@ func identityMatches(set *appsv1beta1.StatefulSet, pod *v1.Pod) bool {
 		set.Name == parent &&
 		pod.Name == getPodName(set, ordinal) &&
 		pod.Namespace == set.Namespace &&
-		pod.Labels[apps.StatefulSetPodNameLabel] == pod.Name
+		pod.Labels[apps.StatefulSetPodNameLabel] == pod.Name &&
+		volumeClaimTemplatesMatchPod(set, pod)
 }
 
 // storageMatches returns true if pod's Volumes cover the set of PersistentVolumeClaims
@@ -372,6 +375,31 @@ func initIdentity(set *appsv1beta1.StatefulSet, pod *v1.Pod) {
 	pod.Spec.Subdomain = set.Spec.ServiceName
 }
 
+const (
+	PodVolumeClaimTemplatesKey = "statefulset.apps.kruise.io/pod-vct-names"
+)
+
+func getPodVolumeClaimTemplateValue(set *appsv1beta1.StatefulSet) string {
+	names := make([]string, len(set.Spec.VolumeClaimTemplates))
+	for i, vct := range set.Spec.VolumeClaimTemplates {
+		names[i] = vct.Name
+	}
+	slices.Sort(names)
+	return strings.Join(names, ",")
+}
+
+func volumeClaimTemplatesMatchPod(set *appsv1beta1.StatefulSet, pod *v1.Pod) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RecreatePodWhenChangeVCTInStatefulSetGate) {
+		return true
+	}
+	targetValue := getPodVolumeClaimTemplateValue(set)
+	actualValue := ""
+	if pod.Annotations != nil {
+		actualValue = pod.Annotations[PodVolumeClaimTemplatesKey]
+	}
+	return targetValue == actualValue
+}
+
 // updateIdentity updates pod's name, hostname, and subdomain, and StatefulSetPodNameLabel to conform to set's name
 // and headless service.
 func updateIdentity(set *appsv1beta1.StatefulSet, pod *v1.Pod) {
@@ -384,6 +412,13 @@ func updateIdentity(set *appsv1beta1.StatefulSet, pod *v1.Pod) {
 	pod.Labels[apps.StatefulSetPodNameLabel] = pod.Name
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodIndexLabel) {
 		pod.Labels[apps.PodIndexLabel] = strconv.Itoa(ordinal)
+	}
+
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.RecreatePodWhenChangeVCTInStatefulSetGate) {
+		pod.Annotations[PodVolumeClaimTemplatesKey] = getPodVolumeClaimTemplateValue(set)
 	}
 }
 

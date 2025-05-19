@@ -141,7 +141,9 @@ func (c *commonControl) GetPodsSortFunc(pods []*v1.Pod, waitUpdateIndexes []int)
 }
 
 func (c *commonControl) GetUpdateOptions() *inplaceupdate.UpdateOptions {
-	opts := &inplaceupdate.UpdateOptions{}
+	opts := &inplaceupdate.UpdateOptions{
+		RecreatePodWhenChangedVolumeClaimTemplate: utilfeature.DefaultFeatureGate.Enabled(features.RecreatePodWhenChangeVCTInCloneSetGate),
+	}
 	if c.Spec.UpdateStrategy.InPlaceUpdateStrategy != nil {
 		opts.GracePeriodSeconds = c.Spec.UpdateStrategy.InPlaceUpdateStrategy.GracePeriodSeconds
 	}

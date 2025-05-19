@@ -918,6 +918,112 @@ var _ = SIGDescribe("AppStatefulSetStorage", func() {
 			sst.WaitForStatusPVCReadyReplicas(ss, 1)
 		})
 	})
+
+	ginkgo.Describe("Recreate Pod when modifying volumeClaimTemplate with OnPodRollingUpdate", func() {
+		const ssName = "statefulset"
+		var ss *appsv1beta1.StatefulSet
+		var sst *framework.StatefulSetTester
+
+		ginkgo.BeforeEach(func() {
+			ss = framework.NewStatefulSet(ssName, ns, "headless", 2, []v1.VolumeMount{
+				{
+					Name:      "test-volume-1",
+					MountPath: "/test-volume-1",
+				},
+				{
+					Name:      "test-volume-2",
+					MountPath: "/test-volume-2",
+				},
+			}, []v1.VolumeMount{}, map[string]string{"app": "test"})
+			ss.Spec.VolumeClaimUpdateStrategy.Type = appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType
+
+			sst = framework.NewStatefulSetTester(c, kc)
+		})
+
+		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentGinkgoTestDescription().Failed {
+				framework.DumpDebugInfo(c, ns)
+			}
+			framework.Logf("Deleting all statefulset in ns %v", ns)
+			//framework.DeleteAllStatefulSets(c, kc, ns)
+		})
+
+		ginkgo.It("add volumeClaimTemplate", func() {
+			ctx := context.TODO()
+
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			_, err := kc.AppsV1beta1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			waitForStatus(ctx, c, kc, ss)
+			sst.WaitForStatusReplicas(ss, 2)
+			sst.WaitForStatusReadyReplicas(ss, 2)
+
+			// store number of volumes for each pod
+			// the number of volumes is not just equal to the number of VCTs as e.g. the kube-api-access volume is added.
+			pods := sst.GetPodList(ss)
+			volumeCountBefore := make([]int, len(pods.Items))
+			for i, pod := range pods.Items {
+				volumeCountBefore[i] = len(pod.Spec.Volumes)
+			}
+
+			ginkgo.By("adding another volumeClaimTemplate")
+
+			ss, err = updateStatefulSetWithRetries(ctx, kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
+				update.Spec.VolumeClaimTemplates = append(ss.Spec.VolumeClaimTemplates, framework.NewStatefulSetPVC("test-volume-3"))
+				update.Spec.Template.Spec.Containers[0].VolumeMounts = append(update.Spec.Template.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+					Name:      "test-volume-3",
+					MountPath: "/test-volume-3",
+				})
+			})
+			framework.ExpectNoError(err)
+			waitForStatus(ctx, c, kc, ss)
+			sst.WaitForStatusReplicas(ss, 2)
+			sst.WaitForStatusReadyReplicas(ss, 2)
+
+			// verify that pods have one volume more than before
+			pods = sst.GetPodList(ss)
+			for i, pod := range pods.Items {
+				framework.ExpectEqual(len(pod.Spec.Volumes), volumeCountBefore[i]+1)
+			}
+
+		})
+
+		ginkgo.It("remove volumeClaimTemplate", func() {
+			ctx := context.TODO()
+
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			_, err := kc.AppsV1beta1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			waitForStatus(ctx, c, kc, ss)
+			sst.WaitForStatusReplicas(ss, 2)
+			sst.WaitForStatusReadyReplicas(ss, 2)
+
+			// store number of volumes for each pod
+			// the number of volumes is not just equal to the number of VCTs as e.g. the kube-api-access volume is added.
+			pods := sst.GetPodList(ss)
+			volumeCountBefore := make([]int, len(pods.Items))
+			for i, pod := range pods.Items {
+				volumeCountBefore[i] = len(pod.Spec.Volumes)
+			}
+
+			ginkgo.By("remove one volumeClaimTemplate")
+
+			ss, err = updateStatefulSetWithRetries(ctx, kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
+				update.Spec.VolumeClaimTemplates = update.Spec.VolumeClaimTemplates[:1]
+				update.Spec.Template.Spec.Containers[0].VolumeMounts = update.Spec.Template.Spec.Containers[0].VolumeMounts[:1]
+			})
+			framework.ExpectNoError(err)
+			waitForStatus(ctx, c, kc, ss)
+			sst.WaitForStatusReplicas(ss, 2)
+			sst.WaitForStatusReadyReplicas(ss, 2)
+
+			// verify that pods have one volume less than before
+			pods = sst.GetPodList(ss)
+			for i, pod := range pods.Items {
+				framework.ExpectEqual(len(pod.Spec.Volumes), volumeCountBefore[i]-1)
+			}
+		})
+	})
 })
 
 // GCE Quota requirements: 3 pds, one per stateful pod manifest declared above.
