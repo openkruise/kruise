@@ -977,8 +977,7 @@ var _ = SIGDescribe("AppStatefulSetStorage", func() {
 			})
 			framework.ExpectNoError(err)
 			waitForStatus(ctx, c, kc, ss)
-			sst.WaitForStatusReplicas(ss, 2)
-			sst.WaitForStatusReadyReplicas(ss, 2)
+			sst.WaitForRollingUpdate(ss)
 
 			// verify that pods have one volume more than before
 			pods = sst.GetPodList(ss)
@@ -1014,8 +1013,7 @@ var _ = SIGDescribe("AppStatefulSetStorage", func() {
 			})
 			framework.ExpectNoError(err)
 			waitForStatus(ctx, c, kc, ss)
-			sst.WaitForStatusReplicas(ss, 2)
-			sst.WaitForStatusReadyReplicas(ss, 2)
+			sst.WaitForRollingUpdate(ss)
 
 			// verify that pods have one volume less than before
 			pods = sst.GetPodList(ss)
