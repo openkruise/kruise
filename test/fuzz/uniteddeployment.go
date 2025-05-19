@@ -17,8 +17,6 @@ limitations under the License.
 package fuzz
 
 import (
-	"math/rand"
-
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -174,7 +172,7 @@ func GenerateUnitedDeploymentSubsetName(cf *fuzz.ConsumeFuzzer, subset *appsv1al
 
 func GenerateUnitedDeploymentSubSetReplicas(cf *fuzz.ConsumeFuzzer, subset *appsv1alpha1.Subset) error {
 	if setMin, err := cf.GetBool(); setMin && err == nil {
-		minVal, err := GenerateSubsetReplicas(cf)
+		minVal, err := GenerateIntOrString(cf)
 		if err != nil {
 			return err
 		}
@@ -182,7 +180,7 @@ func GenerateUnitedDeploymentSubSetReplicas(cf *fuzz.ConsumeFuzzer, subset *apps
 	}
 
 	if setMax, err := cf.GetBool(); setMax && err == nil {
-		maxVal, err := GenerateSubsetReplicas(cf)
+		maxVal, err := GenerateIntOrString(cf)
 		if err != nil {
 			return err
 		}
@@ -190,7 +188,7 @@ func GenerateUnitedDeploymentSubSetReplicas(cf *fuzz.ConsumeFuzzer, subset *apps
 	}
 
 	if setReplicas, err := cf.GetBool(); setReplicas && err == nil {
-		replicas, err := GenerateSubsetReplicas(cf)
+		replicas, err := GenerateIntOrString(cf)
 		if err != nil {
 			return err
 		}
@@ -219,7 +217,7 @@ func GenerateUnitedDeploymentNodeSelectorTerm(cf *fuzz.ConsumeFuzzer, subset *ap
 }
 
 func GenerateUnitedDeploymentTolerations(cf *fuzz.ConsumeFuzzer, subset *appsv1alpha1.Subset) error {
-	tolerations := make([]corev1.Toleration, rand.Intn(2)+1)
+	tolerations := make([]corev1.Toleration, r.Intn(collectionMaxElements)+1)
 	for i := range tolerations {
 		if err := GenerateTolerations(cf, &tolerations[i]); err != nil {
 			return err
