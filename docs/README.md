@@ -34,3 +34,10 @@ You can view the full documentation from the [official website](https://openkrui
 ## Tutorials
 
 Several [Tutorials](./tutorial/README.md) are provided to demonstrate how to use the controllers
+
+## Operations
+
+[Operations](./operations): Guides for operating and maintaining OpenKruise
+  - [Prometheus Metrics](.operationsprometheus-metricsmd)
+  - [Troubleshooting](./operations/troubleshooting.md)
+
