@@ -37,7 +37,7 @@ func getScheduleFailedCondition() v1.PodCondition {
 
 // GetTimeBeforePendingTimeout return true when Pod was scheduled failed and timeout.
 // nextCheckAfter > 0 means the pod is failed to schedule but not timeout yet.
-func GetTimeBeforePendingTimeout(pod *v1.Pod, timeout time.Duration, now time.Time) (timeouted bool, nextCheckAfter time.Duration) {
+func GetTimeBeforePendingTimeout(pod *v1.Pod, timeout time.Duration, currentTime time.Time) (timeouted bool, nextCheckAfter time.Duration) {
 	if pod.DeletionTimestamp != nil || pod.Status.Phase != v1.PodPending || pod.Spec.NodeName != "" {
 		return false, -1
 	}
@@ -47,23 +47,23 @@ func GetTimeBeforePendingTimeout(pod *v1.Pod, timeout time.Duration, now time.Ti
 			condition.Reason == scheduleFailedCondition.Reason {
 			expectSchedule := pod.CreationTimestamp.Add(timeout)
 			// schedule timeout
-			if expectSchedule.Before(now) {
+			if expectSchedule.Before(currentTime) {
 				return true, -1
 			}
-			return false, expectSchedule.Sub(now)
+			return false, expectSchedule.Sub(currentTime)
 		}
 	}
 	return false, -1
 }
 
 // GetTimeBeforeUpdateTimeout is used during updating. when the updating lasts longer than timeout, all pods will be considered as timeout.
-func GetTimeBeforeUpdateTimeout(pod *v1.Pod, updatedCondition *appsv1alpha1.UnitedDeploymentCondition, timeout time.Duration, now time.Time) (timeouted bool, nextCheckAfter time.Duration) {
+func GetTimeBeforeUpdateTimeout(pod *v1.Pod, updatedCondition *appsv1alpha1.UnitedDeploymentCondition, timeout time.Duration, currentTime time.Time) (timeouted bool, nextCheckAfter time.Duration) {
 	if pod.DeletionTimestamp != nil {
 		return false, -1
 	}
 	expectReschedule := updatedCondition.LastTransitionTime.Add(timeout)
-	if expectReschedule.Before(now) {
+	if expectReschedule.Before(currentTime) {
 		return true, -1
 	}
-	return false, expectReschedule.Sub(now)
+	return false, expectReschedule.Sub(currentTime)
 }

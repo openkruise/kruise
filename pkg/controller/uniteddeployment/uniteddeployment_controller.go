@@ -260,7 +260,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 	newStatus, err := r.manageSubsets(instance, existingSubsets, nextUpdate, currentRevision, updatedRevision, subsetType)
 	if err != nil {
 		klog.ErrorS(err, "Failed to update UnitedDeployment", "unitedDeployment", klog.KObj(instance))
-		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), err.Error())
+		r.recorder.Event(instance, corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), err.Error())
 		return reconcile.Result{}, err
 	}
 

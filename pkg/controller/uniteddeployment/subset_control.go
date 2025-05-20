@@ -109,7 +109,7 @@ func (m *SubsetControl) UpdateSubset(subset *Subset, ud *alpha1.UnitedDeployment
 			m.adapter.SetMaxUnavailable(workload, maxUnavailable)
 		}
 
-		updateError = m.Client.Update(context.Background(), workload)
+		updateError = m.Client.Update(context.TODO(), workload)
 		if updateError == nil {
 			break
 		}

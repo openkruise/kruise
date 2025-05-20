@@ -53,8 +53,16 @@ type SubsetStatus struct {
 
 // SubsetUnschedulableStatus stores the unschedulable status of the Subset, which is used by adaptive strategy.
 type SubsetUnschedulableStatus struct {
-	Unschedulable           bool // has reserved pods
-	PreviouslyUnschedulable bool // has condition Schedulable == False
+	// In the Adaptive strategy, a subset is considered Unschedulable when Pods within it are in a Pending state due to
+	// scheduling failures (default mode), or when there are reserved Pods in it (reservation mode).
+	Unschedulable bool
+
+	// Unschedulable indicates the state a subset should be in after reconciliation, while PreviouslyUnschedulable
+	// indicates its state before reconciliation (condition Schedulable == False). In reservation mode, the logic for
+	// determining unschedulability uses the state before reconciliation to ensure the number of ready replicas in a
+	// recovered unschedulable subset meets expectations, thereby avoiding premature deletion of temp Pods that could
+	// lead to insufficient working replicas.
+	PreviouslyUnschedulable bool
 	// In reservation adaptive strategy, it is the number of reserved pods in the subset.
 	// Please refer to the function CheckPodReallyInReservedStatus.
 	ReservedPods int32

@@ -397,7 +397,7 @@ func (ac *reservationAllocator) Alloc(existingSubsets map[string]*Subset) (map[s
 	if err != nil {
 		return nil, err
 	}
-	var subsets []string
+	var subsets = make([]string, 0, len(ac.Spec.Topology.Subsets))
 	for _, subset := range ac.Spec.Topology.Subsets {
 		subsets = append(subsets, subset.Name)
 	}
@@ -408,8 +408,18 @@ func (ac *reservationAllocator) Alloc(existingSubsets map[string]*Subset) (map[s
 }
 
 type reservationAllocatorSubsetRecord struct {
-	maxAllocatable int32 // Refer to `allocateByMinMaxMapAndReservation` for it's usage
-	replicas       int32 // Allocated replicas of the subset, which will be set to the value of the workload's spec.replicas
+	// maxAllocatable indicates the maximum number of replicas that can be safely allocated in a subset based on current information.
+	// Specifically, if this value is non-negative, it means that allocating the corresponding number of additional replicas
+	// in the subset is expected to succeed; if it is negative, it indicates that there are already -maxAllocatable reserved Pods
+	// in the subset that are expected to or have already failed scheduling.
+	//
+	// Under normal circumstances, this value is initialized to MaxInt32, meaning that an arbitrarily large number of replicas
+	// is expected to be schedulable. However, when there are reserved Pods or the subset has already been marked as unschedulable,
+	// this value is initialized to the number of ready Pods in the subset.
+	maxAllocatable int32
+
+	// allocated replicas of the subset, which will be set to the value of the workload's spec.replicas after reconciliation.
+	allocated int32
 }
 
 // allocate allocates `to` replicas to a subset and returns how many replicas is really allocated.
@@ -437,20 +447,30 @@ type reservationAllocatorSubsetRecord struct {
 //     allocate(3, 5), -> 1,
 //     the number of remaining unassigned replicas is decreased by 1, 3-1=2 temporary pod will be created
 //
-//     - param to: will scale up the subset to the value
+//     - param to: will scale up the subset to the value, which should be greater than allocated.
 //     - param rest: rest replicas can be allocated
 //     - return allocated: the number of replicas that should be decreased. if not decreased, temporary pods will be created.
 func (ar *reservationAllocatorSubsetRecord) allocate(to, rest int32) (allocated int32) {
-	toAdd := min(to-ar.replicas, rest)
-	ar.replicas += toAdd
+	toAdd := min(to-ar.allocated, rest)
+	ar.allocated += toAdd
 	ar.maxAllocatable -= toAdd
-	return max(0, min(0, ar.maxAllocatable)+toAdd)
+	if ar.maxAllocatable < 0 {
+		// Since maxAllocatable is negative after allocation, it indicates that a total of |maxAllocatable| replicas
+		// are expected to fail scheduling (they will be marked as reserved Pods directly). Replicas expected to fail
+		// scheduling should not be subtracted from the total replica count, but should instead be reallocated to other subsets.
+		toAdd += ar.maxAllocatable // -= |ar.maxAllocatable|
+		return max(0, toAdd)
+	} else {
+		// Since maxAllocatable remains non-negative, it indicates that the allocated toAdd replicas are still within
+		// the expected capacity for successful scheduling, and thus the total replica count can be reduced accordingly.
+		return toAdd
+	}
 }
 
 func exportReservationRecords(records map[string]*reservationAllocatorSubsetRecord) map[string]int32 {
 	var nextReplicas = make(map[string]int32, len(records))
 	for name, record := range records {
-		nextReplicas[name] = record.replicas
+		nextReplicas[name] = record.allocated
 	}
 	return nextReplicas
 }

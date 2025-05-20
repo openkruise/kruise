@@ -257,7 +257,7 @@ type AdaptiveUnitedDeploymentStrategy struct {
 	// +optional
 	UnschedulableDuration *int32 `json:"unschedulableDuration,omitempty"`
 
-	// ReserveUnschedulablePods indicates whether to enable temporarily rescheduling, which is disabled by default.
+	// ReserveUnschedulablePods indicates whether to enable reservation rescheduling mode, which is disabled by default.
 	// If this feature is enabled, those pending pods that would otherwise be permanently transferred to other subsets
 	// due to scheduling failure will be retained, and a temporary substitute Pod will be created in another subset to take over its work.
 	// When the retained pod is successfully scheduled and ready, its temporary substitute will be deleted.
