@@ -201,7 +201,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 	currentRevision, updatedRevision, _, _, err := r.constructUnitedDeploymentRevisions(instance)
 	if err != nil {
 		klog.ErrorS(err, "Failed to construct controller revision of UnitedDeployment", "unitedDeployment", klog.KObj(instance))
-		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeRevisionProvision), err.Error())
+		r.recorder.Event(instance, corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeRevisionProvision), err.Error())
 		return reconcile.Result{}, err
 	}
 
@@ -217,7 +217,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 	existingSubsets, err := r.getExistingSubsets(instance, control, expectedRevision)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get Subsets of UnitedDeployment", "unitedDeployment", klog.KObj(instance))
-		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed %s",
+		r.recorder.Event(instance, corev1.EventTypeWarning, fmt.Sprintf("Failed %s",
 			eventTypeFindSubsets), err.Error())
 		return reconcile.Result{}, err
 	}
@@ -288,7 +288,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 func (r *ReconcileUnitedDeployment) getExistingSubsets(instance *appsv1alpha1.UnitedDeployment, control ControlInterface, expectedRevision string) (existingSubsets map[string]*Subset, err error) {
 	subSets, err := control.GetAllSubsets(instance, expectedRevision)
 	if err != nil {
-		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeFindSubsets), err.Error())
+		r.recorder.Event(instance, corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeFindSubsets), err.Error())
 		return nil, fmt.Errorf("fail to get all Subsets for UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
 	}
 
@@ -297,7 +297,7 @@ func (r *ReconcileUnitedDeployment) getExistingSubsets(instance *appsv1alpha1.Un
 
 	existingSubsets, err = r.deleteDupSubset(allSubsets, control)
 	if err != nil {
-		r.recorder.Event(instance.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeDupSubsetsDelete), err.Error())
+		r.recorder.Event(instance, corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeDupSubsetsDelete), err.Error())
 		return nil, fmt.Errorf("fail to manage duplicate Subset of UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
 	}
 
