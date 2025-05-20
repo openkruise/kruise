@@ -174,18 +174,18 @@ func CheckPodReallyInReservedStatus(pod *corev1.Pod, subset *Subset, updatedCond
 		// at least after minReadySeconds will the pod get out of Reserved state
 		return true, minReadySeconds
 	} else {
-		var timeouted bool
+		var timeout bool
 		var after time.Duration
 		if podRevision == subset.Status.UpdatedRevision {
-			timeouted, after = util.GetTimeBeforePendingTimeout(pod, pendingTimeout, now)
+			timeout, after = util.GetTimeBeforePendingTimeout(pod, pendingTimeout, now)
 		} else {
-			timeouted, after = util.GetTimeBeforeUpdateTimeout(pod, updatedCondition, pendingTimeout, now)
-			if timeouted {
+			timeout, after = util.GetTimeBeforeUpdateTimeout(pod, updatedCondition, pendingTimeout, now)
+			if timeout {
 				subset.Status.UnschedulableStatus.UpdateTimeoutPods++
 			}
-			klog.InfoS("GetTimeBeforeUpdateTimeout", "pod", pod.Name, "after", after, "timeouted", timeouted)
+			klog.InfoS("GetTimeBeforeUpdateTimeout", "pod", pod.Name, "after", after, "timeout", timeout)
 		}
-		if timeouted {
+		if timeout {
 			return true, minReadySeconds
 		} else {
 			return false, after
