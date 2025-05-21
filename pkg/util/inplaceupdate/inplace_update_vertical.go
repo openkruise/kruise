@@ -66,28 +66,31 @@ func (v *NativeVerticalUpdate) UpdateInplaceUpdateMetadata(op *jsonpatch.Operati
 	// for example: /spec/containers/0/resources/limits/cpu
 	words := strings.Split(op.Path, "/")
 	if len(words) != 7 {
-		return fmt.Errorf("invalid resource path: %s", op.Path)
+		return fmt.Errorf("invalid resource path: %s, expected format: /spec/containers/{index}/resources/{limits|requests}/{resourceName}", op.Path)
 	}
 	idx, err := strconv.Atoi(words[3])
-	if err != nil || len(oldTemp.Spec.Containers) <= idx {
-		return fmt.Errorf("invalid container index: %s", op.Path)
+	if err != nil {
+		return fmt.Errorf("invalid container index: %s, must be a valid integer", words[3])
+	}
+	if len(oldTemp.Spec.Containers) <= idx {
+		return fmt.Errorf("container index %d is out of range, pod template has %d containers (0-%d)", idx, len(oldTemp.Spec.Containers), len(oldTemp.Spec.Containers)-1)
 	}
 	if op.Operation == "remove" || op.Operation == "add" {
 		// Before k8s 1.32, we can not resize resources for a container with no limit or request
 		// TODO(Abner-1) change it if 1.32 released and allowing this operation
-		return errors.New("can not add or remove resources")
+		return errors.New("can not add or remove resources - only modification of existing resources is supported until Kubernetes 1.32")
 	}
 
 	if op.Value == nil {
-		return errors.New("json patch value is nil")
+		return errors.New("json patch value is nil - a valid resource quantity value must be provided")
 	}
 	quantity, err := resource.ParseQuantity(op.Value.(string))
 	if err != nil {
-		return fmt.Errorf("parse quantity error: %v", err)
+		return fmt.Errorf("parse quantity error: %v - use valid format like '100m' for CPU or '1Gi' for memory", err)
 	}
 
 	if !v.CanResourcesResizeInPlace(words[6]) {
-		return fmt.Errorf("disallowed inplace update resource: %s", words[6])
+		return fmt.Errorf("disallowed inplace update resource: %s - only CPU and memory resources can be updated in-place", words[6])
 	}
 
 	cName := oldTemp.Spec.Containers[idx].Name
@@ -175,11 +178,11 @@ func (v *NativeVerticalUpdate) IsUpdateCompleted(pod *v1.Pod) (bool, error) {
 		containers[c.Name] = c
 	}
 	if len(pod.Status.ContainerStatuses) != len(containers) {
-		return false, fmt.Errorf("some container status is not reported")
+		return false, fmt.Errorf("some container status is not reported - expected %d container statuses but got %d", len(containers), len(pod.Status.ContainerStatuses))
 	}
 	for _, cs := range pod.Status.ContainerStatuses {
 		if !v.isContainerUpdateCompleted(containers[cs.Name], &cs) {
-			return false, fmt.Errorf("container %s resources not changed", cs.Name)
+			return false, fmt.Errorf("container %s resources not changed - requested resources in spec don't match resources in status, update may still be in progress", cs.Name)
 		}
 	}
 	return true, nil
