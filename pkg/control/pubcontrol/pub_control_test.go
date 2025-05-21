@@ -21,8 +21,11 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util/feature"
 )
 
 func TestIsPodUnavailableChanged(t *testing.T) {
@@ -71,14 +74,267 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 			},
 			expect: true,
 		},
+		{
+			name: "qos changed",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+				}
+				return demo
+			},
+			expect: true,
+		},
+		{
+			name: "resources changed",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("3"),
+						corev1.ResourceMemory: resource.MustParse("3Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			expect: false,
+		},
+		{
+			name: "resources changed but resizePolicy is restart",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].ResizePolicy = []corev1.ContainerResizePolicy{
+					{
+						ResourceName:  corev1.ResourceCPU,
+						RestartPolicy: corev1.RestartContainer,
+					},
+				}
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].ResizePolicy = []corev1.ContainerResizePolicy{
+					{
+						ResourceName:  corev1.ResourceCPU,
+						RestartPolicy: corev1.RestartContainer,
+					},
+				}
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			expect: true,
+		},
+		{
+			name: "resources changed mixed resizePolicy",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].ResizePolicy = []corev1.ContainerResizePolicy{
+					{
+						ResourceName:  corev1.ResourceCPU,
+						RestartPolicy: corev1.RestartContainer,
+					},
+					{
+						ResourceName:  corev1.ResourceMemory,
+						RestartPolicy: corev1.NotRequired,
+					},
+				}
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].ResizePolicy = []corev1.ContainerResizePolicy{
+					{
+						ResourceName:  corev1.ResourceCPU,
+						RestartPolicy: corev1.RestartContainer,
+					},
+					{
+						ResourceName:  corev1.ResourceMemory,
+						RestartPolicy: corev1.NotRequired,
+					},
+				}
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("3Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("5Gi"),
+					},
+				}
+				return demo
+			},
+			expect: false,
+		},
 	}
 
+	feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	defer feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling, false)
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			control := commonControl{}
 			is := control.IsPodUnavailableChanged(cs.getOldPod(), cs.getNewPod())
 			if cs.expect != is {
 				t.Fatalf("IsPodUnavailableChanged failed")
+			}
+		})
+	}
+}
+
+func TestIsResourceChanged(t *testing.T) {
+	cases := []struct {
+		name               string
+		getOldResourceList func() corev1.ResourceList
+		getNewResourceList func() corev1.ResourceList
+		resourceName       corev1.ResourceName
+		expect             bool
+	}{
+		{
+			name: "resource not exist in old",
+			getOldResourceList: func() corev1.ResourceList {
+				return corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				}
+			},
+			getNewResourceList: func() corev1.ResourceList {
+				return corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				}
+			},
+			resourceName: corev1.ResourceCPU,
+			expect:       true,
+		},
+		{
+			name: "resource not exist in new",
+			getOldResourceList: func() corev1.ResourceList {
+				return corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				}
+			},
+			getNewResourceList: func() corev1.ResourceList {
+				return corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				}
+			},
+			resourceName: corev1.ResourceCPU,
+			expect:       true,
+		},
+		{
+			name: "resource not exist in new and old",
+			getOldResourceList: func() corev1.ResourceList {
+				return corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				}
+			},
+			getNewResourceList: func() corev1.ResourceList {
+				return corev1.ResourceList{
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				}
+			},
+			resourceName: corev1.ResourceCPU,
+			expect:       false,
+		},
+		{
+			name: "resource changed",
+			getOldResourceList: func() corev1.ResourceList {
+				return corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				}
+			},
+			getNewResourceList: func() corev1.ResourceList {
+				return corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				}
+			},
+			resourceName: corev1.ResourceCPU,
+			expect:       true,
+		},
+		{
+			name: "resource not changed",
+			getOldResourceList: func() corev1.ResourceList {
+				return corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				}
+			},
+			getNewResourceList: func() corev1.ResourceList {
+				return corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				}
+			},
+			resourceName: corev1.ResourceMemory,
+			expect:       false,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			is := isResourceChanged(cs.getOldResourceList(), cs.getNewResourceList(), cs.resourceName)
+			if cs.expect != is {
+				t.Fatalf("IsResourceChanged failed")
 			}
 		})
 	}
