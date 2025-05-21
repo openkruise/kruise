@@ -18,6 +18,9 @@ package pubcontrol
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -25,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
@@ -33,9 +37,11 @@ import (
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	"github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
@@ -58,8 +64,39 @@ func (c *commonControl) IsPodReady(pod *corev1.Pod) bool {
 func (c *commonControl) IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool {
 	// If pod.spec changed, pod will be in unavailable condition
 	if !reflect.DeepEqual(oldPod.Spec, newPod.Spec) {
-		klog.V(3).InfoS("Pod specification changed, and maybe cause unavailability", "pod", klog.KObj(newPod))
-		return true
+		if feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			// check if only container resources changed
+			oldPodSpecWithoutResourcesHash, err := podSpecWithoutResourcesHash(oldPod)
+			if err != nil {
+				klog.ErrorS(err, "Failed to get pod hash", "pod", klog.KObj(oldPod))
+				return true
+			}
+
+			newPodSpecWithoutResourcesHash, err := podSpecWithoutResourcesHash(newPod)
+			if err != nil {
+				klog.ErrorS(err, "Failed to get pod hash", "pod", klog.KObj(newPod))
+				return true
+			}
+
+			if oldPodSpecWithoutResourcesHash != newPodSpecWithoutResourcesHash {
+				klog.V(3).InfoS("Pod specification without resources changed, and maybe cause unavailability", "pod", klog.KObj(newPod))
+				return true
+			}
+
+			// containerResources changed, check if resizePolicy is all not-Required
+			for _, ctr := range newPod.Spec.Containers {
+				for _, policy := range ctr.ResizePolicy {
+					// kubernetes not guareented `NotRequired` policy won't restart container, this is a hack?
+					if policy.RestartPolicy != corev1.NotRequired {
+						klog.V(3).InfoS("Pod container resize policy is not NotRequired, and maybe cause unAvailability", "pod", klog.KObj(newPod))
+						return true
+					}
+				}
+			}
+		} else {
+			klog.V(3).InfoS("Pod specification changed, and maybe cause unavailability", "pod", klog.KObj(newPod))
+			return true
+		}
 	}
 	// pod add unavailable label
 	if !appspub.HasUnavailableLabel(oldPod.Labels) && appspub.HasUnavailableLabel(newPod.Labels) {
@@ -67,6 +104,26 @@ func (c *commonControl) IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool
 	}
 	// pod other changes will not cause unavailability situation, then return false
 	return false
+}
+
+func podSpecWithoutResourcesHash(podIn *corev1.Pod) (string, error) {
+	pod := podIn.DeepCopy()
+	// do not need to process init-containers because they wont change
+	for i := range pod.Spec.Containers {
+		pod.Spec.Containers[i].Resources = corev1.ResourceRequirements{}
+	}
+
+	data, err := json.Marshal(pod.Spec)
+	if err != nil {
+		return "", err
+	}
+
+	return rand.SafeEncodeString(hash(string(data))), nil
+}
+
+// hash hashes `data` with sha256 and returns the hex string
+func hash(data string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(data)))
 }
 
 // GetPodsForPub returns Pods protected by the pub object.

@@ -21,8 +21,11 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util/feature"
 )
 
 func TestIsPodUnavailableChanged(t *testing.T) {
@@ -71,8 +74,66 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 			},
 			expect: true,
 		},
+		{
+			name: "resources changed",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+				}
+				return demo
+			},
+			expect: false,
+		},
+		{
+			name: "resources changed but resizePolicy is restart",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].ResizePolicy = []corev1.ContainerResizePolicy{
+					{
+						ResourceName:  corev1.ResourceCPU,
+						RestartPolicy: corev1.RestartContainer,
+					},
+				}
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].ResizePolicy = []corev1.ContainerResizePolicy{
+					{
+						ResourceName:  corev1.ResourceCPU,
+						RestartPolicy: corev1.RestartContainer,
+					},
+				}
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+				}
+				return demo
+			},
+			expect: true,
+		},
 	}
 
+	feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	defer feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling, false)
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			control := commonControl{}
