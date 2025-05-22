@@ -144,6 +144,11 @@ const (
 
 	// EnableSortSidecarContainerByName enable sidecarSet to sort by container name when injecting sidecar containers
 	EnableSortSidecarContainerByName featuregate.Feature = "EnableSortSidecarContainerByName"
+
+	// Enabling this feature means that in the user's Kubernetes cluster, if a pod undergoes vertical scaling
+	// and the container's resizePolicy status is NotRequired, Kruise assumes that this scaling operation will
+	// not restart the container, which will affect the behavior of the PUB workload.
+	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -183,6 +188,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	InPlaceWorkloadVerticalScaling:           {Default: false, PreRelease: featuregate.Alpha},
 	EnablePodProbeMarkerOnServerless:         {Default: false, PreRelease: featuregate.Alpha},
 	EnableSortSidecarContainerByName:         {Default: false, PreRelease: featuregate.Alpha},
+	InPlacePodVerticalScaling:                {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
