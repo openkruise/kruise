@@ -1,9 +1,9 @@
 # Notice of Embargo
 
 This is an embargoed notification that a vulnerability has been discovered in
-<!-- TODO: $PROJECT -->. This notice has been sent to subscribed distributors and service
+OpenKruise/Kruise. This notice has been sent to subscribed distributors and service
 providers in order to allow for timely patching. You are receiving this
-notification as you have agreed to abide by the embargo policy (<!-- TODO: $LINK -->) on this
+notification as you have agreed to abide by the embargo policy (https://github.com/openkruise/kruise/security/policy) on this
 project. Do not forward this information to other parties without complying with
 the instructions of the embargo policy.
 
@@ -57,4 +57,4 @@ when it will be available or links to where the patch will be available.*
 * issue public patches before the disclosure date
 
 This list will be notified immediately if the disclosure date is at risk or
-changes. Questions should be directed to the security contacts <!-- TODO: $LINK -->.
+changes. Questions should be directed to the security contacts at kubernetes-security@service.aliyun.com.
