@@ -194,14 +194,14 @@ func CheckPodReallyInReservedStatus(pod *corev1.Pod, subset *Subset, updatedCond
 }
 
 // IsPodMarkedAsReserved checks whether the Pod is in the Reserved state.
-// The Reserved state is defined as: the Pod has the reserved "apps.kruise.io/is-reserved-pod" set to "true".
+// The Reserved state is defined as: the Pod has the reserved "apps.kruise.io/united-deployment-reserved-pod" set to "true".
 //
 // Parameters:
 //   - pod: the Pod object to be checked.
 //
 // Returns:
 //   - reserved: true if the Pod is in the Reserved state; otherwise, false.
-//   - ok: true if the Pod has the "apps.kruise.io/is-reserved-pod" reserved; otherwise, false.
+//   - ok: true if the Pod has the "apps.kruise.io/united-deployment-reserved-pod" reserved; otherwise, false.
 func IsPodMarkedAsReserved(pod *corev1.Pod) (reserved bool, ok bool) {
 	if label, ok := GetPodLabel(pod, appsv1alpha1.ReservedPodLabelKey); ok {
 		return label == "true", true

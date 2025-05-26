@@ -580,9 +580,9 @@ func TestReservedAdaptiveAllocation(t *testing.T) {
 			subset := &Subset{
 				Status: SubsetStatus{
 					UnschedulableStatus: SubsetUnschedulableStatus{
-						Unschedulable:           reserved[i] != 0,
-						PreviouslyUnschedulable: previouslyUnschedulable,
-						ReservedPods:            reserved[i],
+						Unschedulable:         reserved[i] != 0,
+						MarkedAsUnschedulable: previouslyUnschedulable,
+						ReservedPods:          reserved[i],
 					},
 					Replicas:             cur[i],
 					UpdatedReadyReplicas: cur[i] - reserved[i] - newPods[i],

@@ -317,7 +317,7 @@ type UnitedDeploymentStatus struct {
 	UpdatedReplicas int32 `json:"updatedReplicas"`
 
 	// The number of reserved pods in temporary adaptive strategy.
-	ReservedPods int32 `json:"reservedPods"`
+	ReservedPods int32 `json:"reservedPods,omitempty"`
 
 	// The number of ready current revision replicas for this UnitedDeployment.
 	// +optional
