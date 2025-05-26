@@ -18,6 +18,9 @@ package pubcontrol
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -25,17 +28,22 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	"github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
@@ -56,8 +64,13 @@ func (c *commonControl) IsPodReady(pod *corev1.Pod) bool {
 }
 
 func (c *commonControl) IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool {
-	// If pod.spec changed, pod will be in unavailable condition
+	// If pod.spec changed, pod may be in unavailable condition
 	if !reflect.DeepEqual(oldPod.Spec, newPod.Spec) {
+		if c.canResizeInplace(oldPod, newPod) {
+			klog.V(3).InfoS("Pod resize inplace", "pod", klog.KObj(newPod))
+			return false
+		}
+
 		klog.V(3).InfoS("Pod specification changed, and maybe cause unavailability", "pod", klog.KObj(newPod))
 		return true
 	}
@@ -67,6 +80,139 @@ func (c *commonControl) IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool
 	}
 	// pod other changes will not cause unavailability situation, then return false
 	return false
+}
+
+func (c *commonControl) isNeedProtectResizeAction(newPod *corev1.Pod) bool {
+	// If InPlacePodVerticalScaling is not enabled, then RESIZE is meaningless
+	// and will degrade to an UPDATE action.
+	if !feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		return false
+	}
+
+	pub, err := c.GetPubForPod(newPod)
+	if err != nil || pub == nil {
+		return false
+	}
+
+	return isNeedPubProtection(pub, policyv1alpha1.PubResizeOperation)
+}
+
+func (c *commonControl) canResizeInplace(oldPod, newPod *corev1.Pod) bool {
+	if !c.isNeedProtectResizeAction(newPod) {
+		return false
+	}
+
+	// now check if only container resources changed
+	oldPodSpecWithoutResourcesHash, err := podSpecWithoutResourcesHash(oldPod)
+	if err != nil {
+		klog.ErrorS(err, "Failed to get pod hash", "pod", klog.KObj(oldPod))
+		return false
+	}
+
+	newPodSpecWithoutResourcesHash, err := podSpecWithoutResourcesHash(newPod)
+	if err != nil {
+		klog.ErrorS(err, "Failed to get pod hash", "pod", klog.KObj(newPod))
+		return false
+	}
+
+	if oldPodSpecWithoutResourcesHash != newPodSpecWithoutResourcesHash {
+		klog.V(3).InfoS("Pod specification without resources changed, and maybe cause unavailability", "pod", klog.KObj(newPod))
+		return false
+	}
+
+	// now only containerResources changed.
+	// check if static pod
+	if types.IsStaticPod(newPod) || types.IsStaticPod(oldPod) {
+		klog.V(3).InfoS("Static pod resources changed, and maybe cause unavailability", "pod", klog.KObj(newPod))
+		return false
+	}
+
+	// check if QoS changed
+	if v1qos.ComputePodQOS(oldPod) != v1qos.ComputePodQOS(newPod) {
+		klog.V(3).InfoS("Pod QoS changed, and maybe cause unavailability", "pod", klog.KObj(newPod))
+		return false
+	}
+
+	// only containerResources changed, check if container resource resizePolicy is not NotRequired but
+	// resource changed, then return true
+	if !canInplaceUpdateResources(oldPod, newPod) {
+		klog.V(3).InfoS("Pod container resources changed with restartContainer policy, and maybe cause unavailability", "pod", klog.KObj(newPod))
+		return false
+	}
+
+	return true
+}
+
+func canInplaceUpdateResources(oldPod, newPod *corev1.Pod) bool {
+	oldCtrMap := make(map[string]corev1.Container)
+	for _, ctr := range oldPod.Spec.Containers {
+		oldCtrMap[ctr.Name] = ctr
+	}
+
+	for _, ctr := range newPod.Spec.Containers {
+		for _, policy := range ctr.ResizePolicy {
+			if policy.RestartPolicy == corev1.NotRequired || policy.RestartPolicy == "" {
+				continue
+			}
+
+			oldCtr, ok := oldCtrMap[ctr.Name]
+			if !ok {
+				return false
+			}
+
+			if isContainerResourcesChanged(oldCtr, ctr, policy.ResourceName) {
+				klog.V(3).InfoS("Pod container resources changed with restartContainer policy, and maybe cause unavailability",
+					"pod", klog.KObj(newPod), "container", ctr.Name, "restartPolicy", policy.RestartPolicy, "resourceName", policy.ResourceName)
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func isContainerResourcesChanged(oldCtr, newCtr corev1.Container, resourceName corev1.ResourceName) bool {
+	requestsChanged := isResourceChanged(oldCtr.Resources.Requests, newCtr.Resources.Requests, resourceName)
+	limitsChanged := isResourceChanged(oldCtr.Resources.Limits, newCtr.Resources.Limits, resourceName)
+	return requestsChanged || limitsChanged
+}
+
+func isResourceChanged(a, b corev1.ResourceList, resourceName corev1.ResourceName) bool {
+	// Although the scheduler allocates a certain amount of space, such as 100m/200Mi,
+	// for null values in advance, this does not mean that the kubelet will do the same.
+	// Therefore, our current implementation imposes a strict constraint—requiring the
+	// resource values to be explicitly equal.
+	oldResource, oldOk := a[resourceName]
+	newResource, newOk := b[resourceName]
+	if !oldOk && !newOk {
+		return false
+	}
+
+	if oldOk && !newOk || !oldOk && newOk {
+		return true
+	}
+
+	// both exist
+	return !oldResource.Equal(newResource)
+}
+
+func podSpecWithoutResourcesHash(podIn *corev1.Pod) (string, error) {
+	pod := podIn.DeepCopy()
+	// do not need to process init-containers because they wont change
+	for i := range pod.Spec.Containers {
+		pod.Spec.Containers[i].Resources = corev1.ResourceRequirements{}
+	}
+
+	data, err := json.Marshal(pod.Spec)
+	if err != nil {
+		return "", err
+	}
+
+	return rand.SafeEncodeString(hash(string(data))), nil
+}
+
+// hash hashes `data` with sha256 and returns the hex string
+func hash(data string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(data)))
 }
 
 // GetPodsForPub returns Pods protected by the pub object.
