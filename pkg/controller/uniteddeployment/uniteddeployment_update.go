@@ -74,7 +74,8 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1alpha1.UnitedDeploym
 				"current", subset.GetAnnotations()[appsv1alpha1.AnnotationSubsetPatchKey], "updated", nextUpdate[name].Patch)
 			needUpdate = append(needUpdate, name)
 		} else if subset.Status.UpdatedReplicas < subset.Status.Replicas {
-			klog.V(5).InfoS("UnitedDeployment subset needs update: still in updating progress")
+			klog.V(5).InfoS("UnitedDeployment subset needs update: still in updating progress",
+				"unitedDeployment", klog.KObj(ud), "subset", klog.KObj(subset))
 			needUpdate = append(needUpdate, name)
 		}
 	}

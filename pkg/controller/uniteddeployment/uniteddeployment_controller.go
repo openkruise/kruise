@@ -389,7 +389,7 @@ func calculateSubsetsStatusForReservedAdaptiveStrategy(name string, subset *Subs
 		return
 	}
 	if condition := status.GetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable); condition != nil {
-		subset.Status.UnschedulableStatus.PreviouslyUnschedulable = condition.Status == corev1.ConditionFalse
+		subset.Status.UnschedulableStatus.MarkedAsUnschedulable = condition.Status == corev1.ConditionFalse
 	}
 	var requeueAfter time.Duration = math.MaxInt64
 	unschedulableDuration := ud.Spec.Topology.ScheduleStrategy.GetUnschedulableDuration()
@@ -397,7 +397,7 @@ func calculateSubsetsStatusForReservedAdaptiveStrategy(name string, subset *Subs
 		oldReserved, ok := IsPodMarkedAsReserved(pod)
 		var reserved bool
 		var checkAfter time.Duration
-		if subset.Status.UnschedulableStatus.PreviouslyUnschedulable && !ok {
+		if subset.Status.UnschedulableStatus.MarkedAsUnschedulable && !ok {
 			klog.V(5).InfoS("pod created in unschedulable subset", "pod", klog.KObj(pod), "unitedDeployment", klog.KObj(ud), "subset", name)
 			subset.Status.UnschedulableStatus.ReservedPods++
 			podsToPatch = append(podsToPatch, podToPatchReservedLabel{pod, true})
@@ -443,7 +443,7 @@ func calculateSubsetsStatusForReservedAdaptiveStrategy(name string, subset *Subs
 func postProcessSubsetStatusForReservedAdaptiveStrategy(name string, subset *Subset, ud *appsv1alpha1.UnitedDeployment, nextReplicas int32) {
 	status := ud.Status.GetSubsetStatus(name)
 	if !subset.Status.UnschedulableStatus.Unschedulable &&
-		subset.Status.UnschedulableStatus.PreviouslyUnschedulable &&
+		subset.Status.UnschedulableStatus.MarkedAsUnschedulable &&
 		nextReplicas > subset.Spec.Replicas {
 		// This subset is just recovered (reserved pods started), and allocated with more replicas.
 		// The Pods that are going to be created will be considered non-reserved in the next Reconcile, which will

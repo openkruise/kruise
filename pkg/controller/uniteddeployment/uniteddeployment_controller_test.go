@@ -553,7 +553,7 @@ func TestPostProcessSubsetStatusForReservedAdaptiveStrategy(t *testing.T) {
 				},
 				Status: SubsetStatus{
 					UnschedulableStatus: SubsetUnschedulableStatus{
-						PreviouslyUnschedulable: true,
+						MarkedAsUnschedulable: true,
 					},
 				},
 			}
