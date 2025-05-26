@@ -80,13 +80,12 @@ func Test_CommonControl_GetUpdateOptions(t *testing.T) {
 }
 
 func TestIgnorePodUpdateEvent(t *testing.T) {
-	c := commonControl{CloneSet: &appsv1alpha1.CloneSet{}}
-
 	tests := []struct {
 		name     string
 		option   func()
 		oldPod   *v1.Pod
 		curPod   *v1.Pod
+		cs       *appsv1alpha1.CloneSet
 		expected bool
 	}{
 		{
@@ -113,6 +112,7 @@ func TestIgnorePodUpdateEvent(t *testing.T) {
 					},
 				},
 			},
+			cs:       &appsv1alpha1.CloneSet{},
 			expected: true,
 		},
 		{
@@ -139,6 +139,7 @@ func TestIgnorePodUpdateEvent(t *testing.T) {
 					},
 				},
 			},
+			cs:       &appsv1alpha1.CloneSet{},
 			expected: false,
 		},
 		{
@@ -165,12 +166,65 @@ func TestIgnorePodUpdateEvent(t *testing.T) {
 					},
 				},
 			},
+			cs:       &appsv1alpha1.CloneSet{},
 			expected: false,
+		},
+		{
+			name:     "pod without PreNormal finalizer",
+			option:   func() {},
+			oldPod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{appspub.LifecycleStateKey: string(appspub.LifecycleStatePreparingNormal)}}},
+			curPod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{appspub.LifecycleStateKey: string(appspub.LifecycleStatePreparingNormal)}}},
+			cs:       &appsv1alpha1.CloneSet{},
+			expected: true,
+		},
+		{
+			name:   "update pod with PreNormal finalizer hooked",
+			option: func() {},
+			oldPod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{appspub.LifecycleStateKey: string(appspub.LifecycleStatePreparingNormal)}}},
+			curPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:     map[string]string{appspub.LifecycleStateKey: string(appspub.LifecycleStatePreparingNormal)},
+					Finalizers: []string{"finalizers.sigs.k8s.io/test"},
+				},
+			},
+			cs: &appsv1alpha1.CloneSet{
+				Spec: appsv1alpha1.CloneSetSpec{
+					Lifecycle: &appspub.Lifecycle{
+						PreNormal: &appspub.LifecycleHook{FinalizersHandler: []string{"finalizers.sigs.k8s.io/test"}},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name:   "update pod with PreNormal finalizer already hooked",
+			option: func() {},
+			oldPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:     map[string]string{appspub.LifecycleStateKey: string(appspub.LifecycleStatePreparingNormal)},
+					Finalizers: []string{"finalizers.sigs.k8s.io/test"},
+				},
+			},
+			curPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:     map[string]string{appspub.LifecycleStateKey: string(appspub.LifecycleStatePreparingNormal)},
+					Finalizers: []string{"finalizers.sigs.k8s.io/test"},
+				},
+			},
+			cs: &appsv1alpha1.CloneSet{
+				Spec: appsv1alpha1.CloneSetSpec{
+					Lifecycle: &appspub.Lifecycle{
+						PreNormal: &appspub.LifecycleHook{FinalizersHandler: []string{"finalizers.sigs.k8s.io/test"}},
+					},
+				},
+			},
+			expected: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			c := &commonControl{CloneSet: tt.cs}
 			tt.option()
 			if got := c.IgnorePodUpdateEvent(tt.oldPod, tt.curPod); got != tt.expected {
 				t.Errorf("IgnorePodUpdateEvent() = %v, want %v", got, tt.expected)
