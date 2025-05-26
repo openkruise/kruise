@@ -260,5 +260,13 @@ func lifecycleFinalizerChanged(cs *appsv1alpha1.CloneSet, oldPod, curPod *v1.Pod
 		}
 	}
 
+	if cs.Spec.Lifecycle.PreNormal != nil {
+		for _, f := range cs.Spec.Lifecycle.PreNormal.FinalizersHandler {
+			if controllerutil.ContainsFinalizer(oldPod, f) != controllerutil.ContainsFinalizer(curPod, f) {
+				return true
+			}
+		}
+	}
+
 	return false
 }
