@@ -22,6 +22,9 @@ import (
 	"fmt"
 	"strings"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -295,12 +298,12 @@ func (spc *StatefulPodControl) PodClaimIsStale(set *appsv1beta1.StatefulSet, pod
 // have a reason of v1.EventTypeNormal. If err is not nil the generated event will have a reason of v1.EventTypeWarning.
 func (spc *StatefulPodControl) recordPodEvent(verb string, set *appsv1beta1.StatefulSet, pod *v1.Pod, err error) {
 	if err == nil {
-		reason := fmt.Sprintf("Successful%s", strings.Title(verb))
+		reason := fmt.Sprintf("Successful%s", cases.Title(language.Und, cases.NoLower).String(verb))
 		message := fmt.Sprintf("%s Pod %s in StatefulSet %s successful",
 			strings.ToLower(verb), pod.Name, set.Name)
 		spc.recorder.Event(set, v1.EventTypeNormal, reason, message)
 	} else {
-		reason := fmt.Sprintf("Failed%s", strings.Title(verb))
+		reason := fmt.Sprintf("Failed%s", cases.Title(language.Und, cases.NoLower).String(verb))
 		message := fmt.Sprintf("%s Pod %s in StatefulSet %s failed error: %s",
 			strings.ToLower(verb), pod.Name, set.Name, err)
 		spc.recorder.Event(set, v1.EventTypeWarning, reason, message)
@@ -312,12 +315,12 @@ func (spc *StatefulPodControl) recordPodEvent(verb string, set *appsv1beta1.Stat
 // reason of v1.EventTypeWarning.
 func (spc *StatefulPodControl) recordClaimEvent(verb string, set *appsv1beta1.StatefulSet, pod *v1.Pod, claim *v1.PersistentVolumeClaim, err error) {
 	if err == nil {
-		reason := fmt.Sprintf("Successful%s", strings.Title(verb))
+		reason := fmt.Sprintf("Successful%s", cases.Title(language.Und, cases.NoLower).String(verb))
 		message := fmt.Sprintf("%s Claim %s Pod %s in StatefulSet %s success",
 			strings.ToLower(verb), claim.Name, pod.Name, set.Name)
 		spc.recorder.Event(set, v1.EventTypeNormal, reason, message)
 	} else {
-		reason := fmt.Sprintf("Failed%s", strings.Title(verb))
+		reason := fmt.Sprintf("Failed%s", cases.Title(language.Und, cases.NoLower).String(verb))
 		message := fmt.Sprintf("%s Claim %s for Pod %s in StatefulSet %s failed error: %s",
 			strings.ToLower(verb), claim.Name, pod.Name, set.Name, err)
 		spc.recorder.Event(set, v1.EventTypeWarning, reason, message)
