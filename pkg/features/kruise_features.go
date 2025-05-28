@@ -120,6 +120,10 @@ const (
 	// RecreatePodWhenChangeVCTInCloneSetGate recreate the pod upon changing volume claim templates in a clone set to ensure PVC consistency.
 	RecreatePodWhenChangeVCTInCloneSetGate featuregate.Feature = "RecreatePodWhenChangeVCTInCloneSetGate"
 
+	// RecreatePodWhenChangeVCTInStatefulSetGate enables Advances StatefulSetController to recreate Pods if volumeClaimTemplates
+	// are added or removed
+	RecreatePodWhenChangeVCTInStatefulSetGate featuregate.Feature = "RecreatePodWhenChangeVCTInStatefulSetGate"
+
 	// Enables a StatefulSet to start from an arbitrary non zero ordinal
 	StatefulSetStartOrdinal featuregate.Feature = "StatefulSetStartOrdinal"
 
@@ -173,16 +177,17 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	ResourceDistributionGate:              {Default: false, PreRelease: featuregate.Alpha},
 	DeletionProtectionForCRDCascadingGate: {Default: false, PreRelease: featuregate.Alpha},
 
-	EnhancedLivenessProbeGate:                {Default: false, PreRelease: featuregate.Alpha},
-	RecreatePodWhenChangeVCTInCloneSetGate:   {Default: false, PreRelease: featuregate.Alpha},
-	StatefulSetStartOrdinal:                  {Default: false, PreRelease: featuregate.Alpha},
-	PodIndexLabel:                            {Default: true, PreRelease: featuregate.Beta},
-	EnableExternalCerts:                      {Default: false, PreRelease: featuregate.Alpha},
-	StatefulSetAutoResizePVCGate:             {Default: false, PreRelease: featuregate.Alpha},
-	ForceDeleteTimeoutExpectationFeatureGate: {Default: false, PreRelease: featuregate.Alpha},
-	InPlaceWorkloadVerticalScaling:           {Default: false, PreRelease: featuregate.Alpha},
-	EnablePodProbeMarkerOnServerless:         {Default: false, PreRelease: featuregate.Alpha},
-	EnableSortSidecarContainerByName:         {Default: false, PreRelease: featuregate.Alpha},
+	EnhancedLivenessProbeGate:                 {Default: false, PreRelease: featuregate.Alpha},
+	RecreatePodWhenChangeVCTInCloneSetGate:    {Default: false, PreRelease: featuregate.Alpha},
+	RecreatePodWhenChangeVCTInStatefulSetGate: {Default: false, PreRelease: featuregate.Alpha},
+	StatefulSetStartOrdinal:                   {Default: false, PreRelease: featuregate.Alpha},
+	PodIndexLabel:                             {Default: true, PreRelease: featuregate.Beta},
+	EnableExternalCerts:                       {Default: false, PreRelease: featuregate.Alpha},
+	StatefulSetAutoResizePVCGate:              {Default: false, PreRelease: featuregate.Alpha},
+	ForceDeleteTimeoutExpectationFeatureGate:  {Default: false, PreRelease: featuregate.Alpha},
+	InPlaceWorkloadVerticalScaling:            {Default: false, PreRelease: featuregate.Alpha},
+	EnablePodProbeMarkerOnServerless:          {Default: false, PreRelease: featuregate.Alpha},
+	EnableSortSidecarContainerByName:          {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
