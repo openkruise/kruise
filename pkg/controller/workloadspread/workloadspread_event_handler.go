@@ -51,15 +51,15 @@ const (
 	DeploymentRevisionAnnotation             = "deployment.kubernetes.io/revision"
 )
 
-var _ handler.TypedEventHandler[*corev1.Pod] = &podEventHandler{}
+var _ handler.TypedEventHandler[*corev1.Pod, reconcile.Request] = &podEventHandler{}
 
 type podEventHandler struct{}
 
-func (p *podEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *podEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	p.handlePod(q, evt.Object, CreateEventAction)
 }
 
-func (p *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	oldPod := evt.ObjectOld
 	newPod := evt.ObjectNew
 
@@ -68,14 +68,14 @@ func (p *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent
 	}
 }
 
-func (p *podEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *podEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	p.handlePod(q, evt.Object, DeleteEventAction)
 }
 
-func (p *podEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *podEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *podEventHandler) handlePod(q workqueue.RateLimitingInterface, obj runtime.Object, action EventAction) {
+func (p *podEventHandler) handlePod(q workqueue.TypedRateLimitingInterface[reconcile.Request], obj runtime.Object, action EventAction) {
 	pod := obj.(*corev1.Pod)
 	if value, exist := pod.GetAnnotations()[wsutil.MatchedWorkloadSpreadSubsetAnnotations]; exist {
 		injectWorkloadSpread := &wsutil.InjectWorkloadSpread{}
@@ -96,11 +96,11 @@ type workloadEventHandler struct {
 	client.Reader
 }
 
-func (w workloadEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (w workloadEventHandler) Create(ctx context.Context, evt event.CreateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	w.handleWorkload(q, evt.Object, CreateEventAction)
 }
 
-func (w workloadEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (w workloadEventHandler) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	var gvk schema.GroupVersionKind
 	var oldReplicas int32
 	var newReplicas int32
@@ -167,14 +167,14 @@ func (w workloadEventHandler) Update(ctx context.Context, evt event.UpdateEvent,
 	}
 }
 
-func (w workloadEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (w workloadEventHandler) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	w.handleWorkload(q, evt.Object, DeleteEventAction)
 }
 
-func (w workloadEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (w workloadEventHandler) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (w *workloadEventHandler) handleWorkload(q workqueue.RateLimitingInterface,
+func (w *workloadEventHandler) handleWorkload(q workqueue.TypedRateLimitingInterface[reconcile.Request],
 	obj client.Object, action EventAction) {
 	var gvk schema.GroupVersionKind
 	switch obj.(type) {

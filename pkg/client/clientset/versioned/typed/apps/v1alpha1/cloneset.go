@@ -18,16 +18,15 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
-	"time"
+	context "context"
 
-	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	scheme "github.com/openkruise/kruise/pkg/client/clientset/versioned/scheme"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // CloneSetsGetter has a method to return a CloneSetInterface.
@@ -38,15 +37,16 @@ type CloneSetsGetter interface {
 
 // CloneSetInterface has methods to work with CloneSet resources.
 type CloneSetInterface interface {
-	Create(ctx context.Context, cloneSet *v1alpha1.CloneSet, opts v1.CreateOptions) (*v1alpha1.CloneSet, error)
-	Update(ctx context.Context, cloneSet *v1alpha1.CloneSet, opts v1.UpdateOptions) (*v1alpha1.CloneSet, error)
-	UpdateStatus(ctx context.Context, cloneSet *v1alpha1.CloneSet, opts v1.UpdateOptions) (*v1alpha1.CloneSet, error)
+	Create(ctx context.Context, cloneSet *appsv1alpha1.CloneSet, opts v1.CreateOptions) (*appsv1alpha1.CloneSet, error)
+	Update(ctx context.Context, cloneSet *appsv1alpha1.CloneSet, opts v1.UpdateOptions) (*appsv1alpha1.CloneSet, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+	UpdateStatus(ctx context.Context, cloneSet *appsv1alpha1.CloneSet, opts v1.UpdateOptions) (*appsv1alpha1.CloneSet, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.CloneSet, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.CloneSetList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*appsv1alpha1.CloneSet, error)
+	List(ctx context.Context, opts v1.ListOptions) (*appsv1alpha1.CloneSetList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.CloneSet, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1alpha1.CloneSet, err error)
 	GetScale(ctx context.Context, cloneSetName string, options v1.GetOptions) (*autoscalingv1.Scale, error)
 	UpdateScale(ctx context.Context, cloneSetName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (*autoscalingv1.Scale, error)
 
@@ -55,153 +55,28 @@ type CloneSetInterface interface {
 
 // cloneSets implements CloneSetInterface
 type cloneSets struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithList[*appsv1alpha1.CloneSet, *appsv1alpha1.CloneSetList]
 }
 
 // newCloneSets returns a CloneSets
 func newCloneSets(c *AppsV1alpha1Client, namespace string) *cloneSets {
 	return &cloneSets{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithList[*appsv1alpha1.CloneSet, *appsv1alpha1.CloneSetList](
+			"clonesets",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *appsv1alpha1.CloneSet { return &appsv1alpha1.CloneSet{} },
+			func() *appsv1alpha1.CloneSetList { return &appsv1alpha1.CloneSetList{} },
+		),
 	}
-}
-
-// Get takes name of the cloneSet, and returns the corresponding cloneSet object, and an error if there is any.
-func (c *cloneSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.CloneSet, err error) {
-	result = &v1alpha1.CloneSet{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("clonesets").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of CloneSets that match those selectors.
-func (c *cloneSets) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.CloneSetList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1alpha1.CloneSetList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("clonesets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested cloneSets.
-func (c *cloneSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("clonesets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a cloneSet and creates it.  Returns the server's representation of the cloneSet, and an error, if there is any.
-func (c *cloneSets) Create(ctx context.Context, cloneSet *v1alpha1.CloneSet, opts v1.CreateOptions) (result *v1alpha1.CloneSet, err error) {
-	result = &v1alpha1.CloneSet{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("clonesets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(cloneSet).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a cloneSet and updates it. Returns the server's representation of the cloneSet, and an error, if there is any.
-func (c *cloneSets) Update(ctx context.Context, cloneSet *v1alpha1.CloneSet, opts v1.UpdateOptions) (result *v1alpha1.CloneSet, err error) {
-	result = &v1alpha1.CloneSet{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("clonesets").
-		Name(cloneSet.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(cloneSet).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *cloneSets) UpdateStatus(ctx context.Context, cloneSet *v1alpha1.CloneSet, opts v1.UpdateOptions) (result *v1alpha1.CloneSet, err error) {
-	result = &v1alpha1.CloneSet{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("clonesets").
-		Name(cloneSet.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(cloneSet).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the cloneSet and deletes it. Returns an error if one occurs.
-func (c *cloneSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("clonesets").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *cloneSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("clonesets").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched cloneSet.
-func (c *cloneSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.CloneSet, err error) {
-	result = &v1alpha1.CloneSet{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("clonesets").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }
 
 // GetScale takes name of the cloneSet, and returns the corresponding autoscalingv1.Scale object, and an error if there is any.
 func (c *cloneSets) GetScale(ctx context.Context, cloneSetName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
-	err = c.client.Get().
-		Namespace(c.ns).
+	err = c.GetClient().Get().
+		Namespace(c.GetNamespace()).
 		Resource("clonesets").
 		Name(cloneSetName).
 		SubResource("scale").
@@ -214,8 +89,8 @@ func (c *cloneSets) GetScale(ctx context.Context, cloneSetName string, options v
 // UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
 func (c *cloneSets) UpdateScale(ctx context.Context, cloneSetName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
-	err = c.client.Put().
-		Namespace(c.ns).
+	err = c.GetClient().Put().
+		Namespace(c.GetNamespace()).
 		Resource("clonesets").
 		Name(cloneSetName).
 		SubResource("scale").

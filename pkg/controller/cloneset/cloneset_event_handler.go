@@ -52,9 +52,9 @@ type podEventHandler struct {
 	client.Reader
 }
 
-var _ handler.TypedEventHandler[*v1.Pod] = &podEventHandler{}
+var _ handler.TypedEventHandler[*v1.Pod, reconcile.Request] = &podEventHandler{}
 
-func (e *podEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	pod := evt.Object
 	if pod.DeletionTimestamp != nil {
 		// on a restart of the controller manager, it's possible a new pod shows up in a state that
@@ -102,7 +102,7 @@ func (e *podEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent
 	}
 }
 
-func (e *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	oldPod := evt.ObjectOld
 	curPod := evt.ObjectNew
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
@@ -187,7 +187,7 @@ func (e *podEventHandler) shouldIgnoreUpdate(req *reconcile.Request, oldPod, cur
 	return clonesetcore.New(cs).IgnorePodUpdateEvent(oldPod, curPod)
 }
 
-func (e *podEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	pod := evt.Object
 	clonesetutils.ResourceVersionExpectations.Delete(pod)
 
@@ -206,7 +206,7 @@ func (e *podEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent
 	q.Add(*req)
 }
 
-func (e *podEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 
 }
 
@@ -268,9 +268,9 @@ func (e *podEventHandler) joinCloneSetNames(csList []appsv1alpha1.CloneSet) stri
 type pvcEventHandler struct {
 }
 
-var _ handler.TypedEventHandler[*v1.PersistentVolumeClaim] = &pvcEventHandler{}
+var _ handler.TypedEventHandler[*v1.PersistentVolumeClaim, reconcile.Request] = &pvcEventHandler{}
 
-func (e *pvcEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.PersistentVolumeClaim], q workqueue.RateLimitingInterface) {
+func (e *pvcEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.PersistentVolumeClaim], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	pvc := evt.Object
 	if pvc.DeletionTimestamp != nil {
 		e.Delete(ctx, event.TypedDeleteEvent[*v1.PersistentVolumeClaim]{Object: evt.Object}, q)
@@ -294,14 +294,14 @@ func (e *pvcEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent
 	}
 }
 
-func (e *pvcEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.PersistentVolumeClaim], q workqueue.RateLimitingInterface) {
+func (e *pvcEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.PersistentVolumeClaim], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	pvc := evt.ObjectNew
 	if pvc.DeletionTimestamp != nil {
 		e.Delete(ctx, event.TypedDeleteEvent[*v1.PersistentVolumeClaim]{Object: evt.ObjectNew}, q)
 	}
 }
 
-func (e *pvcEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.PersistentVolumeClaim], q workqueue.RateLimitingInterface) {
+func (e *pvcEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.PersistentVolumeClaim], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	pvc := evt.Object
 	if controllerRef := metav1.GetControllerOf(pvc); controllerRef != nil {
 		if req := resolveControllerRef(pvc.Namespace, controllerRef); req != nil {
@@ -311,6 +311,6 @@ func (e *pvcEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent
 	}
 }
 
-func (e *pvcEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.PersistentVolumeClaim], q workqueue.RateLimitingInterface) {
+func (e *pvcEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.PersistentVolumeClaim], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 
 }

@@ -42,17 +42,17 @@ import (
 	"github.com/openkruise/kruise/pkg/webhook/pod/mutating"
 )
 
-var _ handler.TypedEventHandler[*corev1.Pod] = &enqueueRequestForPod{}
+var _ handler.TypedEventHandler[*corev1.Pod, reconcile.Request] = &enqueueRequestForPod{}
 
 type enqueueRequestForPod struct {
 	reader client.Reader
 	client client.Client
 }
 
-func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	pod := evt.Object
 	pps := p.fetchPersistentPodState(pod)
 	if pps == nil {
@@ -66,14 +66,14 @@ func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.TypedDelete
 	})
 }
 
-func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	p.updatePod(q, evt.ObjectOld, evt.ObjectNew)
 }
 
-func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old, cur runtime.Object) {
+func (p *enqueueRequestForPod) updatePod(q workqueue.TypedRateLimitingInterface[reconcile.Request], old, cur runtime.Object) {
 	newPod := cur.(*corev1.Pod)
 	oldPod := old.(*corev1.Pod)
 	if !isPodValidChanged(oldPod, newPod) {
@@ -134,13 +134,13 @@ func isPodValidChanged(oldPod, newPod *corev1.Pod) bool {
 	return false
 }
 
-var _ handler.TypedEventHandler[*appsv1.StatefulSet] = &enqueueRequestForStatefulSet{}
+var _ handler.TypedEventHandler[*appsv1.StatefulSet, reconcile.Request] = &enqueueRequestForStatefulSet{}
 
 type enqueueRequestForStatefulSet struct {
 	reader client.Reader
 }
 
-func (p *enqueueRequestForStatefulSet) Create(ctx context.Context, evt event.TypedCreateEvent[*appsv1.StatefulSet], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForStatefulSet) Create(ctx context.Context, evt event.TypedCreateEvent[*appsv1.StatefulSet], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	sts := evt.Object
 	if sts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] == "true" &&
 		(sts.Annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] != "" ||
@@ -149,7 +149,7 @@ func (p *enqueueRequestForStatefulSet) Create(ctx context.Context, evt event.Typ
 	}
 }
 
-func (p *enqueueRequestForStatefulSet) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1.StatefulSet], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForStatefulSet) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1.StatefulSet], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	sts := evt.Object
 	if pps := mutating.SelectorPersistentPodState(p.reader, appsv1alpha1.TargetReference{
 		APIVersion: KruiseKindSts.GroupVersion().String(),
@@ -165,10 +165,10 @@ func (p *enqueueRequestForStatefulSet) Delete(ctx context.Context, evt event.Typ
 	}
 }
 
-func (p *enqueueRequestForStatefulSet) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsv1.StatefulSet], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForStatefulSet) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsv1.StatefulSet], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *enqueueRequestForStatefulSet) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1.StatefulSet], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForStatefulSet) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1.StatefulSet], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	oSts := evt.ObjectOld
 	nSts := evt.ObjectNew
 	if oSts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] != nSts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] ||
@@ -194,7 +194,7 @@ func (p *enqueueRequestForStatefulSet) Update(ctx context.Context, evt event.Typ
 	}
 }
 
-func enqueuePersistentPodStateRequest(q workqueue.RateLimitingInterface, apiVersion, kind, ns, name string) {
+func enqueuePersistentPodStateRequest(q workqueue.TypedRateLimitingInterface[reconcile.Request], apiVersion, kind, ns, name string) {
 	// name Format = generate#{apiVersion}#{workload.Kind}#{workload.Name}
 	// example for generate#apps/v1#StatefulSet#echoserver
 	qName := fmt.Sprintf("%s%s#%s#%s", AutoGeneratePersistentPodStatePrefix, apiVersion, kind, name)
@@ -205,13 +205,13 @@ func enqueuePersistentPodStateRequest(q workqueue.RateLimitingInterface, apiVers
 	klog.V(3).InfoS("Enqueue PersistentPodState request", "qName", qName)
 }
 
-var _ handler.TypedEventHandler[*appsv1beta1.StatefulSet] = &enqueueRequestForKruiseStatefulSet{}
+var _ handler.TypedEventHandler[*appsv1beta1.StatefulSet, reconcile.Request] = &enqueueRequestForKruiseStatefulSet{}
 
 type enqueueRequestForKruiseStatefulSet struct {
 	reader client.Reader
 }
 
-func (p *enqueueRequestForKruiseStatefulSet) Create(ctx context.Context, evt event.TypedCreateEvent[*appsv1beta1.StatefulSet], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForKruiseStatefulSet) Create(ctx context.Context, evt event.TypedCreateEvent[*appsv1beta1.StatefulSet], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	sts := evt.Object
 	if sts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] == "true" &&
 		(sts.Annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] != "" ||
@@ -220,7 +220,7 @@ func (p *enqueueRequestForKruiseStatefulSet) Create(ctx context.Context, evt eve
 	}
 }
 
-func (p *enqueueRequestForKruiseStatefulSet) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1beta1.StatefulSet], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForKruiseStatefulSet) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1beta1.StatefulSet], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	sts := evt.Object
 	if pps := mutating.SelectorPersistentPodState(p.reader, appsv1alpha1.TargetReference{
 		APIVersion: KruiseKindSts.GroupVersion().String(),
@@ -236,10 +236,10 @@ func (p *enqueueRequestForKruiseStatefulSet) Delete(ctx context.Context, evt eve
 	}
 }
 
-func (p *enqueueRequestForKruiseStatefulSet) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsv1beta1.StatefulSet], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForKruiseStatefulSet) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsv1beta1.StatefulSet], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *enqueueRequestForKruiseStatefulSet) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1beta1.StatefulSet], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForKruiseStatefulSet) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1beta1.StatefulSet], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	oSts := evt.ObjectOld
 	nSts := evt.ObjectNew
 	if oSts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] != nSts.Annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] ||
@@ -271,7 +271,7 @@ type enqueueRequestForStatefulSetLike struct {
 	reader client.Reader
 }
 
-func (p *enqueueRequestForStatefulSetLike) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForStatefulSetLike) Create(ctx context.Context, evt event.CreateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	workload := evt.Object.(*unstructured.Unstructured)
 	annotations := workload.GetAnnotations()
 	if annotations[appsv1alpha1.AnnotationAutoGeneratePersistentPodState] == "true" &&
@@ -281,7 +281,7 @@ func (p *enqueueRequestForStatefulSetLike) Create(ctx context.Context, evt event
 	}
 }
 
-func (p *enqueueRequestForStatefulSetLike) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForStatefulSetLike) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	oWorkload := evt.ObjectOld.(*unstructured.Unstructured)
 	nWorkload := evt.ObjectNew.(*unstructured.Unstructured)
 	oAnnotations := oWorkload.GetAnnotations()
@@ -309,7 +309,7 @@ func (p *enqueueRequestForStatefulSetLike) Update(ctx context.Context, evt event
 	}
 }
 
-func (p *enqueueRequestForStatefulSetLike) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForStatefulSetLike) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	workload := evt.Object.(*unstructured.Unstructured)
 	if pps := mutating.SelectorPersistentPodState(p.reader, appsv1alpha1.TargetReference{
 		APIVersion: workload.GetAPIVersion(),
@@ -325,5 +325,5 @@ func (p *enqueueRequestForStatefulSetLike) Delete(ctx context.Context, evt event
 	}
 }
 
-func (p *enqueueRequestForStatefulSetLike) Generic(ctx context.Context, genericEvent event.GenericEvent, limitingInterface workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForStatefulSetLike) Generic(ctx context.Context, genericEvent event.GenericEvent, limitingInterface workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
