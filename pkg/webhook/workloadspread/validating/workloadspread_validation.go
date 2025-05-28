@@ -263,7 +263,7 @@ func validateWorkloadSpreadSubsets(ws *appsv1alpha1.WorkloadSpread, subsets []ap
 			if err := corev1.Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm(subset.RequiredNodeSelectorTerm.DeepCopy(), coreNodeSelectorTerm, nil); err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelectorTerm"), subset.RequiredNodeSelectorTerm, fmt.Sprintf("Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm failed: %v", err)))
 			} else {
-				allErrs = append(allErrs, corevalidation.ValidateNodeSelectorTerm(*coreNodeSelectorTerm, fldPath.Index(i).Child("requiredNodeSelectorTerm"))...)
+				allErrs = append(allErrs, corevalidation.ValidateNodeSelectorTerm(*coreNodeSelectorTerm, false, fldPath.Index(i).Child("requiredNodeSelectorTerm"))...)
 			}
 		}
 

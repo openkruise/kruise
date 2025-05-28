@@ -18,13 +18,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	apisappsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	versioned "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/openkruise/kruise/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,7 +35,7 @@ import (
 // UnitedDeployments.
 type UnitedDeploymentInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.UnitedDeploymentLister
+	Lister() appsv1alpha1.UnitedDeploymentLister
 }
 
 type unitedDeploymentInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredUnitedDeploymentInformer(client versioned.Interface, namespace s
 				return client.AppsV1alpha1().UnitedDeployments(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&appsv1alpha1.UnitedDeployment{},
+		&apisappsv1alpha1.UnitedDeployment{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *unitedDeploymentInformer) defaultInformer(client versioned.Interface, r
 }
 
 func (f *unitedDeploymentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1alpha1.UnitedDeployment{}, f.defaultInformer)
+	return f.factory.InformerFor(&apisappsv1alpha1.UnitedDeployment{}, f.defaultInformer)
 }
 
-func (f *unitedDeploymentInformer) Lister() v1alpha1.UnitedDeploymentLister {
-	return v1alpha1.NewUnitedDeploymentLister(f.Informer().GetIndexer())
+func (f *unitedDeploymentInformer) Lister() appsv1alpha1.UnitedDeploymentLister {
+	return appsv1alpha1.NewUnitedDeploymentLister(f.Informer().GetIndexer())
 }

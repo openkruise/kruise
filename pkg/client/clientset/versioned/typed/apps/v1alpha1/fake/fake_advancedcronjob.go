@@ -18,123 +18,34 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeAdvancedCronJobs implements AdvancedCronJobInterface
-type FakeAdvancedCronJobs struct {
+// fakeAdvancedCronJobs implements AdvancedCronJobInterface
+type fakeAdvancedCronJobs struct {
+	*gentype.FakeClientWithList[*v1alpha1.AdvancedCronJob, *v1alpha1.AdvancedCronJobList]
 	Fake *FakeAppsV1alpha1
-	ns   string
 }
 
-var advancedcronjobsResource = v1alpha1.SchemeGroupVersion.WithResource("advancedcronjobs")
-
-var advancedcronjobsKind = v1alpha1.SchemeGroupVersion.WithKind("AdvancedCronJob")
-
-// Get takes name of the advancedCronJob, and returns the corresponding advancedCronJob object, and an error if there is any.
-func (c *FakeAdvancedCronJobs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.AdvancedCronJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(advancedcronjobsResource, c.ns, name), &v1alpha1.AdvancedCronJob{})
-
-	if obj == nil {
-		return nil, err
+func newFakeAdvancedCronJobs(fake *FakeAppsV1alpha1, namespace string) appsv1alpha1.AdvancedCronJobInterface {
+	return &fakeAdvancedCronJobs{
+		gentype.NewFakeClientWithList[*v1alpha1.AdvancedCronJob, *v1alpha1.AdvancedCronJobList](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("advancedcronjobs"),
+			v1alpha1.SchemeGroupVersion.WithKind("AdvancedCronJob"),
+			func() *v1alpha1.AdvancedCronJob { return &v1alpha1.AdvancedCronJob{} },
+			func() *v1alpha1.AdvancedCronJobList { return &v1alpha1.AdvancedCronJobList{} },
+			func(dst, src *v1alpha1.AdvancedCronJobList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.AdvancedCronJobList) []*v1alpha1.AdvancedCronJob {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.AdvancedCronJobList, items []*v1alpha1.AdvancedCronJob) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.AdvancedCronJob), err
-}
-
-// List takes label and field selectors, and returns the list of AdvancedCronJobs that match those selectors.
-func (c *FakeAdvancedCronJobs) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.AdvancedCronJobList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(advancedcronjobsResource, advancedcronjobsKind, c.ns, opts), &v1alpha1.AdvancedCronJobList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.AdvancedCronJobList{ListMeta: obj.(*v1alpha1.AdvancedCronJobList).ListMeta}
-	for _, item := range obj.(*v1alpha1.AdvancedCronJobList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested advancedCronJobs.
-func (c *FakeAdvancedCronJobs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(advancedcronjobsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a advancedCronJob and creates it.  Returns the server's representation of the advancedCronJob, and an error, if there is any.
-func (c *FakeAdvancedCronJobs) Create(ctx context.Context, advancedCronJob *v1alpha1.AdvancedCronJob, opts v1.CreateOptions) (result *v1alpha1.AdvancedCronJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(advancedcronjobsResource, c.ns, advancedCronJob), &v1alpha1.AdvancedCronJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.AdvancedCronJob), err
-}
-
-// Update takes the representation of a advancedCronJob and updates it. Returns the server's representation of the advancedCronJob, and an error, if there is any.
-func (c *FakeAdvancedCronJobs) Update(ctx context.Context, advancedCronJob *v1alpha1.AdvancedCronJob, opts v1.UpdateOptions) (result *v1alpha1.AdvancedCronJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(advancedcronjobsResource, c.ns, advancedCronJob), &v1alpha1.AdvancedCronJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.AdvancedCronJob), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeAdvancedCronJobs) UpdateStatus(ctx context.Context, advancedCronJob *v1alpha1.AdvancedCronJob, opts v1.UpdateOptions) (*v1alpha1.AdvancedCronJob, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(advancedcronjobsResource, "status", c.ns, advancedCronJob), &v1alpha1.AdvancedCronJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.AdvancedCronJob), err
-}
-
-// Delete takes name of the advancedCronJob and deletes it. Returns an error if one occurs.
-func (c *FakeAdvancedCronJobs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(advancedcronjobsResource, c.ns, name, opts), &v1alpha1.AdvancedCronJob{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeAdvancedCronJobs) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(advancedcronjobsResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.AdvancedCronJobList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched advancedCronJob.
-func (c *FakeAdvancedCronJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.AdvancedCronJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(advancedcronjobsResource, c.ns, name, pt, data, subresources...), &v1alpha1.AdvancedCronJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.AdvancedCronJob), err
 }

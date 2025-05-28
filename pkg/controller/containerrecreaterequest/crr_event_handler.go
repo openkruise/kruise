@@ -36,14 +36,14 @@ type podEventHandler struct {
 	client.Reader
 }
 
-var _ handler.TypedEventHandler[*v1.Pod] = &podEventHandler{}
+var _ handler.TypedEventHandler[*v1.Pod, reconcile.Request] = &podEventHandler{}
 
-func (e *podEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	obj := evt.Object
 	e.handle(obj, q)
 }
 
-func (e *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	obj := evt.ObjectNew
 	oldObj := evt.ObjectOld
 	if oldObj.DeletionTimestamp == nil && obj.DeletionTimestamp != nil {
@@ -56,15 +56,15 @@ func (e *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent
 	}
 }
 
-func (e *podEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	obj := evt.Object
 	e.handle(obj, q)
 }
 
-func (e *podEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.Pod], q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (e *podEventHandler) handle(pod *v1.Pod, q workqueue.RateLimitingInterface) {
+func (e *podEventHandler) handle(pod *v1.Pod, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	crrList := &appsv1alpha1.ContainerRecreateRequestList{}
 	err := e.List(context.TODO(), crrList, client.InNamespace(pod.Namespace), client.MatchingLabels{appsv1alpha1.ContainerRecreateRequestPodUIDKey: string(pod.UID)})
 	if err != nil {

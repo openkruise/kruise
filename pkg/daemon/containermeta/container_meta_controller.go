@@ -345,8 +345,7 @@ func (c *Controller) manageContainerMetaSet(pod *v1.Pod, kubePodStatus *kubeletc
 				ContainerID:  status.ID.String(),
 				RestartCount: int32(status.RestartCount),
 				Hashes: appspub.RuntimeContainerHashes{
-					PlainHash:                 status.Hash,
-					PlainHashWithoutResources: status.HashWithoutResources,
+					PlainHash: status.Hash,
 				},
 			}
 		}

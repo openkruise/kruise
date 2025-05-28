@@ -18,13 +18,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	apisappsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	versioned "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/openkruise/kruise/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,7 +35,7 @@ import (
 // BroadcastJobs.
 type BroadcastJobInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.BroadcastJobLister
+	Lister() appsv1alpha1.BroadcastJobLister
 }
 
 type broadcastJobInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredBroadcastJobInformer(client versioned.Interface, namespace strin
 				return client.AppsV1alpha1().BroadcastJobs(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&appsv1alpha1.BroadcastJob{},
+		&apisappsv1alpha1.BroadcastJob{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *broadcastJobInformer) defaultInformer(client versioned.Interface, resyn
 }
 
 func (f *broadcastJobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1alpha1.BroadcastJob{}, f.defaultInformer)
+	return f.factory.InformerFor(&apisappsv1alpha1.BroadcastJob{}, f.defaultInformer)
 }
 
-func (f *broadcastJobInformer) Lister() v1alpha1.BroadcastJobLister {
-	return v1alpha1.NewBroadcastJobLister(f.Informer().GetIndexer())
+func (f *broadcastJobInformer) Lister() appsv1alpha1.BroadcastJobLister {
+	return appsv1alpha1.NewBroadcastJobLister(f.Informer().GetIndexer())
 }
