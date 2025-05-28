@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // BroadcastJobLister helps list BroadcastJobs.
@@ -29,7 +29,7 @@ import (
 type BroadcastJobLister interface {
 	// List lists all BroadcastJobs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.BroadcastJob, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.BroadcastJob, err error)
 	// BroadcastJobs returns an object that can list and get BroadcastJobs.
 	BroadcastJobs(namespace string) BroadcastJobNamespaceLister
 	BroadcastJobListerExpansion
@@ -37,25 +37,17 @@ type BroadcastJobLister interface {
 
 // broadcastJobLister implements the BroadcastJobLister interface.
 type broadcastJobLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*appsv1alpha1.BroadcastJob]
 }
 
 // NewBroadcastJobLister returns a new BroadcastJobLister.
 func NewBroadcastJobLister(indexer cache.Indexer) BroadcastJobLister {
-	return &broadcastJobLister{indexer: indexer}
-}
-
-// List lists all BroadcastJobs in the indexer.
-func (s *broadcastJobLister) List(selector labels.Selector) (ret []*v1alpha1.BroadcastJob, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.BroadcastJob))
-	})
-	return ret, err
+	return &broadcastJobLister{listers.New[*appsv1alpha1.BroadcastJob](indexer, appsv1alpha1.Resource("broadcastjob"))}
 }
 
 // BroadcastJobs returns an object that can list and get BroadcastJobs.
 func (s *broadcastJobLister) BroadcastJobs(namespace string) BroadcastJobNamespaceLister {
-	return broadcastJobNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return broadcastJobNamespaceLister{listers.NewNamespaced[*appsv1alpha1.BroadcastJob](s.ResourceIndexer, namespace)}
 }
 
 // BroadcastJobNamespaceLister helps list and get BroadcastJobs.
@@ -63,36 +55,15 @@ func (s *broadcastJobLister) BroadcastJobs(namespace string) BroadcastJobNamespa
 type BroadcastJobNamespaceLister interface {
 	// List lists all BroadcastJobs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.BroadcastJob, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.BroadcastJob, err error)
 	// Get retrieves the BroadcastJob from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.BroadcastJob, error)
+	Get(name string) (*appsv1alpha1.BroadcastJob, error)
 	BroadcastJobNamespaceListerExpansion
 }
 
 // broadcastJobNamespaceLister implements the BroadcastJobNamespaceLister
 // interface.
 type broadcastJobNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all BroadcastJobs in the indexer for a given namespace.
-func (s broadcastJobNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.BroadcastJob, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.BroadcastJob))
-	})
-	return ret, err
-}
-
-// Get retrieves the BroadcastJob from the indexer for a given namespace and name.
-func (s broadcastJobNamespaceLister) Get(name string) (*v1alpha1.BroadcastJob, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("broadcastjob"), name)
-	}
-	return obj.(*v1alpha1.BroadcastJob), nil
+	listers.ResourceIndexer[*appsv1alpha1.BroadcastJob]
 }

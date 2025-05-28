@@ -448,10 +448,6 @@ func defaultCheckContainersInPlaceUpdateCompleted(pod *v1.Pod, inPlaceUpdateStat
 
 	if runtimeContainerMetaSet != nil {
 		metaHashType := plainHash
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) && inPlaceUpdateState.UpdateResources {
-			// if vertical scaling is enabled and update resources, we should compare plainHashWithoutResources
-			metaHashType = plainHashWithoutResources
-		}
 		if checkAllContainersHashConsistent(pod, runtimeContainerMetaSet, metaHashType) {
 			klog.V(5).InfoS("Check Pod in-place update completed for all container hash consistent", "namespace", pod.Namespace, "name", pod.Name)
 			return nil
@@ -492,7 +488,6 @@ type hashType string
 
 const (
 	plainHash                    hashType = "PlainHash"
-	plainHashWithoutResources    hashType = "PlainHashWithoutResources"
 	extractedEnvFromMetadataHash hashType = "ExtractedEnvFromMetadataHash"
 )
 
@@ -541,15 +536,6 @@ func checkAllContainersHashConsistent(pod *v1.Pod, runtimeContainerMetaSet *apps
 				klog.InfoS("Find container in runtime-container-meta for Pod has different plain hash with spec",
 					"containerName", containerSpec.Name, "namespace", pod.Namespace, "podName", pod.Name,
 					"metaHash", containerMeta.Hashes.PlainHash, "expectedHash", expectedHash)
-				return false
-			}
-		case plainHashWithoutResources:
-			containerSpecCopy := containerSpec.DeepCopy()
-			containerSpecCopy.Resources = v1.ResourceRequirements{}
-			if expectedHash := kubeletcontainer.HashContainer(containerSpecCopy); containerMeta.Hashes.PlainHashWithoutResources != expectedHash {
-				klog.InfoS("Find container in runtime-container-meta for Pod has different plain hash with spec(except resources)",
-					"containerName", containerSpecCopy.Name, "namespace", pod.Namespace, "podName", pod.Name,
-					"metaHash", containerMeta.Hashes.PlainHashWithoutResources, "expectedHash", expectedHash)
 				return false
 			}
 		case extractedEnvFromMetadataHash:

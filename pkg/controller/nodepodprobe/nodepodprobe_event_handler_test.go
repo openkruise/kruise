@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 var (
@@ -48,7 +49,9 @@ func TestNodeEventHandler(t *testing.T) {
 	demo := demoNode.DeepCopy()
 	_ = fakeClient.Create(context.TODO(), demo)
 	// create
-	createQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	createQ := workqueue.NewTypedRateLimitingQueue(
+		workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+	)
 	createEvt := event.TypedCreateEvent[*corev1.Node]{
 		Object: demo,
 	}

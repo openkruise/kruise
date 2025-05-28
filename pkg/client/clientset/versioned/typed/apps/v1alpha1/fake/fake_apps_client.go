@@ -28,71 +28,71 @@ type FakeAppsV1alpha1 struct {
 }
 
 func (c *FakeAppsV1alpha1) AdvancedCronJobs(namespace string) v1alpha1.AdvancedCronJobInterface {
-	return &FakeAdvancedCronJobs{c, namespace}
+	return newFakeAdvancedCronJobs(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) BroadcastJobs(namespace string) v1alpha1.BroadcastJobInterface {
-	return &FakeBroadcastJobs{c, namespace}
+	return newFakeBroadcastJobs(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) CloneSets(namespace string) v1alpha1.CloneSetInterface {
-	return &FakeCloneSets{c, namespace}
+	return newFakeCloneSets(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) ContainerRecreateRequests(namespace string) v1alpha1.ContainerRecreateRequestInterface {
-	return &FakeContainerRecreateRequests{c, namespace}
+	return newFakeContainerRecreateRequests(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) DaemonSets(namespace string) v1alpha1.DaemonSetInterface {
-	return &FakeDaemonSets{c, namespace}
+	return newFakeDaemonSets(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) EphemeralJobs(namespace string) v1alpha1.EphemeralJobInterface {
-	return &FakeEphemeralJobs{c, namespace}
+	return newFakeEphemeralJobs(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) ImageListPullJobs(namespace string) v1alpha1.ImageListPullJobInterface {
-	return &FakeImageListPullJobs{c, namespace}
+	return newFakeImageListPullJobs(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) ImagePullJobs(namespace string) v1alpha1.ImagePullJobInterface {
-	return &FakeImagePullJobs{c, namespace}
+	return newFakeImagePullJobs(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) NodeImages() v1alpha1.NodeImageInterface {
-	return &FakeNodeImages{c}
+	return newFakeNodeImages(c)
 }
 
 func (c *FakeAppsV1alpha1) NodePodProbes() v1alpha1.NodePodProbeInterface {
-	return &FakeNodePodProbes{c}
+	return newFakeNodePodProbes(c)
 }
 
 func (c *FakeAppsV1alpha1) PersistentPodStates(namespace string) v1alpha1.PersistentPodStateInterface {
-	return &FakePersistentPodStates{c, namespace}
+	return newFakePersistentPodStates(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) PodProbeMarkers(namespace string) v1alpha1.PodProbeMarkerInterface {
-	return &FakePodProbeMarkers{c, namespace}
+	return newFakePodProbeMarkers(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) ResourceDistributions() v1alpha1.ResourceDistributionInterface {
-	return &FakeResourceDistributions{c}
+	return newFakeResourceDistributions(c)
 }
 
 func (c *FakeAppsV1alpha1) SidecarSets() v1alpha1.SidecarSetInterface {
-	return &FakeSidecarSets{c}
+	return newFakeSidecarSets(c)
 }
 
 func (c *FakeAppsV1alpha1) StatefulSets(namespace string) v1alpha1.StatefulSetInterface {
-	return &FakeStatefulSets{c, namespace}
+	return newFakeStatefulSets(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) UnitedDeployments(namespace string) v1alpha1.UnitedDeploymentInterface {
-	return &FakeUnitedDeployments{c, namespace}
+	return newFakeUnitedDeployments(c, namespace)
 }
 
 func (c *FakeAppsV1alpha1) WorkloadSpreads(namespace string) v1alpha1.WorkloadSpreadInterface {
-	return &FakeWorkloadSpreads{c, namespace}
+	return newFakeWorkloadSpreads(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

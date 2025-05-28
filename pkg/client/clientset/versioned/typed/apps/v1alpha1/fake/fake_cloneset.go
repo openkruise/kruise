@@ -18,146 +18,61 @@ limitations under the License.
 package fake
 
 import (
-	"context"
+	context "context"
 
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
+	gentype "k8s.io/client-go/gentype"
 	testing "k8s.io/client-go/testing"
 )
 
-// FakeCloneSets implements CloneSetInterface
-type FakeCloneSets struct {
+// fakeCloneSets implements CloneSetInterface
+type fakeCloneSets struct {
+	*gentype.FakeClientWithList[*v1alpha1.CloneSet, *v1alpha1.CloneSetList]
 	Fake *FakeAppsV1alpha1
-	ns   string
 }
 
-var clonesetsResource = v1alpha1.SchemeGroupVersion.WithResource("clonesets")
-
-var clonesetsKind = v1alpha1.SchemeGroupVersion.WithKind("CloneSet")
-
-// Get takes name of the cloneSet, and returns the corresponding cloneSet object, and an error if there is any.
-func (c *FakeCloneSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.CloneSet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(clonesetsResource, c.ns, name), &v1alpha1.CloneSet{})
-
-	if obj == nil {
-		return nil, err
+func newFakeCloneSets(fake *FakeAppsV1alpha1, namespace string) appsv1alpha1.CloneSetInterface {
+	return &fakeCloneSets{
+		gentype.NewFakeClientWithList[*v1alpha1.CloneSet, *v1alpha1.CloneSetList](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("clonesets"),
+			v1alpha1.SchemeGroupVersion.WithKind("CloneSet"),
+			func() *v1alpha1.CloneSet { return &v1alpha1.CloneSet{} },
+			func() *v1alpha1.CloneSetList { return &v1alpha1.CloneSetList{} },
+			func(dst, src *v1alpha1.CloneSetList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.CloneSetList) []*v1alpha1.CloneSet { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1alpha1.CloneSetList, items []*v1alpha1.CloneSet) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.CloneSet), err
-}
-
-// List takes label and field selectors, and returns the list of CloneSets that match those selectors.
-func (c *FakeCloneSets) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.CloneSetList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(clonesetsResource, clonesetsKind, c.ns, opts), &v1alpha1.CloneSetList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.CloneSetList{ListMeta: obj.(*v1alpha1.CloneSetList).ListMeta}
-	for _, item := range obj.(*v1alpha1.CloneSetList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested cloneSets.
-func (c *FakeCloneSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(clonesetsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a cloneSet and creates it.  Returns the server's representation of the cloneSet, and an error, if there is any.
-func (c *FakeCloneSets) Create(ctx context.Context, cloneSet *v1alpha1.CloneSet, opts v1.CreateOptions) (result *v1alpha1.CloneSet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(clonesetsResource, c.ns, cloneSet), &v1alpha1.CloneSet{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.CloneSet), err
-}
-
-// Update takes the representation of a cloneSet and updates it. Returns the server's representation of the cloneSet, and an error, if there is any.
-func (c *FakeCloneSets) Update(ctx context.Context, cloneSet *v1alpha1.CloneSet, opts v1.UpdateOptions) (result *v1alpha1.CloneSet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(clonesetsResource, c.ns, cloneSet), &v1alpha1.CloneSet{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.CloneSet), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeCloneSets) UpdateStatus(ctx context.Context, cloneSet *v1alpha1.CloneSet, opts v1.UpdateOptions) (*v1alpha1.CloneSet, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(clonesetsResource, "status", c.ns, cloneSet), &v1alpha1.CloneSet{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.CloneSet), err
-}
-
-// Delete takes name of the cloneSet and deletes it. Returns an error if one occurs.
-func (c *FakeCloneSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(clonesetsResource, c.ns, name, opts), &v1alpha1.CloneSet{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeCloneSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(clonesetsResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.CloneSetList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched cloneSet.
-func (c *FakeCloneSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.CloneSet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(clonesetsResource, c.ns, name, pt, data, subresources...), &v1alpha1.CloneSet{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.CloneSet), err
 }
 
 // GetScale takes name of the cloneSet, and returns the corresponding scale object, and an error if there is any.
-func (c *FakeCloneSets) GetScale(ctx context.Context, cloneSetName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
+func (c *fakeCloneSets) GetScale(ctx context.Context, cloneSetName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
+	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetSubresourceAction(clonesetsResource, c.ns, "scale", cloneSetName), &autoscalingv1.Scale{})
+		Invokes(testing.NewGetSubresourceActionWithOptions(c.Resource(), c.Namespace(), "scale", cloneSetName, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*autoscalingv1.Scale), err
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeCloneSets) UpdateScale(ctx context.Context, cloneSetName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
+func (c *fakeCloneSets) UpdateScale(ctx context.Context, cloneSetName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
+	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(clonesetsResource, "scale", c.ns, scale), &autoscalingv1.Scale{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(c.Resource(), "scale", c.Namespace(), scale, opts), &autoscalingv1.Scale{})
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*autoscalingv1.Scale), err
 }

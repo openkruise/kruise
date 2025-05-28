@@ -85,7 +85,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		Reconciler:              r,
 		MaxConcurrentReconciles: concurrentReconciles,
 		CacheSyncTimeout:        util.GetControllerCacheSyncTimeout(),
-		RateLimiter:             ratelimiter.DefaultControllerRateLimiter()})
+		RateLimiter:             ratelimiter.DefaultControllerRateLimiter[reconcile.Request]()})
 	if err != nil {
 		return err
 	}

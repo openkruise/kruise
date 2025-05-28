@@ -28,7 +28,7 @@ type FakeAppsV1beta1 struct {
 }
 
 func (c *FakeAppsV1beta1) StatefulSets(namespace string) v1beta1.StatefulSetInterface {
-	return &FakeStatefulSets{c, namespace}
+	return newFakeStatefulSets(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

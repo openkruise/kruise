@@ -35,22 +35,22 @@ import (
 	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
-var _ handler.TypedEventHandler[*appsalphav1.NodePodProbe] = &enqueueRequestForNodePodProbe{}
+var _ handler.TypedEventHandler[*appsalphav1.NodePodProbe, reconcile.Request] = &enqueueRequestForNodePodProbe{}
 
 type enqueueRequestForNodePodProbe struct{}
 
-func (p *enqueueRequestForNodePodProbe) Create(ctx context.Context, evt event.TypedCreateEvent[*appsalphav1.NodePodProbe], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForNodePodProbe) Create(ctx context.Context, evt event.TypedCreateEvent[*appsalphav1.NodePodProbe], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	obj := evt.Object
 	p.queue(q, obj)
 }
 
-func (p *enqueueRequestForNodePodProbe) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsalphav1.NodePodProbe], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForNodePodProbe) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsalphav1.NodePodProbe], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *enqueueRequestForNodePodProbe) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsalphav1.NodePodProbe], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForNodePodProbe) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsalphav1.NodePodProbe], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *enqueueRequestForNodePodProbe) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsalphav1.NodePodProbe], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForNodePodProbe) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsalphav1.NodePodProbe], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	// must be deep copy before update the objection
 	new := evt.ObjectNew
 	old := evt.ObjectOld
@@ -59,7 +59,7 @@ func (p *enqueueRequestForNodePodProbe) Update(ctx context.Context, evt event.Ty
 	}
 }
 
-func (p *enqueueRequestForNodePodProbe) queue(q workqueue.RateLimitingInterface, npp *appsalphav1.NodePodProbe) {
+func (p *enqueueRequestForNodePodProbe) queue(q workqueue.TypedRateLimitingInterface[reconcile.Request], npp *appsalphav1.NodePodProbe) {
 	q.Add(reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Name: npp.Name,
@@ -67,16 +67,16 @@ func (p *enqueueRequestForNodePodProbe) queue(q workqueue.RateLimitingInterface,
 	})
 }
 
-var _ handler.TypedEventHandler[*corev1.Pod] = &enqueueRequestForPod{}
+var _ handler.TypedEventHandler[*corev1.Pod, reconcile.Request] = &enqueueRequestForPod{}
 
 type enqueueRequestForPod struct {
 	reader client.Reader
 }
 
-func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	obj := evt.Object
 	// remove pod probe from nodePodProbe.spec
 	if obj.Spec.NodeName == "" {
@@ -97,10 +97,10 @@ func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.TypedDelete
 	}
 }
 
-func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	new := evt.ObjectNew
 	old := evt.ObjectOld
 	// remove pod probe from nodePodProbe.spec
@@ -129,9 +129,9 @@ type enqueueRequestForNode struct {
 	client.Reader
 }
 
-var _ handler.TypedEventHandler[*corev1.Node] = &enqueueRequestForNode{}
+var _ handler.TypedEventHandler[*corev1.Node, reconcile.Request] = &enqueueRequestForNode{}
 
-func (e *enqueueRequestForNode) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Node], q workqueue.RateLimitingInterface) {
+func (e *enqueueRequestForNode) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Node], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	node := evt.Object
 	if node.Labels["type"] == VirtualKubelet {
 		return
@@ -143,10 +143,10 @@ func (e *enqueueRequestForNode) Create(ctx context.Context, evt event.TypedCreat
 	e.nodeCreate(node, q)
 }
 
-func (e *enqueueRequestForNode) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Node], q workqueue.RateLimitingInterface) {
+func (e *enqueueRequestForNode) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Node], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (e *enqueueRequestForNode) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Node], q workqueue.RateLimitingInterface) {
+func (e *enqueueRequestForNode) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Node], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	node := evt.ObjectNew
 	if node.Labels["type"] == VirtualKubelet {
 		return
@@ -158,7 +158,7 @@ func (e *enqueueRequestForNode) Update(ctx context.Context, evt event.TypedUpdat
 	}
 }
 
-func (e *enqueueRequestForNode) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Node], q workqueue.RateLimitingInterface) {
+func (e *enqueueRequestForNode) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Node], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	node := evt.Object
 	if node.Labels["type"] == VirtualKubelet {
 		return
@@ -166,7 +166,7 @@ func (e *enqueueRequestForNode) Delete(ctx context.Context, evt event.TypedDelet
 	e.nodeDelete(node, q)
 }
 
-func (e *enqueueRequestForNode) nodeCreate(node *corev1.Node, q workqueue.RateLimitingInterface) {
+func (e *enqueueRequestForNode) nodeCreate(node *corev1.Node, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	npp := &appsalphav1.NodePodProbe{}
 	if err := e.Get(context.TODO(), client.ObjectKey{Name: node.Name}, npp); err != nil {
 		if errors.IsNotFound(err) {
@@ -184,7 +184,7 @@ func (e *enqueueRequestForNode) nodeCreate(node *corev1.Node, q workqueue.RateLi
 	}
 }
 
-func (e *enqueueRequestForNode) nodeDelete(node *corev1.Node, q workqueue.RateLimitingInterface) {
+func (e *enqueueRequestForNode) nodeDelete(node *corev1.Node, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	nodePodProbe := &appsalphav1.NodePodProbe{}
 	if err := e.Get(context.TODO(), client.ObjectKey{Name: node.Name}, nodePodProbe); errors.IsNotFound(err) {
 		return

@@ -17,7 +17,7 @@ GOOS ?= $(shell go env GOOS)
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 # Run `setup-envtest list` to list available versions.
-ENVTEST_K8S_VERSION ?= 1.30.0
+ENVTEST_K8S_VERSION ?= 1.32.0
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
@@ -30,7 +30,7 @@ all: build
 ##@ Development
 
 go_check:
-	@scripts/check_go_version "1.22"
+	@scripts/check_go_version "1.23"
 
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	@scripts/generate_client.sh
@@ -160,7 +160,7 @@ ENVTEST ?= $(TESTBIN)/setup-envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(TESTBIN)
 ifeq (, $(shell ls $(TESTBIN)/setup-envtest 2>/dev/null))
-	GOBIN=$(TESTBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@c7e1dc9b5302d649d5531e19168dd7ea0013736d
+	GOBIN=$(TESTBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 endif
 
 # create-cluster creates a kube cluster with kind.

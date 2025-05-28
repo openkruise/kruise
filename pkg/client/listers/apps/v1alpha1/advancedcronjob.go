@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // AdvancedCronJobLister helps list AdvancedCronJobs.
@@ -29,7 +29,7 @@ import (
 type AdvancedCronJobLister interface {
 	// List lists all AdvancedCronJobs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.AdvancedCronJob, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.AdvancedCronJob, err error)
 	// AdvancedCronJobs returns an object that can list and get AdvancedCronJobs.
 	AdvancedCronJobs(namespace string) AdvancedCronJobNamespaceLister
 	AdvancedCronJobListerExpansion
@@ -37,25 +37,17 @@ type AdvancedCronJobLister interface {
 
 // advancedCronJobLister implements the AdvancedCronJobLister interface.
 type advancedCronJobLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*appsv1alpha1.AdvancedCronJob]
 }
 
 // NewAdvancedCronJobLister returns a new AdvancedCronJobLister.
 func NewAdvancedCronJobLister(indexer cache.Indexer) AdvancedCronJobLister {
-	return &advancedCronJobLister{indexer: indexer}
-}
-
-// List lists all AdvancedCronJobs in the indexer.
-func (s *advancedCronJobLister) List(selector labels.Selector) (ret []*v1alpha1.AdvancedCronJob, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.AdvancedCronJob))
-	})
-	return ret, err
+	return &advancedCronJobLister{listers.New[*appsv1alpha1.AdvancedCronJob](indexer, appsv1alpha1.Resource("advancedcronjob"))}
 }
 
 // AdvancedCronJobs returns an object that can list and get AdvancedCronJobs.
 func (s *advancedCronJobLister) AdvancedCronJobs(namespace string) AdvancedCronJobNamespaceLister {
-	return advancedCronJobNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return advancedCronJobNamespaceLister{listers.NewNamespaced[*appsv1alpha1.AdvancedCronJob](s.ResourceIndexer, namespace)}
 }
 
 // AdvancedCronJobNamespaceLister helps list and get AdvancedCronJobs.
@@ -63,36 +55,15 @@ func (s *advancedCronJobLister) AdvancedCronJobs(namespace string) AdvancedCronJ
 type AdvancedCronJobNamespaceLister interface {
 	// List lists all AdvancedCronJobs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.AdvancedCronJob, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.AdvancedCronJob, err error)
 	// Get retrieves the AdvancedCronJob from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.AdvancedCronJob, error)
+	Get(name string) (*appsv1alpha1.AdvancedCronJob, error)
 	AdvancedCronJobNamespaceListerExpansion
 }
 
 // advancedCronJobNamespaceLister implements the AdvancedCronJobNamespaceLister
 // interface.
 type advancedCronJobNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all AdvancedCronJobs in the indexer for a given namespace.
-func (s advancedCronJobNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.AdvancedCronJob, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.AdvancedCronJob))
-	})
-	return ret, err
-}
-
-// Get retrieves the AdvancedCronJob from the indexer for a given namespace and name.
-func (s advancedCronJobNamespaceLister) Get(name string) (*v1alpha1.AdvancedCronJob, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("advancedcronjob"), name)
-	}
-	return obj.(*v1alpha1.AdvancedCronJob), nil
+	listers.ResourceIndexer[*appsv1alpha1.AdvancedCronJob]
 }
