@@ -18,13 +18,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	apisappsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	versioned "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/openkruise/kruise/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,7 +35,7 @@ import (
 // EphemeralJobs.
 type EphemeralJobInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.EphemeralJobLister
+	Lister() appsv1alpha1.EphemeralJobLister
 }
 
 type ephemeralJobInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredEphemeralJobInformer(client versioned.Interface, namespace strin
 				return client.AppsV1alpha1().EphemeralJobs(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&appsv1alpha1.EphemeralJob{},
+		&apisappsv1alpha1.EphemeralJob{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *ephemeralJobInformer) defaultInformer(client versioned.Interface, resyn
 }
 
 func (f *ephemeralJobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1alpha1.EphemeralJob{}, f.defaultInformer)
+	return f.factory.InformerFor(&apisappsv1alpha1.EphemeralJob{}, f.defaultInformer)
 }
 
-func (f *ephemeralJobInformer) Lister() v1alpha1.EphemeralJobLister {
-	return v1alpha1.NewEphemeralJobLister(f.Informer().GetIndexer())
+func (f *ephemeralJobInformer) Lister() appsv1alpha1.EphemeralJobLister {
+	return appsv1alpha1.NewEphemeralJobLister(f.Informer().GetIndexer())
 }

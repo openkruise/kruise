@@ -18,7 +18,7 @@ limitations under the License.
 package externalversions
 
 import (
-	"fmt"
+	fmt "fmt"
 
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"

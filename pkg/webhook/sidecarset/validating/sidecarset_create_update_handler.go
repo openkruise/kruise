@@ -306,12 +306,13 @@ func validateContainersForSidecarSet(
 	fakePod = &core.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
 		Spec: core.PodSpec{
-			DNSPolicy:          core.DNSClusterFirst,
-			RestartPolicy:      core.RestartPolicyAlways,
-			InitContainers:     coreInitContainers,
-			Containers:         coreContainers,
-			Volumes:            coreVolumes,
-			ServiceAccountName: "default",
+			DNSPolicy:                     core.DNSClusterFirst,
+			RestartPolicy:                 core.RestartPolicyAlways,
+			InitContainers:                coreInitContainers,
+			Containers:                    coreContainers,
+			Volumes:                       coreVolumes,
+			ServiceAccountName:            "default",
+			TerminationGracePeriodSeconds: &[]int64{v1.DefaultTerminationGracePeriodSeconds}[0],
 		},
 	}
 

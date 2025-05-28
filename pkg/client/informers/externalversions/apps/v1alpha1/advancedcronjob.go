@@ -18,13 +18,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	apisappsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	versioned "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/openkruise/kruise/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,7 +35,7 @@ import (
 // AdvancedCronJobs.
 type AdvancedCronJobInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.AdvancedCronJobLister
+	Lister() appsv1alpha1.AdvancedCronJobLister
 }
 
 type advancedCronJobInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredAdvancedCronJobInformer(client versioned.Interface, namespace st
 				return client.AppsV1alpha1().AdvancedCronJobs(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&appsv1alpha1.AdvancedCronJob{},
+		&apisappsv1alpha1.AdvancedCronJob{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *advancedCronJobInformer) defaultInformer(client versioned.Interface, re
 }
 
 func (f *advancedCronJobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1alpha1.AdvancedCronJob{}, f.defaultInformer)
+	return f.factory.InformerFor(&apisappsv1alpha1.AdvancedCronJob{}, f.defaultInformer)
 }
 
-func (f *advancedCronJobInformer) Lister() v1alpha1.AdvancedCronJobLister {
-	return v1alpha1.NewAdvancedCronJobLister(f.Informer().GetIndexer())
+func (f *advancedCronJobInformer) Lister() appsv1alpha1.AdvancedCronJobLister {
+	return appsv1alpha1.NewAdvancedCronJobLister(f.Informer().GetIndexer())
 }

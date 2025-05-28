@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PodProbeMarkerLister helps list PodProbeMarkers.
@@ -29,7 +29,7 @@ import (
 type PodProbeMarkerLister interface {
 	// List lists all PodProbeMarkers in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.PodProbeMarker, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.PodProbeMarker, err error)
 	// PodProbeMarkers returns an object that can list and get PodProbeMarkers.
 	PodProbeMarkers(namespace string) PodProbeMarkerNamespaceLister
 	PodProbeMarkerListerExpansion
@@ -37,25 +37,17 @@ type PodProbeMarkerLister interface {
 
 // podProbeMarkerLister implements the PodProbeMarkerLister interface.
 type podProbeMarkerLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*appsv1alpha1.PodProbeMarker]
 }
 
 // NewPodProbeMarkerLister returns a new PodProbeMarkerLister.
 func NewPodProbeMarkerLister(indexer cache.Indexer) PodProbeMarkerLister {
-	return &podProbeMarkerLister{indexer: indexer}
-}
-
-// List lists all PodProbeMarkers in the indexer.
-func (s *podProbeMarkerLister) List(selector labels.Selector) (ret []*v1alpha1.PodProbeMarker, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.PodProbeMarker))
-	})
-	return ret, err
+	return &podProbeMarkerLister{listers.New[*appsv1alpha1.PodProbeMarker](indexer, appsv1alpha1.Resource("podprobemarker"))}
 }
 
 // PodProbeMarkers returns an object that can list and get PodProbeMarkers.
 func (s *podProbeMarkerLister) PodProbeMarkers(namespace string) PodProbeMarkerNamespaceLister {
-	return podProbeMarkerNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return podProbeMarkerNamespaceLister{listers.NewNamespaced[*appsv1alpha1.PodProbeMarker](s.ResourceIndexer, namespace)}
 }
 
 // PodProbeMarkerNamespaceLister helps list and get PodProbeMarkers.
@@ -63,36 +55,15 @@ func (s *podProbeMarkerLister) PodProbeMarkers(namespace string) PodProbeMarkerN
 type PodProbeMarkerNamespaceLister interface {
 	// List lists all PodProbeMarkers in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.PodProbeMarker, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.PodProbeMarker, err error)
 	// Get retrieves the PodProbeMarker from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.PodProbeMarker, error)
+	Get(name string) (*appsv1alpha1.PodProbeMarker, error)
 	PodProbeMarkerNamespaceListerExpansion
 }
 
 // podProbeMarkerNamespaceLister implements the PodProbeMarkerNamespaceLister
 // interface.
 type podProbeMarkerNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all PodProbeMarkers in the indexer for a given namespace.
-func (s podProbeMarkerNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.PodProbeMarker, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.PodProbeMarker))
-	})
-	return ret, err
-}
-
-// Get retrieves the PodProbeMarker from the indexer for a given namespace and name.
-func (s podProbeMarkerNamespaceLister) Get(name string) (*v1alpha1.PodProbeMarker, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("podprobemarker"), name)
-	}
-	return obj.(*v1alpha1.PodProbeMarker), nil
+	listers.ResourceIndexer[*appsv1alpha1.PodProbeMarker]
 }

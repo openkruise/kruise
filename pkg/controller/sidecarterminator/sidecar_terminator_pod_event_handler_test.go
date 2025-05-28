@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func TestEnqueueRequestForPodUpdate(t *testing.T) {
@@ -254,7 +255,9 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 				ObjectOld: cs.getOldPod(),
 				ObjectNew: cs.getNewPod(),
 			}
-			que := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			que := workqueue.NewTypedRateLimitingQueue(
+				workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+			)
 			eventHandler.Update(context.TODO(), evt, que)
 			if que.Len() != cs.expectLen {
 				t.Fatalf("Get unexpected queue length, expected %v, actual %v", cs.expectLen, que.Len())
@@ -360,7 +363,9 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 			evt := event.TypedCreateEvent[*corev1.Pod]{
 				Object: cs.getPod(),
 			}
-			que := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			que := workqueue.NewTypedRateLimitingQueue(
+				workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+			)
 			eventHandler.Create(context.TODO(), evt, que)
 			if que.Len() != cs.expectLen {
 				t.Fatalf("Get unexpected queue length, expected %v, actual %v", cs.expectLen, que.Len())

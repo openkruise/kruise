@@ -1,7 +1,7 @@
 # Build the manager and daemon binaries
 ARG BASE_IMAGE=alpine
 ARG BASE_IMAGE_VERSION=3.21@sha256:56fa17d2a7e7f168a043a2712e63aed1f8543aeafdcee47c58dcffe38ed51099
-FROM golang:1.22.11-alpine3.21@sha256:161858498a61ce093c8e2bd704299bfb23e5bff79aef99b6c40bb9c6a43acf0f AS builder
+FROM golang:1.23.9-alpine3.21@sha256:fb7ea5cd19bc4eea3eb0d1972919ec0f6229b138985ce4b35ce5846c6bc02973 AS builder
 WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod

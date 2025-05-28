@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ResourceDistributionLister helps list ResourceDistributions.
@@ -29,39 +29,19 @@ import (
 type ResourceDistributionLister interface {
 	// List lists all ResourceDistributions in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.ResourceDistribution, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.ResourceDistribution, err error)
 	// Get retrieves the ResourceDistribution from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.ResourceDistribution, error)
+	Get(name string) (*appsv1alpha1.ResourceDistribution, error)
 	ResourceDistributionListerExpansion
 }
 
 // resourceDistributionLister implements the ResourceDistributionLister interface.
 type resourceDistributionLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*appsv1alpha1.ResourceDistribution]
 }
 
 // NewResourceDistributionLister returns a new ResourceDistributionLister.
 func NewResourceDistributionLister(indexer cache.Indexer) ResourceDistributionLister {
-	return &resourceDistributionLister{indexer: indexer}
-}
-
-// List lists all ResourceDistributions in the indexer.
-func (s *resourceDistributionLister) List(selector labels.Selector) (ret []*v1alpha1.ResourceDistribution, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.ResourceDistribution))
-	})
-	return ret, err
-}
-
-// Get retrieves the ResourceDistribution from the index for a given name.
-func (s *resourceDistributionLister) Get(name string) (*v1alpha1.ResourceDistribution, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("resourcedistribution"), name)
-	}
-	return obj.(*v1alpha1.ResourceDistribution), nil
+	return &resourceDistributionLister{listers.New[*appsv1alpha1.ResourceDistribution](indexer, appsv1alpha1.Resource("resourcedistribution"))}
 }

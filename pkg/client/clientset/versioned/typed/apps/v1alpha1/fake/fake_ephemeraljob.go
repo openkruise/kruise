@@ -18,123 +18,34 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeEphemeralJobs implements EphemeralJobInterface
-type FakeEphemeralJobs struct {
+// fakeEphemeralJobs implements EphemeralJobInterface
+type fakeEphemeralJobs struct {
+	*gentype.FakeClientWithList[*v1alpha1.EphemeralJob, *v1alpha1.EphemeralJobList]
 	Fake *FakeAppsV1alpha1
-	ns   string
 }
 
-var ephemeraljobsResource = v1alpha1.SchemeGroupVersion.WithResource("ephemeraljobs")
-
-var ephemeraljobsKind = v1alpha1.SchemeGroupVersion.WithKind("EphemeralJob")
-
-// Get takes name of the ephemeralJob, and returns the corresponding ephemeralJob object, and an error if there is any.
-func (c *FakeEphemeralJobs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.EphemeralJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(ephemeraljobsResource, c.ns, name), &v1alpha1.EphemeralJob{})
-
-	if obj == nil {
-		return nil, err
+func newFakeEphemeralJobs(fake *FakeAppsV1alpha1, namespace string) appsv1alpha1.EphemeralJobInterface {
+	return &fakeEphemeralJobs{
+		gentype.NewFakeClientWithList[*v1alpha1.EphemeralJob, *v1alpha1.EphemeralJobList](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("ephemeraljobs"),
+			v1alpha1.SchemeGroupVersion.WithKind("EphemeralJob"),
+			func() *v1alpha1.EphemeralJob { return &v1alpha1.EphemeralJob{} },
+			func() *v1alpha1.EphemeralJobList { return &v1alpha1.EphemeralJobList{} },
+			func(dst, src *v1alpha1.EphemeralJobList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.EphemeralJobList) []*v1alpha1.EphemeralJob {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.EphemeralJobList, items []*v1alpha1.EphemeralJob) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.EphemeralJob), err
-}
-
-// List takes label and field selectors, and returns the list of EphemeralJobs that match those selectors.
-func (c *FakeEphemeralJobs) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.EphemeralJobList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(ephemeraljobsResource, ephemeraljobsKind, c.ns, opts), &v1alpha1.EphemeralJobList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.EphemeralJobList{ListMeta: obj.(*v1alpha1.EphemeralJobList).ListMeta}
-	for _, item := range obj.(*v1alpha1.EphemeralJobList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested ephemeralJobs.
-func (c *FakeEphemeralJobs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(ephemeraljobsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a ephemeralJob and creates it.  Returns the server's representation of the ephemeralJob, and an error, if there is any.
-func (c *FakeEphemeralJobs) Create(ctx context.Context, ephemeralJob *v1alpha1.EphemeralJob, opts v1.CreateOptions) (result *v1alpha1.EphemeralJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(ephemeraljobsResource, c.ns, ephemeralJob), &v1alpha1.EphemeralJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.EphemeralJob), err
-}
-
-// Update takes the representation of a ephemeralJob and updates it. Returns the server's representation of the ephemeralJob, and an error, if there is any.
-func (c *FakeEphemeralJobs) Update(ctx context.Context, ephemeralJob *v1alpha1.EphemeralJob, opts v1.UpdateOptions) (result *v1alpha1.EphemeralJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(ephemeraljobsResource, c.ns, ephemeralJob), &v1alpha1.EphemeralJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.EphemeralJob), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeEphemeralJobs) UpdateStatus(ctx context.Context, ephemeralJob *v1alpha1.EphemeralJob, opts v1.UpdateOptions) (*v1alpha1.EphemeralJob, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(ephemeraljobsResource, "status", c.ns, ephemeralJob), &v1alpha1.EphemeralJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.EphemeralJob), err
-}
-
-// Delete takes name of the ephemeralJob and deletes it. Returns an error if one occurs.
-func (c *FakeEphemeralJobs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(ephemeraljobsResource, c.ns, name, opts), &v1alpha1.EphemeralJob{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeEphemeralJobs) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(ephemeraljobsResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.EphemeralJobList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched ephemeralJob.
-func (c *FakeEphemeralJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.EphemeralJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(ephemeraljobsResource, c.ns, name, pt, data, subresources...), &v1alpha1.EphemeralJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.EphemeralJob), err
 }
