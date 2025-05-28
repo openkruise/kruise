@@ -68,17 +68,20 @@ func (c *commonControl) IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool
 	if !reflect.DeepEqual(oldPod.Spec, newPod.Spec) {
 		if c.canResizeInplace(oldPod, newPod) {
 			klog.V(3).InfoS("Pod resize inplace", "pod", klog.KObj(newPod))
-			return false
+			// do not return any value, continue to check unavailable label
+		} else {
+			klog.V(3).InfoS("Pod specification changed, and maybe cause unavailability", "pod", klog.KObj(newPod))
+			return true
 		}
-
-		klog.V(3).InfoS("Pod specification changed, and maybe cause unavailability", "pod", klog.KObj(newPod))
-		return true
 	}
 	// pod add unavailable label
 	if !appspub.HasUnavailableLabel(oldPod.Labels) && appspub.HasUnavailableLabel(newPod.Labels) {
+		klog.V(3).InfoS("Pod add unavailable label, and maybe cause unavailability", "pod", klog.KObj(newPod))
 		return true
 	}
 	// pod other changes will not cause unavailability situation, then return false
+
+	klog.V(3).InfoS("Pod other changes, and maybe not cause unavailability", "pod", klog.KObj(newPod))
 	return false
 }
 
@@ -140,34 +143,72 @@ func (c *commonControl) canResizeInplace(oldPod, newPod *corev1.Pod) bool {
 		return false
 	}
 
+	// TODO: Check annotations bind with env using downwardAPI and considering `InPlaceUpdateEnvFromMetadata` featureGate in kruise-daemon
 	return true
 }
 
+// only allowedResizeResourceKey with NotRequired or "" restartPolicy can do inplace update
 func canInplaceUpdateResources(oldPod, newPod *corev1.Pod) bool {
+	if len(oldPod.Spec.Containers) != len(newPod.Spec.Containers) {
+		return false
+	}
+
+	nativeInplaceUpdateImpl := inplaceupdate.GetNativeVerticalUpdateImpl()
+
 	oldCtrMap := make(map[string]corev1.Container)
 	for _, ctr := range oldPod.Spec.Containers {
 		oldCtrMap[ctr.Name] = ctr
 	}
 
 	for _, ctr := range newPod.Spec.Containers {
-		for _, policy := range ctr.ResizePolicy {
-			if policy.RestartPolicy == corev1.NotRequired || policy.RestartPolicy == "" {
-				continue
-			}
+		oldCtr, ok := oldCtrMap[ctr.Name]
+		if !ok {
+			return false
+		}
 
-			oldCtr, ok := oldCtrMap[ctr.Name]
-			if !ok {
-				return false
-			}
+		// check whether oldCtr to newCtr resource changed
+		rsNames := getResourcesNames(oldCtr.Resources.Requests, ctr.Resources.Requests,
+			oldCtr.Resources.Limits, ctr.Resources.Limits)
+		rsPolicyMap := getContainerRestartPolicyMap(&ctr)
+		for rsName := range rsNames {
+			if isContainerResourcesChanged(oldCtr, ctr, rsName) {
+				if !nativeInplaceUpdateImpl.CanResourcesResizeInPlace(string(rsName)) {
+					klog.V(3).InfoS("Pod container resources changed with not allowed resource, and maybe cause unavailability",
+						"pod", klog.KObj(newPod), "container", ctr.Name, "resourceName", rsName)
+					return false
+				}
 
-			if isContainerResourcesChanged(oldCtr, ctr, policy.ResourceName) {
+				// check restartPolicy
+				policy, ok := rsPolicyMap[rsName]
+				if !ok || policy == corev1.NotRequired || policy == "" {
+					continue
+				}
+
 				klog.V(3).InfoS("Pod container resources changed with restartContainer policy, and maybe cause unavailability",
-					"pod", klog.KObj(newPod), "container", ctr.Name, "restartPolicy", policy.RestartPolicy, "resourceName", policy.ResourceName)
+					"pod", klog.KObj(newPod), "container", ctr.Name, "restartPolicy", policy, "resourceName", rsName)
 				return false
 			}
 		}
 	}
 	return true
+}
+
+func getResourcesNames(rsLists ...corev1.ResourceList) sets.Set[corev1.ResourceName] {
+	names := sets.New[corev1.ResourceName]()
+	for _, list := range rsLists {
+		for name := range list {
+			names.Insert(name)
+		}
+	}
+	return names
+}
+
+func getContainerRestartPolicyMap(ctr *corev1.Container) map[corev1.ResourceName]corev1.ResourceResizeRestartPolicy {
+	policyMap := make(map[corev1.ResourceName]corev1.ResourceResizeRestartPolicy)
+	for _, policy := range ctr.ResizePolicy {
+		policyMap[policy.ResourceName] = policy.RestartPolicy
+	}
+	return policyMap
 }
 
 func isContainerResourcesChanged(oldCtr, newCtr corev1.Container, resourceName corev1.ResourceName) bool {

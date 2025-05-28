@@ -154,6 +154,119 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 			expect: false,
 		},
 		{
+			name: "resources changed but with unavailable label",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Labels = map[string]string{
+					fmt.Sprintf("%sdata", pub.PubUnavailablePodLabelPrefix): "true",
+				}
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("3"),
+						corev1.ResourceMemory: resource.MustParse("3Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			expect: true,
+		},
+		{
+			name: "storage resources changed 1",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:     resource.MustParse("2"),
+						corev1.ResourceMemory:  resource.MustParse("4Gi"),
+						corev1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+				}
+				return demo
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			expect: true,
+		},
+		{
+			name: "storage resources changed 2",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:     resource.MustParse("1"),
+						corev1.ResourceMemory:  resource.MustParse("2Gi"),
+						corev1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			expect: true,
+		},
+		{
 			name: "resources changed but static pod",
 			getOldPod: func() *corev1.Pod {
 				demo := podDemo.DeepCopy()
