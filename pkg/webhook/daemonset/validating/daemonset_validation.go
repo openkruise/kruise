@@ -56,14 +56,6 @@ func validateDaemonSetSpec(spec *appsv1alpha1.DaemonSetSpec, fldPath *field.Path
 	}
 	allErrs = append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions)...)
 
-	// Daemons typically run on more than one node, so mark Read-Write persistent disks as invalid.
-	coreVolumes, err := convertor.ConvertCoreVolumes(spec.Template.Spec.Volumes)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.Template, fmt.Sprintf("Convert_v1_Volume_To_core_Volume failed: %v", err)))
-		return allErrs
-	}
-	allErrs = append(allErrs, corevalidation.ValidateReadOnlyPersistentDisks(coreVolumes, nil, fldPath.Child("template", "spec", "volumes"))...)
-
 	// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 	if spec.Template.Spec.RestartPolicy != corev1.RestartPolicyAlways {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("template", "spec", "restartPolicy"), spec.Template.Spec.RestartPolicy, []string{string(corev1.RestartPolicyAlways)}))

@@ -24,8 +24,7 @@ var (
 		AllowIndivisibleHugePagesValues: true,
 
 		AllowInvalidLabelValueInSelector:                  true,
-		AllowHostIPsField:                                 true,
 		AllowInvalidTopologySpreadConstraintLabelSelector: true,
-		ResourceIsPod:                                     false,
+		ResourceIsPod: false,
 	}
 )

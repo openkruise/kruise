@@ -23,6 +23,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
@@ -31,13 +32,13 @@ type eventHandler struct {
 	handler.TypedEnqueueRequestForObject[*appsv1alpha1.UnitedDeployment]
 }
 
-func (e *eventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1alpha1.UnitedDeployment], q workqueue.RateLimitingInterface) {
+func (e *eventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1alpha1.UnitedDeployment], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	klog.InfoS("cleaning up UnitedDeployment", "unitedDeployment", evt.Object)
 	ResourceVersionExpectation.Delete(evt.Object)
 	e.TypedEnqueueRequestForObject.Delete(ctx, evt, q)
 }
 
-func (e *eventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1alpha1.UnitedDeployment], q workqueue.RateLimitingInterface) {
+func (e *eventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1alpha1.UnitedDeployment], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	// make sure latest version is observed
 	ResourceVersionExpectation.Observe(evt.ObjectNew)
 	e.TypedEnqueueRequestForObject.Update(ctx, evt, q)

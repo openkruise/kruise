@@ -193,7 +193,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("statefulset-controller", mgr, controller.Options{
 		Reconciler: r, MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: util.GetControllerCacheSyncTimeout(),
-		RateLimiter: ratelimiter.DefaultControllerRateLimiter()})
+		RateLimiter: ratelimiter.DefaultControllerRateLimiter[reconcile.Request]()})
 	if err != nil {
 		return err
 	}

@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ImageListPullJobLister helps list ImageListPullJobs.
@@ -29,7 +29,7 @@ import (
 type ImageListPullJobLister interface {
 	// List lists all ImageListPullJobs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.ImageListPullJob, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.ImageListPullJob, err error)
 	// ImageListPullJobs returns an object that can list and get ImageListPullJobs.
 	ImageListPullJobs(namespace string) ImageListPullJobNamespaceLister
 	ImageListPullJobListerExpansion
@@ -37,25 +37,17 @@ type ImageListPullJobLister interface {
 
 // imageListPullJobLister implements the ImageListPullJobLister interface.
 type imageListPullJobLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*appsv1alpha1.ImageListPullJob]
 }
 
 // NewImageListPullJobLister returns a new ImageListPullJobLister.
 func NewImageListPullJobLister(indexer cache.Indexer) ImageListPullJobLister {
-	return &imageListPullJobLister{indexer: indexer}
-}
-
-// List lists all ImageListPullJobs in the indexer.
-func (s *imageListPullJobLister) List(selector labels.Selector) (ret []*v1alpha1.ImageListPullJob, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.ImageListPullJob))
-	})
-	return ret, err
+	return &imageListPullJobLister{listers.New[*appsv1alpha1.ImageListPullJob](indexer, appsv1alpha1.Resource("imagelistpulljob"))}
 }
 
 // ImageListPullJobs returns an object that can list and get ImageListPullJobs.
 func (s *imageListPullJobLister) ImageListPullJobs(namespace string) ImageListPullJobNamespaceLister {
-	return imageListPullJobNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return imageListPullJobNamespaceLister{listers.NewNamespaced[*appsv1alpha1.ImageListPullJob](s.ResourceIndexer, namespace)}
 }
 
 // ImageListPullJobNamespaceLister helps list and get ImageListPullJobs.
@@ -63,36 +55,15 @@ func (s *imageListPullJobLister) ImageListPullJobs(namespace string) ImageListPu
 type ImageListPullJobNamespaceLister interface {
 	// List lists all ImageListPullJobs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.ImageListPullJob, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.ImageListPullJob, err error)
 	// Get retrieves the ImageListPullJob from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.ImageListPullJob, error)
+	Get(name string) (*appsv1alpha1.ImageListPullJob, error)
 	ImageListPullJobNamespaceListerExpansion
 }
 
 // imageListPullJobNamespaceLister implements the ImageListPullJobNamespaceLister
 // interface.
 type imageListPullJobNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all ImageListPullJobs in the indexer for a given namespace.
-func (s imageListPullJobNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.ImageListPullJob, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.ImageListPullJob))
-	})
-	return ret, err
-}
-
-// Get retrieves the ImageListPullJob from the indexer for a given namespace and name.
-func (s imageListPullJobNamespaceLister) Get(name string) (*v1alpha1.ImageListPullJob, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("imagelistpulljob"), name)
-	}
-	return obj.(*v1alpha1.ImageListPullJob), nil
+	listers.ResourceIndexer[*appsv1alpha1.ImageListPullJob]
 }
