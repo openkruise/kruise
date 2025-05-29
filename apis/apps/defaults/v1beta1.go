@@ -20,7 +20,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
@@ -43,7 +43,7 @@ func SetDefaultsStatefulSet(obj *v1beta1.StatefulSet, injectTemplateDefaults boo
 			obj.Spec.UpdateStrategy.RollingUpdate = &v1beta1.RollingUpdateStatefulSetStrategy{}
 		}
 		if obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
-			obj.Spec.UpdateStrategy.RollingUpdate.Partition = utilpointer.Int32Ptr(0)
+			obj.Spec.UpdateStrategy.RollingUpdate.Partition = ptr.To(int32(0))
 		}
 		if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
 			maxUnavailable := intstr.FromInt(1)
@@ -53,7 +53,7 @@ func SetDefaultsStatefulSet(obj *v1beta1.StatefulSet, injectTemplateDefaults boo
 			obj.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy = v1beta1.RecreatePodUpdateStrategyType
 		}
 		if obj.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds == nil {
-			obj.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds = utilpointer.Int32Ptr(0)
+			obj.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds = ptr.To(int32(0))
 		}
 	}
 
@@ -76,10 +76,10 @@ func SetDefaultsStatefulSet(obj *v1beta1.StatefulSet, injectTemplateDefaults boo
 	}
 
 	if obj.Spec.Replicas == nil {
-		obj.Spec.Replicas = utilpointer.Int32Ptr(1)
+		obj.Spec.Replicas = ptr.To(int32(1))
 	}
 	if obj.Spec.RevisionHistoryLimit == nil {
-		obj.Spec.RevisionHistoryLimit = utilpointer.Int32Ptr(10)
+		obj.Spec.RevisionHistoryLimit = ptr.To(int32(10))
 	}
 
 	if injectTemplateDefaults {
