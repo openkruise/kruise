@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -70,7 +70,7 @@ func SetDefaultInjectRevision(strategy *v1alpha1.SidecarSetInjectionStrategy) {
 
 func SetDefaultRevisionHistoryLimit(revisionHistoryLimit **int32) {
 	if *revisionHistoryLimit == nil {
-		*revisionHistoryLimit = utilpointer.Int32Ptr(10)
+		*revisionHistoryLimit = ptr.To(int32(10))
 	}
 }
 
@@ -208,7 +208,7 @@ func SetDefaultsBroadcastJob(obj *v1alpha1.BroadcastJob, injectTemplateDefaults 
 // SetDefaults_UnitedDeployment set default values for UnitedDeployment.
 func SetDefaultsUnitedDeployment(obj *v1alpha1.UnitedDeployment, injectTemplateDefaults bool) {
 	if obj.Spec.RevisionHistoryLimit == nil {
-		obj.Spec.RevisionHistoryLimit = utilpointer.Int32Ptr(10)
+		obj.Spec.RevisionHistoryLimit = ptr.To(int32(10))
 	}
 
 	if len(obj.Spec.UpdateStrategy.Type) == 0 {
@@ -255,10 +255,10 @@ func SetDefaultsUnitedDeployment(obj *v1alpha1.UnitedDeployment, injectTemplateD
 // SetDefaults_CloneSet set default values for CloneSet.
 func SetDefaultsCloneSet(obj *v1alpha1.CloneSet, injectTemplateDefaults bool) {
 	if obj.Spec.Replicas == nil {
-		obj.Spec.Replicas = utilpointer.Int32Ptr(1)
+		obj.Spec.Replicas = ptr.To(int32(1))
 	}
 	if obj.Spec.RevisionHistoryLimit == nil {
-		obj.Spec.RevisionHistoryLimit = utilpointer.Int32Ptr(10)
+		obj.Spec.RevisionHistoryLimit = ptr.To(int32(10))
 	}
 
 	if injectTemplateDefaults {
@@ -370,10 +370,10 @@ func SetDefaultsNodeImage(obj *v1alpha1.NodeImage) {
 
 func SetDefaultsImageTagPullPolicy(obj *v1alpha1.ImageTagPullPolicy) {
 	if obj.TimeoutSeconds == nil {
-		obj.TimeoutSeconds = utilpointer.Int32Ptr(600)
+		obj.TimeoutSeconds = ptr.To(int32(600))
 	}
 	if obj.BackoffLimit == nil {
-		obj.BackoffLimit = utilpointer.Int32Ptr(3)
+		obj.BackoffLimit = ptr.To(int32(3))
 	}
 }
 
@@ -386,10 +386,10 @@ func SetDefaultsImagePullJob(obj *v1alpha1.ImagePullJob, addProtection bool) {
 		obj.Spec.PullPolicy = &v1alpha1.PullPolicy{}
 	}
 	if obj.Spec.PullPolicy.TimeoutSeconds == nil {
-		obj.Spec.PullPolicy.TimeoutSeconds = utilpointer.Int32Ptr(600)
+		obj.Spec.PullPolicy.TimeoutSeconds = ptr.To(int32(600))
 	}
 	if obj.Spec.PullPolicy.BackoffLimit == nil {
-		obj.Spec.PullPolicy.BackoffLimit = utilpointer.Int32Ptr(3)
+		obj.Spec.PullPolicy.BackoffLimit = ptr.To(int32(3))
 	}
 	if obj.Spec.ImagePullPolicy == "" {
 		obj.Spec.ImagePullPolicy = v1alpha1.PullIfNotPresent
@@ -408,9 +408,9 @@ func SetDefaultsImageListPullJob(obj *v1alpha1.ImageListPullJob) {
 		obj.Spec.PullPolicy = &v1alpha1.PullPolicy{}
 	}
 	if obj.Spec.PullPolicy.TimeoutSeconds == nil {
-		obj.Spec.PullPolicy.TimeoutSeconds = utilpointer.Int32Ptr(600)
+		obj.Spec.PullPolicy.TimeoutSeconds = ptr.To(int32(600))
 	}
 	if obj.Spec.PullPolicy.BackoffLimit == nil {
-		obj.Spec.PullPolicy.BackoffLimit = utilpointer.Int32Ptr(3)
+		obj.Spec.PullPolicy.BackoffLimit = ptr.To(int32(3))
 	}
 }

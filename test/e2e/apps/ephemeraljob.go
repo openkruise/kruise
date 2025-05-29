@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var _ = SIGDescribe("EphemeralJob", func() {
@@ -560,7 +560,7 @@ var _ = SIGDescribe("EphemeralJob", func() {
 							{Name: "nginx"},
 						},
 						Strategy:                &appsv1alpha1.ContainerRecreateRequestStrategy{MinStartedSeconds: 5},
-						TTLSecondsAfterFinished: utilpointer.Int32Ptr(99999),
+						TTLSecondsAfterFinished: ptr.To[int32](99999),
 					},
 				}
 				crr, err = restartContainerTester.CreateCRR(crr)
