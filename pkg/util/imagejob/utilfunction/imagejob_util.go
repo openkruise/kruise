@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -58,10 +58,10 @@ func CreateJobForWorkload(c client.Client, owner metav1.Object, gvk schema.Group
 				PullSecrets: pullSecrets,
 				PodSelector: &appsv1alpha1.ImagePullJobPodSelector{LabelSelector: podSelector},
 				Parallelism: &parallelism,
-				PullPolicy:  &appsv1alpha1.PullPolicy{BackoffLimit: utilpointer.Int32Ptr(1), TimeoutSeconds: &pullTimeoutSeconds},
+				PullPolicy:  &appsv1alpha1.PullPolicy{BackoffLimit: ptr.To[int32](1), TimeoutSeconds: &pullTimeoutSeconds},
 				CompletionPolicy: appsv1alpha1.CompletionPolicy{
 					Type:                    appsv1alpha1.Always,
-					TTLSecondsAfterFinished: utilpointer.Int32Ptr(600),
+					TTLSecondsAfterFinished: ptr.To[int32](600),
 				},
 				SandboxConfig: &appsv1alpha1.SandboxConfig{
 					Annotations: annotations,
