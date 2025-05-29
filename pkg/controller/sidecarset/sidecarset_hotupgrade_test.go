@@ -23,11 +23,11 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
-	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -63,7 +63,7 @@ var (
 				MatchLabels: map[string]string{"app": "nginx"},
 			},
 			UpdateStrategy:       appsv1alpha1.SidecarSetUpdateStrategy{},
-			RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+			RevisionHistoryLimit: ptr.To(int32(10)),
 		},
 	}
 
