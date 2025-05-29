@@ -20,6 +20,7 @@ import (
 	"context"
 	"sort"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,15 +48,20 @@ func NewCloneSetTester(c clientset.Interface, kc kruiseclientset.Interface, ns s
 }
 
 func (t *CloneSetTester) NewCloneSet(name string, replicas int32, updateStrategy appsv1alpha1.CloneSetUpdateStrategy) *appsv1alpha1.CloneSet {
+	cloneSet := t.newCloneSet(name, replicas)
+	cloneSet.Spec.UpdateStrategy = updateStrategy
+	return cloneSet
+}
+
+func (t *CloneSetTester) newCloneSet(name string, replicas int32) *appsv1alpha1.CloneSet {
 	return &appsv1alpha1.CloneSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: t.ns,
 			Name:      name,
 		},
 		Spec: appsv1alpha1.CloneSetSpec{
-			Replicas:       &replicas,
-			Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{"owner": name}},
-			UpdateStrategy: updateStrategy,
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"owner": name}},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"owner": name},
@@ -84,6 +90,17 @@ func (t *CloneSetTester) NewCloneSet(name string, replicas int32, updateStrategy
 			},
 		},
 	}
+}
+
+func (t *CloneSetTester) NewCloneSetWithLifecycle(name string, replicas int32, lifecycle *appspub.Lifecycle, finalizers []string) *appsv1alpha1.CloneSet {
+	cloneSet := t.newCloneSet(name, replicas)
+	cloneSet.Spec.Lifecycle = lifecycle
+
+	if len(finalizers) > 0 {
+		cloneSet.Spec.Template.Finalizers = finalizers
+	}
+
+	return cloneSet
 }
 
 func (t *CloneSetTester) CreateCloneSet(cs *appsv1alpha1.CloneSet) (*appsv1alpha1.CloneSet, error) {
