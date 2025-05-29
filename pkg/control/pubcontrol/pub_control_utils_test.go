@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openkruise/kruise/apis/apps/pub"
@@ -133,7 +134,7 @@ var (
 			UID:       types.UID("f6d5b184-d82f-461c-a432-fbd59e2f0379"),
 		},
 		Spec: apps.DeploymentSpec{
-			Replicas: utilpointer.Int32Ptr(10),
+			Replicas: ptr.To[int32](10),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "nginx",
@@ -165,7 +166,7 @@ var (
 			},
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: utilpointer.Int32Ptr(10),
+			Replicas: ptr.To[int32](10),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "nginx",
