@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -103,15 +103,15 @@ var _ = SIGDescribe("PullImages", func() {
 						{Key: framework.FakeNodeImageLabelKey, Operator: metav1.LabelSelectorOpDoesNotExist},
 					}}},
 					PullPolicy: &appsv1alpha1.PullPolicy{
-						TimeoutSeconds: utilpointer.Int32Ptr(50),
-						BackoffLimit:   utilpointer.Int32Ptr(2),
+						TimeoutSeconds: ptr.To[int32](50),
+						BackoffLimit:   ptr.To[int32](2),
 					},
 					Parallelism:     &intorstr4,
 					ImagePullPolicy: appsv1alpha1.PullAlways,
 					CompletionPolicy: appsv1alpha1.CompletionPolicy{
 						Type:                    appsv1alpha1.Always,
-						ActiveDeadlineSeconds:   utilpointer.Int64Ptr(50),
-						TTLSecondsAfterFinished: utilpointer.Int32Ptr(20),
+						ActiveDeadlineSeconds:   ptr.To[int64](50),
+						TTLSecondsAfterFinished: ptr.To[int32](20),
 					},
 				},
 			}
@@ -161,8 +161,8 @@ var _ = SIGDescribe("PullImages", func() {
 				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
 					Selector: &appsv1alpha1.ImagePullJobNodeSelector{Names: []string{nodes[0].Name}},
 					PullPolicy: &appsv1alpha1.PullPolicy{
-						TimeoutSeconds: utilpointer.Int32Ptr(50),
-						BackoffLimit:   utilpointer.Int32Ptr(2),
+						TimeoutSeconds: ptr.To[int32](50),
+						BackoffLimit:   ptr.To[int32](2),
 					},
 					Parallelism:     &intorstr4,
 					ImagePullPolicy: appsv1alpha1.PullIfNotPresent,
@@ -216,8 +216,8 @@ var _ = SIGDescribe("PullImages", func() {
 				Images: []string{WebserverImage},
 				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
 					PullPolicy: &appsv1alpha1.PullPolicy{
-						TimeoutSeconds: utilpointer.Int32Ptr(50),
-						BackoffLimit:   utilpointer.Int32Ptr(2),
+						TimeoutSeconds: ptr.To[int32](50),
+						BackoffLimit:   ptr.To[int32](2),
 					},
 					Parallelism:     &intorstr4,
 					ImagePullPolicy: appsv1alpha1.PullAlways,
@@ -264,8 +264,8 @@ var _ = SIGDescribe("PullImages", func() {
 				Images: []string{WebserverImage},
 				ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
 					PullPolicy: &appsv1alpha1.PullPolicy{
-						TimeoutSeconds: utilpointer.Int32Ptr(50),
-						BackoffLimit:   utilpointer.Int32Ptr(2),
+						TimeoutSeconds: ptr.To[int32](50),
+						BackoffLimit:   ptr.To[int32](2),
 					},
 					Parallelism:     &intorstr4,
 					ImagePullPolicy: appsv1alpha1.PullIfNotPresent,
