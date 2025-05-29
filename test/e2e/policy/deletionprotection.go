@@ -38,7 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
@@ -107,7 +107,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 
 			ginkgo.By("Scale CloneSet replicas to 0")
 			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
-				cs.Spec.Replicas = utilpointer.Int32Ptr(0)
+				cs.Spec.Replicas = ptr.To[int32](0)
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Eventually(func() int32 {
@@ -249,7 +249,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 
 			ginkgo.By("Scale CloneSet replicas to 2 and protection to Cascading")
 			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
-				cs.Spec.Replicas = utilpointer.Int32Ptr(2)
+				cs.Spec.Replicas = ptr.To[int32](2)
 				cs.Labels[policyv1alpha1.DeletionProtectionKey] = policyv1alpha1.DeletionProtectionTypeCascading
 			})
 			gomega.Eventually(func() int32 {
@@ -265,7 +265,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 
 			ginkgo.By("Scale CloneSet replicas to 0")
 			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
-				cs.Spec.Replicas = utilpointer.Int32Ptr(0)
+				cs.Spec.Replicas = ptr.To[int32](0)
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Eventually(func() int32 {
@@ -289,7 +289,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 					Labels:    map[string]string{policyv1alpha1.DeletionProtectionKey: policyv1alpha1.DeletionProtectionTypeAlways},
 				},
 				Spec: apps.DeploymentSpec{
-					Replicas: utilpointer.Int32Ptr(0),
+					Replicas: ptr.To[int32](0),
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"owner": name}},
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
