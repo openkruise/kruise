@@ -34,11 +34,12 @@ import (
 
 func TestIsPodUnavailableChanged(t *testing.T) {
 	cases := []struct {
-		name      string
-		getOldPod func() *corev1.Pod
-		getNewPod func() *corev1.Pod
-		getPub    func() *policyv1alpha1.PodUnavailableBudget
-		expect    bool
+		name                                       string
+		getOldPod                                  func() *corev1.Pod
+		getNewPod                                  func() *corev1.Pod
+		getPub                                     func() *policyv1alpha1.PodUnavailableBudget
+		enableInPlacePodVerticalScalingFeatureGate bool
+		expect                                     bool
 	}{
 		{
 			name: "only annotations change",
@@ -56,6 +57,25 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				return pub
 			},
 			expect: false,
+			enableInPlacePodVerticalScalingFeatureGate: false,
+		},
+		{
+			name: "only annotations change with featureGate enabled",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Annotations["add"] = "annotations"
+				return demo
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			expect: false,
+			enableInPlacePodVerticalScalingFeatureGate: true,
 		},
 		{
 			name: "add unavailable label",
@@ -73,6 +93,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				return pub
 			},
 			expect: true,
+			enableInPlacePodVerticalScalingFeatureGate: false,
 		},
 		{
 			name: "image changed",
@@ -90,6 +111,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				return pub
 			},
 			expect: true,
+			enableInPlacePodVerticalScalingFeatureGate: false,
 		},
 		{
 			name: "qos changed",
@@ -116,6 +138,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				return pub
 			},
 			expect: true,
+			enableInPlacePodVerticalScalingFeatureGate: true,
 		},
 		{
 			name: "resources changed",
@@ -152,6 +175,44 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				return pub
 			},
 			expect: false,
+			enableInPlacePodVerticalScalingFeatureGate: true,
+		},
+		{
+			name: "resources changed but featureGate disabled",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("3"),
+						corev1.ResourceMemory: resource.MustParse("3Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			expect: true,
+			enableInPlacePodVerticalScalingFeatureGate: false,
 		},
 		{
 			name: "resources changed but with unavailable label",
@@ -191,6 +252,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				return pub
 			},
 			expect: true,
+			enableInPlacePodVerticalScalingFeatureGate: true,
 		},
 		{
 			name: "storage resources changed 1",
@@ -228,6 +290,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				return pub
 			},
 			expect: true,
+			enableInPlacePodVerticalScalingFeatureGate: true,
 		},
 		{
 			name: "storage resources changed 2",
@@ -265,6 +328,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				return pub
 			},
 			expect: true,
+			enableInPlacePodVerticalScalingFeatureGate: true,
 		},
 		{
 			name: "resources changed but static pod",
@@ -305,6 +369,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				return pub
 			},
 			expect: true,
+			enableInPlacePodVerticalScalingFeatureGate: true,
 		},
 		{
 			name: "resources changed but resizePolicy is restart",
@@ -353,6 +418,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				return pub
 			},
 			expect: true,
+			enableInPlacePodVerticalScalingFeatureGate: true,
 		},
 		{
 			name: "resources changed mixed resizePolicy",
@@ -409,10 +475,10 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				return pub
 			},
 			expect: false,
+			enableInPlacePodVerticalScalingFeatureGate: true,
 		},
 	}
 
-	feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	defer feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling, false)
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
@@ -423,6 +489,8 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				Client:           fakeClient,
 				controllerFinder: finder,
 			}
+			feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling,
+				cs.enableInPlacePodVerticalScalingFeatureGate)
 			is := control.IsPodUnavailableChanged(cs.getOldPod(), cs.getNewPod())
 			if cs.expect != is {
 				t.Fatalf("IsPodUnavailableChanged failed")
@@ -440,11 +508,11 @@ func TestIsNeedProtectResizeAction(t *testing.T) {
 		expect         bool
 	}{
 		{
-			name:           "feature not enabled",
+			name:           "protect resize when featureGate disabled but protect update",
 			getPod:         func() *corev1.Pod { return podDemo.DeepCopy() },
 			getPub:         func() *policyv1alpha1.PodUnavailableBudget { return pubDemo.DeepCopy() },
 			enabledFeature: false,
-			expect:         false,
+			expect:         true,
 		},
 		{
 			name:   "pub not protect resize action",
@@ -475,14 +543,17 @@ func TestIsNeedProtectResizeAction(t *testing.T) {
 			expect:         true,
 		},
 		{
-			name:   "pub protect resize action by default",
+			name:   "pub protect resize action when featureGate disabled",
 			getPod: func() *corev1.Pod { return podDemo.DeepCopy() },
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
-				pub.Annotations = nil
+				if pub.Annotations == nil {
+					pub.Annotations = map[string]string{}
+				}
+				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = string(policyv1alpha1.PubResizeOperation)
 				return pub
 			},
-			enabledFeature: true,
+			enabledFeature: false,
 			expect:         true,
 		},
 	}

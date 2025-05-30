@@ -86,22 +86,27 @@ func (c *commonControl) IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool
 }
 
 func (c *commonControl) isNeedProtectResizeAction(newPod *corev1.Pod) bool {
-	// If InPlacePodVerticalScaling is not enabled, then RESIZE is meaningless
-	// and will degrade to an UPDATE action.
-	if !feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return false
-	}
-
 	pub, err := c.GetPubForPod(newPod)
 	if err != nil || pub == nil {
-		return false
+		return true
 	}
 
-	return isNeedPubProtection(pub, policyv1alpha1.PubResizeOperation)
+	if isNeedPubProtection(pub, policyv1alpha1.PubResizeOperation) {
+		return true
+	}
+
+	// if protect UPDATE but featureGate InPlacePodVerticalScaling is disabled, then need to protect RESIZE
+	if isNeedPubProtection(pub, policyv1alpha1.PubUpdateOperation) &&
+		!feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		return true
+	}
+
+	return false
 }
 
+// return true if this action won't cause unavailability
 func (c *commonControl) canResizeInplace(oldPod, newPod *corev1.Pod) bool {
-	if !c.isNeedProtectResizeAction(newPod) {
+	if c.isNeedProtectResizeAction(newPod) {
 		return false
 	}
 
@@ -143,7 +148,7 @@ func (c *commonControl) canResizeInplace(oldPod, newPod *corev1.Pod) bool {
 		return false
 	}
 
-	// TODO: Check annotations bind with env using downwardAPI and considering `InPlaceUpdateEnvFromMetadata` featureGate in kruise-daemon
+	// TODO: Check annotations、labels bind with env using downwardAPI and considering `InPlaceUpdateEnvFromMetadata` featureGate in kruise-daemon
 	return true
 }
 

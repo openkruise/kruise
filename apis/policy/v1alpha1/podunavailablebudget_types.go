@@ -27,16 +27,16 @@ import (
 type PubOperation string
 
 const (
-	// PubProtectOperationAnnotation indicates the pub protected Operation[DELETE,UPDATE,EVICT,RESIZE].
+	// PubProtectOperationAnnotation indicates the pub protected Operation[DELETE,UPDATE,EVICT].
 	// if annotations[kruise.io/pub-protect-operations]=EVICT indicates the pub only protect evict pod.
-	// if the annotations do not exist, the default DELETE,EVICT,UPDATE,RESIZE are protected.
-	// RESIZE is a special UPDATE operation that represents changes to container resources. When the
-	// pod feature gate InPlacePodVerticalScaling is not enabled, it will degrade to the UPDATE strategy.
-	// When the pod feature gate InPlacePodVerticalScaling is enabled, it will protect against cases
-	// where in-place resizing is not possible. Specifically, these scenarios include:
-	// - 1. Changes to resources when restartPolicy == restartContainer.
-	// - 2. Changes to static pod resources.
-	// - 3. Changes to pod QoS.
+	// if the annotations do not exist, the default DELETE,EVICT,UPDATE are protected.
+	// RESIZE: Pod vertical scaling action. If it's enabled, all resize action will be protected. RESIZE
+	// is an extension of UPDATE, so if RESIZE is enabled, UPDATE will also be protected.
+	// UPDATE: Kruise will carefully differentiate whether this update will cause interruptions. When
+	// the FeatureGate InPlacePodVerticalScaling is enabled, pod inplace vertical scaling will be
+	// considered non-disruption only when allowedResources(cpu、memory) changes、restartPolicy
+	// is not restartContainer、is not static pod and QoS not changed. But if featureGate
+	// InPlacePodVerticalScaling is disabled, all resize action will be considered as disruption.
 	PubProtectOperationAnnotation = "kruise.io/pub-protect-operations"
 	// pod webhook operation
 	PubUpdateOperation PubOperation = "UPDATE"
