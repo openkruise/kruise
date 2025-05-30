@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openkruise/kruise/apis/apps/pub"
@@ -91,7 +92,7 @@ var (
 					Kind:       "ReplicaSet",
 					Name:       "nginx",
 					UID:        types.UID("606132e0-85ef-460a-8cf5-cd8f915a8cc3"),
-					Controller: utilpointer.BoolPtr(true),
+					Controller: ptr.To(true),
 				},
 			},
 		},
@@ -156,7 +157,7 @@ var (
 					Kind:       "Deployment",
 					Name:       "nginx",
 					UID:        types.UID("f6d5b184-d82f-461c-a432-fbd59e2f0379"),
-					Controller: utilpointer.BoolPtr(true),
+					Controller: ptr.To(true),
 				},
 			},
 			UID: types.UID("606132e0-85ef-460a-8cf5-cd8f915a8cc3"),
