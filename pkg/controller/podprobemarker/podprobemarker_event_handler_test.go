@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
@@ -33,7 +33,7 @@ var (
 					Kind:       "ReplicaSet",
 					Name:       "nginx",
 					UID:        types.UID("606132e0-85ef-460a-8cf5-cd8f915a8cc3"),
-					Controller: utilpointer.BoolPtr(true),
+					Controller: ptr.To(true),
 				},
 			},
 		},
