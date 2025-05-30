@@ -18,8 +18,9 @@ package framework
 
 import (
 	"context"
-	"sort"
+	"sort" // Ensure this import is present
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub" // Added import
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +48,7 @@ func NewCloneSetTester(c clientset.Interface, kc kruiseclientset.Interface, ns s
 }
 
 func (t *CloneSetTester) NewCloneSet(name string, replicas int32, updateStrategy appsv1alpha1.CloneSetUpdateStrategy) *appsv1alpha1.CloneSet {
-	return &appsv1alpha1.CloneSet{
+	cs := &appsv1alpha1.CloneSet{ // Assign to cs first
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: t.ns,
 			Name:      name,
@@ -84,12 +85,26 @@ func (t *CloneSetTester) NewCloneSet(name string, replicas int32, updateStrategy
 			},
 		},
 	}
+	return cs // Return the created cs
 }
+
+// START: Added function from PR #2060
+func (t *CloneSetTester) NewCloneSetWithLifecycle(name string, replicas int32, lifecycle *appspub.Lifecycle, finalizers []string) *appsv1alpha1.CloneSet {
+	cs := t.NewCloneSet(name, replicas, appsv1alpha1.CloneSetUpdateStrategy{})
+	cs.Spec.Lifecycle = lifecycle
+	if len(finalizers) > 0 {
+		cs.Spec.Template.ObjectMeta.Finalizers = finalizers
+	}
+	return cs
+}
+
+// END: Added function from PR #2060
 
 func (t *CloneSetTester) CreateCloneSet(cs *appsv1alpha1.CloneSet) (*appsv1alpha1.CloneSet, error) {
 	return t.kc.AppsV1alpha1().CloneSets(t.ns).Create(context.TODO(), cs, metav1.CreateOptions{})
 }
 
+// ... (rest of the CloneSetTester methods) ...
 func (t *CloneSetTester) GetCloneSet(name string) (*appsv1alpha1.CloneSet, error) {
 	return t.kc.AppsV1alpha1().CloneSets(t.ns).Get(context.TODO(), name, metav1.GetOptions{})
 }
@@ -114,7 +129,6 @@ func (t *CloneSetTester) ListPodsForCloneSet(name string) (pods []*v1.Pod, err e
 	}
 	for i := range podList.Items {
 		pod := &podList.Items[i]
-		// ignore deleting pod
 		if pod.DeletionTimestamp != nil {
 			continue
 		}

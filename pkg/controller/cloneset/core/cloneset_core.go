@@ -24,6 +24,8 @@ import (
 	"github.com/appscode/jsonpatch"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	// "k8s.io/apimachinery/pkg/util/sets" // Not strictly needed for PR #2060's change in this func
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
@@ -134,7 +136,6 @@ func (c *commonControl) IsPodUpdateReady(pod *v1.Pod, minReadySeconds int32) boo
 }
 
 func (c *commonControl) GetPodsSortFunc(pods []*v1.Pod, waitUpdateIndexes []int) func(i, j int) bool {
-	// not-ready < ready, unscheduled < scheduled, and pending < running
 	return func(i, j int) bool {
 		return kubecontroller.ActivePods(pods).Less(waitUpdateIndexes[i], waitUpdateIndexes[j])
 	}
@@ -145,8 +146,6 @@ func (c *commonControl) GetUpdateOptions() *inplaceupdate.UpdateOptions {
 	if c.Spec.UpdateStrategy.InPlaceUpdateStrategy != nil {
 		opts.GracePeriodSeconds = c.Spec.UpdateStrategy.InPlaceUpdateStrategy.GracePeriodSeconds
 	}
-	// For the InPlaceOnly strategy, ignore the hash comparison of VolumeClaimTemplates.
-	// Consider making changes through a feature gate.
 	if c.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
 		opts.IgnoreVolumeClaimTemplatesHashDiff = true
 	}
@@ -180,18 +179,26 @@ func (c *commonControl) ExtraStatusCalculation(status *appsv1alpha1.CloneSetStat
 
 func (c *commonControl) IgnorePodUpdateEvent(oldPod, curPod *v1.Pod) bool {
 	if oldPod.Generation != curPod.Generation {
+		klog.V(5).Infof("CloneSet %s/%s: Pod %s/%s generation changed, not ignoring update.",
+			c.CloneSet.Namespace, c.CloneSet.Name, curPod.Namespace, curPod.Name)
 		return false
 	}
 
-	if lifecycleFinalizerChanged(c.CloneSet, oldPod, curPod) {
+	if lifecycleFinalizerChanged(c.CloneSet, oldPod, curPod) { // This uses PR #2060's version
+		klog.V(4).Infof("CloneSet %s/%s: Pod %s/%s lifecycle finalizer changed, not ignoring update.",
+			c.CloneSet.Namespace, c.CloneSet.Name, curPod.Namespace, curPod.Name)
 		return false
 	}
 
 	if c.IsPodUpdatePaused(oldPod) != c.IsPodUpdatePaused(curPod) {
+		klog.V(5).Infof("CloneSet %s/%s: Pod %s/%s pause status changed, not ignoring update.",
+			c.CloneSet.Namespace, c.CloneSet.Name, curPod.Namespace, curPod.Name)
 		return false
 	}
 
 	if podutil.IsPodReady(oldPod) != podutil.IsPodReady(curPod) {
+		klog.V(5).Infof("CloneSet %s/%s: Pod %s/%s readiness changed, not ignoring update.",
+			c.CloneSet.Namespace, c.CloneSet.Name, curPod.Namespace, curPod.Name)
 		return false
 	}
 
@@ -203,28 +210,41 @@ func (c *commonControl) IgnorePodUpdateEvent(oldPod, curPod *v1.Pod) bool {
 		}
 		return false
 	}
-	isPodInplaceUpdating := func(pod *v1.Pod) bool {
-		if len(pod.Labels) > 0 && appspub.LifecycleStateType(pod.Labels[appspub.LifecycleStateKey]) != appspub.LifecycleStateNormal {
-			return true
+	isPodConsideredActivelyUpdating := func(pod *v1.Pod) bool {
+		if len(pod.Labels) > 0 {
+			state := appspub.LifecycleStateType(pod.Labels[appspub.LifecycleStateKey])
+			// Only consider actual update-related states, not all non-Normal states
+			return state == appspub.LifecycleStatePreparingUpdate || state == appspub.LifecycleStateUpdating
 		}
 		return false
 	}
 
-	if containsReadinessGate(curPod) || isPodInplaceUpdating(curPod) {
+	if containsReadinessGate(curPod) || isPodConsideredActivelyUpdating(curPod) { // Use modified function
 		opts := c.GetUpdateOptions()
 		opts = inplaceupdate.SetOptionsDefaults(opts)
 		if err := containersUpdateCompleted(curPod, opts.CheckContainersUpdateCompleted); err == nil {
 			if cond := inplaceupdate.GetCondition(curPod); cond == nil || cond.Status != v1.ConditionTrue {
+				klog.V(5).Infof("CloneSet %s/%s: Pod %s/%s in-place update condition not true, not ignoring update.",
+					c.CloneSet.Namespace, c.CloneSet.Name, curPod.Namespace, curPod.Name)
 				return false
 			}
-			// if InPlaceWorkloadVerticalScaling is enabled, we should not ignore the update event of updating pod
-			// for handling only in-place resource resize
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) {
+				klog.V(5).Infof("CloneSet %s/%s: Pod %s/%s in-place update complete and InPlaceWorkloadVerticalScaling enabled, not ignoring update.",
+					c.CloneSet.Namespace, c.CloneSet.Name, curPod.Namespace, curPod.Name)
 				return false
 			}
+		} else {
+			// If containersUpdateCompleted fails (e.g. no annotation), it's not necessarily an active update needing reconciliation *if* the lifecycle state isn't an update state.
+			// However, if it IS an update state, then this failure is significant.
+			// The original logic: if err != nil, it means the update isn't complete or state is missing, so don't ignore.
+			// This seems reasonable IF isPodConsideredActivelyUpdating is true.
+			klog.V(5).Infof("CloneSet %s/%s: Pod %s/%s containersUpdateCompleted check failed (%v) or indicates ongoing update, not ignoring update.",
+				c.CloneSet.Namespace, c.CloneSet.Name, curPod.Namespace, curPod.Name, err)
+			return false
 		}
 	}
-
+	klog.V(5).Infof("CloneSet %s/%s: Pod %s/%s update event meets criteria for optimized ignoring.",
+		c.CloneSet.Namespace, c.CloneSet.Name, curPod.Namespace, curPod.Name)
 	return true
 }
 
@@ -242,6 +262,14 @@ func containersUpdateCompleted(pod *v1.Pod, checkFunc func(pod *v1.Pod, state *a
 func lifecycleFinalizerChanged(cs *appsv1alpha1.CloneSet, oldPod, curPod *v1.Pod) bool {
 	if cs.Spec.Lifecycle == nil {
 		return false
+	}
+
+	if cs.Spec.Lifecycle.PreNormal != nil {
+		for _, f := range cs.Spec.Lifecycle.PreNormal.FinalizersHandler {
+			if controllerutil.ContainsFinalizer(oldPod, f) != controllerutil.ContainsFinalizer(curPod, f) {
+				return true
+			}
+		}
 	}
 
 	if cs.Spec.Lifecycle.PreDelete != nil {
