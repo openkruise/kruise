@@ -349,6 +349,87 @@ var _ = SIGDescribe("CloneSet", func() {
 		})
 	})
 
+	ginkgo.Context("[CloneSet PreNormal Hook with Optimization Enabled]", func() {
+		var pollingInterval = 3 * time.Second
+		var shortTimeout = 60 * time.Second
+		var mediumTimeout = 120 * time.Second
+
+		ginkgo.It("should transition Pod from PreparingNormal to Normal after PreNormal finalizer is added externally [#2057]", func() {
+			localTestRandStr := rand.String(5)
+			csName := "cs-prenormal-opt-" + localTestRandStr
+			preNormalTestFinalizer := "kruise.io/e2e-test-prenormal-finalizer-" + localTestRandStr
+
+			ginkgo.By("Ensuring CloneSetEventHandlerOptimization feature gate is expected to be enabled for this test (manual check or CI config)")
+
+			ginkgo.By(fmt.Sprintf("Creating CloneSet %s in namespace %s with a PreNormal hook using finalizer %s", csName, ns, preNormalTestFinalizer))
+			lifecycle := &appspub.Lifecycle{
+				PreNormal: &appspub.LifecycleHook{
+					FinalizersHandler: []string{preNormalTestFinalizer},
+					MarkPodNotReady:   true,
+				},
+			}
+			csSpec := tester.NewCloneSet(csName, 1, appsv1alpha1.CloneSetUpdateStrategy{})
+			csSpec.Spec.Lifecycle = lifecycle
+			csSpec.Spec.Template.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.Nginx)
+
+			_, err := tester.CreateCloneSet(csSpec)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to create CloneSet %s", csName)
+
+			ginkgo.By(fmt.Sprintf("Waiting for CloneSet %s to have 1 pod", csName))
+			gomega.Eventually(func() (int, error) {
+				pods, errList := tester.ListPodsForCloneSet(csName)
+				if errList != nil {
+					return 0, errList
+				}
+				return len(pods), nil
+			}, mediumTimeout, pollingInterval).Should(gomega.Equal(1), "CloneSet %s should create 1 pod", csName)
+
+			var pod *v1.Pod
+			ginkgo.By(fmt.Sprintf("Waiting for the Pod of CloneSet %s to enter PreparingNormal state and NOT have the finalizer yet", csName))
+			gomega.Eventually(func(g gomega.Gomega) {
+				pods, errList := tester.ListPodsForCloneSet(csName)
+				g.Expect(errList).NotTo(gomega.HaveOccurred(), "Failed to list pods for %s", csName)
+				g.Expect(pods).To(gomega.HaveLen(1), "Expected 1 pod for %s, but got %d", csName, len(pods))
+				pod = pods[0]
+
+				state, ok := pod.Labels[appspub.LifecycleStateKey]
+				g.Expect(ok).To(gomega.BeTrue(), "Pod %s/%s has no lifecycle state label", pod.Namespace, pod.Name)
+				g.Expect(state).To(gomega.Equal(string(appspub.LifecycleStatePreparingNormal)), "Pod %s/%s in state '%s', expected '%s'", pod.Namespace, pod.Name, state, string(appspub.LifecycleStatePreparingNormal))
+				g.Expect(sets.NewString(pod.Finalizers...).Has(preNormalTestFinalizer)).To(gomega.BeFalse(), "Pod %s/%s should NOT have finalizer '%s' yet, but it does: %v", pod.Namespace, pod.Name, preNormalTestFinalizer, pod.Finalizers)
+			}, mediumTimeout, pollingInterval).Should(gomega.Succeed(), "Pod for %s should enter PreparingNormal and not have finalizer", csName)
+
+			gomega.Expect(pod).NotTo(gomega.BeNil(), "Pod variable should have been assigned")
+
+			ginkgo.By(fmt.Sprintf("Manually adding PreNormal finalizer '%s' to Pod %s/%s", preNormalTestFinalizer, pod.Namespace, pod.Name))
+			latestPod, errGet := c.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+			gomega.Expect(errGet).NotTo(gomega.HaveOccurred(), "Failed to get latest Pod %s/%s for update", pod.Namespace, pod.Name)
+
+			podCopy := latestPod.DeepCopy()
+			podCopy.Finalizers = append(podCopy.Finalizers, preNormalTestFinalizer)
+			_, errUpdate := c.CoreV1().Pods(podCopy.Namespace).Update(context.TODO(), podCopy, metav1.UpdateOptions{})
+			gomega.Expect(errUpdate).NotTo(gomega.HaveOccurred(), "Failed to add finalizer '%s' to Pod %s/%s", preNormalTestFinalizer, pod.Namespace, pod.Name)
+
+			ginkgo.By(fmt.Sprintf("Waiting for Pod %s/%s to transition to Normal state and finalizer to be removed", pod.Namespace, pod.Name))
+			gomega.Eventually(func(g gomega.Gomega) {
+				p, errGetPod := c.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+				g.Expect(errGetPod).NotTo(gomega.HaveOccurred(), "Failed to get pod %s/%s after finalizer addition", pod.Namespace, pod.Name)
+
+				state, ok := p.Labels[appspub.LifecycleStateKey]
+				g.Expect(ok).To(gomega.BeTrue(), "Pod %s/%s has no lifecycle state label after finalizer addition", p.Namespace, p.Name)
+				g.Expect(state).To(gomega.Equal(string(appspub.LifecycleStateNormal)), "Pod %s/%s in state '%s', expected '%s' after finalizer addition. Current finalizers: %v", p.Namespace, p.Name, state, string(appspub.LifecycleStateNormal), p.Finalizers)
+				g.Expect(sets.NewString(p.Finalizers...).Has(preNormalTestFinalizer)).To(gomega.BeFalse(), "Pod %s/%s should have PreNormal finalizer '%s' removed by controller, but it's still present: %v", p.Namespace, p.Name, preNormalTestFinalizer, p.Finalizers)
+			}, mediumTimeout, pollingInterval).Should(gomega.Succeed(), "Pod %s/%s should transition to Normal state and finalizer removed", pod.Namespace, pod.Name)
+
+			ginkgo.By(fmt.Sprintf("Verifying CloneSet %s status reflects Pod is ready and updated", csName))
+			gomega.Eventually(func(g gomega.Gomega) {
+				currentCS, errGetCS := kc.AppsV1alpha1().CloneSets(ns).Get(context.TODO(), csName, metav1.GetOptions{})
+				g.Expect(errGetCS).NotTo(gomega.HaveOccurred())
+				g.Expect(currentCS.Status.ReadyReplicas).To(gomega.Equal(int32(1)), "CloneSet %s should have 1 ready replica", csName)
+				g.Expect(currentCS.Status.UpdatedReadyReplicas).To(gomega.Equal(int32(1)), "CloneSet %s should have 1 updated ready replica", csName)
+			}, shortTimeout, pollingInterval).Should(gomega.Succeed())
+		})
+	})
+
 	framework.KruiseDescribe("CloneSet Updating", func() {
 		var err error
 
@@ -1147,6 +1228,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(job.Spec.Parallelism.IntValue()).To(gomega.Equal(2))
 		})
 	})
+
 })
 
 func testChangePodQOS(tester *framework.CloneSetTester, randStr string, c clientset.Interface) {

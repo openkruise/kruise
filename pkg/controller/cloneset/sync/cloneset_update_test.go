@@ -814,7 +814,7 @@ func TestUpdate(t *testing.T) {
 				Spec: appsv1alpha1.CloneSetSpec{
 					Replicas: getInt32Pointer(1),
 					Lifecycle: &appspub.Lifecycle{
-						PreNormal:     &appspub.LifecycleHook{FinalizersHandler: []string{"slb/online"}},
+						PreNormal:     &appspub.LifecycleHook{FinalizersHandler: []string{"kruise.io/pre-normal-test-finalizer"}},
 						InPlaceUpdate: &appspub.LifecycleHook{FinalizersHandler: []string{"slb/online"}},
 					},
 					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType},
@@ -838,7 +838,7 @@ func TestUpdate(t *testing.T) {
 							apps.ControllerRevisionHashLabelKey:  "rev_old",
 							appspub.LifecycleStateKey:            string(appspub.LifecycleStatePreparingNormal),
 						},
-						Finalizers: []string{"slb/online"},
+						Finalizers: []string{"kruise.io/pre-normal-test-finalizer", "slb/online"},
 					},
 					Spec: v1.PodSpec{
 						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
