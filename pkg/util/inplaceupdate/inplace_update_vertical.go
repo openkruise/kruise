@@ -57,6 +57,10 @@ func init() {
 	}
 }
 
+func GetNativeVerticalUpdateImpl() *NativeVerticalUpdate {
+	return verticalUpdateImpl.(*NativeVerticalUpdate)
+}
+
 // NativeVerticalUpdate represents the vertical scaling of k8s standard
 type NativeVerticalUpdate struct{}
 
