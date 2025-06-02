@@ -332,7 +332,7 @@ var _ = SIGDescribe("PullImage", func() {
 				},
 				Type: v1.SecretTypeDockercfg,
 				Data: map[string][]byte{
-					v1.DockerConfigKey: []byte(`{"auths":{"docker.io/library/nginx":{"username":"echoserver","password":"test","auth":"ZWNobHVzZXI6dGVzdA=="}}}`),
+					v1.DockerConfigKey: []byte(`{"auths":{"docker.io/library/nginx":{"username":"echoserver","password":"test","auth":"ZWNob3NlcnZlcjp0ZXN0"}}}`),
 				},
 			}
 			_, err := c.CoreV1().Secrets(ns).Create(context.TODO(), secret, metav1.CreateOptions{})
