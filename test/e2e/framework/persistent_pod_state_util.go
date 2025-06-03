@@ -104,8 +104,8 @@ func (s *PersistentPodStateTester) NewBaseStatefulset(namespace string) *appsv1.
 }
 
 func (s *PersistentPodStateTester) WaitForStatefulsetRunning(sts *appsv1.StatefulSet) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute*5, true,
+		func(ctx context.Context) (bool, error) {
 			inner, err := s.c.AppsV1().StatefulSets(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
@@ -383,8 +383,8 @@ func (s *PersistentPodStateTester) CreateStatefulsetLikePods(sts *StatefulSetLik
 }
 
 func (s *PersistentPodStateTester) waitStatefulsetLikePodsRunning(sts *StatefulSetLikeTest) {
-	pollErr := wait.PollImmediate(time.Second*3, time.Minute*5,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second*3, time.Minute*5, true,
+		func(ctx context.Context) (bool, error) {
 			options := metav1.ListOptions{LabelSelector: "app=staticip"}
 			items, err := s.c.CoreV1().Pods(sts.Namespace).List(context.TODO(), options)
 			if err != nil {

@@ -120,8 +120,8 @@ func (t *DaemonSetTester) PatchDaemonSet(name string, patchType types.PatchType,
 }
 
 func (t *DaemonSetTester) WaitForDaemonSetDeleted(namespace, name string) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, true,
+		func(ctx context.Context) (bool, error) {
 			_, err := t.kc.AppsV1alpha1().DaemonSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
@@ -195,7 +195,7 @@ func (t *DaemonSetTester) SetDaemonSetNodeLabels(nodeName string, labels map[str
 	nodeClient := t.c.CoreV1().Nodes()
 	var newNode *v1.Node
 	var newLabels map[string]string
-	err := wait.PollImmediate(DaemonSetRetryPeriod, DaemonSetRetryTimeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.TODO(), DaemonSetRetryPeriod, DaemonSetRetryTimeout, false, func(ctx context.Context) (bool, error) {
 		node, err := nodeClient.Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			return false, err

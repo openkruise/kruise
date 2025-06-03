@@ -344,8 +344,8 @@ func (s *PodProbeMarkerTester) CreateStatefulSet(sts *appsv1beta1.StatefulSet) {
 }
 
 func (s *PodProbeMarkerTester) WaitForStatefulSetRunning(sts *appsv1beta1.StatefulSet) {
-	pollErr := wait.PollImmediate(time.Second, 2*time.Minute,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, 2*time.Minute, true,
+		func(ctx context.Context) (bool, error) {
 			inner, err := s.kc.AppsV1beta1().StatefulSets(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
