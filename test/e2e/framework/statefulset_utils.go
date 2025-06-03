@@ -213,7 +213,7 @@ func (s *StatefulSetTester) Scale(ss *appsv1beta1.StatefulSet, count int32) (*ap
 	ss = s.update(ns, name, func(ss *appsv1beta1.StatefulSet) { *(ss.Spec.Replicas) = count })
 
 	var statefulPodList *v1.PodList
-	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 		statefulPodList = s.GetPodList(ss)
 		if int32(len(statefulPodList.Items)) == count {
 			return true, nil
@@ -304,28 +304,27 @@ func (s *StatefulSetTester) ConfirmStatefulPodCount(count int, ss *appsv1beta1.S
 // WaitForRunning waits for numPodsRunning in ss to be Running and for the first
 // numPodsReady ordinals to be Ready.
 func (s *StatefulSetTester) WaitForRunning(numPodsRunning, numPodsReady int32, ss *appsv1beta1.StatefulSet) {
-	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
-		func() (bool, error) {
-			podList := s.GetPodList(ss)
-			s.SortStatefulPods(podList)
-			if int32(len(podList.Items)) < numPodsRunning {
-				Logf("Found %d stateful pods, waiting for %d", len(podList.Items), numPodsRunning)
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), StatefulSetPoll, StatefulSetTimeout, false, func(ctx context.Context) (bool, error) {
+		podList := s.GetPodList(ss)
+		s.SortStatefulPods(podList)
+		if int32(len(podList.Items)) < numPodsRunning {
+			Logf("Found %d stateful pods, waiting for %d", len(podList.Items), numPodsRunning)
+			return false, nil
+		}
+		if int32(len(podList.Items)) > numPodsRunning {
+			return false, fmt.Errorf("Too many pods scheduled, expected %d got %d", numPodsRunning, len(podList.Items))
+		}
+		for _, p := range podList.Items {
+			shouldBeReady := getStatefulPodOrdinal(&p) < int(numPodsReady)
+			isReady := podutil.IsPodReady(&p)
+			desiredReadiness := shouldBeReady == isReady
+			Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, v1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
+			if p.Status.Phase != v1.PodRunning || !desiredReadiness {
 				return false, nil
 			}
-			if int32(len(podList.Items)) > numPodsRunning {
-				return false, fmt.Errorf("Too many pods scheduled, expected %d got %d", numPodsRunning, len(podList.Items))
-			}
-			for _, p := range podList.Items {
-				shouldBeReady := getStatefulPodOrdinal(&p) < int(numPodsReady)
-				isReady := podutil.IsPodReady(&p)
-				desiredReadiness := shouldBeReady == isReady
-				Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, v1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
-				if p.Status.Phase != v1.PodRunning || !desiredReadiness {
-					return false, nil
-				}
-			}
-			return true, nil
-		})
+		}
+		return true, nil
+	})
 	if pollErr != nil {
 		Failf("Failed waiting for pods to enter running: %v", pollErr)
 	}
@@ -333,8 +332,8 @@ func (s *StatefulSetTester) WaitForRunning(numPodsRunning, numPodsReady int32, s
 
 // WaitForState periodically polls for the ss and its pods until the until function returns either true or an error
 func (s *StatefulSetTester) WaitForState(ss *appsv1beta1.StatefulSet, until func(*appsv1beta1.StatefulSet, *v1.PodList) (bool, error)) {
-	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), StatefulSetPoll, StatefulSetTimeout, true,
+		func(ctx context.Context) (bool, error) {
 			ssGet, err := s.kc.AppsV1beta1().StatefulSets(ss.Namespace).Get(context.TODO(), ss.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -639,8 +638,8 @@ func (s *StatefulSetTester) WaitForStatusReadyReplicas(ss *appsv1beta1.StatefulS
 	Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
-	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), StatefulSetPoll, StatefulSetTimeout, true,
+		func(ctx context.Context) (bool, error) {
 			ssGet, err := s.kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -663,8 +662,8 @@ func (s *StatefulSetTester) WaitForStatusPVCReadyReplicas(ss *appsv1beta1.Statef
 	Logf("Waiting for statefulset status.volume updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
-	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), StatefulSetPoll, StatefulSetTimeout, true,
+		func(ctx context.Context) (bool, error) {
 			ssGet, err := s.kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -692,8 +691,8 @@ func (s *StatefulSetTester) WaitForStatusReplicas(ss *appsv1beta1.StatefulSet, e
 	Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
-	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), StatefulSetPoll, StatefulSetTimeout, true,
+		func(ctx context.Context) (bool, error) {
 			ssGet, err := s.kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -760,7 +759,7 @@ func DeleteAllStatefulSets(c clientset.Interface, kc kruiseclientset.Interface, 
 	// pvs are global, so we need to wait for the exact ones bound to the statefulset pvcs.
 	pvNames := sets.NewString()
 	// TODO: Don't assume all pvcs in the ns belong to a statefulset
-	pvcPollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
+	pvcPollErr := wait.PollUntilContextTimeout(context.TODO(), StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			Logf("WARNING: Failed to list pvcs, retrying %v", err)
@@ -780,7 +779,7 @@ func DeleteAllStatefulSets(c clientset.Interface, kc kruiseclientset.Interface, 
 		errList = append(errList, "Timeout waiting for pvc deletion.")
 	}
 
-	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
 		pvList, err := c.CoreV1().PersistentVolumes().List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
 			Logf("WARNING: Failed to list pvs, retrying %v", err)
@@ -975,15 +974,14 @@ func (s *StatefulSetTester) GetPVCList(ss *appsv1beta1.StatefulSet) *v1.Persiste
 	return pvcList
 }
 func (s *StatefulSetTester) WaitForPVCState(ss *appsv1beta1.StatefulSet, until func(*appsv1beta1.StatefulSet, *v1.PersistentVolumeClaimList) (bool, error)) {
-	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
-		func() (bool, error) {
-			ssGet, err := s.kc.AppsV1beta1().StatefulSets(ss.Namespace).Get(context.TODO(), ss.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			pvcList := s.GetPVCList(ssGet)
-			return until(ssGet, pvcList)
-		})
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), StatefulSetPoll, StatefulSetTimeout, true, func(ctx context.Context) (bool, error) {
+		ssGet, err := s.kc.AppsV1beta1().StatefulSets(ss.Namespace).Get(context.TODO(), ss.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		pvcList := s.GetPVCList(ssGet)
+		return until(ssGet, pvcList)
+	})
 	if pollErr != nil {
 		Failf("Failed waiting for state update: %v", pollErr)
 	}
