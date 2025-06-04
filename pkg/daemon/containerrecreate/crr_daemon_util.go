@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
@@ -190,7 +190,7 @@ func convertCRRToPod(crr *appsv1alpha1.ContainerRecreateRequest) *v1.Pod {
 	}
 
 	if pod.Spec.TerminationGracePeriodSeconds == nil {
-		pod.Spec.TerminationGracePeriodSeconds = utilpointer.Int64Ptr(30)
+		pod.Spec.TerminationGracePeriodSeconds = ptr.To(int64(30))
 	}
 
 	for i := range crr.Spec.Containers {
