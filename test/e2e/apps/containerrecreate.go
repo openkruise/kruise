@@ -390,7 +390,6 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 							{Name: "sidecar"},
 						},
 						ActiveDeadlineSeconds:   pointer.Int64Ptr(3),
-						TTLSecondsAfterFinished: ptr.To[int32](3),
 					},
 				}
 				crr, err = tester.CreateCRR(crr)
