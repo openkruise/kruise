@@ -18,114 +18,34 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeResourceDistributions implements ResourceDistributionInterface
-type FakeResourceDistributions struct {
+// fakeResourceDistributions implements ResourceDistributionInterface
+type fakeResourceDistributions struct {
+	*gentype.FakeClientWithList[*v1alpha1.ResourceDistribution, *v1alpha1.ResourceDistributionList]
 	Fake *FakeAppsV1alpha1
 }
 
-var resourcedistributionsResource = v1alpha1.SchemeGroupVersion.WithResource("resourcedistributions")
-
-var resourcedistributionsKind = v1alpha1.SchemeGroupVersion.WithKind("ResourceDistribution")
-
-// Get takes name of the resourceDistribution, and returns the corresponding resourceDistribution object, and an error if there is any.
-func (c *FakeResourceDistributions) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ResourceDistribution, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootGetAction(resourcedistributionsResource, name), &v1alpha1.ResourceDistribution{})
-	if obj == nil {
-		return nil, err
+func newFakeResourceDistributions(fake *FakeAppsV1alpha1) appsv1alpha1.ResourceDistributionInterface {
+	return &fakeResourceDistributions{
+		gentype.NewFakeClientWithList[*v1alpha1.ResourceDistribution, *v1alpha1.ResourceDistributionList](
+			fake.Fake,
+			"",
+			v1alpha1.SchemeGroupVersion.WithResource("resourcedistributions"),
+			v1alpha1.SchemeGroupVersion.WithKind("ResourceDistribution"),
+			func() *v1alpha1.ResourceDistribution { return &v1alpha1.ResourceDistribution{} },
+			func() *v1alpha1.ResourceDistributionList { return &v1alpha1.ResourceDistributionList{} },
+			func(dst, src *v1alpha1.ResourceDistributionList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.ResourceDistributionList) []*v1alpha1.ResourceDistribution {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.ResourceDistributionList, items []*v1alpha1.ResourceDistribution) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.ResourceDistribution), err
-}
-
-// List takes label and field selectors, and returns the list of ResourceDistributions that match those selectors.
-func (c *FakeResourceDistributions) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ResourceDistributionList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootListAction(resourcedistributionsResource, resourcedistributionsKind, opts), &v1alpha1.ResourceDistributionList{})
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.ResourceDistributionList{ListMeta: obj.(*v1alpha1.ResourceDistributionList).ListMeta}
-	for _, item := range obj.(*v1alpha1.ResourceDistributionList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested resourceDistributions.
-func (c *FakeResourceDistributions) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewRootWatchAction(resourcedistributionsResource, opts))
-}
-
-// Create takes the representation of a resourceDistribution and creates it.  Returns the server's representation of the resourceDistribution, and an error, if there is any.
-func (c *FakeResourceDistributions) Create(ctx context.Context, resourceDistribution *v1alpha1.ResourceDistribution, opts v1.CreateOptions) (result *v1alpha1.ResourceDistribution, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootCreateAction(resourcedistributionsResource, resourceDistribution), &v1alpha1.ResourceDistribution{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ResourceDistribution), err
-}
-
-// Update takes the representation of a resourceDistribution and updates it. Returns the server's representation of the resourceDistribution, and an error, if there is any.
-func (c *FakeResourceDistributions) Update(ctx context.Context, resourceDistribution *v1alpha1.ResourceDistribution, opts v1.UpdateOptions) (result *v1alpha1.ResourceDistribution, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateAction(resourcedistributionsResource, resourceDistribution), &v1alpha1.ResourceDistribution{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ResourceDistribution), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeResourceDistributions) UpdateStatus(ctx context.Context, resourceDistribution *v1alpha1.ResourceDistribution, opts v1.UpdateOptions) (*v1alpha1.ResourceDistribution, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootUpdateSubresourceAction(resourcedistributionsResource, "status", resourceDistribution), &v1alpha1.ResourceDistribution{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ResourceDistribution), err
-}
-
-// Delete takes name of the resourceDistribution and deletes it. Returns an error if one occurs.
-func (c *FakeResourceDistributions) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(resourcedistributionsResource, name, opts), &v1alpha1.ResourceDistribution{})
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeResourceDistributions) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewRootDeleteCollectionAction(resourcedistributionsResource, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.ResourceDistributionList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched resourceDistribution.
-func (c *FakeResourceDistributions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ResourceDistribution, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(resourcedistributionsResource, name, pt, data, subresources...), &v1alpha1.ResourceDistribution{})
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ResourceDistribution), err
 }

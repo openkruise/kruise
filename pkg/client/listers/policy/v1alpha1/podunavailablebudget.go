@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PodUnavailableBudgetLister helps list PodUnavailableBudgets.
@@ -29,7 +29,7 @@ import (
 type PodUnavailableBudgetLister interface {
 	// List lists all PodUnavailableBudgets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.PodUnavailableBudget, err error)
+	List(selector labels.Selector) (ret []*policyv1alpha1.PodUnavailableBudget, err error)
 	// PodUnavailableBudgets returns an object that can list and get PodUnavailableBudgets.
 	PodUnavailableBudgets(namespace string) PodUnavailableBudgetNamespaceLister
 	PodUnavailableBudgetListerExpansion
@@ -37,25 +37,17 @@ type PodUnavailableBudgetLister interface {
 
 // podUnavailableBudgetLister implements the PodUnavailableBudgetLister interface.
 type podUnavailableBudgetLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*policyv1alpha1.PodUnavailableBudget]
 }
 
 // NewPodUnavailableBudgetLister returns a new PodUnavailableBudgetLister.
 func NewPodUnavailableBudgetLister(indexer cache.Indexer) PodUnavailableBudgetLister {
-	return &podUnavailableBudgetLister{indexer: indexer}
-}
-
-// List lists all PodUnavailableBudgets in the indexer.
-func (s *podUnavailableBudgetLister) List(selector labels.Selector) (ret []*v1alpha1.PodUnavailableBudget, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.PodUnavailableBudget))
-	})
-	return ret, err
+	return &podUnavailableBudgetLister{listers.New[*policyv1alpha1.PodUnavailableBudget](indexer, policyv1alpha1.Resource("podunavailablebudget"))}
 }
 
 // PodUnavailableBudgets returns an object that can list and get PodUnavailableBudgets.
 func (s *podUnavailableBudgetLister) PodUnavailableBudgets(namespace string) PodUnavailableBudgetNamespaceLister {
-	return podUnavailableBudgetNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return podUnavailableBudgetNamespaceLister{listers.NewNamespaced[*policyv1alpha1.PodUnavailableBudget](s.ResourceIndexer, namespace)}
 }
 
 // PodUnavailableBudgetNamespaceLister helps list and get PodUnavailableBudgets.
@@ -63,36 +55,15 @@ func (s *podUnavailableBudgetLister) PodUnavailableBudgets(namespace string) Pod
 type PodUnavailableBudgetNamespaceLister interface {
 	// List lists all PodUnavailableBudgets in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.PodUnavailableBudget, err error)
+	List(selector labels.Selector) (ret []*policyv1alpha1.PodUnavailableBudget, err error)
 	// Get retrieves the PodUnavailableBudget from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.PodUnavailableBudget, error)
+	Get(name string) (*policyv1alpha1.PodUnavailableBudget, error)
 	PodUnavailableBudgetNamespaceListerExpansion
 }
 
 // podUnavailableBudgetNamespaceLister implements the PodUnavailableBudgetNamespaceLister
 // interface.
 type podUnavailableBudgetNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all PodUnavailableBudgets in the indexer for a given namespace.
-func (s podUnavailableBudgetNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.PodUnavailableBudget, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.PodUnavailableBudget))
-	})
-	return ret, err
-}
-
-// Get retrieves the PodUnavailableBudget from the indexer for a given namespace and name.
-func (s podUnavailableBudgetNamespaceLister) Get(name string) (*v1alpha1.PodUnavailableBudget, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("podunavailablebudget"), name)
-	}
-	return obj.(*v1alpha1.PodUnavailableBudget), nil
+	listers.ResourceIndexer[*policyv1alpha1.PodUnavailableBudget]
 }

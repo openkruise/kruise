@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
@@ -29,8 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func newTestPodEventHandler(reader client.Reader, expectations kubecontroller.ControllerExpectationsInterface) *podEventHandler {
@@ -171,7 +171,12 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 
 		exp := kubecontroller.NewControllerExpectations()
 		enqueueHandler := newTestPodEventHandler(fakeClient, exp)
-		q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-queue")
+		q := workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+			workqueue.TypedRateLimitingQueueConfig[reconcile.Request]{
+				Name: "test-queue",
+			},
+		)
 
 		for i := 0; i < len(testCase.alterExpectationCreationsAdds); i++ {
 			exp.ExpectCreations(logger, testCase.alterExpectationCreationsKey, 1)
@@ -654,7 +659,12 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 		}
 		exp := kubecontroller.NewControllerExpectations()
 		enqueueHandler := newTestPodEventHandler(fakeClient, exp)
-		q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-queue")
+		q := workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+			workqueue.TypedRateLimitingQueueConfig[reconcile.Request]{
+				Name: "test-queue",
+			},
+		)
 
 		enqueueHandler.Update(context.TODO(), testCase.e, q)
 		time.Sleep(time.Millisecond * 10)
@@ -776,7 +786,12 @@ func TestEnqueueRequestForNodeCreate(t *testing.T) {
 			fakeClient.Create(context.TODO(), ds)
 		}
 		enqueueHandler := newTestNodeEventHandler(fakeClient)
-		q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-queue")
+		q := workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+			workqueue.TypedRateLimitingQueueConfig[reconcile.Request]{
+				Name: "test-queue",
+			},
+		)
 
 		enqueueHandler.Create(context.TODO(), testCase.e, q)
 		if q.Len() != testCase.expectedQueueLen {
@@ -901,7 +916,12 @@ func TestEnqueueRequestForNodeUpdate(t *testing.T) {
 			fakeClient.Create(context.TODO(), ds)
 		}
 		enqueueHandler := newTestNodeEventHandler(fakeClient)
-		q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-queue")
+		q := workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+			workqueue.TypedRateLimitingQueueConfig[reconcile.Request]{
+				Name: "test-queue",
+			},
+		)
 
 		enqueueHandler.Update(context.TODO(), testCase.e, q)
 		if q.Len() != testCase.expectedQueueLen {

@@ -18,13 +18,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	apisappsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	versioned "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/openkruise/kruise/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,7 +35,7 @@ import (
 // ImageListPullJobs.
 type ImageListPullJobInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.ImageListPullJobLister
+	Lister() appsv1alpha1.ImageListPullJobLister
 }
 
 type imageListPullJobInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredImageListPullJobInformer(client versioned.Interface, namespace s
 				return client.AppsV1alpha1().ImageListPullJobs(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&appsv1alpha1.ImageListPullJob{},
+		&apisappsv1alpha1.ImageListPullJob{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *imageListPullJobInformer) defaultInformer(client versioned.Interface, r
 }
 
 func (f *imageListPullJobInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1alpha1.ImageListPullJob{}, f.defaultInformer)
+	return f.factory.InformerFor(&apisappsv1alpha1.ImageListPullJob{}, f.defaultInformer)
 }
 
-func (f *imageListPullJobInformer) Lister() v1alpha1.ImageListPullJobLister {
-	return v1alpha1.NewImageListPullJobLister(f.Informer().GetIndexer())
+func (f *imageListPullJobInformer) Lister() appsv1alpha1.ImageListPullJobLister {
+	return appsv1alpha1.NewImageListPullJobLister(f.Informer().GetIndexer())
 }
