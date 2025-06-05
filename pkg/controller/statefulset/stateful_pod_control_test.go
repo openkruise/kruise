@@ -250,58 +250,94 @@ func TestStatefulPodControlCreatePodFailed(t *testing.T) {
 }
 
 func TestStatefulPodControlNoOpUpdate(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
-	fakeClient := &fake.Clientset{}
-	claims := getPersistentVolumeClaims(set, pod)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	for k := range claims {
-		claim := claims[k]
-		indexer.Add(&claim)
+	testFn := func(t *testing.T) {
+		recorder := record.NewFakeRecorder(10)
+		set := newStatefulSet(3)
+		pod := newStatefulSetPod(set, 0)
+		fakeClient := &fake.Clientset{}
+		claims := getPersistentVolumeClaims(set, pod)
+		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		for k := range claims {
+			claim := claims[k]
+			indexer.Add(&claim)
+		}
+		claimLister := corelisters.NewPersistentVolumeClaimLister(indexer)
+		control := NewStatefulPodControl(fakeClient, nil, claimLister, nil, recorder)
+		fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
+			t.Error("no-op update should not make any client invocation")
+			return true, nil, apierrors.NewInternalError(errors.New("If we are here we have a problem"))
+		})
+		if err := control.UpdateStatefulPod(set, pod); err != nil {
+			t.Errorf("Error returned on no-op update error: %s", err)
+		}
+		events := collectEvents(recorder.Events)
+		if eventCount := len(events); eventCount != 0 {
+			t.Errorf("no-op update: got %d events, but want 0", eventCount)
+		}
 	}
-	claimLister := corelisters.NewPersistentVolumeClaimLister(indexer)
-	control := NewStatefulPodControl(fakeClient, nil, claimLister, nil, recorder)
-	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
-		t.Error("no-op update should not make any client invocation")
-		return true, nil, apierrors.NewInternalError(errors.New("If we are here we have a problem"))
+
+	t.Run("RecreatePodWhenChangeVCTInStatefulSetGate enabled", func(t *testing.T) {
+		defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecreatePodWhenChangeVCTInStatefulSetGate, true)()
+		testFn(t)
 	})
-	if err := control.UpdateStatefulPod(set, pod); err != nil {
-		t.Errorf("Error returned on no-op update error: %s", err)
-	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 0 {
-		t.Errorf("no-op update: got %d events, but want 0", eventCount)
-	}
+	t.Run("RecreatePodWhenChangeVCTInStatefulSetGate disabled", func(t *testing.T) {
+		defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecreatePodWhenChangeVCTInStatefulSetGate, false)()
+		testFn(t)
+	})
+
 }
 
 func TestStatefulPodControlUpdatesIdentity(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
-	fakeClient := fake.NewSimpleClientset(pod)
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	claimLister := corelisters.NewPersistentVolumeClaimLister(indexer)
-	control := NewStatefulPodControl(fakeClient, nil, claimLister, nil, recorder)
-	var updated *v1.Pod
-	fakeClient.PrependReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		updated = update.GetObject().(*v1.Pod)
-		return true, update.GetObject(), nil
+	testFn := func(t *testing.T, expectAnnotationUpdate bool) {
+		recorder := record.NewFakeRecorder(10)
+		set := newStatefulSet(3)
+		pod := newStatefulSetPod(set, 0)
+
+		vctAnnotationBefore := pod.Annotations[PodVolumeClaimTemplatesKey]
+
+		fakeClient := fake.NewSimpleClientset(pod)
+		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		claimLister := corelisters.NewPersistentVolumeClaimLister(indexer)
+		control := NewStatefulPodControl(fakeClient, nil, claimLister, nil, recorder)
+		var updated *v1.Pod
+		fakeClient.PrependReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
+			update := action.(core.UpdateAction)
+			updated = update.GetObject().(*v1.Pod)
+			return true, update.GetObject(), nil
+		})
+		pod.Name = "goo-0"
+		set.Spec.VolumeClaimTemplates = append(set.Spec.VolumeClaimTemplates, v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			},
+		})
+
+		if err := control.UpdateStatefulPod(set, pod); err != nil {
+			t.Errorf("Successful update returned an error: %s", err)
+		}
+		events := collectEvents(recorder.Events)
+		if eventCount := len(events); eventCount != 3 {
+			t.Errorf("Pod update successful:got %d events,but want 3", eventCount)
+			t.Log(events)
+		} else if !strings.Contains(events[0], v1.EventTypeNormal) {
+			t.Errorf("Found unexpected non-normal event %s", events[0])
+		}
+		if !identityMatches(set, updated) {
+			t.Error("Name update failed identity does not match")
+		}
+		if expectAnnotationUpdate != (vctAnnotationBefore != updated.Annotations[PodVolumeClaimTemplatesKey]) {
+			t.Error("Expected pod-vct-names to be updated")
+		}
+	}
+
+	t.Run("RecreatePodWhenChangeVCTInStatefulSetGate enabled", func(t *testing.T) {
+		defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecreatePodWhenChangeVCTInStatefulSetGate, true)()
+		testFn(t, true)
 	})
-	pod.Name = "goo-0"
-	if err := control.UpdateStatefulPod(set, pod); err != nil {
-		t.Errorf("Successful update returned an error: %s", err)
-	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 1 {
-		t.Errorf("Pod update successful:got %d events,but want 1", eventCount)
-	} else if !strings.Contains(events[0], v1.EventTypeNormal) {
-		t.Errorf("Found unexpected non-normal event %s", events[0])
-	}
-	if !identityMatches(set, updated) {
-		t.Error("Name update failed identity does not match")
-	}
+	t.Run("RecreatePodWhenChangeVCTInStatefulSetGate disabled", func(t *testing.T) {
+		defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecreatePodWhenChangeVCTInStatefulSetGate, false)()
+		testFn(t, false)
+	})
 }
 
 func TestStatefulPodControlUpdateIdentityFailure(t *testing.T) {

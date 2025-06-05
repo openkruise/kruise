@@ -21,7 +21,9 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/features"
 	apiutil "github.com/openkruise/kruise/pkg/util/api"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/pvc"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
@@ -377,7 +379,8 @@ func ValidateVolumeClaimTemplateUpdate(c client.Client, sts, oldSts *appsv1beta1
 		sts.Spec.VolumeClaimUpdateStrategy.Type == appsv1beta1.OnPVCDeleteVolumeClaimUpdateStrategyType {
 		return nil
 	}
-	if len(sts.Spec.VolumeClaimTemplates) != len(oldSts.Spec.VolumeClaimTemplates) {
+	if len(sts.Spec.VolumeClaimTemplates) != len(oldSts.Spec.VolumeClaimTemplates) &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.RecreatePodWhenChangeVCTInStatefulSetGate) {
 		return field.ErrorList{field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), sts.Spec.VolumeClaimTemplates, "volumeClaimTemplate can not be added or deleted when OnRollingUpdate")}
 	}
 
@@ -389,18 +392,23 @@ func ValidateVolumeClaimTemplateUpdate(c client.Client, sts, oldSts *appsv1beta1
 	var err error
 	for _, template := range sts.Spec.VolumeClaimTemplates {
 		templateIdStr := fmt.Sprintf("volumeClaimTemplates[%v]", template.Name)
+
 		oldTemplate, exist := name2Template[template.Name]
-		if !exist {
+		if !exist && !utilfeature.DefaultFeatureGate.Enabled(features.RecreatePodWhenChangeVCTInStatefulSetGate) {
 			return field.ErrorList{field.Forbidden(field.NewPath("spec", templateIdStr, "name"), "volumeClaimTemplate name can not be modified")}
+		} else if !exist && utilfeature.DefaultFeatureGate.Enabled(features.RecreatePodWhenChangeVCTInStatefulSetGate) {
+			continue
+		} else {
+			matched, resizeOnly := pvc.CompareWithCheckFn(oldTemplate, &template, isPVCResize)
+			if matched {
+				continue
+			}
+
+			if !resizeOnly {
+				return field.ErrorList{field.Invalid(field.NewPath("spec", templateIdStr), template, "volumeClaimTemplate can not be modified when OnRollingUpdate")}
+			}
 		}
 
-		matched, resizeOnly := pvc.CompareWithCheckFn(oldTemplate, &template, isPVCResize)
-		if matched {
-			continue
-		}
-		if !resizeOnly {
-			return field.ErrorList{field.Invalid(field.NewPath("spec", templateIdStr), template, "volumeClaimTemplate can not be modified when OnRollingUpdate")}
-		}
 		// check if sc allow volume expand
 		var sc *storagev1.StorageClass
 		scName := template.Spec.StorageClassName
