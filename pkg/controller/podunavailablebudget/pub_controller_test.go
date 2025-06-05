@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -198,7 +199,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -212,7 +213,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[1].Name,
 							UID:        rs[1].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -258,7 +259,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -272,7 +273,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[1].Name,
 							UID:        rs[1].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -319,7 +320,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -333,7 +334,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[1].Name,
 							UID:        rs[1].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -385,7 +386,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -404,7 +405,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[1].Name,
 							UID:        rs[1].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -490,7 +491,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -539,7 +540,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -589,7 +590,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -638,7 +639,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					if i >= 7 {
@@ -692,7 +693,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)

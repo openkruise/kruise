@@ -44,6 +44,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type PersistentPodStateTester struct {
@@ -254,7 +255,7 @@ func (s *PersistentPodStateTester) CreateStatefulsetLikeCRD(namespace string) {
 					Deprecated: false,
 					Schema: &apiextensionsv1.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-							XPreserveUnknownFields: utilpointer.BoolPtr(true),
+							XPreserveUnknownFields: ptr.To(true),
 							Type:                   "object",
 						},
 					},
