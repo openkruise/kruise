@@ -84,8 +84,8 @@ func (t *EphemeralJobTester) GetPodsByEjob(name string) ([]*v1.Pod, error) {
 }
 
 func (t *EphemeralJobTester) WaitForEphemeralJobCreated(job *appsv1alpha1.EphemeralJob) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, false,
+		func(ctx context.Context) (bool, error) {
 			_, err := t.kc.AppsV1alpha1().EphemeralJobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -98,8 +98,8 @@ func (t *EphemeralJobTester) WaitForEphemeralJobCreated(job *appsv1alpha1.Epheme
 }
 
 func (t *EphemeralJobTester) WaitForEphemeralJobDeleted(job *appsv1alpha1.EphemeralJob) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, false,
+		func(ctx context.Context) (bool, error) {
 			_, err := t.kc.AppsV1alpha1().EphemeralJobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
@@ -202,8 +202,8 @@ func (t *EphemeralJobTester) CheckEphemeralJobExist(job *appsv1alpha1.EphemeralJ
 }
 
 func (s *EphemeralJobTester) WaitForDeploymentRunning(deployment *apps.Deployment) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute*5, false,
+		func(ctx context.Context) (bool, error) {
 			inner, err := s.c.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
@@ -240,8 +240,8 @@ func (s *EphemeralJobTester) DeleteDeployment(deployment *apps.Deployment) {
 }
 
 func (s *EphemeralJobTester) WaitForDeploymentDeleted(deployment *apps.Deployment) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, false,
+		func(ctx context.Context) (bool, error) {
 			_, err := s.c.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {

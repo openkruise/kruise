@@ -201,8 +201,8 @@ func (s *SidecarSetTester) UpdatePod(pod *corev1.Pod) {
 }
 
 func (s *SidecarSetTester) WaitForSidecarSetUpgradeComplete(sidecarSet *appsv1alpha1.SidecarSet, exceptStatus *appsv1alpha1.SidecarSetStatus) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute*5, false,
+		func(ctx context.Context) (bool, error) {
 			inner, err := s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSet.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -274,8 +274,8 @@ func (s *SidecarSetTester) DeleteDeployment(deployment *apps.Deployment) {
 }
 
 func (s *SidecarSetTester) WaitForSidecarSetCreated(sidecarSet *appsv1alpha1.SidecarSet) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, true,
+		func(ctx context.Context) (bool, error) {
 			_, err := s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSet.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -288,8 +288,8 @@ func (s *SidecarSetTester) WaitForSidecarSetCreated(sidecarSet *appsv1alpha1.Sid
 }
 
 func (s *SidecarSetTester) WaitForDeploymentRunning(deployment *apps.Deployment) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute*5, true,
+		func(ctx context.Context) (bool, error) {
 			inner, err := s.c.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
@@ -306,8 +306,8 @@ func (s *SidecarSetTester) WaitForDeploymentRunning(deployment *apps.Deployment)
 }
 
 func (s *SidecarSetTester) WaitForDeploymentDeleted(deployment *apps.Deployment) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, true,
+		func(ctx context.Context) (bool, error) {
 			_, err := s.c.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
@@ -323,8 +323,8 @@ func (s *SidecarSetTester) WaitForDeploymentDeleted(deployment *apps.Deployment)
 }
 
 func (s *SidecarSetTester) WaitForSidecarSetDeleted(sidecarSet *appsv1alpha1.SidecarSet) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, true,
+		func(ctx context.Context) (bool, error) {
 			_, err := s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSet.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
@@ -417,8 +417,8 @@ func (s *SidecarSetTester) CreateCloneSet(cloneset *appsv1alpha1.CloneSet) *apps
 }
 
 func (s *SidecarSetTester) WaitForCloneSetRunning(cloneset *appsv1alpha1.CloneSet) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute*5, false,
+		func(ctx context.Context) (bool, error) {
 			inner, err := s.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(context.TODO(), cloneset.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err

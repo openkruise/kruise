@@ -472,7 +472,9 @@ var _ = SIGDescribe("InplaceVPA", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check that daemon pods launch on every node of the cluster")
-			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.CheckRunningOnAllNodes(ds))
+			err = wait.PollUntilContextTimeout(context.TODO(), framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, true, func(ctx context.Context) (bool, error) {
+				return tester.CheckRunningOnAllNodes(ds)()
+			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to start")
 
 			err = tester.CheckDaemonStatus(dsName)

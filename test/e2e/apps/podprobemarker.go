@@ -321,8 +321,8 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			// Firstly, probe.sh return false
-			err = wait.PollImmediate(1*time.Second, 10*time.Second,
-				func() (done bool, err error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 10*time.Second, true,
+				func(ctx context.Context) (done bool, err error) {
 					pods, err := tester.ListActivePods(ns)
 					if err != nil {
 						return false, err
@@ -345,8 +345,8 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			// Secondly, probe.sh return true & msg is 'data'
-			err = wait.PollImmediate(1*time.Second, 20*time.Second,
-				func() (done bool, err error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 20*time.Second, true,
+				func(ctx context.Context) (done bool, err error) {
 					pods, err := tester.ListActivePods(ns)
 					if err != nil {
 						return false, err
@@ -373,8 +373,8 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			// Thirdly, probe.sh return true & msg is 'gate'
-			err = wait.PollImmediate(1*time.Second, 20*time.Second,
-				func() (done bool, err error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), 1*time.Second, 20*time.Second, true,
+				func(ctx context.Context) (done bool, err error) {
 					pods, err := tester.ListActivePods(ns)
 					if err != nil {
 						return false, err

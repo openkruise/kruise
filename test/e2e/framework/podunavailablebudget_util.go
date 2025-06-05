@@ -203,8 +203,8 @@ func (t *PodUnavailableBudgetTester) CreateCloneSet(cloneset *appsv1alpha1.Clone
 }
 
 func (t *PodUnavailableBudgetTester) WaitForPubCreated(pub *policyv1alpha1.PodUnavailableBudget) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, true,
+		func(ctx context.Context) (bool, error) {
 			_, err := t.kc.PolicyV1alpha1().PodUnavailableBudgets(pub.Namespace).Get(context.TODO(), pub.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -217,8 +217,8 @@ func (t *PodUnavailableBudgetTester) WaitForPubCreated(pub *policyv1alpha1.PodUn
 }
 
 func (t *PodUnavailableBudgetTester) WaitForCloneSetRunning(cloneset *appsv1alpha1.CloneSet) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute*5, true,
+		func(ctx context.Context) (bool, error) {
 			inner, err := t.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(context.TODO(), cloneset.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -234,8 +234,8 @@ func (t *PodUnavailableBudgetTester) WaitForCloneSetRunning(cloneset *appsv1alph
 }
 
 func (t *PodUnavailableBudgetTester) WaitForDeploymentReadyAndRunning(deployment *apps.Deployment) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute*5, true,
+		func(ctx context.Context) (bool, error) {
 			inner, err := t.c.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -253,8 +253,8 @@ func (t *PodUnavailableBudgetTester) WaitForDeploymentReadyAndRunning(deployment
 }
 
 func (t *PodUnavailableBudgetTester) WaitForCloneSetMinReadyAndRunning(cloneSets []*appsv1alpha1.CloneSet, minReady int32) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute*10,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute*10, true,
+		func(ctx context.Context) (bool, error) {
 			var readyReplicas int32 = 0
 			completed := 0
 			for _, cloneSet := range cloneSets {
@@ -333,8 +333,8 @@ func (t *PodUnavailableBudgetTester) DeleteCloneSets(namespace string) {
 }
 
 func (t *PodUnavailableBudgetTester) WaitForDeploymentDeleted(deployment *apps.Deployment) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, true,
+		func(ctx context.Context) (bool, error) {
 			_, err := t.c.AppsV1().Deployments(deployment.Namespace).Get(context.TODO(), deployment.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
@@ -350,8 +350,8 @@ func (t *PodUnavailableBudgetTester) WaitForDeploymentDeleted(deployment *apps.D
 }
 
 func (t *PodUnavailableBudgetTester) WaitForCloneSetDeleted(cloneset *appsv1alpha1.CloneSet) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, true,
+		func(ctx context.Context) (bool, error) {
 			_, err := t.kc.AppsV1alpha1().CloneSets(cloneset.Namespace).Get(context.TODO(), cloneset.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
@@ -367,8 +367,8 @@ func (t *PodUnavailableBudgetTester) WaitForCloneSetDeleted(cloneset *appsv1alph
 }
 
 func (s *SidecarSetTester) WaitForSidecarSetMinReadyAndUpgrade(sidecarSet *appsv1alpha1.SidecarSet, exceptStatus *appsv1alpha1.SidecarSetStatus, minReady int32) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute*5, true,
+		func(ctx context.Context) (bool, error) {
 			inner, err := s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSet.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
