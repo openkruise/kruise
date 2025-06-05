@@ -34,7 +34,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/utils/integer"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -382,7 +382,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	status.ObservedGeneration = set.Generation
 	status.CurrentRevision = currentRevision.Name
 	status.UpdateRevision = updateRevision.Name
-	status.CollisionCount = utilpointer.Int32Ptr(collisionCount)
+	status.CollisionCount = ptr.To[int32](collisionCount)
 	status.LabelSelector = selector.String()
 	minReadySeconds := getMinReadySeconds(set)
 
@@ -1074,7 +1074,7 @@ func (ssc *defaultStatefulSetControl) processCondemned(ctx context.Context, set 
 //
 // Returns:
 // - bool shouldExit: whether to exit.
-// - bool shouldBreak: whether to break the pod for-loop and proceed with the update logic.
+// - bool shouldBreak: whether to break out of the loop.
 // - An error if encountered during processing; nil otherwise.
 func (ssc *defaultStatefulSetControl) processReplica(
 	ctx context.Context,

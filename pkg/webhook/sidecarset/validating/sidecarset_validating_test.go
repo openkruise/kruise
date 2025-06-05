@@ -6,6 +6,7 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
@@ -366,7 +367,7 @@ func TestValidateSidecarSet(t *testing.T) {
 										{
 											ServiceAccountToken: &corev1.ServiceAccountTokenProjection{
 												Audience:          "istio-ca",
-												ExpirationSeconds: pointer.Int64Ptr(43200),
+												ExpirationSeconds: ptr.To(int64(43200)),
 												Path:              "istio-token",
 											},
 										},

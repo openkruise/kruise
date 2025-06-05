@@ -30,6 +30,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
+	"k8s.io/utils/ptr"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -136,7 +137,7 @@ var (
 			UID:       types.UID("f6d5b184-d82f-461c-a432-fbd59e2f0379"),
 		},
 		Spec: apps.DeploymentSpec{
-			Replicas: utilpointer.Int32Ptr(10),
+			Replicas: ptr.To[int32](10),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "nginx",
@@ -168,7 +169,7 @@ var (
 			},
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: utilpointer.Int32Ptr(10),
+			Replicas: ptr.To[int32](10),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "nginx",
@@ -952,12 +953,12 @@ func TestPubReconcile(t *testing.T) {
 			},
 			getDeployment: func() *apps.Deployment {
 				object := deploymentDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return object
 			},
 			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
@@ -1002,12 +1003,12 @@ func TestPubReconcile(t *testing.T) {
 			},
 			getDeployment: func() *apps.Deployment {
 				object := deploymentDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return object
 			},
 			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
@@ -1052,12 +1053,12 @@ func TestPubReconcile(t *testing.T) {
 			},
 			getDeployment: func() *apps.Deployment {
 				object := deploymentDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return object
 			},
 			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
@@ -1102,12 +1103,12 @@ func TestPubReconcile(t *testing.T) {
 			},
 			getDeployment: func() *apps.Deployment {
 				object := deploymentDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return object
 			},
 			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
@@ -1156,12 +1157,12 @@ func TestPubReconcile(t *testing.T) {
 			},
 			getDeployment: func() *apps.Deployment {
 				object := deploymentDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return object
 			},
 			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
@@ -1215,12 +1216,12 @@ func TestPubReconcile(t *testing.T) {
 			},
 			getDeployment: func() *apps.Deployment {
 				object := deploymentDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return object
 			},
 			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {

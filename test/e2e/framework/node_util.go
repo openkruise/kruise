@@ -32,7 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -140,7 +140,7 @@ func (t *NodeTester) CreateFakeNode(randStr string) (node *v1.Node, err error) {
 			for i := range podList.Items {
 				pod := &podList.Items[i]
 				if pod.DeletionTimestamp != nil && pod.DeletionGracePeriodSeconds != nil {
-					t.c.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{GracePeriodSeconds: utilpointer.Int64Ptr(0)})
+					t.c.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))})
 				}
 			}
 			if len(podList.Items) == 0 && noNode {

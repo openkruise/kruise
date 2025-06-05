@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
@@ -147,7 +147,7 @@ func TestGetActiveDeadlineSecondsForNever(t *testing.T) {
 					Spec: appsv1alpha1.ImagePullJobSpec{
 						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
 							PullPolicy: &appsv1alpha1.PullPolicy{
-								TimeoutSeconds: utilpointer.Int32Ptr(1799),
+								TimeoutSeconds: ptr.To(int32(1799)),
 							},
 						},
 					},
@@ -162,7 +162,7 @@ func TestGetActiveDeadlineSecondsForNever(t *testing.T) {
 					Spec: appsv1alpha1.ImagePullJobSpec{
 						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
 							PullPolicy: &appsv1alpha1.PullPolicy{
-								TimeoutSeconds: utilpointer.Int32Ptr(7200),
+								TimeoutSeconds: ptr.To(int32(7200)),
 							},
 						},
 					},

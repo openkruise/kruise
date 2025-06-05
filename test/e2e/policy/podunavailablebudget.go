@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -114,7 +114,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 
 			// create deployment
 			deployment := tester.NewBaseDeployment(ns)
-			deployment.Spec.Replicas = utilpointer.Int32Ptr(1)
+			deployment.Spec.Replicas = ptr.To(int32(1))
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deployment.Namespace, deployment.Name))
 			tester.CreateDeployment(deployment)
 
@@ -202,7 +202,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 
 			// create deployment
 			deployment := tester.NewBaseDeployment(ns)
-			deployment.Spec.Replicas = utilpointer.Int32Ptr(4)
+			deployment.Spec.Replicas = ptr.To(int32(4))
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deployment.Namespace, deployment.Name))
 			tester.CreateDeployment(deployment)
 
@@ -225,7 +225,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 
 			// scale down deployment
 			ginkgo.By(fmt.Sprintf("scale down Deployment(%s/%s)", deployment.Namespace, deployment.Name))
-			deployment.Spec.Replicas = utilpointer.Int32Ptr(0)
+			deployment.Spec.Replicas = ptr.To(int32(0))
 			_, err = c.AppsV1().Deployments(deployment.Namespace).Update(context.TODO(), deployment, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -481,7 +481,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 				Type:   intstr.String,
 				StrVal: "25%",
 			}
-			deployment.Spec.Replicas = utilpointer.Int32Ptr(5)
+			deployment.Spec.Replicas = ptr.To(int32(5))
 			deploymentIn1 := deployment.DeepCopy()
 			deploymentIn1.Name = fmt.Sprintf("%s-1", deploymentIn1.Name)
 			ginkgo.By(fmt.Sprintf("Creating Deployment1(%s/%s)", deploymentIn1.Namespace, deploymentIn1.Name))
@@ -546,7 +546,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 
 			// scale down replicas = 0
 			ginkgo.By("scale down Deployment-1 replicas to 0")
-			deploymentIn1.Spec.Replicas = utilpointer.Int32(0)
+			deploymentIn1.Spec.Replicas = ptr.To(int32(0))
 			_, err = c.AppsV1().Deployments(deploymentIn1.Namespace).Update(context.TODO(), deploymentIn1, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			tester.WaitForDeploymentReadyAndRunning(deploymentIn1)
@@ -626,7 +626,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 
 			// create deployment
 			deployment := tester.NewBaseDeployment(ns)
-			deployment.Spec.Replicas = utilpointer.Int32Ptr(5)
+			deployment.Spec.Replicas = ptr.To(int32(5))
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deployment.Namespace, deployment.Name))
 			tester.CreateDeployment(deployment)
 
@@ -953,7 +953,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 
 			// create cloneset1
 			cloneset := tester.NewBaseCloneSet(ns)
-			cloneset.Spec.Replicas = utilpointer.Int32Ptr(5)
+			cloneset.Spec.Replicas = ptr.To(int32(5))
 			cloneset.Spec.UpdateStrategy.Type = appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType
 			clonesetIn1 := cloneset.DeepCopy()
 			clonesetIn1.Name = fmt.Sprintf("%s-1", clonesetIn1.Name)
@@ -1118,7 +1118,7 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 			// create cloneset
 			cloneset := tester.NewBaseCloneSet(ns)
 			cloneset.Spec.UpdateStrategy.Type = appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType
-			cloneset.Spec.Replicas = utilpointer.Int32Ptr(10)
+			cloneset.Spec.Replicas = ptr.To(int32(10))
 			ginkgo.By(fmt.Sprintf("Creating CloneSet(%s/%s)", cloneset.Namespace, cloneset.Name))
 			cloneset = tester.CreateCloneSet(cloneset)
 

@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -55,7 +55,7 @@ var (
 				//Partition:      &partition,
 				//MaxUnavailable: &maxUnavailable,
 			},
-			RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+			RevisionHistoryLimit: ptr.To(int32(10)),
 		},
 	}
 

@@ -34,7 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var _ = SIGDescribe("ContainerRecreateRequest", func() {
@@ -87,7 +87,7 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 							{Name: "app"},
 						},
 						Strategy:                &appsv1alpha1.ContainerRecreateRequestStrategy{MinStartedSeconds: 5},
-						TTLSecondsAfterFinished: utilpointer.Int32Ptr(3),
+						TTLSecondsAfterFinished: ptr.To[int32](3),
 					},
 				}
 				crr, err = tester.CreateCRR(crr)
@@ -388,7 +388,7 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 							{Name: "app"},
 							{Name: "sidecar"},
 						},
-						ActiveDeadlineSeconds: utilpointer.Int64Ptr(3),
+						ActiveDeadlineSeconds: ptr.To(int64(3)),
 					},
 				}
 				crr, err = tester.CreateCRR(crr)
@@ -445,8 +445,8 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 							{Name: "sidecar"},
 						},
 						Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{
-							TerminationGracePeriodSeconds: utilpointer.Int64Ptr(3),
-							UnreadyGracePeriodSeconds:     utilpointer.Int64Ptr(1),
+							TerminationGracePeriodSeconds: ptr.To(int64(3)),
+							UnreadyGracePeriodSeconds:     ptr.To(int64(1)),
 						},
 					},
 				}
