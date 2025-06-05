@@ -144,6 +144,12 @@ const (
 
 	// EnableSortSidecarContainerByName enable sidecarSet to sort by container name when injecting sidecar containers
 	EnableSortSidecarContainerByName featuregate.Feature = "EnableSortSidecarContainerByName"
+
+	// Enabling this feature means that the Kubernetes cluster has activated the in-place pod resize
+	// feature (https://kubernetes.io/blog/2025/05/16/kubernetes-v1-33-in-place-pod-resize-beta/).
+	// Under this feature, kruise will think all legal pod-vertical-scaling actions must success.
+	// PodUnavailableBudget will specifically protect the resize actions of individual Pods.
+	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -183,6 +189,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	InPlaceWorkloadVerticalScaling:           {Default: false, PreRelease: featuregate.Alpha},
 	EnablePodProbeMarkerOnServerless:         {Default: false, PreRelease: featuregate.Alpha},
 	EnableSortSidecarContainerByName:         {Default: false, PreRelease: featuregate.Alpha},
+	InPlacePodVerticalScaling:                {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
