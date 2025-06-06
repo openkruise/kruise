@@ -1840,3 +1840,73 @@ func TestPodVolumeDevicesAppend(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildSidecarVolumes_WithDifferentVolumeScenarios(t *testing.T) {
+	pod := pod1.DeepCopy()
+
+	cases := []struct {
+		name                    string
+		getSidecarSet           func() *appsv1alpha1.SidecarSet
+		exceptVolumesInSidecars []corev1.Volume
+	}{
+		{
+			name: "missing volume in sidecarSet",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				sidecarSetIn := sidecarSetWithStaragent.DeepCopy()
+				sidecarSetIn.Spec.Volumes = []corev1.Volume{
+					{Name: "volume-a1"},
+					{Name: "volume-b2"},
+					{Name: "volume-c3"},
+				}
+				sidecarSetIn.Spec.InitContainers[0].VolumeDevices = []corev1.VolumeDevice{
+					{Name: "disk0", DevicePath: "/dev/nvme0"},
+				}
+				sidecarSetIn.Spec.Containers[0].VolumeDevices = []corev1.VolumeDevice{
+					{Name: "disk0", DevicePath: "/dev/nvme1"},
+				}
+				return sidecarSetIn
+			},
+			exceptVolumesInSidecars: nil,
+		},
+		{
+			name: "existing volumes in sidecarSet",
+			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+				sidecarSetIn := sidecarSetWithStaragent.DeepCopy()
+				sidecarSetIn.Spec.InitContainers[0].VolumeMounts = []corev1.VolumeMount{
+					{Name: "volume-1", MountPath: "/a/b"},
+					{Name: "volume-2", MountPath: "/c/d"},
+				}
+				sidecarSetIn.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+					{Name: "volume-3", MountPath: "/a/b"},
+					{Name: "volume-4", MountPath: "/c/d"},
+				}
+				sidecarSetIn.Spec.InitContainers[0].VolumeDevices = []corev1.VolumeDevice{{Name: "disk0", DevicePath: "/dev/nvme0"}}
+				sidecarSetIn.Spec.Containers[0].VolumeDevices = []corev1.VolumeDevice{{Name: "disk1", DevicePath: "/dev/nvme1"}}
+				sidecarSetIn.Spec.Volumes = append(sidecarSetIn.Spec.Volumes, corev1.Volume{Name: "disk0"}, corev1.Volume{Name: "disk1"})
+				return sidecarSetIn
+			},
+			exceptVolumesInSidecars: []corev1.Volume{
+				{Name: "volume-1"},
+				{Name: "volume-2"},
+				{Name: "disk0"},
+				{Name: "volume-3"},
+				{Name: "volume-4"},
+				{Name: "disk1"},
+			},
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			sidecarSetIn := cs.getSidecarSet()
+			matchedSidecarSets := []sidecarcontrol.SidecarControl{sidecarcontrol.New(sidecarSetIn)}
+			_, _, _, volumesInSidecars, _, err := buildSidecars(false, pod, nil, matchedSidecarSets)
+			if err != nil {
+				t.Fatalf("failed to build sidecar containers: %v", err)
+			}
+			if !reflect.DeepEqual(cs.exceptVolumesInSidecars, volumesInSidecars) {
+				t.Fatalf("expected volumes %v, but got %v", cs.exceptVolumesInSidecars, volumesInSidecars)
+			}
+		})
+	}
+}
