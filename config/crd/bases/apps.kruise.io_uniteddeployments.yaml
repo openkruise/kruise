@@ -656,6 +656,13 @@ spec:
                               Defaults to 0 (pod will be considered available as soon as it is ready)
                             format: int32
                             type: integer
+                          progressDeadlineSeconds:
+                            description: |-
+                              ProgressDeadlineSeconds is defined as the maximum time taken for
+                              the CloneSet to reach completion or the paused state due to partition.
+                              The time during which the CloneSet is paused would NOT be included in the progress deadline.
+                            format: int32
+                            type: integer
                           replicas:
                             description: |-
                               Replicas is the desired number of replicas of the given Template.
