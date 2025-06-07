@@ -82,6 +82,12 @@ type CloneSetSpec struct {
 
 	// Lifecycle defines the lifecycle hooks for Pods pre-available(pre-normal), pre-delete, in-place update.
 	Lifecycle *appspub.Lifecycle `json:"lifecycle,omitempty"`
+
+	// ProgressDeadlineSeconds is defined as the maximum time taken for
+	// the CloneSet to reach completion or the paused state due to partition.
+	// The time during which the CloneSet is paused would NOT be included in the progress deadline.
+	// +optional
+	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty"`
 }
 
 // CloneSetScaleStrategy defines strategies for pods scale.
@@ -205,6 +211,18 @@ type CloneSetStatus struct {
 	LabelSelector string `json:"labelSelector,omitempty"`
 }
 
+// CloneSetConditionReason is type for CloneSet reasons.
+type CloneSetConditionReason string
+
+const (
+	// CloneSetProgressDeadlineExceeded is added in a cloneset when it fails to show any progress within the given deadline.
+	CloneSetProgressDeadlineExceeded CloneSetConditionReason = "ProgressDeadlineExceeded"
+	// CloneSetProgressPaused is added in a cloneset when it is paused.
+	CloneSetProgressPaused CloneSetConditionReason = "ProgressPaused"
+	// CloneSetProgressResumed is added in a deployment when it is resumed
+	CloneSetProgressResumed = "ProgressResumed"
+)
+
 // CloneSetConditionType is type for CloneSet conditions.
 type CloneSetConditionType string
 
@@ -213,6 +231,8 @@ const (
 	CloneSetConditionFailedScale CloneSetConditionType = "FailedScale"
 	// CloneSetConditionFailedUpdate indicates cloneset controller failed to update pods.
 	CloneSetConditionFailedUpdate CloneSetConditionType = "FailedUpdate"
+	// CloneSetConditionTypeProgressing indicates cloneset controller is progressing.
+	CloneSetConditionTypeProgressing CloneSetConditionType = "Progressing"
 )
 
 // CloneSetCondition describes the state of a CloneSet at a certain point.
@@ -221,6 +241,8 @@ type CloneSetCondition struct {
 	Type CloneSetConditionType `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
 	Status v1.ConditionStatus `json:"status"`
+	// Last time the condition is updated.
+	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
 	// Last time the condition transitioned from one status to another.
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
 	// The reason for the condition's last transition.
