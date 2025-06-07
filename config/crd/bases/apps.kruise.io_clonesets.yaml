@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.16.5
+    controller-gen.kubebuilder.io/version: v0.17.3
   name: clonesets.apps.kruise.io
 spec:
   group: apps.kruise.io
@@ -160,6 +160,14 @@ spec:
                   Minimum number of seconds for which a newly created pod should be ready
                   without any of its container crashing, for it to be considered available.
                   Defaults to 0 (pod will be considered available as soon as it is ready)
+                format: int32
+                type: integer
+              progressDeadlineSeconds:
+                description: |-
+                  ProgressDeadlineSeconds specifies the maximum time for the CloneSet to reach available
+                  or paused state due to partitioning. The controller will set a ProgressDeadlineExceeded
+                  condition when timeout occurs, while excluding paused state duration from the deadline calculation.
+                  It continues processing failed CloneSets and defaults to 600 seconds which can be overridden explicitly.
                 format: int32
                 type: integer
               replicas:
@@ -462,6 +470,10 @@ spec:
                     lastTransitionTime:
                       description: Last time the condition transitioned from one status
                         to another.
+                      format: date-time
+                      type: string
+                    lastUpdateTime:
+                      description: Last time the condition is updated.
                       format: date-time
                       type: string
                     message:
