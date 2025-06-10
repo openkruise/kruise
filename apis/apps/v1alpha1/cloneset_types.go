@@ -83,10 +83,10 @@ type CloneSetSpec struct {
 	// Lifecycle defines the lifecycle hooks for Pods pre-available(pre-normal), pre-delete, in-place update.
 	Lifecycle *appspub.Lifecycle `json:"lifecycle,omitempty"`
 
-	// ProgressDeadlineSeconds is defined as the maximum time taken for
-	// the CloneSet to reach completion or the paused state due to partition.
-	// The time during which the CloneSet is paused would NOT be included in the progress deadline.
-	// +optional
+	// ProgressDeadlineSeconds specifies the maximum time for the CloneSet to reach available
+	// or paused state due to partitioning. The controller will set a ProgressDeadlineExceeded
+	// condition when timeout occurs, while excluding paused state duration from the deadline calculation.
+	// It continues processing failed CloneSets and defaults to 600 seconds which can be overridden explicitly.
 	ProgressDeadlineSeconds *int32 `json:"progressDeadlineSeconds,omitempty"`
 }
 
@@ -218,9 +218,13 @@ const (
 	// CloneSetProgressDeadlineExceeded is added in a cloneset when it fails to show any progress within the given deadline.
 	CloneSetProgressDeadlineExceeded CloneSetConditionReason = "ProgressDeadlineExceeded"
 	// CloneSetProgressPaused is added in a cloneset when it is paused.
-	CloneSetProgressPaused CloneSetConditionReason = "ProgressPaused"
-	// CloneSetProgressResumed is added in a deployment when it is resumed
-	CloneSetProgressResumed = "ProgressResumed"
+	CloneSetProgressPaused CloneSetConditionReason = "CloneSetPaused"
+	// CloneSetProgressUpdated is added in a cloneset when it is updated.
+	CloneSetProgressUpdated CloneSetConditionReason = "CloneSetUpdated"
+	// CloneSetProgressPartitionAvailable is added in a cloneset when paused due to partition.
+	CloneSetProgressPartitionAvailable CloneSetConditionReason = "ProgressPartitionAvailable"
+	// CloneSetAvailable is added in a cloneset when it is available.
+	CloneSetAvailable CloneSetConditionReason = "CloneSetAvailable"
 )
 
 // CloneSetConditionType is type for CloneSet conditions.

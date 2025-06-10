@@ -164,9 +164,10 @@ spec:
                 type: integer
               progressDeadlineSeconds:
                 description: |-
-                  ProgressDeadlineSeconds is defined as the maximum time taken for
-                  the CloneSet to reach completion or the paused state due to partition.
-                  The time during which the CloneSet is paused would NOT be included in the progress deadline.
+                  ProgressDeadlineSeconds specifies the maximum time for the CloneSet to reach available
+                  or paused state due to partitioning. The controller will set a ProgressDeadlineExceeded
+                  condition when timeout occurs, while excluding paused state duration from the deadline calculation.
+                  It continues processing failed CloneSets and defaults to 600 seconds which can be overridden explicitly.
                 format: int32
                 type: integer
               replicas:
