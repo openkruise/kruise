@@ -437,10 +437,18 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 				transferEnvs = util.MergeEnvVar(transferEnvs, injectedEnvs)
 				// insert volumes that initContainers used
 				for _, mount := range initContainer.VolumeMounts {
-					volumesInSidecars = append(volumesInSidecars, *volumesMap[mount.Name])
+					if vol, ok := volumesMap[mount.Name]; ok {
+						volumesInSidecars = append(volumesInSidecars, *vol)
+					} else {
+						klog.Warningf("InitContainer volumeMount %s cannot be found in volumes of sidecarSet %s", mount.Name, sidecarSet.Name)
+					}
 				}
 				for _, mount := range initContainer.VolumeDevices {
-					volumesInSidecars = append(volumesInSidecars, *volumesMap[mount.Name])
+					if vol, ok := volumesMap[mount.Name]; ok {
+						volumesInSidecars = append(volumesInSidecars, *vol)
+					} else {
+						klog.Warningf("InitContainer volumeDevice %s cannot be found in volumes of sidecarSet %s", mount.Name, sidecarSet.Name)
+					}
 				}
 				// merge VolumeMounts from sidecar.VolumeMounts and shared VolumeMounts
 				initContainer.VolumeMounts = util.MergeVolumeMounts(initContainer.Container, injectedMounts)
@@ -501,10 +509,18 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 			isInjecting = true
 			// insert volume that sidecar container used
 			for _, mount := range sidecarContainer.VolumeMounts {
-				volumesInSidecars = append(volumesInSidecars, *volumesMap[mount.Name])
+				if vol, ok := volumesMap[mount.Name]; ok {
+					volumesInSidecars = append(volumesInSidecars, *vol)
+				} else {
+					klog.Warningf("Container volumeMount %s cannot be found in volumes of sidecarSet %s", mount.Name, sidecarSet.Name)
+				}
 			}
 			for _, mount := range sidecarContainer.VolumeDevices {
-				volumesInSidecars = append(volumesInSidecars, *volumesMap[mount.Name])
+				if vol, ok := volumesMap[mount.Name]; ok {
+					volumesInSidecars = append(volumesInSidecars, *vol)
+				} else {
+					klog.Warningf("Container volumeDevice %s cannot be found in volumes of sidecarSet %s", mount.Name, sidecarSet.Name)
+				}
 			}
 			// merge VolumeMounts from sidecar.VolumeMounts and shared VolumeMounts
 			sidecarContainer.VolumeMounts = util.MergeVolumeMounts(sidecarContainer.Container, injectedMounts)
