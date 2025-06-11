@@ -593,10 +593,9 @@ func TestUpdate(t *testing.T) {
 						apps.DefaultDeploymentUniqueLabelKey: "rev_new",
 						appspub.LifecycleStateKey:            string(appspub.LifecycleStatePreparingNormal),
 					}},
-					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
+					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}, NodeName: "127.0.0.1"},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionFalse},
-						{Type: v1.ContainersReady, Status: v1.ConditionTrue},
 						{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionTrue},
 					}},
 				},
@@ -608,10 +607,9 @@ func TestUpdate(t *testing.T) {
 						apps.DefaultDeploymentUniqueLabelKey: "rev_new",
 						appspub.LifecycleStateKey:            string(appspub.LifecycleStateNormal),
 					}},
-					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
+					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}, NodeName: "127.0.0.1"},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionFalse},
-						{Type: v1.ContainersReady, Status: v1.ConditionTrue},
 						{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionTrue},
 					}},
 				},
@@ -675,7 +673,6 @@ func TestUpdate(t *testing.T) {
 					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionFalse},
-						{Type: v1.ContainersReady, Status: v1.ConditionTrue},
 						{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionTrue},
 					}},
 				},
@@ -691,7 +688,6 @@ func TestUpdate(t *testing.T) {
 					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
 						{Type: v1.PodReady, Status: v1.ConditionFalse},
-						{Type: v1.ContainersReady, Status: v1.ConditionTrue},
 						{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionTrue},
 					}},
 				},
@@ -852,7 +848,6 @@ func TestUpdate(t *testing.T) {
 						Phase: v1.PodRunning,
 						Conditions: []v1.PodCondition{
 							{Type: v1.PodReady, Status: v1.ConditionTrue},
-							{Type: v1.ContainersReady, Status: v1.ConditionTrue},
 							{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionTrue, LastTransitionTime: now},
 						},
 						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
@@ -877,7 +872,6 @@ func TestUpdate(t *testing.T) {
 						Phase: v1.PodRunning,
 						Conditions: []v1.PodCondition{
 							{Type: v1.PodReady, Status: v1.ConditionTrue},
-							{Type: v1.ContainersReady, Status: v1.ConditionTrue},
 							{Type: appspub.InPlaceUpdateReady, Status: v1.ConditionTrue, LastTransitionTime: now},
 						},
 						ContainerStatuses: []v1.ContainerStatus{{Name: "c1", ImageID: "image-id-xyz"}},
@@ -957,7 +951,7 @@ func TestUpdate(t *testing.T) {
 			},
 		},
 		{
-			name:           "create: preparingNormal->Normal without hook, pod not ready",
+			name:           "create: preparingNormal->Normal without hook, pod is not scheduled, should stay at preparingNormal",
 			cs:             &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{Replicas: getInt32Pointer(1)}},
 			updateRevision: &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "rev_new"}},
 			pods: []*v1.Pod{
