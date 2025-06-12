@@ -30,6 +30,7 @@ import (
 	utilcontainerlaunchpriority "github.com/openkruise/kruise/pkg/util/containerlaunchpriority"
 	utilcontainermeta "github.com/openkruise/kruise/pkg/util/containermeta"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/metrics/update"
 	"github.com/openkruise/kruise/pkg/util/volumeclaimtemplate"
 
 	apps "k8s.io/api/apps/v1"
@@ -274,6 +275,7 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 		if !opts.IgnoreVolumeClaimTemplatesHashDiff {
 			canInPlace := volumeclaimtemplate.CanVCTemplateInplaceUpdate(oldRevision, newRevision)
 			if !canInPlace {
+				update.RecordUpdateType(update.RecreateDueToVolumesChange)
 				return nil
 			}
 		}
