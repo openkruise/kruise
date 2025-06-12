@@ -22,8 +22,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/appscode/jsonpatch"
-
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
@@ -32,6 +30,7 @@ import (
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/volumeclaimtemplate"
 
+	"github.com/appscode/jsonpatch"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -256,7 +255,7 @@ func addMetadataSharedContainersToUpdate(pod *v1.Pod, containersToUpdate sets.St
 }
 
 // defaultCalculateInPlaceUpdateSpec calculates diff between old and update revisions.
-// If the diff just contains replace operation of spec.containers[x].image, it will returns an UpdateSpec.
+// If the diff just contains replace operation of spec.containers[x].image, it will return an UpdateSpec.
 // Otherwise, it returns nil which means can not use in-place update.
 func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) *UpdateSpec {
 	if oldRevision == nil || newRevision == nil {
@@ -269,13 +268,10 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 		return nil
 	}
 
-	// RecreatePodWhenChangeVCTInCloneSetGate enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.RecreatePodWhenChangeVCTInCloneSetGate) {
-		if !opts.IgnoreVolumeClaimTemplatesHashDiff {
-			canInPlace := volumeclaimtemplate.CanVCTemplateInplaceUpdate(oldRevision, newRevision)
-			if !canInPlace {
-				return nil
-			}
+	if opts.RecreatePodWhenChangedVolumeClaimTemplate && !opts.IgnoreVolumeClaimTemplatesHashDiff {
+		canInPlace := volumeclaimtemplate.CanVCTemplateInplaceUpdate(oldRevision, newRevision)
+		if !canInPlace {
+			return nil
 		}
 	}
 
