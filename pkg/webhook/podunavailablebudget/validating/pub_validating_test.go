@@ -154,7 +154,7 @@ func TestValidatingPub(t *testing.T) {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
 				pub.Spec.MinAvailable = nil
-				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = string(policyv1alpha1.PubEvictOperation + "," + policyv1alpha1.PubDeleteOperation)
+				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = string(policyv1alpha1.PubEvictOperation + "," + policyv1alpha1.PubDeleteOperation + "," + policyv1alpha1.PubUpdateOperation + "," + policyv1alpha1.PubResizeOperation)
 				return pub
 			},
 			expectErrList: 0,

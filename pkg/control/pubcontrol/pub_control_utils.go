@@ -252,8 +252,17 @@ func IsReferenceEqual(ref1, ref2 *policyv1alpha1.TargetReference) bool {
 func isNeedPubProtection(pub *policyv1alpha1.PodUnavailableBudget, operation policyv1alpha1.PubOperation) bool {
 	operationValue, ok := pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation]
 	if !ok || operationValue == "" {
+		// not protect resize as default
+		if operation == policyv1alpha1.PubResizeOperation {
+			return false
+		}
 		return true
 	}
 	operations := sets.NewString(strings.Split(operationValue, ",")...)
+
+	// if resize set in pub protect operation, then protect update and resize
+	if operation == policyv1alpha1.PubUpdateOperation {
+		return operations.Has(string(operation)) || operations.Has(string(policyv1alpha1.PubResizeOperation))
+	}
 	return operations.Has(string(operation))
 }

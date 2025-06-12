@@ -434,3 +434,106 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 		})
 	}
 }
+
+func TestIsNeedPubProtection(t *testing.T) {
+	cases := []struct {
+		name          string
+		getPub        func() *policyv1alpha1.PodUnavailableBudget
+		operation     policyv1alpha1.PubOperation
+		expectProtect bool
+	}{
+		{
+			name: "pub protect update by default",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:     policyv1alpha1.PubUpdateOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub protect delete by default",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:     policyv1alpha1.PubDeleteOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub protect evict by default",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:     policyv1alpha1.PubEvictOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub not protect resize by default",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:     policyv1alpha1.PubResizeOperation,
+			expectProtect: false,
+		},
+		{
+			name: "pub protect resize",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubResizeOperation),
+				}
+				return pub
+			},
+			operation:     policyv1alpha1.PubResizeOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub protect update",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubResizeOperation) + "," + string(policyv1alpha1.PubUpdateOperation),
+				}
+				return pub
+			},
+			operation:     policyv1alpha1.PubUpdateOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub protect update when resize set",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubResizeOperation) + "," + string(policyv1alpha1.PubDeleteOperation),
+				}
+				return pub
+			},
+			operation:     policyv1alpha1.PubUpdateOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub not protect update when resize not set",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubEvictOperation) + "," + string(policyv1alpha1.PubDeleteOperation),
+				}
+				return pub
+			},
+			operation:     policyv1alpha1.PubUpdateOperation,
+			expectProtect: false,
+		},
+	}
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			pub := cs.getPub()
+			protect := isNeedPubProtection(pub, cs.operation)
+			if cs.expectProtect != protect {
+				t.Fatalf("isNeedPubProtection failed, expect: %v, but got: %v", cs.expectProtect, protect)
+			}
+		})
+	}
+}

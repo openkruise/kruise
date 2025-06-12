@@ -89,7 +89,7 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) validatingPodUnavailableBudget
 		operations := strings.Split(operationsValue, ",")
 		for _, operation := range operations {
 			if operation != string(policyv1alpha1.PubUpdateOperation) && operation != string(policyv1alpha1.PubDeleteOperation) &&
-				operation != string(policyv1alpha1.PubEvictOperation) {
+				operation != string(policyv1alpha1.PubEvictOperation) && operation != string(policyv1alpha1.PubResizeOperation) {
 				allErrs = append(allErrs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("annotation[%s] is invalid", policyv1alpha1.PubProtectOperationAnnotation)))
 			}
 		}
