@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 	testingclock "k8s.io/utils/clock/testing"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -1628,7 +1629,7 @@ func TestScaleUpStatefulSetWithMinReadySeconds(t *testing.T) {
 			Type: apps.RollingUpdateStatefulSetStrategyType,
 			RollingUpdate: func() *appsv1beta1.RollingUpdateStatefulSetStrategy {
 				return &appsv1beta1.RollingUpdateStatefulSetStrategy{
-					Partition:       utilpointer.Int32Ptr(0),
+					Partition:       ptr.To(int32(0)),
 					MinReadySeconds: &test.minReadySeconds,
 				}
 			}(),
@@ -1795,7 +1796,7 @@ func TestUpdateStatefulSetWithMinReadySeconds(t *testing.T) {
 			Type: apps.RollingUpdateStatefulSetStrategyType,
 			RollingUpdate: func() *appsv1beta1.RollingUpdateStatefulSetStrategy {
 				return &appsv1beta1.RollingUpdateStatefulSetStrategy{
-					Partition:       utilpointer.Int32Ptr(0),
+					Partition:       ptr.To(int32(0)),
 					MaxUnavailable:  &test.maxUnavailable,
 					PodUpdatePolicy: appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType,
 					MinReadySeconds: &test.minReadySeconds,

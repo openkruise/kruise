@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
@@ -635,11 +635,11 @@ func TestGetMinReadySeconds(t *testing.T) {
 	if getMinReadySeconds(set) != 0 {
 		t.Error("getMinReadySeconds should be zero")
 	}
-	set.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds = utilpointer.Int32Ptr(3)
+	set.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds = ptr.To[int32](3)
 	if getMinReadySeconds(set) != 3 {
 		t.Error("getMinReadySeconds should be 3")
 	}
-	set.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds = utilpointer.Int32Ptr(30)
+	set.Spec.UpdateStrategy.RollingUpdate.MinReadySeconds = ptr.To[int32](30)
 	if getMinReadySeconds(set) != 30 {
 		t.Error("getMinReadySeconds should be 3")
 	}
@@ -1440,7 +1440,7 @@ func TestIsCurrentRevisionNeeded(t *testing.T) {
 			// 3: updated revision
 			// 4: updated revision
 			// => 2: should be current revision
-			name: "Ordinals start 0, partition 1, create current pod2",
+			name: "Ordinals start 2, partition 1, create current pod2",
 			statefulSet: &appsv1beta1.StatefulSet{
 				Spec: appsv1beta1.StatefulSetSpec{
 					Replicas:        int32Ptr(3),

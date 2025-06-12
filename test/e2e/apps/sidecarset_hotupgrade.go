@@ -25,12 +25,12 @@ import (
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 var _ = SIGDescribe("SidecarSet", func() {
@@ -114,7 +114,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(1)
+			deploymentIn.Spec.Replicas = ptr.To[int32](1)
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 			// check pod image and annotations
@@ -225,7 +225,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 
 			// create deployment
 			deploymentIn := tester.NewBaseDeployment(ns)
-			deploymentIn.Spec.Replicas = utilpointer.Int32Ptr(2)
+			deploymentIn.Spec.Replicas = ptr.To[int32](2)
 			ginkgo.By(fmt.Sprintf("Creating Deployment(%s/%s)", deploymentIn.Namespace, deploymentIn.Name))
 			tester.CreateDeployment(deploymentIn)
 			// check pod image and annotations

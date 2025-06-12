@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/gomega"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -76,7 +77,7 @@ func (s *PersistentPodStateTester) NewBaseStatefulset(namespace string) *appsv1.
 			Labels:      map[string]string{},
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas: utilpointer.Int32Ptr(5),
+			Replicas: ptr.To[int32](5),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "staticip",
@@ -97,7 +98,7 @@ func (s *PersistentPodStateTester) NewBaseStatefulset(namespace string) *appsv1.
 							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 						},
 					},
-					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(5),
+					TerminationGracePeriodSeconds: ptr.To(int64(5)),
 				},
 			},
 		},
@@ -193,7 +194,7 @@ func (s *PersistentPodStateTester) NewBaseStatefulsetLikeTest(namespace string) 
 			Labels:      map[string]string{},
 		},
 		Spec: StatefulSetLikeTestSpec{
-			Replicas: utilpointer.Int32Ptr(5),
+			Replicas: ptr.To[int32](5),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "staticip",
@@ -214,7 +215,7 @@ func (s *PersistentPodStateTester) NewBaseStatefulsetLikeTest(namespace string) 
 							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 						},
 					},
-					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(5),
+					TerminationGracePeriodSeconds: ptr.To(int64(5)),
 				},
 			},
 		},
