@@ -149,10 +149,6 @@ type RuntimeContainerHashes struct {
 	// PlainHash is the hash that directly calculated from pod.spec.container[x].
 	// Usually it is calculated by Kubelet and will be in annotation of each runtime container.
 	PlainHash uint64 `json:"plainHash"`
-	// PlainHashWithoutResources is the hash that directly calculated from pod.spec.container[x]
-	// over fields with Resources field zero'd out.
-	// Usually it is calculated by Kubelet and will be in annotation of each runtime container.
-	PlainHashWithoutResources uint64 `json:"plainHashWithoutResources"`
 	// ExtractedEnvFromMetadataHash is the hash that calculated from pod.spec.container[x],
 	// whose envs from annotations/labels have already been extracted to the real values.
 	ExtractedEnvFromMetadataHash uint64 `json:"extractedEnvFromMetadataHash,omitempty"`

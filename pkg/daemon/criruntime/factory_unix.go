@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"os"
 
+	kubeletutil "k8s.io/cri-client/pkg/util"
 	"k8s.io/klog/v2"
-	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 
 	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"

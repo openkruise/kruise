@@ -28,22 +28,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-var _ handler.TypedEventHandler[*corev1.Pod] = &enqueueRequestForPod{}
+var _ handler.TypedEventHandler[*corev1.Pod, reconcile.Request] = &enqueueRequestForPod{}
 
 type enqueueRequestForPod struct{}
 
-func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
-func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
-func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	p.handlePodCreate(q, evt.Object)
 }
-func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	p.handlePodUpdate(q, evt.ObjectOld, evt.ObjectNew)
 }
 
-func (p *enqueueRequestForPod) handlePodCreate(q workqueue.RateLimitingInterface, obj runtime.Object) {
+func (p *enqueueRequestForPod) handlePodCreate(q workqueue.TypedRateLimitingInterface[reconcile.Request], obj runtime.Object) {
 	pod := obj.(*corev1.Pod)
 	if isInterestingPod(pod) {
 		q.Add(reconcile.Request{
@@ -55,7 +55,7 @@ func (p *enqueueRequestForPod) handlePodCreate(q workqueue.RateLimitingInterface
 	}
 }
 
-func (p *enqueueRequestForPod) handlePodUpdate(q workqueue.RateLimitingInterface, old, cur runtime.Object) {
+func (p *enqueueRequestForPod) handlePodUpdate(q workqueue.TypedRateLimitingInterface[reconcile.Request], old, cur runtime.Object) {
 	newPod := cur.(*corev1.Pod)
 	oldPod := old.(*corev1.Pod)
 	if oldPod.ResourceVersion == newPod.ResourceVersion {
