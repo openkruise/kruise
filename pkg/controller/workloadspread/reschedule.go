@@ -113,7 +113,7 @@ func (r *ReconcileWorkloadSpread) deletePodsForSubset(ws *appsv1alpha1.WorkloadS
 
 // PodUnscheduledTimeout return true when Pod was scheduled failed and timeout.
 func PodUnscheduledTimeout(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod) bool {
-	timeouted, nextCheckAfter := util.GetTimeBeforePendingTimeout(pod, time.Second*time.Duration(*ws.Spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds))
+	timeouted, nextCheckAfter := util.GetTimeBeforePendingTimeout(pod, time.Second*time.Duration(*ws.Spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds), time.Now())
 	if nextCheckAfter > 0 {
 		durationStore.Push(getWorkloadSpreadKey(ws), nextCheckAfter)
 	}
