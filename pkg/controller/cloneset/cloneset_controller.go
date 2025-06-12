@@ -228,6 +228,25 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		return reconcile.Result{}, err
 	}
 
+	// Initialize or update conditions for tracking progress
+	if instance.Spec.ProgressDeadlineSeconds != nil {
+		progressing := getCloneSetCondition(&instance.Status, appsv1alpha1.CloneSetConditionTypeProgressing)
+		if progressing == nil {
+			now := metav1.Now()
+			instance.Status.Conditions = append(instance.Status.Conditions, appsv1alpha1.CloneSetCondition{
+				Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
+				Status:             v1.ConditionTrue,
+				LastTransitionTime: now,
+				Reason:             "NewCloneSet",
+				Message:            "CloneSet is progressing.",
+			})
+
+			if err := r.Status().Update(context.TODO(), instance); err != nil {
+				return reconcile.Result{}, err
+			}
+		}
+	}
+
 	coreControl := clonesetcore.New(instance)
 	if coreControl.IsInitializing() {
 		klog.V(4).InfoS("CloneSet skipped reconcile for initializing", "cloneSet", request)
@@ -734,4 +753,15 @@ func (r *ReconcileCloneSet) deleteOnePVC(cs *appsv1alpha1.CloneSet, pvc *v1.Pers
 func updateClaimOwnerRefToPod(pvc *v1.PersistentVolumeClaim, cs *appsv1alpha1.CloneSet, pod *v1.Pod) bool {
 	util.RemoveOwnerRef(pvc, cs)
 	return util.SetOwnerRef(pvc, pod, schema.GroupVersionKind{Version: "v1", Kind: "Pod"})
+}
+
+// getCloneSetCondition returns the condition with the provided type
+func getCloneSetCondition(status *appsv1alpha1.CloneSetStatus, condType appsv1alpha1.CloneSetConditionType) *appsv1alpha1.CloneSetCondition {
+	for i := range status.Conditions {
+		c := status.Conditions[i]
+		if c.Type == condType {
+			return &status.Conditions[i]
+		}
+	}
+	return nil
 }
