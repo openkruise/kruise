@@ -111,13 +111,14 @@ func getTTLSecondsForNever() *int32 {
 }
 
 func getActiveDeadlineSecondsForNever(job *appsv1alpha1.ImagePullJob) *int64 {
-	if job.Spec.PullPolicy != nil && job.Spec.PullPolicy.TimeoutSeconds != nil &&
-		int64(*job.Spec.PullPolicy.TimeoutSeconds) > defaultActiveDeadlineSecondsForNever {
-
-		ret := int64(*job.Spec.PullPolicy.TimeoutSeconds)
-		return utilpointer.Int64(ret)
-	}
 	var ret = defaultActiveDeadlineSecondsForNever
+	if job.Spec.PullPolicy != nil && job.Spec.PullPolicy.TimeoutSeconds != nil {
+		var backoff = 1
+		if job.Spec.PullPolicy.BackoffLimit != nil {
+			backoff = int(*job.Spec.PullPolicy.BackoffLimit)
+		}
+		ret = max(defaultActiveDeadlineSecondsForNever, int64(int(*job.Spec.PullPolicy.TimeoutSeconds)*backoff))
+	}
 	return utilpointer.Int64(ret)
 }
 
