@@ -27,92 +27,16 @@ import (
 
 	"github.com/openkruise/kruise/apis/apps/pub"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
-	"github.com/openkruise/kruise/pkg/util/feature"
 )
 
-func TestIsPodUnavailableChanged(t *testing.T) {
+func TestCanResizeInplace(t *testing.T) {
 	cases := []struct {
-		name                                       string
-		getOldPod                                  func() *corev1.Pod
-		getNewPod                                  func() *corev1.Pod
-		getPub                                     func() *policyv1alpha1.PodUnavailableBudget
-		enableInPlacePodVerticalScalingFeatureGate bool
-		expect                                     bool
+		name      string
+		getOldPod func() *corev1.Pod
+		getNewPod func() *corev1.Pod
+		expect    bool
 	}{
-		{
-			name: "only annotations change",
-			getOldPod: func() *corev1.Pod {
-				demo := podDemo.DeepCopy()
-				return demo
-			},
-			getNewPod: func() *corev1.Pod {
-				demo := podDemo.DeepCopy()
-				demo.Annotations["add"] = "annotations"
-				return demo
-			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				return pub
-			},
-			expect: false,
-			enableInPlacePodVerticalScalingFeatureGate: false,
-		},
-		{
-			name: "only annotations change with featureGate enabled",
-			getOldPod: func() *corev1.Pod {
-				demo := podDemo.DeepCopy()
-				return demo
-			},
-			getNewPod: func() *corev1.Pod {
-				demo := podDemo.DeepCopy()
-				demo.Annotations["add"] = "annotations"
-				return demo
-			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				return pub
-			},
-			expect: false,
-			enableInPlacePodVerticalScalingFeatureGate: true,
-		},
-		{
-			name: "add unavailable label",
-			getOldPod: func() *corev1.Pod {
-				demo := podDemo.DeepCopy()
-				return demo
-			},
-			getNewPod: func() *corev1.Pod {
-				demo := podDemo.DeepCopy()
-				demo.Labels[fmt.Sprintf("%sdata", pub.PubUnavailablePodLabelPrefix)] = "true"
-				return demo
-			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				return pub
-			},
-			expect: true,
-			enableInPlacePodVerticalScalingFeatureGate: false,
-		},
-		{
-			name: "image changed",
-			getOldPod: func() *corev1.Pod {
-				demo := podDemo.DeepCopy()
-				return demo
-			},
-			getNewPod: func() *corev1.Pod {
-				demo := podDemo.DeepCopy()
-				demo.Spec.Containers[0].Image = "nginx:v2"
-				return demo
-			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				return pub
-			},
-			expect: true,
-			enableInPlacePodVerticalScalingFeatureGate: false,
-		},
 		{
 			name: "qos changed",
 			getOldPod: func() *corev1.Pod {
@@ -133,12 +57,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				}
 				return demo
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				return pub
-			},
-			expect: true,
-			enableInPlacePodVerticalScalingFeatureGate: true,
+			expect: false,
 		},
 		{
 			name: "resources changed",
@@ -170,89 +89,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				}
 				return demo
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				return pub
-			},
-			expect: false,
-			enableInPlacePodVerticalScalingFeatureGate: true,
-		},
-		{
-			name: "resources changed but featureGate disabled",
-			getOldPod: func() *corev1.Pod {
-				demo := podDemo.DeepCopy()
-				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("1"),
-						corev1.ResourceMemory: resource.MustParse("2Gi"),
-					},
-					Limits: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("2"),
-						corev1.ResourceMemory: resource.MustParse("4Gi"),
-					},
-				}
-				return demo
-			},
-			getNewPod: func() *corev1.Pod {
-				demo := podDemo.DeepCopy()
-				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("3"),
-						corev1.ResourceMemory: resource.MustParse("3Gi"),
-					},
-					Limits: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("2"),
-						corev1.ResourceMemory: resource.MustParse("4Gi"),
-					},
-				}
-				return demo
-			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				return pub
-			},
 			expect: true,
-			enableInPlacePodVerticalScalingFeatureGate: false,
-		},
-		{
-			name: "resources changed but with unavailable label",
-			getOldPod: func() *corev1.Pod {
-				demo := podDemo.DeepCopy()
-				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("1"),
-						corev1.ResourceMemory: resource.MustParse("2Gi"),
-					},
-					Limits: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("2"),
-						corev1.ResourceMemory: resource.MustParse("4Gi"),
-					},
-				}
-				return demo
-			},
-			getNewPod: func() *corev1.Pod {
-				demo := podDemo.DeepCopy()
-				demo.Labels = map[string]string{
-					fmt.Sprintf("%sdata", pub.PubUnavailablePodLabelPrefix): "true",
-				}
-				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("3"),
-						corev1.ResourceMemory: resource.MustParse("3Gi"),
-					},
-					Limits: corev1.ResourceList{
-						corev1.ResourceCPU:    resource.MustParse("2"),
-						corev1.ResourceMemory: resource.MustParse("4Gi"),
-					},
-				}
-				return demo
-			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				return pub
-			},
-			expect: true,
-			enableInPlacePodVerticalScalingFeatureGate: true,
 		},
 		{
 			name: "storage resources changed 1",
@@ -285,12 +122,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				}
 				return demo
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				return pub
-			},
-			expect: true,
-			enableInPlacePodVerticalScalingFeatureGate: true,
+			expect: false,
 		},
 		{
 			name: "storage resources changed 2",
@@ -323,12 +155,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				}
 				return demo
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				return pub
-			},
-			expect: true,
-			enableInPlacePodVerticalScalingFeatureGate: true,
+			expect: false,
 		},
 		{
 			name: "resources changed but static pod",
@@ -364,12 +191,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				}
 				return demo
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				return pub
-			},
-			expect: true,
-			enableInPlacePodVerticalScalingFeatureGate: true,
+			expect: false,
 		},
 		{
 			name: "resources changed but resizePolicy is restart",
@@ -413,12 +235,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				}
 				return demo
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				return pub
-			},
-			expect: true,
-			enableInPlacePodVerticalScalingFeatureGate: true,
+			expect: false,
 		},
 		{
 			name: "resources changed mixed resizePolicy",
@@ -470,95 +287,132 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				}
 				return demo
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := pubDemo.DeepCopy()
-				return pub
+			expect: true,
+		},
+		{
+			name: "resources changed but add unavailable labels",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Labels[fmt.Sprintf("%sdata", pub.PubUnavailablePodLabelPrefix)] = "true"
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("3"),
+						corev1.ResourceMemory: resource.MustParse("3Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
 			},
 			expect: false,
-			enableInPlacePodVerticalScalingFeatureGate: true,
 		},
 	}
 
-	defer feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling, false)
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getPub()).
-				WithStatusSubresource(&policyv1alpha1.PodUnavailableBudget{}).Build()
-			finder := &controllerfinder.ControllerFinder{Client: fakeClient}
-			control := commonControl{
-				Client:           fakeClient,
-				controllerFinder: finder,
-			}
-			feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling,
-				cs.enableInPlacePodVerticalScalingFeatureGate)
-			is := control.IsPodUnavailableChanged(cs.getOldPod(), cs.getNewPod())
+			control := commonControl{}
+			is := control.CanResizeInplace(cs.getOldPod(), cs.getNewPod())
 			if cs.expect != is {
-				t.Fatalf("IsPodUnavailableChanged failed")
+				t.Fatalf("CanResizeInplace failed")
 			}
 		})
 	}
 }
 
-func TestIsNeedProtectResizeAction(t *testing.T) {
+func TestIsPodUnavailableChanged(t *testing.T) {
 	cases := []struct {
-		name           string
-		getPod         func() *corev1.Pod
-		getPub         func() *policyv1alpha1.PodUnavailableBudget
-		enabledFeature bool
-		expect         bool
+		name      string
+		getOldPod func() *corev1.Pod
+		getNewPod func() *corev1.Pod
+		getPub    func() *policyv1alpha1.PodUnavailableBudget
+		expect    bool
 	}{
 		{
-			name:           "protect resize when featureGate disabled but protect update",
-			getPod:         func() *corev1.Pod { return podDemo.DeepCopy() },
-			getPub:         func() *policyv1alpha1.PodUnavailableBudget { return pubDemo.DeepCopy() },
-			enabledFeature: false,
-			expect:         true,
-		},
-		{
-			name:   "pub not protect resize action",
-			getPod: func() *corev1.Pod { return podDemo.DeepCopy() },
+			name: "only annotations change",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Annotations["add"] = "annotations"
+				return demo
+			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
-				if pub.Annotations == nil {
-					pub.Annotations = map[string]string{}
-				}
-				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = string(policyv1alpha1.PubUpdateOperation)
 				return pub
 			},
-			enabledFeature: true,
-			expect:         false,
+			expect: false,
 		},
 		{
-			name:   "pub protect resize action",
-			getPod: func() *corev1.Pod { return podDemo.DeepCopy() },
+			name: "only annotations change with featureGate enabled",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Annotations["add"] = "annotations"
+				return demo
+			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
-				if pub.Annotations == nil {
-					pub.Annotations = map[string]string{}
-				}
-				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = string(policyv1alpha1.PubResizeOperation)
 				return pub
 			},
-			enabledFeature: true,
-			expect:         true,
+			expect: false,
 		},
 		{
-			name:   "pub protect resize action when featureGate disabled",
-			getPod: func() *corev1.Pod { return podDemo.DeepCopy() },
+			name: "add unavailable label",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Labels[fmt.Sprintf("%sdata", pub.PubUnavailablePodLabelPrefix)] = "true"
+				return demo
+			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
-				if pub.Annotations == nil {
-					pub.Annotations = map[string]string{}
-				}
-				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = string(policyv1alpha1.PubResizeOperation)
 				return pub
 			},
-			enabledFeature: false,
-			expect:         true,
+			expect: true,
+		},
+		{
+			name: "image changed",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Image = "nginx:v2"
+				return demo
+			},
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			expect: true,
 		},
 	}
 
-	defer feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling, false)
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getPub()).
@@ -568,8 +422,7 @@ func TestIsNeedProtectResizeAction(t *testing.T) {
 				Client:           fakeClient,
 				controllerFinder: finder,
 			}
-			feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling, cs.enabledFeature)
-			is := control.isNeedProtectResizeAction(cs.getPod())
+			is := control.IsPodUnavailableChanged(cs.getOldPod(), cs.getNewPod())
 			if cs.expect != is {
 				t.Fatalf("IsPodUnavailableChanged failed")
 			}

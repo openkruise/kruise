@@ -31,7 +31,8 @@ const (
 	// if annotations[kruise.io/pub-protect-operations]=EVICT indicates the pub only protect evict pod.
 	// if the annotations do not exist, the default DELETE,EVICT,UPDATE are protected.
 	// RESIZE: Pod vertical scaling action. If it's enabled, all resize action will be protected. RESIZE
-	// is an extension of UPDATE, so if RESIZE is enabled, UPDATE will also be protected.
+	// is an extension of UPDATE, if RESIZE is disabled and UPDATE is enabled, any UPDATE operation will
+	// be protected only as it will definitely cause container restarts.
 	// UPDATE: Kruise will carefully differentiate whether this update will cause interruptions. When
 	// the FeatureGate InPlacePodVerticalScaling is enabled, pod inplace vertical scaling will be
 	// considered non-disruption only when allowedResources(cpu、memory) changes、restartPolicy

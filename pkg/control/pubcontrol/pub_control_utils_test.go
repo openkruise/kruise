@@ -36,7 +36,9 @@ import (
 	"github.com/openkruise/kruise/apis/apps/pub"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	"github.com/openkruise/kruise/pkg/util/feature"
 )
 
 func init() {
@@ -441,6 +443,7 @@ func TestIsNeedPubProtection(t *testing.T) {
 		getPub        func() *policyv1alpha1.PodUnavailableBudget
 		operation     policyv1alpha1.PubOperation
 		expectProtect bool
+		enableInplace bool
 	}{
 		{
 			name: "pub protect update by default",
@@ -470,13 +473,24 @@ func TestIsNeedPubProtection(t *testing.T) {
 			expectProtect: true,
 		},
 		{
-			name: "pub not protect resize by default",
+			name: "pub not protect resize by default when featureGate InPlacePodVerticalScaling is enabled",
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
 			operation:     policyv1alpha1.PubResizeOperation,
+			enableInplace: true,
 			expectProtect: false,
+		},
+		{
+			name: "pub protect resize by default when featureGate InPlacePodVerticalScaling is disabled",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:     policyv1alpha1.PubResizeOperation,
+			enableInplace: false,
+			expectProtect: true,
 		},
 		{
 			name: "pub protect resize",
@@ -526,11 +540,67 @@ func TestIsNeedPubProtection(t *testing.T) {
 			operation:     policyv1alpha1.PubUpdateOperation,
 			expectProtect: false,
 		},
+		{
+			name: "pub protect resize when update set and featureGate InPlacePodVerticalScaling is disabled",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubEvictOperation) + "," + string(policyv1alpha1.PubUpdateOperation),
+				}
+				return pub
+			},
+			enableInplace: false,
+			operation:     policyv1alpha1.PubResizeOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub not protect resize when update set and featureGate InPlacePodVerticalScaling enabled",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubEvictOperation) + "," + string(policyv1alpha1.PubUpdateOperation),
+				}
+				return pub
+			},
+			enableInplace: true,
+			operation:     policyv1alpha1.PubResizeOperation,
+			expectProtect: false,
+		},
+		{
+			name: "pub not protect resize when featureGate InPlacePodVerticalScaling enabled",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubEvictOperation),
+				}
+				return pub
+			},
+			enableInplace: true,
+			operation:     policyv1alpha1.PubResizeOperation,
+			expectProtect: false,
+		},
+		{
+			name: "pub not protect resize when featureGate InPlacePodVerticalScaling disabled",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubEvictOperation),
+				}
+				return pub
+			},
+			enableInplace: false,
+			operation:     policyv1alpha1.PubResizeOperation,
+			expectProtect: false,
+		},
 	}
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
+			if cs.enableInplace {
+				feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+			}
 			pub := cs.getPub()
 			protect := isNeedPubProtection(pub, cs.operation)
+			feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling, false)
 			if cs.expectProtect != protect {
 				t.Fatalf("isNeedPubProtection failed, expect: %v, but got: %v", cs.expectProtect, protect)
 			}

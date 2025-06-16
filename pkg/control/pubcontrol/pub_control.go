@@ -39,11 +39,9 @@ import (
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
-	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
-	"github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
@@ -66,13 +64,8 @@ func (c *commonControl) IsPodReady(pod *corev1.Pod) bool {
 func (c *commonControl) IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool {
 	// If pod.spec changed, pod may be in unavailable condition
 	if !reflect.DeepEqual(oldPod.Spec, newPod.Spec) {
-		if c.canResizeInplace(oldPod, newPod) {
-			klog.V(3).InfoS("Pod resize inplace", "pod", klog.KObj(newPod))
-			// do not return any value, continue to check unavailable label
-		} else {
-			klog.V(3).InfoS("Pod specification changed, and maybe cause unavailability", "pod", klog.KObj(newPod))
-			return true
-		}
+		klog.V(3).InfoS("Pod specification changed, and maybe cause unavailability", "pod", klog.KObj(newPod))
+		return true
 	}
 	// pod add unavailable label
 	if !appspub.HasUnavailableLabel(oldPod.Labels) && appspub.HasUnavailableLabel(newPod.Labels) {
@@ -85,31 +78,12 @@ func (c *commonControl) IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool
 	return false
 }
 
-func (c *commonControl) isNeedProtectResizeAction(newPod *corev1.Pod) bool {
-	pub, err := c.GetPubForPod(newPod)
-	if err != nil || pub == nil {
-		return true
-	}
-
-	if isNeedPubProtection(pub, policyv1alpha1.PubResizeOperation) {
-		return true
-	}
-
-	// if protect UPDATE but featureGate InPlacePodVerticalScaling is disabled, then need to protect RESIZE
-	if isNeedPubProtection(pub, policyv1alpha1.PubUpdateOperation) &&
-		!feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		return true
-	}
-
-	return false
-}
-
 // return true if this action won't cause unavailability
-func (c *commonControl) canResizeInplace(oldPod, newPod *corev1.Pod) bool {
-	if c.isNeedProtectResizeAction(newPod) {
+func (c *commonControl) CanResizeInplace(oldPod, newPod *corev1.Pod) bool {
+	if !appspub.HasUnavailableLabel(oldPod.Labels) && appspub.HasUnavailableLabel(newPod.Labels) {
+		klog.V(3).InfoS("Pod add unavailable label, can not resize inplace", "pod", klog.KObj(newPod))
 		return false
 	}
-
 	// now check if only container resources changed
 	oldPodSpecWithoutResourcesHash, err := podSpecWithoutResourcesHash(oldPod)
 	if err != nil {

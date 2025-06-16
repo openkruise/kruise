@@ -35,7 +35,9 @@ import (
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	kubeClient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/feature"
 )
 
 const (
@@ -251,18 +253,29 @@ func IsReferenceEqual(ref1, ref2 *policyv1alpha1.TargetReference) bool {
 
 func isNeedPubProtection(pub *policyv1alpha1.PodUnavailableBudget, operation policyv1alpha1.PubOperation) bool {
 	operationValue, ok := pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation]
+	enableInPlacePodVerticalScaling := feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
 	if !ok || operationValue == "" {
-		// not protect resize as default
+		// when operation == RESIZE
+		// 1. if featureGate InPlacePodVerticalScaling is enabled, then do not protect resize
+		// 2. if featureGate InPlacePodVerticalScaling is disabled, then RESIZE is regarded as UPDATE, so return true
 		if operation == policyv1alpha1.PubResizeOperation {
-			return false
+			return !enableInPlacePodVerticalScaling
 		}
 		return true
 	}
-	operations := sets.NewString(strings.Split(operationValue, ",")...)
 
-	// if resize set in pub protect operation, then protect update and resize
-	if operation == policyv1alpha1.PubUpdateOperation {
-		return operations.Has(string(operation)) || operations.Has(string(policyv1alpha1.PubResizeOperation))
-	}
+	operations := func() sets.Set[string] {
+		operations := sets.New(strings.Split(operationValue, ",")...)
+		// if resize set in pub protect operation, then protect update and resize
+		if operations.Has(string(policyv1alpha1.PubResizeOperation)) {
+			operations.Insert(string(policyv1alpha1.PubUpdateOperation))
+		}
+		// if disable featureGate InPlacePodVerticalScaling, update will contain resize
+		if !enableInPlacePodVerticalScaling && operations.Has(string(policyv1alpha1.PubUpdateOperation)) {
+			operations.Insert(string(policyv1alpha1.PubResizeOperation))
+		}
+		return operations
+	}()
+
 	return operations.Has(string(operation))
 }
