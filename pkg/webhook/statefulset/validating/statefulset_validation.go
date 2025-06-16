@@ -394,19 +394,20 @@ func ValidateVolumeClaimTemplateUpdate(c client.Client, sts, oldSts *appsv1beta1
 		templateIdStr := fmt.Sprintf("volumeClaimTemplates[%v]", template.Name)
 
 		oldTemplate, exist := name2Template[template.Name]
-		if !exist && !utilfeature.DefaultFeatureGate.Enabled(features.RecreatePodWhenChangeVCTInStatefulSetGate) {
-			return field.ErrorList{field.Forbidden(field.NewPath("spec", templateIdStr, "name"), "volumeClaimTemplate name can not be modified")}
-		} else if !exist && utilfeature.DefaultFeatureGate.Enabled(features.RecreatePodWhenChangeVCTInStatefulSetGate) {
-			continue
-		} else {
-			matched, resizeOnly := pvc.CompareWithCheckFn(oldTemplate, &template, isPVCResize)
-			if matched {
+		if !exist {
+			if utilfeature.DefaultFeatureGate.Enabled(features.RecreatePodWhenChangeVCTInStatefulSetGate) {
 				continue
 			}
+			return field.ErrorList{field.Forbidden(field.NewPath("spec", templateIdStr, "name"), "volumeClaimTemplate name can not be modified")}
+		}
 
-			if !resizeOnly {
-				return field.ErrorList{field.Invalid(field.NewPath("spec", templateIdStr), template, "volumeClaimTemplate can not be modified when OnRollingUpdate")}
-			}
+		matched, resizeOnly := pvc.CompareWithCheckFn(oldTemplate, &template, isPVCResize)
+		if matched {
+			continue
+		}
+
+		if !resizeOnly {
+			return field.ErrorList{field.Invalid(field.NewPath("spec", templateIdStr), template, "volumeClaimTemplate can not be modified when OnRollingUpdate")}
 		}
 
 		// check if sc allow volume expand
