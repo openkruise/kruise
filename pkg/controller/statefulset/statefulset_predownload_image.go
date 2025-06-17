@@ -32,7 +32,9 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/revisionadapter"
@@ -75,7 +77,9 @@ func (dss *defaultStatefulSetControl) createImagePullJobsForInPlaceUpdate(sts *a
 	}
 
 	// opt is update option, this section is to get update option
-	opts := &inplaceupdate.UpdateOptions{}
+	opts := &inplaceupdate.UpdateOptions{
+		RecreatePodWhenChangedVolumeClaimTemplate: utilfeature.DefaultFeatureGate.Enabled(features.RecreatePodWhenChangeVCTInStatefulSetGate),
+	}
 	if sts.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy != nil {
 		opts.GracePeriodSeconds = sts.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy.GracePeriodSeconds
 	}
