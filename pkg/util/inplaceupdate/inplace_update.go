@@ -35,6 +35,7 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/metrics/update"
 	"github.com/openkruise/kruise/pkg/util/podadapter"
 	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 )
@@ -78,6 +79,7 @@ type Interface interface {
 	CanUpdateInPlace(oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) bool
 	Update(pod *v1.Pod, oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) UpdateResult
 	Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult
+	RefreshRestartCountBaseToPod(pod *v1.Pod) (gotPod *v1.Pod, err error)
 }
 
 // UpdateSpec records the images of containers which need to in-place update.
@@ -317,6 +319,7 @@ func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.Control
 	if opts.GracePeriodSeconds > 0 {
 		delayDuration = time.Second * time.Duration(opts.GracePeriodSeconds)
 	}
+	update.RecordInplaceReason(len(spec.ContainerImages) > 0, spec.UpdateEnvFromMetadata, len(spec.ContainerResources) > 0)
 	return UpdateResult{InPlaceUpdate: true, DelayDuration: delayDuration, NewResourceVersion: newResourceVersion}
 }
 
