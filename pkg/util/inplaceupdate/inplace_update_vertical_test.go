@@ -269,3 +269,39 @@ func TestIsContainerUpdateCompleted(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerateResourcePatch(t *testing.T) {
+	v := NativeVerticalUpdate{}
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "test-container",
+					Resources: v1.ResourceRequirements{
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+					},
+				},
+				{
+					Name: "test-container2",
+					Resources: v1.ResourceRequirements{
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+					},
+				},
+			},
+		},
+	}
+	expectedResources := map[string]*v1.ResourceRequirements{
+		"test-container": {
+			Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+			Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+		},
+		"test-container2": {
+			Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
+			Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+		},
+	}
+	patch := v.GenerateResourcePatch(pod, expectedResources)
+	assert.Equal(t, `{"spec":{"containers":[{"name":"test-container","resources":{"limits":{"cpu":"200m"},"requests":{"memory":"1Gi"}}},{"name":"test-container2","resources":{"limits":{"cpu":"300m"},"requests":{"memory":"2Gi"}}}]}}`, string(patch))
+}

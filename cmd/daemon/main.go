@@ -62,14 +62,14 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 	rand.Seed(time.Now().UnixNano())
-	features.SetDefaultFeatureGates()
-	ctrl.SetLogger(klogr.New())
-
 	cfg := config.GetConfigOrDie()
 	cfg.UserAgent = "kruise-daemon"
 	if err := client.NewRegistry(cfg); err != nil {
 		klog.Fatalf("Failed to init clientset registry: %v", err)
 	}
+	features.SetDefaultFeatureGates()
+	ctrl.SetLogger(klogr.New())
+
 	if enablePprof != nil && *enablePprof {
 		go func() {
 			if err := http.ListenAndServe(*pprofAddr, nil); err != nil {

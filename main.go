@@ -142,6 +142,13 @@ func main() {
 		setupLog.Error(err, "logsapi ValidateAndApply failed")
 		os.Exit(1)
 	}
+	cfg := ctrl.GetConfigOrDie()
+	err := extclient.NewRegistry(cfg)
+	if err != nil {
+		setupLog.Error(err, "unable to init kruise clientset and informer")
+		os.Exit(1)
+	}
+
 	features.SetDefaultFeatureGates()
 	util.SetControllerCacheSyncTimeout(controllerCacheSyncTimeout)
 
@@ -160,16 +167,10 @@ func main() {
 	}
 
 	ctx := ctrl.SetupSignalHandler()
-	cfg := ctrl.GetConfigOrDie()
 	setRestConfig(cfg)
 	cfg.UserAgent = "kruise-manager"
 
 	setupLog.Info("new clientset registry")
-	err := extclient.NewRegistry(cfg)
-	if err != nil {
-		setupLog.Error(err, "unable to init kruise clientset and informer")
-		os.Exit(1)
-	}
 	err = util.InitProtectionLogger()
 	if err != nil {
 		setupLog.Error(err, "unable to init protection logger")

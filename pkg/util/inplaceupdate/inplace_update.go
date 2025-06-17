@@ -26,6 +26,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
@@ -34,7 +35,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/podadapter"
 	"github.com/openkruise/kruise/pkg/util/revisionadapter"
 )
@@ -66,7 +69,7 @@ type UpdateOptions struct {
 	AdditionalFuncs    []func(*v1.Pod)
 
 	CalculateSpec                  func(oldRevision, newRevision *apps.ControllerRevision, opts *UpdateOptions) *UpdateSpec
-	PatchSpecToPod                 func(pod *v1.Pod, spec *UpdateSpec, state *appspub.InPlaceUpdateState) (*v1.Pod, error)
+	PatchSpecToPod                 func(pod *v1.Pod, spec *UpdateSpec, state *appspub.InPlaceUpdateState) (*v1.Pod, map[string]*v1.ResourceRequirements, error)
 	CheckPodUpdateCompleted        func(pod *v1.Pod) error
 	CheckContainersUpdateCompleted func(pod *v1.Pod, state *appspub.InPlaceUpdateState) error
 	CheckPodNeedsBeUnready         func(pod *v1.Pod, spec *UpdateSpec) bool
@@ -227,10 +230,24 @@ func (c *realControl) finishGracePeriod(pod *v1.Pod, opts *UpdateOptions) (time.
 				return nil
 			}
 
-			if clone, err = opts.PatchSpecToPod(clone, &spec, &updateState); err != nil {
+			var expectedResources map[string]*v1.ResourceRequirements
+			clone, expectedResources, err = opts.PatchSpecToPod(clone, &spec, &updateState)
+			if err != nil {
 				return err
 			}
 			appspub.RemoveInPlaceUpdateGrace(clone)
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceUpdateResourceByResize) && len(expectedResources) != 0 {
+				patchResources := verticalUpdateImpl.GenerateResourcePatch(clone, expectedResources)
+				if patchResources != nil {
+					if adp, ok := c.podAdapter.(podadapter.AdapterWithPatch); ok {
+						cloneCopy := clone.DeepCopy()
+						_, err = adp.PatchPodResource(cloneCopy, client.RawPatch(types.StrategicMergePatchType, patchResources))
+						if err != nil {
+							return err
+						}
+					}
+				}
+			}
 		}
 
 		_, err = c.podAdapter.UpdatePod(clone)
@@ -266,8 +283,22 @@ func (c *realControl) updateNextBatch(pod *v1.Pod, opts *UpdateOptions) (bool, e
 			UpdateEnvFromMetadata: state.UpdateEnvFromMetadata,
 			ContainerResources:    state.NextContainerResources,
 		}
-		if clone, err = opts.PatchSpecToPod(clone, &spec, &state); err != nil {
+		var expectedResources map[string]*v1.ResourceRequirements
+		clone, expectedResources, err = opts.PatchSpecToPod(clone, &spec, &state)
+		if err != nil {
 			return err
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceUpdateResourceByResize) && len(expectedResources) != 0 {
+			patchResources := verticalUpdateImpl.GenerateResourcePatch(clone, expectedResources)
+			if patchResources != nil {
+				if adp, ok := c.podAdapter.(podadapter.AdapterWithPatch); ok {
+					cloneCopy := clone.DeepCopy()
+					_, err = adp.PatchPodResource(cloneCopy, client.RawPatch(types.StrategicMergePatchType, patchResources))
+					if err != nil {
+						return err
+					}
+				}
+			}
 		}
 
 		updated = true
@@ -349,10 +380,26 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 		delete(clone.Annotations, appspub.InPlaceUpdateStateKeyOld)
 
 		if spec.GraceSeconds <= 0 {
-			if clone, err = opts.PatchSpecToPod(clone, spec, &inPlaceUpdateState); err != nil {
+			var expectedResources map[string]*v1.ResourceRequirements
+			clone, expectedResources, err = opts.PatchSpecToPod(clone, spec, &inPlaceUpdateState)
+			if err != nil {
 				return err
 			}
 			appspub.RemoveInPlaceUpdateGrace(clone)
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceUpdateResourceByResize) && len(expectedResources) != 0 {
+				patchResources := verticalUpdateImpl.GenerateResourcePatch(clone, expectedResources)
+				if patchResources != nil {
+					if adp, ok := c.podAdapter.(podadapter.AdapterWithPatch); ok {
+						cloneCopy := clone.DeepCopy()
+						_, err := adp.PatchPodResource(cloneCopy, client.RawPatch(types.StrategicMergePatchType, patchResources))
+						if err != nil {
+							klog.InfoS(fmt.Sprintf("updatePodInPlace resize patch failed: %s/%s, error: %v", cloneCopy.Namespace, cloneCopy.Name, err))
+							return err
+						}
+						newResourceVersion = cloneCopy.ResourceVersion
+					}
+				}
+			}
 		} else {
 			inPlaceUpdateSpecJSON, _ := json.Marshal(spec)
 			clone.Annotations[appspub.InPlaceUpdateGraceKey] = string(inPlaceUpdateSpecJSON)

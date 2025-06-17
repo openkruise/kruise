@@ -33,6 +33,7 @@ rules:
   resources:
   - pods/ephemeralcontainers
   - pods/status
+  - pods/resize
   verbs:
   - get
   - patch

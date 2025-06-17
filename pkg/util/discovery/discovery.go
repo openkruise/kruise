@@ -20,10 +20,9 @@ import (
 	"fmt"
 	"time"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"

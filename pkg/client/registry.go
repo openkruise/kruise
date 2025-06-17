@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/rest"
 )
 
@@ -10,12 +11,18 @@ var (
 	cfg *rest.Config
 
 	defaultGenericClient *GenericClientset
+
+	curVersion *version.Info
 )
 
 // NewRegistry creates clientset by client-go
 func NewRegistry(c *rest.Config) error {
 	var err error
 	defaultGenericClient, err = newForConfig(c)
+	if err != nil {
+		return err
+	}
+	curVersion, err = defaultGenericClient.DiscoveryClient.ServerVersion()
 	if err != nil {
 		return err
 	}
@@ -37,4 +44,9 @@ func GetGenericClientWithName(name string) *GenericClientset {
 	newCfg := *cfg
 	newCfg.UserAgent = fmt.Sprintf("%s/%s", cfg.UserAgent, name)
 	return newForConfigOrDie(&newCfg)
+}
+
+// GetCurrentServerVersion returns current k8s version
+func GetCurrentServerVersion() *version.Info {
+	return curVersion
 }

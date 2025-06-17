@@ -21,10 +21,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/coreos/go-semver/semver"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/featuregate"
 
+	"github.com/openkruise/kruise/pkg/client"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
@@ -139,6 +141,10 @@ const (
 	// of managed Pods.
 	InPlaceWorkloadVerticalScaling featuregate.Feature = "InPlaceWorkloadVerticalScaling"
 
+	// InPlaceUpdateResourceByResize enable in-place update resource by resize
+	// see https://github.com/kubernetes/kubernetes/pull/128266
+	InPlaceUpdateResourceByResize featuregate.Feature = "InPlaceUpdateResourceByResize"
+
 	// EnablePodProbeMarkerOnServerless enable PodProbeMarker on Serverless Pod
 	EnablePodProbeMarkerOnServerless featuregate.Feature = "EnablePodProbeMarkerOnServerless"
 
@@ -181,6 +187,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	StatefulSetAutoResizePVCGate:             {Default: false, PreRelease: featuregate.Alpha},
 	ForceDeleteTimeoutExpectationFeatureGate: {Default: false, PreRelease: featuregate.Alpha},
 	InPlaceWorkloadVerticalScaling:           {Default: false, PreRelease: featuregate.Alpha},
+	InPlaceUpdateResourceByResize:            {Default: false, PreRelease: featuregate.Alpha},
 	EnablePodProbeMarkerOnServerless:         {Default: false, PreRelease: featuregate.Alpha},
 	EnableSortSidecarContainerByName:         {Default: false, PreRelease: featuregate.Alpha},
 }
@@ -227,5 +234,14 @@ func SetDefaultFeatureGates() {
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(ResourcesDeletionProtection) {
 		_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", DeletionProtectionForCRDCascadingGate))
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(InPlaceWorkloadVerticalScaling) {
+		ver := client.GetCurrentServerVersion()
+		if ver.Major != "" && ver.Minor != "" &&
+			semver.New(fmt.Sprintf("%s.%s.0", ver.Major, ver.Minor)).Compare(*semver.New("1.32.0")) >= 0 {
+			_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", InPlaceUpdateResourceByResize))
+		} else {
+			_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=false", InPlaceUpdateResourceByResize))
+		}
 	}
 }
