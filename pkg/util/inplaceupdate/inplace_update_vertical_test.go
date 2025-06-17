@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/appscode/jsonpatch"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -266,6 +267,129 @@ func TestIsContainerUpdateCompleted(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := v.isContainerUpdateCompleted(&tt.container, &tt.containerStatus)
 			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+}
+
+func TestGenerateResourcePatch(t *testing.T) {
+	v := NativeVerticalUpdate{}
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "test-container",
+					Resources: v1.ResourceRequirements{
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+					},
+				},
+				{
+					Name: "test-container2",
+					Resources: v1.ResourceRequirements{
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+					},
+				},
+			},
+		},
+	}
+	testCases := []struct {
+		name              string
+		pod               *v1.Pod
+		expectedResources map[string]*v1.ResourceRequirements
+		expectedPatch     []byte
+	}{
+		{
+			name: "both limit and request need update",
+			pod:  pod,
+			expectedResources: map[string]*v1.ResourceRequirements{
+				"test-container": {
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+				"test-container2": {
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
+					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+				},
+			},
+			expectedPatch: []byte(`{"spec":{"containers":[{"name":"test-container","resources":{"limits":{"cpu":"200m"},"requests":{"memory":"1Gi"}}},{"name":"test-container2","resources":{"limits":{"cpu":"300m"},"requests":{"memory":"2Gi"}}}]}}`),
+		},
+		{
+			name: "only limit need update",
+			pod:  pod,
+			expectedResources: map[string]*v1.ResourceRequirements{
+				"test-container": {
+					Limits: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+				},
+			},
+			expectedPatch: []byte(`{"spec":{"containers":[{"name":"test-container","resources":{"limits":{"cpu":"200m"}}}]}}`),
+		},
+		{
+			name: "only request need update",
+			pod:  pod,
+			expectedResources: map[string]*v1.ResourceRequirements{
+				"test-container": {
+					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+			},
+			expectedPatch: []byte(`{"spec":{"containers":[{"name":"test-container","resources":{"requests":{"memory":"1Gi"}}}]}}`),
+		},
+		{
+			name:              "no containers",
+			pod:               pod,
+			expectedResources: map[string]*v1.ResourceRequirements{},
+			expectedPatch:     nil,
+		},
+		{
+			name: "only test-container need update",
+			pod:  pod,
+			expectedResources: map[string]*v1.ResourceRequirements{
+				"test-container": {
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+				},
+			},
+			expectedPatch: []byte(`{"spec":{"containers":[{"name":"test-container","resources":{"limits":{"cpu":"200m"},"requests":{"memory":"1Gi"}}}]}}`),
+		},
+		{
+			name: "only test-container2 need update",
+			pod:  pod,
+			expectedResources: map[string]*v1.ResourceRequirements{
+				"test-container2": {
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("300m")},
+					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+				},
+			},
+			expectedPatch: []byte(`{"spec":{"containers":[{"name":"test-container2","resources":{"limits":{"cpu":"300m"},"requests":{"memory":"2Gi"}}}]}}`),
+		},
+		{
+			name: "non-resizable resources",
+			pod:  pod,
+			expectedResources: map[string]*v1.ResourceRequirements{
+				"test-container": {
+					Limits: v1.ResourceList{"nvidia.com/gpu": resource.MustParse("1")},
+				},
+			},
+			expectedPatch: nil,
+		},
+		{
+			name: "same resources",
+			pod:  pod,
+			expectedResources: map[string]*v1.ResourceRequirements{
+				"test-container": {
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("512Mi")},
+				},
+			},
+			expectedPatch: nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			patch := v.GenerateResourcePatch(tc.pod, tc.expectedResources)
+			if diff := cmp.Diff(string(tc.expectedPatch), string(patch)); diff != "" {
+				t.Errorf("patch mismatch (-want +got):\n%s", diff)
+			}
 		})
 	}
 }

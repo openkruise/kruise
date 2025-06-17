@@ -209,7 +209,7 @@ func realPullerSyncFn(t *testing.T, limitedPool bool) {
 	}
 	fakeRuntime := &fakeRuntime{images: make(map[string]*imageStatus)}
 	workerLimitedPool = NewChanPool(2)
-	go workerLimitedPool.Start()
+	workerLimitedPool.Start()
 	p, _ := newRealPuller(fakeRuntime, &secretManager, eventRecorder)
 
 	nameSuffuix := "_NoLimitPool"
@@ -305,7 +305,7 @@ func TestRealPullerSyncWithLimitedPool(t *testing.T) {
 
 	r := &fakeRuntime{images: make(map[string]*imageStatus)}
 	workerLimitedPool = NewChanPool(2)
-	go workerLimitedPool.Start()
+	workerLimitedPool.Start()
 	p, _ := newRealPuller(r, &secretManager, eventRecorder)
 
 	ref, _ := reference.GetReference(scheme, baseNodeImage)

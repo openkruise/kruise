@@ -10,7 +10,7 @@ func TestChanPool_Submit_Start_Stop(t *testing.T) {
 	taskCount := 10
 	poolSize := 3
 	pool := NewChanPool(poolSize)
-	go pool.Start()
+	pool.Start()
 	var wg sync.WaitGroup
 	wg.Add(taskCount)
 
@@ -37,7 +37,7 @@ func TestChanPool_Submit_Start_Stop(t *testing.T) {
 
 func TestChanPool_StopWithoutTasks(t *testing.T) {
 	pool := NewChanPool(2)
-	go pool.Start()
+	pool.Start()
 	pool.Stop()
 
 	select {

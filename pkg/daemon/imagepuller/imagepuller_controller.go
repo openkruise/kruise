@@ -98,7 +98,7 @@ func NewController(opts daemonoptions.Options, secretManager daemonutil.SecretMa
 	if opts.MaxWorkersForPullImages > 0 {
 		klog.InfoS("set image pull worker number", "worker", opts.MaxWorkersForPullImages)
 		workerLimitedPool = NewChanPool(opts.MaxWorkersForPullImages)
-		go workerLimitedPool.Start()
+		workerLimitedPool.Start()
 	}
 	puller, err := newRealPuller(opts.RuntimeFactory.GetImageService(), secretManager, recorder)
 	if err != nil {
