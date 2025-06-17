@@ -47,12 +47,40 @@ type SubsetStatus struct {
 	ReadyReplicas        int32
 	UpdatedReplicas      int32
 	UpdatedReadyReplicas int32
+	UpdatedRevision      string
 	UnschedulableStatus  SubsetUnschedulableStatus
 }
 
+// SubsetUnschedulableStatus stores the unschedulable status of the Subset, which is used by adaptive strategy.
+// There are two sub-strategies of adaptive strategy:
+//   - default strategy: Pending pods will be deleted with the corresponding subset marked as unschedulable.
+//   - reservation strategy: Pending pods will be reserved and temporary Pods will be created in another subset to
+//     take over their work until they have been scheduled and started.
 type SubsetUnschedulableStatus struct {
+	// In the Adaptive strategy, a subset is considered Unschedulable when Pods within it are in a Pending state due to
+	// scheduling failures (default mode), or when there are reserved Pods in it (reservation mode).
 	Unschedulable bool
-	PendingPods   int32
+
+	// In reservation adaptive strategy, MarkedAsUnschedulable is used to ensure the number of ready replicas in a
+	// recovered unschedulable subset meets expectations, thereby avoiding premature deletion of temp Pods that could
+	// lead to insufficient working replicas.
+	//
+	// Specifically, when a subset is marked as unschedulable, even if there are no reserved Pods in it (for example,
+	// all reserved Pods have been successfully scheduled and started), all newly created Pods will be directly marked
+	// as reserved. In this way, the corresponding number of temporary Pods will only be scaled down after the new Pods
+	// are confirmed to have successfully started and exited the reserved state.
+	MarkedAsUnschedulable bool
+	// In reservation adaptive strategy, it is the number of reserved pods in the subset.
+	// Please refer to the function CheckPodReallyInReservedStatus.
+	ReservedPods int32
+	// The number of Pending Pods, used by normal adaptive strategy only. It is always 0 in reservation strategy.
+	PendingPods int32
+	// Healthy running pods with old revision and marked as reserved (timeouted)
+	UpdateTimeoutPods int32
+}
+
+func (s *Subset) Allocatable() bool {
+	return !s.Status.UnschedulableStatus.Unschedulable && !s.Status.UnschedulableStatus.MarkedAsUnschedulable
 }
 
 // SubsetUpdateStrategy stores the strategy detail of the Subset.
