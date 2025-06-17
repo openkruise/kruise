@@ -46,6 +46,8 @@ type pubControl interface {
 	// webhook
 	// determine if this change to pod might cause unavailability
 	IsPodUnavailableChanged(oldPod, newPod *corev1.Pod) bool
+	// determine if this change can resize inplace
+	CanResizeInplace(oldPod, newPod *corev1.Pod) bool
 	// get pub for pod
 	GetPubForPod(pod *corev1.Pod) (*policyv1alpha1.PodUnavailableBudget, error)
 	// get pod controller of

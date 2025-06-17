@@ -58,6 +58,9 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 			oldPod); err != nil {
 			return false, "", err
 		}
+		// check whether could inplace update
+		canResizeInplace := pubcontrol.PubControl.CanResizeInplace(oldPod, newPod)
+
 		// the change will not cause pod unavailability, then pass
 		if !pubcontrol.PubControl.IsPodUnavailableChanged(oldPod, newPod) {
 			klog.V(6).InfoS("validate pod changed can not cause unavailability, then don't need check pub", "namespace", newPod.Namespace, "name", newPod.Name)
@@ -71,7 +74,11 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		}
 		// if dry run
 		dryRun = dryrun.IsDryRun(options.DryRun)
-		operation = policyv1alpha1.PubUpdateOperation
+		if canResizeInplace {
+			operation = policyv1alpha1.PubResizeOperation
+		} else {
+			operation = policyv1alpha1.PubUpdateOperation
+		}
 
 	// filter out invalid Delete operation, only validate delete pods resources
 	case admissionv1.Delete:

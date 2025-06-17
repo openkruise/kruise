@@ -27,14 +27,23 @@ import (
 type PubOperation string
 
 const (
-	// PubProtectOperationAnnotation indicates the pub protected Operation[DELETE,UPDATE,EVICT]
-	// if annotations[kruise.io/pub-protect-operations]=EVICT indicates the pub only protect evict pod
-	// if the annotations do not exist, the default DELETE,EVICT,UPDATE are protected
+	// PubProtectOperationAnnotation indicates the pub protected Operation[DELETE,UPDATE,EVICT].
+	// if annotations[kruise.io/pub-protect-operations]=EVICT indicates the pub only protect evict pod.
+	// if the annotations do not exist, the default DELETE,EVICT,UPDATE are protected.
+	// RESIZE: Pod vertical scaling action. If it's enabled, all resize action will be protected. RESIZE
+	// is an extension of UPDATE, if RESIZE is disabled and UPDATE is enabled, any UPDATE operation will
+	// be protected only as it will definitely cause container restarts.
+	// UPDATE: Kruise will carefully differentiate whether this update will cause interruptions. When
+	// the FeatureGate InPlacePodVerticalScaling is enabled, pod inplace vertical scaling will be
+	// considered non-disruption only when allowedResources(cpu、memory) changes、restartPolicy
+	// is not restartContainer、is not static pod and QoS not changed. But if featureGate
+	// InPlacePodVerticalScaling is disabled, all resize action will be considered as disruption.
 	PubProtectOperationAnnotation = "kruise.io/pub-protect-operations"
 	// pod webhook operation
 	PubUpdateOperation PubOperation = "UPDATE"
 	PubDeleteOperation PubOperation = "DELETE"
 	PubEvictOperation  PubOperation = "EVICT"
+	PubResizeOperation PubOperation = "RESIZE"
 	// PubProtectTotalReplicasAnnotation is the target replicas.
 	// By default, PUB will get the target replicas through workload.spec.replicas. but there are some scenarios that may workload doesn't
 	// implement scale subresources or Pod doesn't have workload management. In this scenario, you can set pub.kruise.io/protect-total-replicas
