@@ -27,6 +27,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -99,7 +100,11 @@ func TestReconcile(t *testing.T) {
 
 	// Set up the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
 	// channel when it is finished.
-	mgr, err := manager.New(cfg, manager.Options{})
+	mgr, err := manager.New(cfg, manager.Options{
+		Controller: config.Controller{
+			SkipNameValidation: &[]bool{true}[0],
+		},
+	})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	c = utilclient.NewClientFromManager(mgr, "test-uniteddeployment-controller")
 

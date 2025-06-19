@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // WorkloadSpreadLister helps list WorkloadSpreads.
@@ -29,7 +29,7 @@ import (
 type WorkloadSpreadLister interface {
 	// List lists all WorkloadSpreads in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.WorkloadSpread, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.WorkloadSpread, err error)
 	// WorkloadSpreads returns an object that can list and get WorkloadSpreads.
 	WorkloadSpreads(namespace string) WorkloadSpreadNamespaceLister
 	WorkloadSpreadListerExpansion
@@ -37,25 +37,17 @@ type WorkloadSpreadLister interface {
 
 // workloadSpreadLister implements the WorkloadSpreadLister interface.
 type workloadSpreadLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*appsv1alpha1.WorkloadSpread]
 }
 
 // NewWorkloadSpreadLister returns a new WorkloadSpreadLister.
 func NewWorkloadSpreadLister(indexer cache.Indexer) WorkloadSpreadLister {
-	return &workloadSpreadLister{indexer: indexer}
-}
-
-// List lists all WorkloadSpreads in the indexer.
-func (s *workloadSpreadLister) List(selector labels.Selector) (ret []*v1alpha1.WorkloadSpread, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.WorkloadSpread))
-	})
-	return ret, err
+	return &workloadSpreadLister{listers.New[*appsv1alpha1.WorkloadSpread](indexer, appsv1alpha1.Resource("workloadspread"))}
 }
 
 // WorkloadSpreads returns an object that can list and get WorkloadSpreads.
 func (s *workloadSpreadLister) WorkloadSpreads(namespace string) WorkloadSpreadNamespaceLister {
-	return workloadSpreadNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return workloadSpreadNamespaceLister{listers.NewNamespaced[*appsv1alpha1.WorkloadSpread](s.ResourceIndexer, namespace)}
 }
 
 // WorkloadSpreadNamespaceLister helps list and get WorkloadSpreads.
@@ -63,36 +55,15 @@ func (s *workloadSpreadLister) WorkloadSpreads(namespace string) WorkloadSpreadN
 type WorkloadSpreadNamespaceLister interface {
 	// List lists all WorkloadSpreads in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.WorkloadSpread, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.WorkloadSpread, err error)
 	// Get retrieves the WorkloadSpread from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.WorkloadSpread, error)
+	Get(name string) (*appsv1alpha1.WorkloadSpread, error)
 	WorkloadSpreadNamespaceListerExpansion
 }
 
 // workloadSpreadNamespaceLister implements the WorkloadSpreadNamespaceLister
 // interface.
 type workloadSpreadNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all WorkloadSpreads in the indexer for a given namespace.
-func (s workloadSpreadNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.WorkloadSpread, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.WorkloadSpread))
-	})
-	return ret, err
-}
-
-// Get retrieves the WorkloadSpread from the indexer for a given namespace and name.
-func (s workloadSpreadNamespaceLister) Get(name string) (*v1alpha1.WorkloadSpread, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("workloadspread"), name)
-	}
-	return obj.(*v1alpha1.WorkloadSpread), nil
+	listers.ResourceIndexer[*appsv1alpha1.WorkloadSpread]
 }

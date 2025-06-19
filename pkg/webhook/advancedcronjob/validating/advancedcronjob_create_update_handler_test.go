@@ -35,8 +35,9 @@ func TestValidateCronJobSpec(t *testing.T) {
 			Containers: []v1.Container{
 				{Name: "foo", Image: "foo:latest", TerminationMessagePolicy: v1.TerminationMessageReadFile, ImagePullPolicy: v1.PullIfNotPresent},
 			},
-			RestartPolicy: v1.RestartPolicyAlways,
-			DNSPolicy:     v1.DNSDefault,
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			DNSPolicy:                     v1.DNSDefault,
+			TerminationGracePeriodSeconds: &[]int64{v1.DefaultTerminationGracePeriodSeconds}[0],
 		},
 	}
 

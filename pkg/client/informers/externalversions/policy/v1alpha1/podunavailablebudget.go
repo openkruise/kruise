@@ -18,13 +18,13 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
+	context "context"
 	time "time"
 
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	apispolicyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	versioned "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/openkruise/kruise/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/openkruise/kruise/pkg/client/listers/policy/v1alpha1"
+	policyv1alpha1 "github.com/openkruise/kruise/pkg/client/listers/policy/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -35,7 +35,7 @@ import (
 // PodUnavailableBudgets.
 type PodUnavailableBudgetInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.PodUnavailableBudgetLister
+	Lister() policyv1alpha1.PodUnavailableBudgetLister
 }
 
 type podUnavailableBudgetInformer struct {
@@ -70,7 +70,7 @@ func NewFilteredPodUnavailableBudgetInformer(client versioned.Interface, namespa
 				return client.PolicyV1alpha1().PodUnavailableBudgets(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&policyv1alpha1.PodUnavailableBudget{},
+		&apispolicyv1alpha1.PodUnavailableBudget{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,9 +81,9 @@ func (f *podUnavailableBudgetInformer) defaultInformer(client versioned.Interfac
 }
 
 func (f *podUnavailableBudgetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&policyv1alpha1.PodUnavailableBudget{}, f.defaultInformer)
+	return f.factory.InformerFor(&apispolicyv1alpha1.PodUnavailableBudget{}, f.defaultInformer)
 }
 
-func (f *podUnavailableBudgetInformer) Lister() v1alpha1.PodUnavailableBudgetLister {
-	return v1alpha1.NewPodUnavailableBudgetLister(f.Informer().GetIndexer())
+func (f *podUnavailableBudgetInformer) Lister() policyv1alpha1.PodUnavailableBudgetLister {
+	return policyv1alpha1.NewPodUnavailableBudgetLister(f.Informer().GetIndexer())
 }

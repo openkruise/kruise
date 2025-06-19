@@ -18,15 +18,14 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
-	"time"
+	context "context"
 
-	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	scheme "github.com/openkruise/kruise/pkg/client/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // NodePodProbesGetter has a method to return a NodePodProbeInterface.
@@ -37,147 +36,34 @@ type NodePodProbesGetter interface {
 
 // NodePodProbeInterface has methods to work with NodePodProbe resources.
 type NodePodProbeInterface interface {
-	Create(ctx context.Context, nodePodProbe *v1alpha1.NodePodProbe, opts v1.CreateOptions) (*v1alpha1.NodePodProbe, error)
-	Update(ctx context.Context, nodePodProbe *v1alpha1.NodePodProbe, opts v1.UpdateOptions) (*v1alpha1.NodePodProbe, error)
-	UpdateStatus(ctx context.Context, nodePodProbe *v1alpha1.NodePodProbe, opts v1.UpdateOptions) (*v1alpha1.NodePodProbe, error)
+	Create(ctx context.Context, nodePodProbe *appsv1alpha1.NodePodProbe, opts v1.CreateOptions) (*appsv1alpha1.NodePodProbe, error)
+	Update(ctx context.Context, nodePodProbe *appsv1alpha1.NodePodProbe, opts v1.UpdateOptions) (*appsv1alpha1.NodePodProbe, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+	UpdateStatus(ctx context.Context, nodePodProbe *appsv1alpha1.NodePodProbe, opts v1.UpdateOptions) (*appsv1alpha1.NodePodProbe, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.NodePodProbe, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.NodePodProbeList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*appsv1alpha1.NodePodProbe, error)
+	List(ctx context.Context, opts v1.ListOptions) (*appsv1alpha1.NodePodProbeList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NodePodProbe, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *appsv1alpha1.NodePodProbe, err error)
 	NodePodProbeExpansion
 }
 
 // nodePodProbes implements NodePodProbeInterface
 type nodePodProbes struct {
-	client rest.Interface
+	*gentype.ClientWithList[*appsv1alpha1.NodePodProbe, *appsv1alpha1.NodePodProbeList]
 }
 
 // newNodePodProbes returns a NodePodProbes
 func newNodePodProbes(c *AppsV1alpha1Client) *nodePodProbes {
 	return &nodePodProbes{
-		client: c.RESTClient(),
+		gentype.NewClientWithList[*appsv1alpha1.NodePodProbe, *appsv1alpha1.NodePodProbeList](
+			"nodepodprobes",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			"",
+			func() *appsv1alpha1.NodePodProbe { return &appsv1alpha1.NodePodProbe{} },
+			func() *appsv1alpha1.NodePodProbeList { return &appsv1alpha1.NodePodProbeList{} },
+		),
 	}
-}
-
-// Get takes name of the nodePodProbe, and returns the corresponding nodePodProbe object, and an error if there is any.
-func (c *nodePodProbes) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NodePodProbe, err error) {
-	result = &v1alpha1.NodePodProbe{}
-	err = c.client.Get().
-		Resource("nodepodprobes").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of NodePodProbes that match those selectors.
-func (c *nodePodProbes) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NodePodProbeList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1alpha1.NodePodProbeList{}
-	err = c.client.Get().
-		Resource("nodepodprobes").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested nodePodProbes.
-func (c *nodePodProbes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Resource("nodepodprobes").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a nodePodProbe and creates it.  Returns the server's representation of the nodePodProbe, and an error, if there is any.
-func (c *nodePodProbes) Create(ctx context.Context, nodePodProbe *v1alpha1.NodePodProbe, opts v1.CreateOptions) (result *v1alpha1.NodePodProbe, err error) {
-	result = &v1alpha1.NodePodProbe{}
-	err = c.client.Post().
-		Resource("nodepodprobes").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(nodePodProbe).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a nodePodProbe and updates it. Returns the server's representation of the nodePodProbe, and an error, if there is any.
-func (c *nodePodProbes) Update(ctx context.Context, nodePodProbe *v1alpha1.NodePodProbe, opts v1.UpdateOptions) (result *v1alpha1.NodePodProbe, err error) {
-	result = &v1alpha1.NodePodProbe{}
-	err = c.client.Put().
-		Resource("nodepodprobes").
-		Name(nodePodProbe.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(nodePodProbe).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *nodePodProbes) UpdateStatus(ctx context.Context, nodePodProbe *v1alpha1.NodePodProbe, opts v1.UpdateOptions) (result *v1alpha1.NodePodProbe, err error) {
-	result = &v1alpha1.NodePodProbe{}
-	err = c.client.Put().
-		Resource("nodepodprobes").
-		Name(nodePodProbe.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(nodePodProbe).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the nodePodProbe and deletes it. Returns an error if one occurs.
-func (c *nodePodProbes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Resource("nodepodprobes").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *nodePodProbes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Resource("nodepodprobes").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched nodePodProbe.
-func (c *nodePodProbes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NodePodProbe, err error) {
-	result = &v1alpha1.NodePodProbe{}
-	err = c.client.Patch(pt).
-		Resource("nodepodprobes").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }
