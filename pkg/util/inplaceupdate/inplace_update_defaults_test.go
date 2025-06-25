@@ -896,6 +896,7 @@ func Test_defaultCalculateInPlaceUpdateSpec_VCTHash(t *testing.T) {
 		defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecreatePodWhenChangeVCTInCloneSetGate, enable)()
 		for _, tt := range tests {
 			t.Run(fmt.Sprintf("%v-%v", tt.name, enable), func(t *testing.T) {
+				tt.args.opts.RecreatePodWhenChangedVolumeClaimTemplate = enable
 				got := defaultCalculateInPlaceUpdateSpec(tt.args.oldRevision, tt.args.newRevision, tt.args.opts)
 				wanted := tt.wantWhenDisable
 				if utilfeature.DefaultFeatureGate.Enabled(features.RecreatePodWhenChangeVCTInCloneSetGate) {

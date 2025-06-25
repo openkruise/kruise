@@ -60,7 +60,8 @@ type UpdateResult struct {
 }
 
 type UpdateOptions struct {
-	IgnoreVolumeClaimTemplatesHashDiff bool
+	IgnoreVolumeClaimTemplatesHashDiff        bool
+	RecreatePodWhenChangedVolumeClaimTemplate bool
 
 	GracePeriodSeconds int32
 	AdditionalFuncs    []func(*v1.Pod)
