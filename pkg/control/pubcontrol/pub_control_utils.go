@@ -266,10 +266,6 @@ func isNeedPubProtection(pub *policyv1alpha1.PodUnavailableBudget, operation pol
 
 	operations := func() sets.Set[string] {
 		operations := sets.New(strings.Split(operationValue, ",")...)
-		// if resize set in pub protect operation, then protect update and resize
-		if operations.Has(string(policyv1alpha1.PubResizeOperation)) {
-			operations.Insert(string(policyv1alpha1.PubUpdateOperation))
-		}
 		// if disable featureGate InPlacePodVerticalScaling, update will contain resize
 		if !enableInPlacePodVerticalScaling && operations.Has(string(policyv1alpha1.PubUpdateOperation)) {
 			operations.Insert(string(policyv1alpha1.PubResizeOperation))

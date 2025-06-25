@@ -517,7 +517,7 @@ func TestIsNeedPubProtection(t *testing.T) {
 			expectProtect: true,
 		},
 		{
-			name: "pub protect update when resize set",
+			name: "pub won't protect update when resize set",
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Annotations = map[string]string{
@@ -526,7 +526,7 @@ func TestIsNeedPubProtection(t *testing.T) {
 				return pub
 			},
 			operation:     policyv1alpha1.PubUpdateOperation,
-			expectProtect: true,
+			expectProtect: false,
 		},
 		{
 			name: "pub not protect update when resize not set",
