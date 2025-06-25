@@ -103,6 +103,12 @@ func (t *CloneSetTester) NewCloneSetWithLifecycle(name string, replicas int32, l
 	return cloneSet
 }
 
+func (t *CloneSetTester) NewCloneSetWithSpecificScheduler(name string, replicas int32, scheduler string) *appsv1alpha1.CloneSet {
+	cloneSet := t.newCloneSet(name, replicas)
+	cloneSet.Spec.Template.Spec.SchedulerName = scheduler
+	return cloneSet
+}
+
 func (t *CloneSetTester) CreateCloneSet(cs *appsv1alpha1.CloneSet) (*appsv1alpha1.CloneSet, error) {
 	return t.kc.AppsV1alpha1().CloneSets(t.ns).Create(context.TODO(), cs, metav1.CreateOptions{})
 }
