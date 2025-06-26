@@ -254,24 +254,24 @@ func IsReferenceEqual(ref1, ref2 *policyv1alpha1.TargetReference) bool {
 func isNeedPubProtection(pub *policyv1alpha1.PodUnavailableBudget, operation policyv1alpha1.PubOperation) bool {
 	operationValue, ok := pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation]
 	enableInPlacePodVerticalScaling := feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
+	operations := sets.New[policyv1alpha1.PubOperation]()
 	if !ok || operationValue == "" {
-		// when operation == RESIZE
-		// 1. if featureGate InPlacePodVerticalScaling is enabled, then do not protect resize
-		// 2. if featureGate InPlacePodVerticalScaling is disabled, then RESIZE is regarded as UPDATE, so return true
-		if operation == policyv1alpha1.PubResizeOperation {
-			return !enableInPlacePodVerticalScaling
-		}
-		return true
+		// by default, protect delete, update, evict
+		operations.Insert(
+			policyv1alpha1.PubDeleteOperation,
+			policyv1alpha1.PubUpdateOperation,
+			policyv1alpha1.PubEvictOperation,
+		)
 	}
 
-	operations := func() sets.Set[string] {
-		operations := sets.New(strings.Split(operationValue, ",")...)
-		// if disable featureGate InPlacePodVerticalScaling, update will contain resize
-		if !enableInPlacePodVerticalScaling && operations.Has(string(policyv1alpha1.PubUpdateOperation)) {
-			operations.Insert(string(policyv1alpha1.PubResizeOperation))
-		}
-		return operations
-	}()
+	for _, action := range strings.Split(operationValue, ",") {
+		operations.Insert(policyv1alpha1.PubOperation(action))
+	}
 
-	return operations.Has(string(operation))
+	// if featureGate InPlacePodVerticalScaling is disabled, resize will be treat as update
+	if !enableInPlacePodVerticalScaling && operations.Has(policyv1alpha1.PubUpdateOperation) {
+		operations.Insert(policyv1alpha1.PubResizeOperation)
+	}
+
+	return operations.Has(operation)
 }
