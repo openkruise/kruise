@@ -31,6 +31,7 @@ import (
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
@@ -78,6 +79,7 @@ var _ = ginkgo.Describe("BroadcastJob", ginkgo.Label("BroadcastJob", "job", "wor
 			}
 		},
 	}
+
 	ginkgo.Context("BroadcastJob dispatching", func() {
 		ginkgo.It("succeeds for parallelism < number of node", func() {
 			ginkgo.By("Create Fake Node " + randStr)
@@ -151,6 +153,87 @@ var _ = ginkgo.Describe("BroadcastJob", ginkgo.Label("BroadcastJob", "job", "wor
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return job.Status.Succeeded
 			}, 60*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
+		})
+	})
+
+	ginkgo.Context("BroadcastJob uncordon handling", func() {
+		ginkgo.It("creates missing pod after node uncordon", func() {
+			// Create fake node
+			fakeNode, err := nodeTester.CreateFakeNode(randStr)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// Cordon the fake node
+			ginkgo.By("Cordoning fake node " + fakeNode.Name)
+			_, err = c.CoreV1().Nodes().Patch(context.TODO(), fakeNode.Name,
+				types.StrategicMergePatchType,
+				[]byte(`{"spec":{"unschedulable":true}}`),
+				metav1.PatchOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// Create BroadcastJob job-" + randStr
+			job := &appsv1alpha1.BroadcastJob{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-" + randStr},
+				Spec: appsv1alpha1.BroadcastJobSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Tolerations: []v1.Toleration{{Key: framework.E2eFakeKey, Operator: v1.TolerationOpEqual, Value: randStr, Effect: v1.TaintEffectNoSchedule}},
+							Containers: []v1.Container{{
+								Name:    "box",
+								Image:   BusyboxImage,
+								Command: []string{"/bin/sh", "-c", "sleep 30"},
+							}},
+							RestartPolicy: v1.RestartPolicyNever,
+						},
+					},
+					CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+				},
+			}
+
+			nodes, err := nodeTester.ListRealNodesWithFake(job.Spec.Template.Spec.Tolerations)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			totalNodes := int32(len(nodes))
+			parallelism := intstr.FromInt(len(nodes))
+			job.Spec.Parallelism = &parallelism
+
+			ginkgo.By("Creating BroadcastJob " + job.Name)
+			job, err = tester.CreateBroadcastJob(job)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Verify desired count equals total nodes - 1 (due to cordoned node)")
+			gomega.Eventually(func() int32 {
+				job, err = tester.GetBroadcastJob(job.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return job.Status.Desired
+			}, 30*time.Second, time.Second).Should(gomega.Equal(totalNodes - 1))
+
+			ginkgo.By("Verify active pods equals total nodes - 1 (as pod is not created on cordoned node)")
+			gomega.Eventually(func() int32 {
+				job, err = tester.GetBroadcastJob(job.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return job.Status.Active
+			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(totalNodes - 1))
+
+			// Uncordon the fake node
+			ginkgo.By("Uncordoning fake node " + fakeNode.Name)
+			_, err = c.CoreV1().Nodes().Patch(context.TODO(), fakeNode.Name,
+				types.StrategicMergePatchType,
+				[]byte(`{"spec":{"unschedulable":false}}`),
+				metav1.PatchOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Verify desired count becomes total nodes after uncordon")
+			gomega.Eventually(func() int32 {
+				job, err = tester.GetBroadcastJob(job.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return job.Status.Desired
+			}, 30*time.Second, time.Second).Should(gomega.Equal(totalNodes))
+
+			ginkgo.By("Verify active pods becomes total nodes after uncordon (missing pod now created)")
+			gomega.Eventually(func() int32 {
+				job, err = tester.GetBroadcastJob(job.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return job.Status.Active
+			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(totalNodes))
 		})
 	})
 })
