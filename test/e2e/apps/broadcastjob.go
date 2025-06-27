@@ -154,7 +154,6 @@ var _ = SIGDescribe("BroadcastJob", func() {
 		})
 	})
 
-	// ------------------------------------------------------------------------
 	framework.KruiseDescribe("BroadcastJob uncordon handling", func() {
 		framework.ConformanceIt("creates missing pod after node uncordon", func() {
 			// Create fake node
