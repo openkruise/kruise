@@ -24,6 +24,7 @@ import (
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/integer"
 )
 
 var _ = SIGDescribe("BroadcastJob", func() {
@@ -71,7 +73,7 @@ var _ = SIGDescribe("BroadcastJob", func() {
 				if err != nil {
 					framework.Logf("[FAILURE_DEBUG] Get BroadcastJob %s error: %v", "job-"+randStr, err)
 				} else {
-					framework.Logf("[FAILURE_DEBUG] Get BroadcastJob: %v", framework.DumpJSON(job))
+					framework.Logf("[FAILURE_DEBUG] Get BroadcastJob: %v", util.DumpJSON(job))
 				}
 			}
 		},
@@ -105,7 +107,7 @@ var _ = SIGDescribe("BroadcastJob", func() {
 
 			nodes, err := nodeTester.ListRealNodesWithFake(job.Spec.Template.Spec.Tolerations)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			parallelism := intstr.FromInt(framework.IntMax(len(nodes)-1, framework.IntMin(len(nodes), 1)))
+			parallelism := intstr.FromInt(integer.IntMax(len(nodes)-1, integer.IntMin(len(nodes), 1)))
 			job.Spec.Parallelism = &parallelism
 
 			job, err = tester.CreateBroadcastJob(job)
@@ -164,9 +166,6 @@ var _ = SIGDescribe("BroadcastJob", func() {
 			var job *appsv1alpha1.BroadcastJob
 			defer func() {
 				_ = nodeTester.DeleteFakeNode(fakeNode.Name)
-				if job != nil {
-					_ = tester.DeleteBroadcastJob(job.Name)
-				}
 			}()
 
 			// Cordon the fake node
