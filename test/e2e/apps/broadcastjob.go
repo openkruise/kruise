@@ -183,9 +183,10 @@ var _ = SIGDescribe("BroadcastJob", func() {
 						Spec: v1.PodSpec{
 							Tolerations: []v1.Toleration{{Key: framework.E2eFakeKey, Operator: v1.TolerationOpEqual, Value: randStr, Effect: v1.TaintEffectNoSchedule}},
 							Containers: []v1.Container{{
-								Name:    "box",
-								Image:   BusyboxImage,
-								Command: []string{"/bin/sh", "-c", "exit 0"},
+								Name:  "box",
+								Image: BusyboxImage,
+								// keep the pod alive so we can observe it re-schedule
+								Command: []string{"/bin/sh", "-c", "sleep 30"},
 							}},
 							RestartPolicy: v1.RestartPolicyNever,
 						},
