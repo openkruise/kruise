@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // NodePodProbeLister helps list NodePodProbes.
@@ -29,39 +29,19 @@ import (
 type NodePodProbeLister interface {
 	// List lists all NodePodProbes in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.NodePodProbe, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.NodePodProbe, err error)
 	// Get retrieves the NodePodProbe from the index for a given name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.NodePodProbe, error)
+	Get(name string) (*appsv1alpha1.NodePodProbe, error)
 	NodePodProbeListerExpansion
 }
 
 // nodePodProbeLister implements the NodePodProbeLister interface.
 type nodePodProbeLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*appsv1alpha1.NodePodProbe]
 }
 
 // NewNodePodProbeLister returns a new NodePodProbeLister.
 func NewNodePodProbeLister(indexer cache.Indexer) NodePodProbeLister {
-	return &nodePodProbeLister{indexer: indexer}
-}
-
-// List lists all NodePodProbes in the indexer.
-func (s *nodePodProbeLister) List(selector labels.Selector) (ret []*v1alpha1.NodePodProbe, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.NodePodProbe))
-	})
-	return ret, err
-}
-
-// Get retrieves the NodePodProbe from the index for a given name.
-func (s *nodePodProbeLister) Get(name string) (*v1alpha1.NodePodProbe, error) {
-	obj, exists, err := s.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("nodepodprobe"), name)
-	}
-	return obj.(*v1alpha1.NodePodProbe), nil
+	return &nodePodProbeLister{listers.New[*appsv1alpha1.NodePodProbe](indexer, appsv1alpha1.Resource("nodepodprobe"))}
 }

@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // UnitedDeploymentLister helps list UnitedDeployments.
@@ -29,7 +29,7 @@ import (
 type UnitedDeploymentLister interface {
 	// List lists all UnitedDeployments in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.UnitedDeployment, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.UnitedDeployment, err error)
 	// UnitedDeployments returns an object that can list and get UnitedDeployments.
 	UnitedDeployments(namespace string) UnitedDeploymentNamespaceLister
 	UnitedDeploymentListerExpansion
@@ -37,25 +37,17 @@ type UnitedDeploymentLister interface {
 
 // unitedDeploymentLister implements the UnitedDeploymentLister interface.
 type unitedDeploymentLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*appsv1alpha1.UnitedDeployment]
 }
 
 // NewUnitedDeploymentLister returns a new UnitedDeploymentLister.
 func NewUnitedDeploymentLister(indexer cache.Indexer) UnitedDeploymentLister {
-	return &unitedDeploymentLister{indexer: indexer}
-}
-
-// List lists all UnitedDeployments in the indexer.
-func (s *unitedDeploymentLister) List(selector labels.Selector) (ret []*v1alpha1.UnitedDeployment, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.UnitedDeployment))
-	})
-	return ret, err
+	return &unitedDeploymentLister{listers.New[*appsv1alpha1.UnitedDeployment](indexer, appsv1alpha1.Resource("uniteddeployment"))}
 }
 
 // UnitedDeployments returns an object that can list and get UnitedDeployments.
 func (s *unitedDeploymentLister) UnitedDeployments(namespace string) UnitedDeploymentNamespaceLister {
-	return unitedDeploymentNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return unitedDeploymentNamespaceLister{listers.NewNamespaced[*appsv1alpha1.UnitedDeployment](s.ResourceIndexer, namespace)}
 }
 
 // UnitedDeploymentNamespaceLister helps list and get UnitedDeployments.
@@ -63,36 +55,15 @@ func (s *unitedDeploymentLister) UnitedDeployments(namespace string) UnitedDeplo
 type UnitedDeploymentNamespaceLister interface {
 	// List lists all UnitedDeployments in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.UnitedDeployment, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.UnitedDeployment, err error)
 	// Get retrieves the UnitedDeployment from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.UnitedDeployment, error)
+	Get(name string) (*appsv1alpha1.UnitedDeployment, error)
 	UnitedDeploymentNamespaceListerExpansion
 }
 
 // unitedDeploymentNamespaceLister implements the UnitedDeploymentNamespaceLister
 // interface.
 type unitedDeploymentNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all UnitedDeployments in the indexer for a given namespace.
-func (s unitedDeploymentNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.UnitedDeployment, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.UnitedDeployment))
-	})
-	return ret, err
-}
-
-// Get retrieves the UnitedDeployment from the indexer for a given namespace and name.
-func (s unitedDeploymentNamespaceLister) Get(name string) (*v1alpha1.UnitedDeployment, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("uniteddeployment"), name)
-	}
-	return obj.(*v1alpha1.UnitedDeployment), nil
+	listers.ResourceIndexer[*appsv1alpha1.UnitedDeployment]
 }

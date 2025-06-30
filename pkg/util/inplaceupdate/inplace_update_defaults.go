@@ -19,12 +19,12 @@ package inplaceupdate
 import (
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"strconv"
 	"strings"
 
-	"github.com/appscode/jsonpatch"
-
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilcontainerlaunchpriority "github.com/openkruise/kruise/pkg/util/containerlaunchpriority"
@@ -32,6 +32,7 @@ import (
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/volumeclaimtemplate"
 
+	"github.com/appscode/jsonpatch"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/klog/v2"
 	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
 func SetOptionsDefaults(opts *UpdateOptions) *UpdateOptions {
@@ -70,7 +72,7 @@ func SetOptionsDefaults(opts *UpdateOptions) *UpdateOptions {
 }
 
 // defaultPatchUpdateSpecToPod returns new pod that merges spec into old pod
-func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.InPlaceUpdateState) (*v1.Pod, error) {
+func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.InPlaceUpdateState) (*v1.Pod, map[string]*v1.ResourceRequirements, error) {
 	klog.V(5).InfoS("Begin to in-place update pod", "namespace", pod.Namespace, "name", pod.Name, "spec", util.DumpJSON(spec), "state", util.DumpJSON(state))
 
 	state.NextContainerImages = make(map[string]string)
@@ -81,11 +83,11 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 		cloneBytes, _ := json.Marshal(pod)
 		modified, err := strategicpatch.StrategicMergePatch(cloneBytes, spec.MetaDataPatch, &v1.Pod{})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		pod = &v1.Pod{}
 		if err = json.Unmarshal(modified, pod); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -154,9 +156,9 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 		}
 	}
 
+	expectedResources := map[string]*v1.ResourceRequirements{}
 	// update resources
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) {
-		expectedResources := map[string]*v1.ResourceRequirements{}
 		for i := range pod.Spec.Containers {
 			c := &pod.Spec.Containers[i]
 			newResource, resourceExists := spec.ContainerResources[c.Name]
@@ -173,7 +175,9 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 
 		// vertical update containers in a batch,
 		// or internal enterprise implementations can update+sync pod resources here at once
-		verticalUpdateImpl.UpdateResource(pod, expectedResources)
+		if !client.ShouldUpdateResourceByResize() {
+			verticalUpdateImpl.UpdateResource(pod, expectedResources)
+		}
 	}
 
 	// update annotations and labels for the containers to update
@@ -208,7 +212,10 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 
 	inPlaceUpdateStateJSON, _ := json.Marshal(state)
 	pod.Annotations[appspub.InPlaceUpdateStateKey] = string(inPlaceUpdateStateJSON)
-	return pod, nil
+	if client.ShouldUpdateResourceByResize() {
+		return pod, expectedResources, nil
+	}
+	return pod, nil, nil
 }
 
 func addMetadataSharedContainersToUpdate(pod *v1.Pod, containersToUpdate sets.String, containerRefMetadata map[string]metav1.ObjectMeta) {
@@ -448,10 +455,6 @@ func defaultCheckContainersInPlaceUpdateCompleted(pod *v1.Pod, inPlaceUpdateStat
 
 	if runtimeContainerMetaSet != nil {
 		metaHashType := plainHash
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) && inPlaceUpdateState.UpdateResources {
-			// if vertical scaling is enabled and update resources, we should compare plainHashWithoutResources
-			metaHashType = plainHashWithoutResources
-		}
 		if checkAllContainersHashConsistent(pod, runtimeContainerMetaSet, metaHashType) {
 			klog.V(5).InfoS("Check Pod in-place update completed for all container hash consistent", "namespace", pod.Namespace, "name", pod.Name)
 			return nil
@@ -492,7 +495,6 @@ type hashType string
 
 const (
 	plainHash                    hashType = "PlainHash"
-	plainHashWithoutResources    hashType = "PlainHashWithoutResources"
 	extractedEnvFromMetadataHash hashType = "ExtractedEnvFromMetadataHash"
 )
 
@@ -537,19 +539,12 @@ func checkAllContainersHashConsistent(pod *v1.Pod, runtimeContainerMetaSet *apps
 
 		switch hashType {
 		case plainHash:
-			if expectedHash := kubeletcontainer.HashContainer(containerSpec); containerMeta.Hashes.PlainHash != expectedHash {
+			isConsistentInNewVersion := kubeletcontainer.HashContainer(containerSpec) == containerMeta.Hashes.PlainHash
+			isConsistentInOldVersion := hashContainer(containerSpec) == containerMeta.Hashes.PlainHash
+			if !isConsistentInNewVersion && !isConsistentInOldVersion {
 				klog.InfoS("Find container in runtime-container-meta for Pod has different plain hash with spec",
 					"containerName", containerSpec.Name, "namespace", pod.Namespace, "podName", pod.Name,
-					"metaHash", containerMeta.Hashes.PlainHash, "expectedHash", expectedHash)
-				return false
-			}
-		case plainHashWithoutResources:
-			containerSpecCopy := containerSpec.DeepCopy()
-			containerSpecCopy.Resources = v1.ResourceRequirements{}
-			if expectedHash := kubeletcontainer.HashContainer(containerSpecCopy); containerMeta.Hashes.PlainHashWithoutResources != expectedHash {
-				klog.InfoS("Find container in runtime-container-meta for Pod has different plain hash with spec(except resources)",
-					"containerName", containerSpecCopy.Name, "namespace", pod.Namespace, "podName", pod.Name,
-					"metaHash", containerMeta.Hashes.PlainHashWithoutResources, "expectedHash", expectedHash)
+					"metaHash", containerMeta.Hashes.PlainHash, "expectedHashInNewVersion", kubeletcontainer.HashContainer(containerSpec), "expectedHashInOldVersion", hashContainer(containerSpec))
 				return false
 			}
 		case extractedEnvFromMetadataHash:
@@ -564,6 +559,18 @@ func checkAllContainersHashConsistent(pod *v1.Pod, runtimeContainerMetaSet *apps
 	}
 
 	return true
+}
+
+// hashContainer copy from kubelet v1.31-
+// in 1.31+, kubeletcontainer.HashContainer will only pick some fields to hash
+// in order to be compatible with 1.31 and earlier, here is the implementation of kubeletcontainer.HashContainer(1.31-) copied.
+func hashContainer(container *v1.Container) uint64 {
+	hash := fnv.New32a()
+	// Omit nil or empty field when calculating hash value
+	// Please see https://github.com/kubernetes/kubernetes/issues/53644
+	containerJSON, _ := json.Marshal(container)
+	hashutil.DeepHashObject(hash, containerJSON)
+	return uint64(hash.Sum32())
 }
 
 const (

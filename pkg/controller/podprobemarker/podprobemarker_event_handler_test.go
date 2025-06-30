@@ -6,6 +6,10 @@ import (
 	"testing"
 	"time"
 
+	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -13,11 +17,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-
-	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 var (
@@ -69,7 +69,9 @@ func TestPodUpdateEventHandler(t *testing.T) {
 	newPod := podDemo.DeepCopy()
 	newPod.ResourceVersion = fmt.Sprintf("%d", time.Now().Unix())
 
-	updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	updateQ := workqueue.NewTypedRateLimitingQueue(
+		workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+	)
 	updateEvent := event.TypedUpdateEvent[*corev1.Pod]{
 		ObjectOld: podDemo,
 		ObjectNew: newPod,
@@ -590,7 +592,9 @@ func TestPodUpdateEventHandler_v2(t *testing.T) {
 			}
 			_ = fakeClient.Create(context.TODO(), cs.getNode())
 			oldPod, newPod := cs.getPod()
-			updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			updateQ := workqueue.NewTypedRateLimitingQueue(
+				workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+			)
 			updateEvent := event.TypedUpdateEvent[*corev1.Pod]{
 				ObjectOld: oldPod,
 				ObjectNew: newPod,

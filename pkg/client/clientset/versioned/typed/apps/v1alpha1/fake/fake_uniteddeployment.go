@@ -18,146 +18,63 @@ limitations under the License.
 package fake
 
 import (
-	"context"
+	context "context"
 
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
+	gentype "k8s.io/client-go/gentype"
 	testing "k8s.io/client-go/testing"
 )
 
-// FakeUnitedDeployments implements UnitedDeploymentInterface
-type FakeUnitedDeployments struct {
+// fakeUnitedDeployments implements UnitedDeploymentInterface
+type fakeUnitedDeployments struct {
+	*gentype.FakeClientWithList[*v1alpha1.UnitedDeployment, *v1alpha1.UnitedDeploymentList]
 	Fake *FakeAppsV1alpha1
-	ns   string
 }
 
-var uniteddeploymentsResource = v1alpha1.SchemeGroupVersion.WithResource("uniteddeployments")
-
-var uniteddeploymentsKind = v1alpha1.SchemeGroupVersion.WithKind("UnitedDeployment")
-
-// Get takes name of the unitedDeployment, and returns the corresponding unitedDeployment object, and an error if there is any.
-func (c *FakeUnitedDeployments) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.UnitedDeployment, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(uniteddeploymentsResource, c.ns, name), &v1alpha1.UnitedDeployment{})
-
-	if obj == nil {
-		return nil, err
+func newFakeUnitedDeployments(fake *FakeAppsV1alpha1, namespace string) appsv1alpha1.UnitedDeploymentInterface {
+	return &fakeUnitedDeployments{
+		gentype.NewFakeClientWithList[*v1alpha1.UnitedDeployment, *v1alpha1.UnitedDeploymentList](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("uniteddeployments"),
+			v1alpha1.SchemeGroupVersion.WithKind("UnitedDeployment"),
+			func() *v1alpha1.UnitedDeployment { return &v1alpha1.UnitedDeployment{} },
+			func() *v1alpha1.UnitedDeploymentList { return &v1alpha1.UnitedDeploymentList{} },
+			func(dst, src *v1alpha1.UnitedDeploymentList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.UnitedDeploymentList) []*v1alpha1.UnitedDeployment {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.UnitedDeploymentList, items []*v1alpha1.UnitedDeployment) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.UnitedDeployment), err
-}
-
-// List takes label and field selectors, and returns the list of UnitedDeployments that match those selectors.
-func (c *FakeUnitedDeployments) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.UnitedDeploymentList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(uniteddeploymentsResource, uniteddeploymentsKind, c.ns, opts), &v1alpha1.UnitedDeploymentList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.UnitedDeploymentList{ListMeta: obj.(*v1alpha1.UnitedDeploymentList).ListMeta}
-	for _, item := range obj.(*v1alpha1.UnitedDeploymentList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested unitedDeployments.
-func (c *FakeUnitedDeployments) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(uniteddeploymentsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a unitedDeployment and creates it.  Returns the server's representation of the unitedDeployment, and an error, if there is any.
-func (c *FakeUnitedDeployments) Create(ctx context.Context, unitedDeployment *v1alpha1.UnitedDeployment, opts v1.CreateOptions) (result *v1alpha1.UnitedDeployment, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(uniteddeploymentsResource, c.ns, unitedDeployment), &v1alpha1.UnitedDeployment{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.UnitedDeployment), err
-}
-
-// Update takes the representation of a unitedDeployment and updates it. Returns the server's representation of the unitedDeployment, and an error, if there is any.
-func (c *FakeUnitedDeployments) Update(ctx context.Context, unitedDeployment *v1alpha1.UnitedDeployment, opts v1.UpdateOptions) (result *v1alpha1.UnitedDeployment, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(uniteddeploymentsResource, c.ns, unitedDeployment), &v1alpha1.UnitedDeployment{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.UnitedDeployment), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeUnitedDeployments) UpdateStatus(ctx context.Context, unitedDeployment *v1alpha1.UnitedDeployment, opts v1.UpdateOptions) (*v1alpha1.UnitedDeployment, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(uniteddeploymentsResource, "status", c.ns, unitedDeployment), &v1alpha1.UnitedDeployment{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.UnitedDeployment), err
-}
-
-// Delete takes name of the unitedDeployment and deletes it. Returns an error if one occurs.
-func (c *FakeUnitedDeployments) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(uniteddeploymentsResource, c.ns, name, opts), &v1alpha1.UnitedDeployment{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeUnitedDeployments) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(uniteddeploymentsResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.UnitedDeploymentList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched unitedDeployment.
-func (c *FakeUnitedDeployments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.UnitedDeployment, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(uniteddeploymentsResource, c.ns, name, pt, data, subresources...), &v1alpha1.UnitedDeployment{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.UnitedDeployment), err
 }
 
 // GetScale takes name of the unitedDeployment, and returns the corresponding scale object, and an error if there is any.
-func (c *FakeUnitedDeployments) GetScale(ctx context.Context, unitedDeploymentName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
+func (c *fakeUnitedDeployments) GetScale(ctx context.Context, unitedDeploymentName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
+	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewGetSubresourceAction(uniteddeploymentsResource, c.ns, "scale", unitedDeploymentName), &autoscalingv1.Scale{})
+		Invokes(testing.NewGetSubresourceActionWithOptions(c.Resource(), c.Namespace(), "scale", unitedDeploymentName, options), emptyResult)
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*autoscalingv1.Scale), err
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeUnitedDeployments) UpdateScale(ctx context.Context, unitedDeploymentName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
+func (c *fakeUnitedDeployments) UpdateScale(ctx context.Context, unitedDeploymentName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
+	emptyResult := &autoscalingv1.Scale{}
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(uniteddeploymentsResource, "scale", c.ns, scale), &autoscalingv1.Scale{})
+		Invokes(testing.NewUpdateSubresourceActionWithOptions(c.Resource(), "scale", c.Namespace(), scale, opts), &autoscalingv1.Scale{})
 
 	if obj == nil {
-		return nil, err
+		return emptyResult, err
 	}
 	return obj.(*autoscalingv1.Scale), err
 }

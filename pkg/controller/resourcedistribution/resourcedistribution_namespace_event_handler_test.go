@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 var (
@@ -74,7 +75,9 @@ func TestNamespaceEventHandler(t *testing.T) {
 }
 
 func testEnqueueRequestForNamespaceCreate(namespace *corev1.Namespace, expectedNumber int, t *testing.T) {
-	createQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	createQ := workqueue.NewTypedRateLimitingQueue(
+		workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+	)
 	createEvt := event.TypedCreateEvent[*corev1.Namespace]{
 		Object: namespace,
 	}
@@ -85,7 +88,9 @@ func testEnqueueRequestForNamespaceCreate(namespace *corev1.Namespace, expectedN
 }
 
 func testEnqueueRequestForNamespaceUpdate(namespaceOld, namespaceNew *corev1.Namespace, expectedNumber int, t *testing.T) {
-	updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	updateQ := workqueue.NewTypedRateLimitingQueue(
+		workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+	)
 	updateEvt := event.TypedUpdateEvent[*corev1.Namespace]{
 		ObjectOld: namespaceOld,
 		ObjectNew: namespaceNew,
@@ -97,7 +102,9 @@ func testEnqueueRequestForNamespaceUpdate(namespaceOld, namespaceNew *corev1.Nam
 }
 
 func testEnqueueRequestForNamespaceDelete(namespace *corev1.Namespace, expectedNumber int, t *testing.T) {
-	deleteQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	deleteQ := workqueue.NewTypedRateLimitingQueue(
+		workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+	)
 	deleteEvt := event.TypedDeleteEvent[*corev1.Namespace]{
 		Object: namespace,
 	}

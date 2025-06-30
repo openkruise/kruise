@@ -151,7 +151,9 @@ func TestPodEventHandler(t *testing.T) {
 	by, _ := json.Marshal(injectWorkloadSpread)
 
 	// create
-	createQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	createQ := workqueue.NewTypedRateLimitingQueue(
+		workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+	)
 
 	createPod := podDemo.DeepCopy()
 	createPod.Annotations = map[string]string{
@@ -169,13 +171,14 @@ func TestPodEventHandler(t *testing.T) {
 	}
 
 	key, _ := createQ.Get()
-	nsn, _ := key.(reconcile.Request)
-	if nsn.Namespace != createPod.Namespace && nsn.Name != injectWorkloadSpread.Name {
+	if key.Namespace != createPod.Namespace && key.Name != injectWorkloadSpread.Name {
 		t.Errorf("matching WorkloadSpread %s/%s failed", createPod.Namespace, injectWorkloadSpread.Name)
 	}
 
 	// update
-	updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	updateQ := workqueue.NewTypedRateLimitingQueue(
+		workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+	)
 
 	oldPod := podDemo.DeepCopy()
 	oldPod.Annotations = map[string]string{
@@ -199,13 +202,14 @@ func TestPodEventHandler(t *testing.T) {
 	}
 
 	key, _ = updateQ.Get()
-	nsn, _ = key.(reconcile.Request)
-	if nsn.Namespace != newPod.Namespace && nsn.Name != injectWorkloadSpread.Name {
+	if key.Namespace != newPod.Namespace && key.Name != injectWorkloadSpread.Name {
 		t.Errorf("matching WorkloadSpread %s/%s failed", newPod.Namespace, injectWorkloadSpread.Name)
 	}
 
 	// delete
-	deleteQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	deleteQ := workqueue.NewTypedRateLimitingQueue(
+		workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+	)
 	deletePod := podDemo.DeepCopy()
 	deletePod.Annotations = map[string]string{
 		wsutil.MatchedWorkloadSpreadSubsetAnnotations: string(by),
@@ -222,8 +226,7 @@ func TestPodEventHandler(t *testing.T) {
 	}
 
 	key, _ = deleteQ.Get()
-	nsn, _ = key.(reconcile.Request)
-	if nsn.Namespace != deletePod.Namespace && nsn.Name != injectWorkloadSpread.Name {
+	if key.Namespace != deletePod.Namespace && key.Name != injectWorkloadSpread.Name {
 		t.Errorf("matching WorkloadSpread %s/%s failed", deletePod.Namespace, injectWorkloadSpread.Name)
 	}
 }
@@ -1102,7 +1105,9 @@ func TestWorkloadEventHandlerForCreate(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getWorkloadSpread()).Build()
 			handler := &workloadEventHandler{Reader: fakeClient}
 
-			createQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			createQ := workqueue.NewTypedRateLimitingQueue(
+				workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+			)
 			createEvt := event.CreateEvent{
 				Object: cs.getWorkload(),
 			}
@@ -1112,8 +1117,7 @@ func TestWorkloadEventHandlerForCreate(t *testing.T) {
 				return
 			}
 			key, _ := createQ.Get()
-			nsn, _ := key.(reconcile.Request)
-			if nsn.Namespace != workloadSpreadDemo.Namespace && nsn.Name != workloadSpreadDemo.Name {
+			if key.Namespace != workloadSpreadDemo.Namespace && key.Name != workloadSpreadDemo.Name {
 				t.Errorf("match WorkloadSpread %s/%s failed", workloadSpreadDemo.Namespace, workloadSpreadDemo.Name)
 			}
 		})
@@ -1223,7 +1227,9 @@ func TestWorkloadEventHandlerForDelete(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getWorkloadSpread()).Build()
 			handler := &workloadEventHandler{Reader: fakeClient}
 
-			deleteQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			deleteQ := workqueue.NewTypedRateLimitingQueue(
+				workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+			)
 			deleteEvt := event.DeleteEvent{
 				Object: cs.getWorkload(),
 			}
@@ -1233,8 +1239,7 @@ func TestWorkloadEventHandlerForDelete(t *testing.T) {
 				return
 			}
 			key, _ := deleteQ.Get()
-			nsn, _ := key.(reconcile.Request)
-			if nsn.Namespace != workloadSpreadDemo.Namespace && nsn.Name != workloadSpreadDemo.Name {
+			if key.Namespace != workloadSpreadDemo.Namespace && key.Name != workloadSpreadDemo.Name {
 				t.Errorf("match WorkloadSpread %s/%s failed", workloadSpreadDemo.Namespace, workloadSpreadDemo.Name)
 			}
 		})
@@ -1363,7 +1368,9 @@ func TestWorkloadEventHandlerForUpdate(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getWorkloadSpread()).Build()
 			handler := &workloadEventHandler{Reader: fakeClient}
 
-			updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			updateQ := workqueue.NewTypedRateLimitingQueue(
+				workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+			)
 			oldWorkload, newWorkload := cs.getWorkloads()
 			updateEvt := event.UpdateEvent{
 				ObjectOld: oldWorkload,
@@ -1375,8 +1382,7 @@ func TestWorkloadEventHandlerForUpdate(t *testing.T) {
 				return
 			}
 			key, _ := updateQ.Get()
-			nsn, _ := key.(reconcile.Request)
-			if nsn.Namespace != workloadSpreadDemo.Namespace && nsn.Name != workloadSpreadDemo.Name {
+			if key.Namespace != workloadSpreadDemo.Namespace && key.Name != workloadSpreadDemo.Name {
 				t.Errorf("match WorkloadSpread %s/%s failed", workloadSpreadDemo.Namespace, workloadSpreadDemo.Name)
 			}
 		})

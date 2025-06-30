@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // EphemeralJobLister helps list EphemeralJobs.
@@ -29,7 +29,7 @@ import (
 type EphemeralJobLister interface {
 	// List lists all EphemeralJobs in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.EphemeralJob, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.EphemeralJob, err error)
 	// EphemeralJobs returns an object that can list and get EphemeralJobs.
 	EphemeralJobs(namespace string) EphemeralJobNamespaceLister
 	EphemeralJobListerExpansion
@@ -37,25 +37,17 @@ type EphemeralJobLister interface {
 
 // ephemeralJobLister implements the EphemeralJobLister interface.
 type ephemeralJobLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*appsv1alpha1.EphemeralJob]
 }
 
 // NewEphemeralJobLister returns a new EphemeralJobLister.
 func NewEphemeralJobLister(indexer cache.Indexer) EphemeralJobLister {
-	return &ephemeralJobLister{indexer: indexer}
-}
-
-// List lists all EphemeralJobs in the indexer.
-func (s *ephemeralJobLister) List(selector labels.Selector) (ret []*v1alpha1.EphemeralJob, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.EphemeralJob))
-	})
-	return ret, err
+	return &ephemeralJobLister{listers.New[*appsv1alpha1.EphemeralJob](indexer, appsv1alpha1.Resource("ephemeraljob"))}
 }
 
 // EphemeralJobs returns an object that can list and get EphemeralJobs.
 func (s *ephemeralJobLister) EphemeralJobs(namespace string) EphemeralJobNamespaceLister {
-	return ephemeralJobNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return ephemeralJobNamespaceLister{listers.NewNamespaced[*appsv1alpha1.EphemeralJob](s.ResourceIndexer, namespace)}
 }
 
 // EphemeralJobNamespaceLister helps list and get EphemeralJobs.
@@ -63,36 +55,15 @@ func (s *ephemeralJobLister) EphemeralJobs(namespace string) EphemeralJobNamespa
 type EphemeralJobNamespaceLister interface {
 	// List lists all EphemeralJobs in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.EphemeralJob, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.EphemeralJob, err error)
 	// Get retrieves the EphemeralJob from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.EphemeralJob, error)
+	Get(name string) (*appsv1alpha1.EphemeralJob, error)
 	EphemeralJobNamespaceListerExpansion
 }
 
 // ephemeralJobNamespaceLister implements the EphemeralJobNamespaceLister
 // interface.
 type ephemeralJobNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all EphemeralJobs in the indexer for a given namespace.
-func (s ephemeralJobNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.EphemeralJob, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.EphemeralJob))
-	})
-	return ret, err
-}
-
-// Get retrieves the EphemeralJob from the indexer for a given namespace and name.
-func (s ephemeralJobNamespaceLister) Get(name string) (*v1alpha1.EphemeralJob, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("ephemeraljob"), name)
-	}
-	return obj.(*v1alpha1.EphemeralJob), nil
+	listers.ResourceIndexer[*appsv1alpha1.EphemeralJob]
 }

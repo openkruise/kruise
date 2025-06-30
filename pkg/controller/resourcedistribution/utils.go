@@ -105,7 +105,7 @@ func matchViaTargets(namespace *corev1.Namespace, distributor *appsv1alpha1.Reso
 }
 
 // addMatchedResourceDistributionToWorkQueue adds rds into q
-func addMatchedResourceDistributionToWorkQueue(q workqueue.RateLimitingInterface, rds []*appsv1alpha1.ResourceDistribution) {
+func addMatchedResourceDistributionToWorkQueue(q workqueue.TypedRateLimitingInterface[reconcile.Request], rds []*appsv1alpha1.ResourceDistribution) {
 	for _, rd := range rds {
 		q.Add(reconcile.Request{
 			NamespacedName: types.NamespacedName{

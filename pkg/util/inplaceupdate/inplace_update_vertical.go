@@ -17,6 +17,7 @@ limitations under the License.
 package inplaceupdate
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -42,6 +43,8 @@ type VerticalUpdateInterface interface {
 	UpdateResource(pod *v1.Pod, expectedResources map[string]*v1.ResourceRequirements)
 	// IsUpdateCompleted To determine whether the pod has been successfully vertical updated
 	IsUpdateCompleted(pod *v1.Pod) (bool, error)
+	// GenerateResourcePatch generate the resource patch for the pod
+	GenerateResourcePatch(pod *v1.Pod, expectedResources map[string]*v1.ResourceRequirements) []byte
 }
 
 var verticalUpdateImpl VerticalUpdateInterface = nil
@@ -170,6 +173,50 @@ func (v *NativeVerticalUpdate) UpdateResource(pod *v1.Pod, expectedResources map
 		v.updateContainerResource(c, newResource)
 	}
 	return
+}
+
+func (v *NativeVerticalUpdate) GenerateResourcePatch(pod *v1.Pod, expectedResources map[string]*v1.ResourceRequirements) []byte {
+	var patchContainers []string
+	for i := range pod.Spec.Containers {
+		c := &pod.Spec.Containers[i]
+		newResource, resourceExists := expectedResources[c.Name]
+		if !resourceExists {
+			continue
+		}
+		resources := v1.ResourceRequirements{}
+		for key, quantity := range newResource.Limits {
+			if !v.CanResourcesResizeInPlace(string(key)) {
+				continue
+			}
+			if resources.Limits == nil {
+				resources.Limits = make(v1.ResourceList)
+			}
+			if pod.Spec.Containers[i].Resources.Limits != nil && pod.Spec.Containers[i].Resources.Limits[key].Equal(quantity) {
+				continue
+			}
+			resources.Limits[key] = quantity
+		}
+		for key, quantity := range newResource.Requests {
+			if !v.CanResourcesResizeInPlace(string(key)) {
+				continue
+			}
+			if resources.Requests == nil {
+				resources.Requests = make(v1.ResourceList)
+			}
+			if pod.Spec.Containers[i].Resources.Requests != nil && pod.Spec.Containers[i].Resources.Requests[key].Equal(quantity) {
+				continue
+			}
+			resources.Requests[key] = quantity
+		}
+		if len(resources.Limits) > 0 || len(resources.Requests) > 0 {
+			resourcePatch, _ := json.Marshal(resources)
+			patchContainers = append(patchContainers, fmt.Sprintf(`{"name":"%s","resources":%s}`, c.Name, string(resourcePatch)))
+		}
+	}
+	if len(patchContainers) == 0 {
+		return nil
+	}
+	return []byte(fmt.Sprintf(`{"spec":{"containers":[%s]}}`, strings.Join(patchContainers, ",")))
 }
 
 func (v *NativeVerticalUpdate) IsUpdateCompleted(pod *v1.Pod) (bool, error) {

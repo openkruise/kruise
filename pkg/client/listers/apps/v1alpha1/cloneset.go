@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // CloneSetLister helps list CloneSets.
@@ -29,7 +29,7 @@ import (
 type CloneSetLister interface {
 	// List lists all CloneSets in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.CloneSet, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.CloneSet, err error)
 	// CloneSets returns an object that can list and get CloneSets.
 	CloneSets(namespace string) CloneSetNamespaceLister
 	CloneSetListerExpansion
@@ -37,25 +37,17 @@ type CloneSetLister interface {
 
 // cloneSetLister implements the CloneSetLister interface.
 type cloneSetLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*appsv1alpha1.CloneSet]
 }
 
 // NewCloneSetLister returns a new CloneSetLister.
 func NewCloneSetLister(indexer cache.Indexer) CloneSetLister {
-	return &cloneSetLister{indexer: indexer}
-}
-
-// List lists all CloneSets in the indexer.
-func (s *cloneSetLister) List(selector labels.Selector) (ret []*v1alpha1.CloneSet, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.CloneSet))
-	})
-	return ret, err
+	return &cloneSetLister{listers.New[*appsv1alpha1.CloneSet](indexer, appsv1alpha1.Resource("cloneset"))}
 }
 
 // CloneSets returns an object that can list and get CloneSets.
 func (s *cloneSetLister) CloneSets(namespace string) CloneSetNamespaceLister {
-	return cloneSetNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return cloneSetNamespaceLister{listers.NewNamespaced[*appsv1alpha1.CloneSet](s.ResourceIndexer, namespace)}
 }
 
 // CloneSetNamespaceLister helps list and get CloneSets.
@@ -63,36 +55,15 @@ func (s *cloneSetLister) CloneSets(namespace string) CloneSetNamespaceLister {
 type CloneSetNamespaceLister interface {
 	// List lists all CloneSets in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.CloneSet, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.CloneSet, err error)
 	// Get retrieves the CloneSet from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.CloneSet, error)
+	Get(name string) (*appsv1alpha1.CloneSet, error)
 	CloneSetNamespaceListerExpansion
 }
 
 // cloneSetNamespaceLister implements the CloneSetNamespaceLister
 // interface.
 type cloneSetNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all CloneSets in the indexer for a given namespace.
-func (s cloneSetNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.CloneSet, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.CloneSet))
-	})
-	return ret, err
-}
-
-// Get retrieves the CloneSet from the indexer for a given namespace and name.
-func (s cloneSetNamespaceLister) Get(name string) (*v1alpha1.CloneSet, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("cloneset"), name)
-	}
-	return obj.(*v1alpha1.CloneSet), nil
+	listers.ResourceIndexer[*appsv1alpha1.CloneSet]
 }

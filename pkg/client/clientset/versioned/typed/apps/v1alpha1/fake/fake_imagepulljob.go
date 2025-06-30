@@ -18,123 +18,34 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeImagePullJobs implements ImagePullJobInterface
-type FakeImagePullJobs struct {
+// fakeImagePullJobs implements ImagePullJobInterface
+type fakeImagePullJobs struct {
+	*gentype.FakeClientWithList[*v1alpha1.ImagePullJob, *v1alpha1.ImagePullJobList]
 	Fake *FakeAppsV1alpha1
-	ns   string
 }
 
-var imagepulljobsResource = v1alpha1.SchemeGroupVersion.WithResource("imagepulljobs")
-
-var imagepulljobsKind = v1alpha1.SchemeGroupVersion.WithKind("ImagePullJob")
-
-// Get takes name of the imagePullJob, and returns the corresponding imagePullJob object, and an error if there is any.
-func (c *FakeImagePullJobs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ImagePullJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(imagepulljobsResource, c.ns, name), &v1alpha1.ImagePullJob{})
-
-	if obj == nil {
-		return nil, err
+func newFakeImagePullJobs(fake *FakeAppsV1alpha1, namespace string) appsv1alpha1.ImagePullJobInterface {
+	return &fakeImagePullJobs{
+		gentype.NewFakeClientWithList[*v1alpha1.ImagePullJob, *v1alpha1.ImagePullJobList](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("imagepulljobs"),
+			v1alpha1.SchemeGroupVersion.WithKind("ImagePullJob"),
+			func() *v1alpha1.ImagePullJob { return &v1alpha1.ImagePullJob{} },
+			func() *v1alpha1.ImagePullJobList { return &v1alpha1.ImagePullJobList{} },
+			func(dst, src *v1alpha1.ImagePullJobList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.ImagePullJobList) []*v1alpha1.ImagePullJob {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.ImagePullJobList, items []*v1alpha1.ImagePullJob) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.ImagePullJob), err
-}
-
-// List takes label and field selectors, and returns the list of ImagePullJobs that match those selectors.
-func (c *FakeImagePullJobs) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ImagePullJobList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(imagepulljobsResource, imagepulljobsKind, c.ns, opts), &v1alpha1.ImagePullJobList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.ImagePullJobList{ListMeta: obj.(*v1alpha1.ImagePullJobList).ListMeta}
-	for _, item := range obj.(*v1alpha1.ImagePullJobList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested imagePullJobs.
-func (c *FakeImagePullJobs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(imagepulljobsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a imagePullJob and creates it.  Returns the server's representation of the imagePullJob, and an error, if there is any.
-func (c *FakeImagePullJobs) Create(ctx context.Context, imagePullJob *v1alpha1.ImagePullJob, opts v1.CreateOptions) (result *v1alpha1.ImagePullJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(imagepulljobsResource, c.ns, imagePullJob), &v1alpha1.ImagePullJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ImagePullJob), err
-}
-
-// Update takes the representation of a imagePullJob and updates it. Returns the server's representation of the imagePullJob, and an error, if there is any.
-func (c *FakeImagePullJobs) Update(ctx context.Context, imagePullJob *v1alpha1.ImagePullJob, opts v1.UpdateOptions) (result *v1alpha1.ImagePullJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(imagepulljobsResource, c.ns, imagePullJob), &v1alpha1.ImagePullJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ImagePullJob), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeImagePullJobs) UpdateStatus(ctx context.Context, imagePullJob *v1alpha1.ImagePullJob, opts v1.UpdateOptions) (*v1alpha1.ImagePullJob, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(imagepulljobsResource, "status", c.ns, imagePullJob), &v1alpha1.ImagePullJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ImagePullJob), err
-}
-
-// Delete takes name of the imagePullJob and deletes it. Returns an error if one occurs.
-func (c *FakeImagePullJobs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(imagepulljobsResource, c.ns, name, opts), &v1alpha1.ImagePullJob{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeImagePullJobs) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(imagepulljobsResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.ImagePullJobList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched imagePullJob.
-func (c *FakeImagePullJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ImagePullJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(imagepulljobsResource, c.ns, name, pt, data, subresources...), &v1alpha1.ImagePullJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.ImagePullJob), err
 }

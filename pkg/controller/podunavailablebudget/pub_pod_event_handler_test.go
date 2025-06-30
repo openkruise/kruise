@@ -22,13 +22,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/workqueue"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-
-	"github.com/openkruise/kruise/pkg/control/pubcontrol"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func TestPodEventHandler(t *testing.T) {
@@ -41,7 +41,9 @@ func TestPodEventHandler(t *testing.T) {
 	}
 
 	// create
-	createQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	createQ := workqueue.NewTypedRateLimitingQueue(
+		workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+	)
 	createEvt := event.TypedCreateEvent[*corev1.Pod]{
 		Object: podDemo.DeepCopy(),
 	}
@@ -56,7 +58,9 @@ func TestPodEventHandler(t *testing.T) {
 	newPod.ResourceVersion = fmt.Sprintf("%d", time.Now().Unix())
 	readyCondition := podutil.GetPodReadyCondition(newPod.Status)
 	readyCondition.Status = corev1.ConditionFalse
-	updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	updateQ := workqueue.NewTypedRateLimitingQueue(
+		workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+	)
 	updateEvent := event.TypedUpdateEvent[*corev1.Pod]{
 		ObjectOld: podDemo,
 		ObjectNew: newPod,
@@ -72,7 +76,9 @@ func TestPodEventHandler(t *testing.T) {
 	newPod = podDemo.DeepCopy()
 	newPod.ResourceVersion = fmt.Sprintf("%d", time.Now().Unix())
 	newPod.Spec.Containers[0].Image = "nginx:latest"
-	updateQ = workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	updateQ = workqueue.NewTypedRateLimitingQueue(
+		workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+	)
 	updateEvent = event.TypedUpdateEvent[*corev1.Pod]{
 		ObjectOld: podDemo,
 		ObjectNew: newPod,

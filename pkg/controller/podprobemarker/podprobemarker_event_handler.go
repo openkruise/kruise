@@ -39,25 +39,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-var _ handler.TypedEventHandler[*appsalphav1.PodProbeMarker] = &enqueueRequestForPodProbeMarker{}
+var _ handler.TypedEventHandler[*appsalphav1.PodProbeMarker, reconcile.Request] = &enqueueRequestForPodProbeMarker{}
 
 type enqueueRequestForPodProbeMarker struct{}
 
-func (p *enqueueRequestForPodProbeMarker) Create(ctx context.Context, evt event.TypedCreateEvent[*appsalphav1.PodProbeMarker], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPodProbeMarker) Create(ctx context.Context, evt event.TypedCreateEvent[*appsalphav1.PodProbeMarker], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	p.queue(q, evt.Object)
 }
 
-func (p *enqueueRequestForPodProbeMarker) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsalphav1.PodProbeMarker], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPodProbeMarker) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsalphav1.PodProbeMarker], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *enqueueRequestForPodProbeMarker) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsalphav1.PodProbeMarker], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPodProbeMarker) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsalphav1.PodProbeMarker], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *enqueueRequestForPodProbeMarker) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsalphav1.PodProbeMarker], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPodProbeMarker) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsalphav1.PodProbeMarker], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	p.queue(q, evt.ObjectNew)
 }
 
-func (p *enqueueRequestForPodProbeMarker) queue(q workqueue.RateLimitingInterface, obj runtime.Object) {
+func (p *enqueueRequestForPodProbeMarker) queue(q workqueue.TypedRateLimitingInterface[reconcile.Request], obj runtime.Object) {
 	ppm, ok := obj.(*appsalphav1.PodProbeMarker)
 	if !ok {
 		return
@@ -70,22 +70,22 @@ func (p *enqueueRequestForPodProbeMarker) queue(q workqueue.RateLimitingInterfac
 	})
 }
 
-var _ handler.TypedEventHandler[*corev1.Pod] = &enqueueRequestForPod{}
+var _ handler.TypedEventHandler[*corev1.Pod, reconcile.Request] = &enqueueRequestForPod{}
 
 type enqueueRequestForPod struct {
 	reader client.Reader
 }
 
-func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	newObj := evt.ObjectNew
 	oldObj := evt.ObjectOld
 	oldInitialCondition := util.GetCondition(oldObj, corev1.PodInitialized)

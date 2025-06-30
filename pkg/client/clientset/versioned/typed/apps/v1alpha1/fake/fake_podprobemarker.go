@@ -18,123 +18,34 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakePodProbeMarkers implements PodProbeMarkerInterface
-type FakePodProbeMarkers struct {
+// fakePodProbeMarkers implements PodProbeMarkerInterface
+type fakePodProbeMarkers struct {
+	*gentype.FakeClientWithList[*v1alpha1.PodProbeMarker, *v1alpha1.PodProbeMarkerList]
 	Fake *FakeAppsV1alpha1
-	ns   string
 }
 
-var podprobemarkersResource = v1alpha1.SchemeGroupVersion.WithResource("podprobemarkers")
-
-var podprobemarkersKind = v1alpha1.SchemeGroupVersion.WithKind("PodProbeMarker")
-
-// Get takes name of the podProbeMarker, and returns the corresponding podProbeMarker object, and an error if there is any.
-func (c *FakePodProbeMarkers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.PodProbeMarker, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(podprobemarkersResource, c.ns, name), &v1alpha1.PodProbeMarker{})
-
-	if obj == nil {
-		return nil, err
+func newFakePodProbeMarkers(fake *FakeAppsV1alpha1, namespace string) appsv1alpha1.PodProbeMarkerInterface {
+	return &fakePodProbeMarkers{
+		gentype.NewFakeClientWithList[*v1alpha1.PodProbeMarker, *v1alpha1.PodProbeMarkerList](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("podprobemarkers"),
+			v1alpha1.SchemeGroupVersion.WithKind("PodProbeMarker"),
+			func() *v1alpha1.PodProbeMarker { return &v1alpha1.PodProbeMarker{} },
+			func() *v1alpha1.PodProbeMarkerList { return &v1alpha1.PodProbeMarkerList{} },
+			func(dst, src *v1alpha1.PodProbeMarkerList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.PodProbeMarkerList) []*v1alpha1.PodProbeMarker {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.PodProbeMarkerList, items []*v1alpha1.PodProbeMarker) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.PodProbeMarker), err
-}
-
-// List takes label and field selectors, and returns the list of PodProbeMarkers that match those selectors.
-func (c *FakePodProbeMarkers) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.PodProbeMarkerList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podprobemarkersResource, podprobemarkersKind, c.ns, opts), &v1alpha1.PodProbeMarkerList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.PodProbeMarkerList{ListMeta: obj.(*v1alpha1.PodProbeMarkerList).ListMeta}
-	for _, item := range obj.(*v1alpha1.PodProbeMarkerList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested podProbeMarkers.
-func (c *FakePodProbeMarkers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(podprobemarkersResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a podProbeMarker and creates it.  Returns the server's representation of the podProbeMarker, and an error, if there is any.
-func (c *FakePodProbeMarkers) Create(ctx context.Context, podProbeMarker *v1alpha1.PodProbeMarker, opts v1.CreateOptions) (result *v1alpha1.PodProbeMarker, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(podprobemarkersResource, c.ns, podProbeMarker), &v1alpha1.PodProbeMarker{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.PodProbeMarker), err
-}
-
-// Update takes the representation of a podProbeMarker and updates it. Returns the server's representation of the podProbeMarker, and an error, if there is any.
-func (c *FakePodProbeMarkers) Update(ctx context.Context, podProbeMarker *v1alpha1.PodProbeMarker, opts v1.UpdateOptions) (result *v1alpha1.PodProbeMarker, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(podprobemarkersResource, c.ns, podProbeMarker), &v1alpha1.PodProbeMarker{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.PodProbeMarker), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePodProbeMarkers) UpdateStatus(ctx context.Context, podProbeMarker *v1alpha1.PodProbeMarker, opts v1.UpdateOptions) (*v1alpha1.PodProbeMarker, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(podprobemarkersResource, "status", c.ns, podProbeMarker), &v1alpha1.PodProbeMarker{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.PodProbeMarker), err
-}
-
-// Delete takes name of the podProbeMarker and deletes it. Returns an error if one occurs.
-func (c *FakePodProbeMarkers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(podprobemarkersResource, c.ns, name, opts), &v1alpha1.PodProbeMarker{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakePodProbeMarkers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(podprobemarkersResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.PodProbeMarkerList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched podProbeMarker.
-func (c *FakePodProbeMarkers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PodProbeMarker, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podprobemarkersResource, c.ns, name, pt, data, subresources...), &v1alpha1.PodProbeMarker{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.PodProbeMarker), err
 }
