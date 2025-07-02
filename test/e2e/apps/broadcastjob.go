@@ -162,13 +162,8 @@ var _ = SIGDescribe("BroadcastJob", func() {
 			fakeNode, err := nodeTester.CreateFakeNode(randStr)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			// cleanup both node and job
-			var job *appsv1alpha1.BroadcastJob
-			defer func() {
-				_ = nodeTester.DeleteFakeNode(fakeNode.Name)
-			}()
-
 			// Cordon the fake node
+			ginkgo.By("Cordoning fake node " + fakeNode.Name)
 			_, err = c.CoreV1().Nodes().Patch(context.TODO(), fakeNode.Name,
 				types.StrategicMergePatchType,
 				[]byte(`{"spec":{"unschedulable":true}}`),
@@ -176,16 +171,15 @@ var _ = SIGDescribe("BroadcastJob", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			// Create BroadcastJob job-" + randStr
-			job = &appsv1alpha1.BroadcastJob{
+			job := &appsv1alpha1.BroadcastJob{
 				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-" + randStr},
 				Spec: appsv1alpha1.BroadcastJobSpec{
 					Template: v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
 							Tolerations: []v1.Toleration{{Key: framework.E2eFakeKey, Operator: v1.TolerationOpEqual, Value: randStr, Effect: v1.TaintEffectNoSchedule}},
 							Containers: []v1.Container{{
-								Name:  "box",
-								Image: BusyboxImage,
-								// keep the pod alive so we can observe it re-schedule
+								Name:    "box",
+								Image:   BusyboxImage,
 								Command: []string{"/bin/sh", "-c", "sleep 30"},
 							}},
 							RestartPolicy: v1.RestartPolicyNever,
@@ -197,39 +191,49 @@ var _ = SIGDescribe("BroadcastJob", func() {
 
 			nodes, err := nodeTester.ListRealNodesWithFake(job.Spec.Template.Spec.Tolerations)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			totalNodes := int32(len(nodes))
 			parallelism := intstr.FromInt(len(nodes))
 			job.Spec.Parallelism = &parallelism
 
+			ginkgo.By("Creating BroadcastJob " + job.Name)
 			job, err = tester.CreateBroadcastJob(job)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			ginkgo.By("Verify desired count equals total nodes")
+			ginkgo.By("Verify desired count equals total nodes - 1 (due to cordoned node)")
 			gomega.Eventually(func() int32 {
 				job, err = tester.GetBroadcastJob(job.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return job.Status.Desired
-			}, 10*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
+			}, 30*time.Second, time.Second).Should(gomega.Equal(totalNodes - 1))
 
-			ginkgo.By("Verify active pods = total nodes - 1 (missing cordoned node)")
+			ginkgo.By("Verify active pods equals total nodes - 1 (as pod is not created on cordoned node)")
 			gomega.Eventually(func() int32 {
 				job, err = tester.GetBroadcastJob(job.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return job.Status.Active
-			}, 30*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes) - 1)))
+			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(totalNodes - 1))
 
 			// Uncordon the fake node
+			ginkgo.By("Uncordoning fake node " + fakeNode.Name)
 			_, err = c.CoreV1().Nodes().Patch(context.TODO(), fakeNode.Name,
 				types.StrategicMergePatchType,
 				[]byte(`{"spec":{"unschedulable":false}}`),
 				metav1.PatchOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			ginkgo.By("Verify active pods = total nodes (missing pod now created)")
+			ginkgo.By("Verify desired count becomes total nodes after uncordon")
+			gomega.Eventually(func() int32 {
+				job, err = tester.GetBroadcastJob(job.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return job.Status.Desired
+			}, 30*time.Second, time.Second).Should(gomega.Equal(totalNodes))
+
+			ginkgo.By("Verify active pods becomes total nodes after uncordon (missing pod now created)")
 			gomega.Eventually(func() int32 {
 				job, err = tester.GetBroadcastJob(job.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return job.Status.Active
-			}, 60*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
+			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(totalNodes))
 		})
 	})
 })
