@@ -48,7 +48,7 @@ func init() {
 	flag.StringVar(&protectionLogPath, "protection-log-path", "/log", "protection log path, for example pub, delete_protection")
 }
 func InitProtectionLogger() error {
-	err := os.MkdirAll(protectionLogPath, 0644)
+	err := os.MkdirAll(protectionLogPath, 0755)
 	if err != nil {
 		return fmt.Errorf("MkdirAll(%s) failed: %s", protectionLogPath, err.Error())
 	}
