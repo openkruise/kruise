@@ -48,7 +48,7 @@ func TestParseRegistry(t *testing.T) {
 		{name: "image with docker.io", imageName: "docker.io/library/ubuntu", want: "docker.io"},
 		{name: "image with gcr.io", imageName: "gcr.io/project/image", want: "gcr.io"},
 		{name: "image with registry and port", imageName: "myregistry.com:5000/user/image", want: "myregistry.com:5000"},
-		{name: "image without registry", imageName: "ubuntu", want: "ubuntu"},
+		{name: "image without registry", imageName: "ubuntu", want: "docker.io"},
 		{name: "empty image name", imageName: "", want: ""},
 	}
 
