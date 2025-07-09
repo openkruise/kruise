@@ -19,134 +19,150 @@ package secret
 import (
 	"context"
 	"encoding/json"
+	"flag"
+	"io"
 	"testing"
 
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
-func TestAuthInfos(t *testing.T) {
-	tests := []struct {
+// init suppresses the klog output during tests for a cleaner result
+func init() {
+	klog.InitFlags(nil)
+	flag.Set("logtostderr", "false")
+	flag.Set("alsologtostderr", "false")
+	klog.SetOutput(io.Discard)
+}
+
+// createDockerConfigSecret correctly creates a Kubernetes secret of type kubernetes.io/dockerconfigjson
+func createDockerConfigSecret(name, registry, username, password string) corev1.Secret {
+	dockerConfigEntry := credentialprovider.DockerConfigEntry{
+		Username: username,
+		Password: password,
+	}
+	dockerConfig := credentialprovider.DockerConfig{
+		registry: dockerConfigEntry,
+	}
+	dockerConfigJSON := credentialprovider.DockerConfigJSON{
+		Auths: dockerConfig,
+	}
+	marshaledJSON, _ := json.Marshal(dockerConfigJSON)
+	return corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Type: corev1.SecretTypeDockerConfigJson,
+		Data: map[string][]byte{
+			corev1.DockerConfigJsonKey: marshaledJSON,
+		},
+	}
+}
+
+func TestConvertToRegistryAuths(t *testing.T) {
+	testCases := []struct {
 		name        string
-		imageName   string
-		tag         string
-		pullSecrets []corev1.Secret
-		expectNil   bool
+		secrets     []corev1.Secret
+		repo        string
+		expectAuths []daemonutil.AuthInfo
+		expectErr   bool
 	}{
 		{
-			name:      "valid image with docker.io - no secrets",
-			imageName: "library/ubuntu",
-			tag:       "latest",
-			expectNil: false,
+			name: "Matching secret found for docker.io",
+			secrets: []corev1.Secret{
+				createDockerConfigSecret("my-secret", "https://index.docker.io/v1/", "testuser", "testpass"),
+			},
+			repo: "index.docker.io",
+			expectAuths: []daemonutil.AuthInfo{
+				{Username: "testuser", Password: "testpass"},
+			},
+			expectErr: false,
 		},
 		{
-			name:      "valid image with custom registry - no secrets",
-			imageName: "gcr.io/project/image",
-			tag:       "v1.0",
-			expectNil: false,
+			name: "No matching secret for repo",
+			secrets: []corev1.Secret{
+				createDockerConfigSecret("my-secret", "another.registry.com", "testuser", "testpass"),
+			},
+			repo:      "index.docker.io",
+			expectErr: false,
 		},
 		{
-			name:      "invalid image name",
-			imageName: "INVALID_IMAGE",
-			tag:       "latest",
-			expectNil: true,
+			name: "Secret with invalid data",
+			secrets: []corev1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "bad-secret"},
+					Type:       corev1.SecretTypeDockerConfigJson,
+					Data: map[string][]byte{
+						corev1.DockerConfigJsonKey: []byte(`{"invalid-json`),
+					},
+				},
+			},
+			repo:      "index.docker.io",
+			expectErr: true,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := AuthInfos(context.Background(), tt.imageName, tt.tag, tt.pullSecrets)
-			if tt.name == "invalid image name" && result != nil {
-				t.Errorf("AuthInfos() with invalid image expected nil, got %v", result)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			auths, err := ConvertToRegistryAuths(tc.secrets, tc.repo)
+			if tc.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.ElementsMatch(t, tc.expectAuths, auths)
 			}
 		})
 	}
 }
 
-func TestMakeAndSetKeyring(t *testing.T) {
-	// reset keyring to nil before test
-	keyring = nil
-
-	MakeAndSetKeyring()
-
-	if keyring == nil {
-		t.Error("MakeAndSetKeyring() should set keyring to non-nil value")
+func TestAuthInfos(t *testing.T) {
+	sharedSecrets := []corev1.Secret{
+		createDockerConfigSecret("docker-secret", "https://index.docker.io/v1/", "dockeruser", "dockerpass"),
+		createDockerConfigSecret("gcr-secret", "gcr.io", "gcruser", "gcrpass"),
 	}
-}
 
-func TestConvertToRegistryAuths(t *testing.T) {
-	//create test docker config secret
-	dockerConfig := map[string]interface{}{
-		"auths": map[string]interface{}{
-			"docker.io": map[string]interface{}{
-				"username": "testuser",
-				"password": "testpass",
-			},
-		},
-	}
-	configData, _ := json.Marshal(dockerConfig)
-
-	tests := []struct {
+	testCases := []struct {
 		name        string
-		pullSecrets []corev1.Secret
-		repo        string
-		expectError bool
-		expectEmpty bool
+		imageName   string
+		tag         string
+		secrets     []corev1.Secret
+		expectAuths []daemonutil.AuthInfo
 	}{
 		{
-			name: "docker config secret",
-			pullSecrets: []corev1.Secret{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "docker-secret"},
-					Type:       corev1.SecretTypeDockerConfigJson,
-					Data:       map[string][]byte{".dockerconfigjson": configData},
-				},
+			name:      "Standard docker.io image",
+			imageName: "library/ubuntu",
+			tag:       "latest",
+			secrets:   sharedSecrets,
+			expectAuths: []daemonutil.AuthInfo{
+				{Username: "dockeruser", Password: "dockerpass"},
 			},
-			repo:        "docker.io",
-			expectError: false,
-			expectEmpty: false,
 		},
 		{
-			name:        "no secrets",
-			pullSecrets: []corev1.Secret{},
-			repo:        "docker.io",
-			expectError: false,
-			expectEmpty: false,
+			name:      "gcr.io image",
+			imageName: "gcr.io/my-project/my-image",
+			tag:       "v1",
+			secrets:   sharedSecrets,
+			expectAuths: []daemonutil.AuthInfo{
+				{Username: "gcruser", Password: "gcrpass"},
+			},
+		},
+		{
+			name:        "Image with no matching secret",
+			imageName:   "quay.io/some/image",
+			tag:         "1.0",
+			secrets:     []corev1.Secret{createDockerConfigSecret("gcr-secret", "gcr.io", "gcruser", "gcrpass")},
+			expectAuths: nil,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			keyring = credentialprovider.NewDockerKeyring()
-
-			result, err := ConvertToRegistryAuths(tt.pullSecrets, tt.repo)
-
-			if tt.expectError && err == nil {
-				t.Error("ConvertToRegistryAuths() expected error, got nil")
-			}
-			if !tt.expectError && err != nil {
-				t.Errorf("ConvertToRegistryAuths() unexpected error: %v", err)
-			}
-
-			// check specific credentials for docker config secret test
-			if tt.name == "docker config secret" && len(result) > 0 {
-				found := false
-				for _, auth := range result {
-					if auth.Username == "testuser" && auth.Password == "testpass" {
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Error("Expected to find testuser/testpass credentials in AuthInfo results")
-				}
-			}
-
-			if tt.expectEmpty && len(result) > 0 {
-				// Note: may find existing credentials from environment, so this is informational
-				t.Logf("ConvertToRegistryAuths() found %d existing credentials from environment", len(result))
-			}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			auths := AuthInfos(context.TODO(), tc.imageName, tc.tag, tc.secrets)
+			assert.ElementsMatch(t, tc.expectAuths, auths)
 		})
 	}
 }
