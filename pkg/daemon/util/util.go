@@ -35,9 +35,14 @@ func NodeName() (string, error) {
 
 // ParseRegistry return the registry of image
 func ParseRegistry(imageName string) string {
+	if imageName == "" {
+		return ""
+	}
+
 	idx := strings.Index(imageName, "/")
 	if idx == -1 {
-		return imageName
+		// No registry specified, return default docker.io
+		return "docker.io"
 	}
 	return imageName[0:idx]
 }
