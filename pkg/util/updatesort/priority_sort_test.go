@@ -17,8 +17,10 @@ limitations under the License.
 package updatesort
 
 import (
+	"reflect"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
@@ -184,5 +186,173 @@ func TestCompare(t *testing.T) {
 		if got != tc.expected {
 			t.Fatalf("case #%d expected %v, got %v", i, tc.expected, got)
 		}
+	}
+}
+
+func Test_prioritySort_Sort(t *testing.T) {
+	type fields struct {
+		strategy *appspub.UpdatePriorityStrategy
+	}
+	type args struct {
+		pods    []*v1.Pod
+		indexes []int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{
+			name: "empty priority strategy",
+			fields: fields{
+				strategy: &appspub.UpdatePriorityStrategy{},
+			},
+			args: args{
+				pods: []*v1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pod-0",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pod-1",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pod-2",
+						},
+					},
+				},
+				indexes: []int{0, 1, 2},
+			},
+			want: []int{0, 1, 2},
+		},
+		{
+			name: "priority strategy, keep original order if not match any priority rule",
+			fields: fields{
+				strategy: &appspub.UpdatePriorityStrategy{
+					WeightPriority: []appspub.UpdatePriorityWeightTerm{
+						{
+							Weight: 100,
+							MatchSelector: metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"foo": "bar",
+								},
+							},
+						},
+						{
+							Weight: 90,
+							MatchSelector: metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"hello": "world",
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				pods: []*v1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pod-0",
+							Labels: map[string]string{
+								"hello": "world",
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pod-1",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pod-2",
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pod-3",
+						},
+					},
+				},
+				indexes: []int{0, 1, 2, 3},
+			},
+			want: []int{2, 0, 1, 3},
+		},
+		{
+			name: "priority strategy, no Pods matched any priority rule, keep original order",
+			fields: fields{
+				strategy: &appspub.UpdatePriorityStrategy{
+					WeightPriority: []appspub.UpdatePriorityWeightTerm{
+						{
+							Weight: 100,
+							MatchSelector: metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"not": "match",
+								},
+							},
+						},
+						{
+							Weight: 90,
+							MatchSelector: metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"not1": "match1",
+								},
+							},
+						},
+					},
+				},
+			},
+			args: args{
+				pods: []*v1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pod-0",
+							Labels: map[string]string{
+								"hello": "world",
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pod-1",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pod-2",
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pod-3",
+						},
+					},
+				},
+				indexes: []int{0, 1, 2, 3},
+			},
+			want: []int{0, 1, 2, 3},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ps := &prioritySort{
+				strategy: tt.fields.strategy,
+			}
+			if got := ps.Sort(tt.args.pods, tt.args.indexes); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("prioritySort.Sort() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
