@@ -11,7 +11,6 @@ import (
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -142,7 +141,7 @@ func (h *CloneSetCreateUpdateHandler) validateUpdateStrategy(strategy *appsv1alp
 	partition, err := util.GetScaledValueFromIntOrPercent(strategy.Partition, replicas, true)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("partition"), strategy.Partition.String(),
-			fmt.Sprintf("failed getValueFromIntOrPercent for partition: %v", err)))
+			fmt.Sprintf("failed GetScaledValueFromIntOrPercent for partition: %v", err)))
 	}
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(partition), fldPath.Child("partition"))...)
 
@@ -156,19 +155,19 @@ func (h *CloneSetCreateUpdateHandler) validateUpdateStrategy(strategy *appsv1alp
 
 	var maxUnavailable int
 	if strategy.MaxUnavailable != nil {
-		maxUnavailable, err = intstrutil.GetValueFromIntOrPercent(strategy.MaxUnavailable, replicas, true)
+		maxUnavailable, err = util.GetScaledValueFromIntOrPercent(strategy.MaxUnavailable, replicas, true)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxUnavailable"), strategy.MaxUnavailable.String(),
-				fmt.Sprintf("failed getValueFromIntOrPercent for maxUnavailable: %v", err)))
+				fmt.Sprintf("failed GetScaledValueFromIntOrPercent for maxUnavailable: %v", err)))
 		}
 	}
 
 	var maxSurge int
 	if strategy.MaxSurge != nil {
-		maxSurge, err = intstrutil.GetValueFromIntOrPercent(strategy.MaxSurge, replicas, true)
+		maxSurge, err = util.GetScaledValueFromIntOrPercent(strategy.MaxSurge, replicas, true)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), strategy.MaxSurge.String(),
-				fmt.Sprintf("failed getValueFromIntOrPercent for maxSurge: %v", err)))
+				fmt.Sprintf("failed GetScaledValueFromIntOrPercent for maxSurge: %v", err)))
 		}
 		if strategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType && maxSurge > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("maxSurge"), strategy.MaxSurge.String(),
