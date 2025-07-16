@@ -170,6 +170,38 @@ func TestGetActiveDeadlineSecondsForNever(t *testing.T) {
 			},
 			expected: 7200,
 		},
+		{
+			name: "timeout < 1800 but backoff*timeout > 1800",
+			getImageJob: func() *appsv1alpha1.ImagePullJob {
+				return &appsv1alpha1.ImagePullJob{
+					Spec: appsv1alpha1.ImagePullJobSpec{
+						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+							PullPolicy: &appsv1alpha1.PullPolicy{
+								TimeoutSeconds: ptr.To(int32(700)),
+								BackoffLimit:   ptr.To(int32(3)),
+							},
+						},
+					},
+				}
+			},
+			expected: 2100,
+		},
+		{
+			name: "timeout < 1800 and backoff*timeout < 1800",
+			getImageJob: func() *appsv1alpha1.ImagePullJob {
+				return &appsv1alpha1.ImagePullJob{
+					Spec: appsv1alpha1.ImagePullJobSpec{
+						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+							PullPolicy: &appsv1alpha1.PullPolicy{
+								TimeoutSeconds: ptr.To(int32(300)),
+								BackoffLimit:   ptr.To(int32(3)),
+							},
+						},
+					},
+				}
+			},
+			expected: 1800,
+		},
 	}
 
 	for _, cs := range cases {
