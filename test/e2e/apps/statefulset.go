@@ -919,149 +919,159 @@ var _ = SIGDescribe("AppStatefulSetStorage", func() {
 		})
 	})
 
-	ginkgo.Describe("Recreate Pod when modifying volumeClaimTemplate with OnPodRollingUpdate", func() {
-		const ssName = "statefulset"
-		var ss *appsv1beta1.StatefulSet
-		var sst *framework.StatefulSetTester
+	testRecreatePodWhenModifyingVCT := func(podUpdatePolicy appsv1beta1.PodUpdateStrategyType) func() {
+		return func() {
+			const ssName = "statefulset"
+			var ss *appsv1beta1.StatefulSet
+			var sst *framework.StatefulSetTester
 
-		ginkgo.BeforeEach(func() {
-			ss = framework.NewStatefulSet(ssName, ns, "headless", 2, []v1.VolumeMount{
-				{
-					Name:      "test-volume-1",
-					MountPath: "/test-volume-1",
-				},
-				{
-					Name:      "test-volume-2",
-					MountPath: "/test-volume-2",
-				},
-			}, []v1.VolumeMount{}, map[string]string{"app": "test"})
-			ss.Spec.VolumeClaimUpdateStrategy.Type = appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType
+			ginkgo.BeforeEach(func() {
+				ss = framework.NewStatefulSet(ssName, ns, "headless", 2, []v1.VolumeMount{
+					{
+						Name:      "test-volume-1",
+						MountPath: "/test-volume-1",
+					},
+					{
+						Name:      "test-volume-2",
+						MountPath: "/test-volume-2",
+					},
+				}, []v1.VolumeMount{}, map[string]string{"app": "test"})
+				ss.Spec.VolumeClaimUpdateStrategy.Type = appsv1beta1.OnPodRollingUpdateVolumeClaimUpdateStrategyType
+				ss.Spec.UpdateStrategy.RollingUpdate = &appsv1beta1.RollingUpdateStatefulSetStrategy{
+					PodUpdatePolicy: podUpdatePolicy,
+				}
+				if podUpdatePolicy == appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType {
+					ss.Spec.Template.Spec.ReadinessGates = append(ss.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appspub.InPlaceUpdateReady})
+				}
 
-			sst = framework.NewStatefulSetTester(c, kc)
-		})
+				sst = framework.NewStatefulSetTester(c, kc)
+			})
 
-		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.DumpDebugInfo(c, ns)
-			}
-			framework.Logf("Deleting all statefulset in ns %v", ns)
-			//framework.DeleteAllStatefulSets(c, kc, ns)
-		})
+			ginkgo.AfterEach(func() {
+				if ginkgo.CurrentGinkgoTestDescription().Failed {
+					framework.DumpDebugInfo(c, ns)
+				}
+				framework.Logf("Deleting all statefulset in ns %v", ns)
+				//framework.DeleteAllStatefulSets(c, kc, ns)
+			})
 
-		ginkgo.It("add volumeClaimTemplate", func() {
-			ctx := context.TODO()
+			ginkgo.It("add volumeClaimTemplate", func() {
+				ctx := context.TODO()
 
-			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			_, err := kc.AppsV1beta1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			waitForStatus(ctx, c, kc, ss)
-			sst.WaitForStatusReplicas(ss, 2)
-			sst.WaitForStatusReadyReplicas(ss, 2)
+				ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+				_, err := kc.AppsV1beta1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+				waitForStatus(ctx, c, kc, ss)
+				sst.WaitForStatusReplicas(ss, 2)
+				sst.WaitForStatusReadyReplicas(ss, 2)
 
-			// store number of volumes for each pod
-			// the number of volumes is not just equal to the number of VCTs as e.g. the kube-api-access volume is added.
-			pods := sst.GetPodList(ss)
-			volumeCountBefore := make([]int, len(pods.Items))
-			for i, pod := range pods.Items {
-				volumeCountBefore[i] = len(pod.Spec.Volumes)
-			}
+				// store number of volumes for each pod
+				// the number of volumes is not just equal to the number of VCTs as e.g. the kube-api-access volume is added.
+				pods := sst.GetPodList(ss)
+				volumeCountBefore := make([]int, len(pods.Items))
+				for i, pod := range pods.Items {
+					volumeCountBefore[i] = len(pod.Spec.Volumes)
+				}
 
-			ginkgo.By("adding another volumeClaimTemplate")
+				ginkgo.By("adding another volumeClaimTemplate")
 
-			ss, err = updateStatefulSetWithRetries(ctx, kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
-				update.Spec.VolumeClaimTemplates = append(ss.Spec.VolumeClaimTemplates, framework.NewStatefulSetPVC("test-volume-3"))
-				update.Spec.Template.Spec.Containers[0].VolumeMounts = append(update.Spec.Template.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
-					Name:      "test-volume-3",
-					MountPath: "/test-volume-3",
+				ss, err = updateStatefulSetWithRetries(ctx, kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
+					update.Spec.VolumeClaimTemplates = append(ss.Spec.VolumeClaimTemplates, framework.NewStatefulSetPVC("test-volume-3"))
+					update.Spec.Template.Spec.Containers[0].VolumeMounts = append(update.Spec.Template.Spec.Containers[0].VolumeMounts, v1.VolumeMount{
+						Name:      "test-volume-3",
+						MountPath: "/test-volume-3",
+					})
 				})
+				framework.ExpectNoError(err)
+				waitForStatus(ctx, c, kc, ss)
+				sst.WaitForRollingUpdate(ss)
+
+				// verify that pods have one volume more than before
+				pods = sst.GetPodList(ss)
+				for i, pod := range pods.Items {
+					framework.ExpectEqual(len(pod.Spec.Volumes), volumeCountBefore[i]+1)
+				}
+
 			})
-			framework.ExpectNoError(err)
-			waitForStatus(ctx, c, kc, ss)
-			sst.WaitForRollingUpdate(ss)
 
-			// verify that pods have one volume more than before
-			pods = sst.GetPodList(ss)
-			for i, pod := range pods.Items {
-				framework.ExpectEqual(len(pod.Spec.Volumes), volumeCountBefore[i]+1)
-			}
+			ginkgo.It("remove volumeClaimTemplate", func() {
+				ctx := context.TODO()
 
-		})
+				ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+				_, err := kc.AppsV1beta1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+				waitForStatus(ctx, c, kc, ss)
+				sst.WaitForStatusReplicas(ss, 2)
+				sst.WaitForStatusReadyReplicas(ss, 2)
 
-		ginkgo.It("remove volumeClaimTemplate", func() {
-			ctx := context.TODO()
+				// store number of volumes for each pod
+				// the number of volumes is not just equal to the number of VCTs as e.g. the kube-api-access volume is added.
+				pods := sst.GetPodList(ss)
+				volumeCountBefore := make([]int, len(pods.Items))
+				for i, pod := range pods.Items {
+					volumeCountBefore[i] = len(pod.Spec.Volumes)
+				}
 
-			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			_, err := kc.AppsV1beta1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			waitForStatus(ctx, c, kc, ss)
-			sst.WaitForStatusReplicas(ss, 2)
-			sst.WaitForStatusReadyReplicas(ss, 2)
+				ginkgo.By("remove one volumeClaimTemplate")
 
-			// store number of volumes for each pod
-			// the number of volumes is not just equal to the number of VCTs as e.g. the kube-api-access volume is added.
-			pods := sst.GetPodList(ss)
-			volumeCountBefore := make([]int, len(pods.Items))
-			for i, pod := range pods.Items {
-				volumeCountBefore[i] = len(pod.Spec.Volumes)
-			}
+				ss, err = updateStatefulSetWithRetries(ctx, kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
+					update.Spec.VolumeClaimTemplates = update.Spec.VolumeClaimTemplates[:1]
+					update.Spec.Template.Spec.Containers[0].VolumeMounts = update.Spec.Template.Spec.Containers[0].VolumeMounts[:1]
+				})
+				framework.ExpectNoError(err)
+				waitForStatus(ctx, c, kc, ss)
+				sst.WaitForRollingUpdate(ss)
 
-			ginkgo.By("remove one volumeClaimTemplate")
-
-			ss, err = updateStatefulSetWithRetries(ctx, kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
-				update.Spec.VolumeClaimTemplates = update.Spec.VolumeClaimTemplates[:1]
-				update.Spec.Template.Spec.Containers[0].VolumeMounts = update.Spec.Template.Spec.Containers[0].VolumeMounts[:1]
-			})
-			framework.ExpectNoError(err)
-			waitForStatus(ctx, c, kc, ss)
-			sst.WaitForRollingUpdate(ss)
-
-			// verify that pods have one volume less than before
-			pods = sst.GetPodList(ss)
-			for i, pod := range pods.Items {
-				framework.ExpectEqual(len(pod.Spec.Volumes), volumeCountBefore[i]-1)
-			}
-		})
-
-		ginkgo.It("rename volumeClaimTemplate", func() {
-			ctx := context.TODO()
-
-			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			_, err := kc.AppsV1beta1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
-			framework.ExpectNoError(err)
-			waitForStatus(ctx, c, kc, ss)
-			sst.WaitForStatusReplicas(ss, 2)
-			sst.WaitForStatusReadyReplicas(ss, 2)
-
-			// store number of volumes for each pod
-			// the number of volumes is not just equal to the number of VCTs as e.g. the kube-api-access volume is added.
-			pods := sst.GetPodList(ss)
-			volumeCountBefore := make([]int, len(pods.Items))
-			for i, pod := range pods.Items {
-				volumeCountBefore[i] = len(pod.Spec.Volumes)
-			}
-
-			ginkgo.By("rename one volumeClaimTemplate")
-
-			ss, err = updateStatefulSetWithRetries(ctx, kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
-				oldName := update.Spec.VolumeClaimTemplates[0].Name
-				update.Spec.VolumeClaimTemplates[0].Name = "new-name"
-				for _, mount := range update.Spec.Template.Spec.Containers[0].VolumeMounts {
-					if mount.Name == oldName {
-						mount.Name = "new-name"
-					}
+				// verify that pods have one volume less than before
+				pods = sst.GetPodList(ss)
+				for i, pod := range pods.Items {
+					framework.ExpectEqual(len(pod.Spec.Volumes), volumeCountBefore[i]-1)
 				}
 			})
-			framework.ExpectNoError(err)
-			waitForStatus(ctx, c, kc, ss)
-			sst.WaitForRollingUpdate(ss)
 
-			// verify that pods have same number of volumes as before
-			pods = sst.GetPodList(ss)
-			for i, pod := range pods.Items {
-				framework.ExpectEqual(len(pod.Spec.Volumes), volumeCountBefore[i])
-			}
-		})
-	})
+			ginkgo.It("rename volumeClaimTemplate", func() {
+				ctx := context.TODO()
+
+				ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+				_, err := kc.AppsV1beta1().StatefulSets(ns).Create(ctx, ss, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+				waitForStatus(ctx, c, kc, ss)
+				sst.WaitForStatusReplicas(ss, 2)
+				sst.WaitForStatusReadyReplicas(ss, 2)
+
+				// store number of volumes for each pod
+				// the number of volumes is not just equal to the number of VCTs as e.g. the kube-api-access volume is added.
+				pods := sst.GetPodList(ss)
+				volumeCountBefore := make([]int, len(pods.Items))
+				for i, pod := range pods.Items {
+					volumeCountBefore[i] = len(pod.Spec.Volumes)
+				}
+
+				ginkgo.By("rename one volumeClaimTemplate")
+
+				ss, err = updateStatefulSetWithRetries(ctx, kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
+					oldName := update.Spec.VolumeClaimTemplates[0].Name
+					update.Spec.VolumeClaimTemplates[0].Name = "new-name"
+					for _, mount := range update.Spec.Template.Spec.Containers[0].VolumeMounts {
+						if mount.Name == oldName {
+							mount.Name = "new-name"
+						}
+					}
+				})
+				framework.ExpectNoError(err)
+				waitForStatus(ctx, c, kc, ss)
+				sst.WaitForRollingUpdate(ss)
+
+				// verify that pods have same number of volumes as before
+				pods = sst.GetPodList(ss)
+				for i, pod := range pods.Items {
+					framework.ExpectEqual(len(pod.Spec.Volumes), volumeCountBefore[i])
+				}
+			})
+		}
+	}
+	ginkgo.Describe("Recreate Pod when modifying volumeClaimTemplate with OnPodRollingUpdate and InPlaceIfPossiblePodUpdateStrategyType", testRecreatePodWhenModifyingVCT(appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType))
+	ginkgo.Describe("Recreate Pod when modifying volumeClaimTemplate with OnPodRollingUpdate and RecreatePodUpdateStrategyType", testRecreatePodWhenModifyingVCT(appsv1beta1.RecreatePodUpdateStrategyType))
 })
 
 // GCE Quota requirements: 3 pds, one per stateful pod manifest declared above.
