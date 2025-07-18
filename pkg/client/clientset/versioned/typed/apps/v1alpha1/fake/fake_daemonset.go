@@ -18,123 +18,32 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeDaemonSets implements DaemonSetInterface
-type FakeDaemonSets struct {
+// fakeDaemonSets implements DaemonSetInterface
+type fakeDaemonSets struct {
+	*gentype.FakeClientWithList[*v1alpha1.DaemonSet, *v1alpha1.DaemonSetList]
 	Fake *FakeAppsV1alpha1
-	ns   string
 }
 
-var daemonsetsResource = v1alpha1.SchemeGroupVersion.WithResource("daemonsets")
-
-var daemonsetsKind = v1alpha1.SchemeGroupVersion.WithKind("DaemonSet")
-
-// Get takes name of the daemonSet, and returns the corresponding daemonSet object, and an error if there is any.
-func (c *FakeDaemonSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.DaemonSet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(daemonsetsResource, c.ns, name), &v1alpha1.DaemonSet{})
-
-	if obj == nil {
-		return nil, err
+func newFakeDaemonSets(fake *FakeAppsV1alpha1, namespace string) appsv1alpha1.DaemonSetInterface {
+	return &fakeDaemonSets{
+		gentype.NewFakeClientWithList[*v1alpha1.DaemonSet, *v1alpha1.DaemonSetList](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("daemonsets"),
+			v1alpha1.SchemeGroupVersion.WithKind("DaemonSet"),
+			func() *v1alpha1.DaemonSet { return &v1alpha1.DaemonSet{} },
+			func() *v1alpha1.DaemonSetList { return &v1alpha1.DaemonSetList{} },
+			func(dst, src *v1alpha1.DaemonSetList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.DaemonSetList) []*v1alpha1.DaemonSet { return gentype.ToPointerSlice(list.Items) },
+			func(list *v1alpha1.DaemonSetList, items []*v1alpha1.DaemonSet) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.DaemonSet), err
-}
-
-// List takes label and field selectors, and returns the list of DaemonSets that match those selectors.
-func (c *FakeDaemonSets) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.DaemonSetList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(daemonsetsResource, daemonsetsKind, c.ns, opts), &v1alpha1.DaemonSetList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.DaemonSetList{ListMeta: obj.(*v1alpha1.DaemonSetList).ListMeta}
-	for _, item := range obj.(*v1alpha1.DaemonSetList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested daemonSets.
-func (c *FakeDaemonSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(daemonsetsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a daemonSet and creates it.  Returns the server's representation of the daemonSet, and an error, if there is any.
-func (c *FakeDaemonSets) Create(ctx context.Context, daemonSet *v1alpha1.DaemonSet, opts v1.CreateOptions) (result *v1alpha1.DaemonSet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(daemonsetsResource, c.ns, daemonSet), &v1alpha1.DaemonSet{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.DaemonSet), err
-}
-
-// Update takes the representation of a daemonSet and updates it. Returns the server's representation of the daemonSet, and an error, if there is any.
-func (c *FakeDaemonSets) Update(ctx context.Context, daemonSet *v1alpha1.DaemonSet, opts v1.UpdateOptions) (result *v1alpha1.DaemonSet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(daemonsetsResource, c.ns, daemonSet), &v1alpha1.DaemonSet{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.DaemonSet), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeDaemonSets) UpdateStatus(ctx context.Context, daemonSet *v1alpha1.DaemonSet, opts v1.UpdateOptions) (*v1alpha1.DaemonSet, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(daemonsetsResource, "status", c.ns, daemonSet), &v1alpha1.DaemonSet{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.DaemonSet), err
-}
-
-// Delete takes name of the daemonSet and deletes it. Returns an error if one occurs.
-func (c *FakeDaemonSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(daemonsetsResource, c.ns, name, opts), &v1alpha1.DaemonSet{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeDaemonSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(daemonsetsResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.DaemonSetList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched daemonSet.
-func (c *FakeDaemonSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.DaemonSet, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(daemonsetsResource, c.ns, name, pt, data, subresources...), &v1alpha1.DaemonSet{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.DaemonSet), err
 }

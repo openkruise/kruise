@@ -441,3 +441,7 @@ func IsRestartableInitContainer(initContainer *v1.Container) bool {
 
 	return *initContainer.RestartPolicy == v1.ContainerRestartPolicyAlways
 }
+
+func HasPodScheduled(pod *v1.Pod) bool {
+	return len(pod.Spec.NodeName) > 0
+}

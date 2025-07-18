@@ -18,123 +18,34 @@ limitations under the License.
 package fake
 
 import (
-	"context"
-
 	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
-	types "k8s.io/apimachinery/pkg/types"
-	watch "k8s.io/apimachinery/pkg/watch"
-	testing "k8s.io/client-go/testing"
+	appsv1alpha1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1alpha1"
+	gentype "k8s.io/client-go/gentype"
 )
 
-// FakeBroadcastJobs implements BroadcastJobInterface
-type FakeBroadcastJobs struct {
+// fakeBroadcastJobs implements BroadcastJobInterface
+type fakeBroadcastJobs struct {
+	*gentype.FakeClientWithList[*v1alpha1.BroadcastJob, *v1alpha1.BroadcastJobList]
 	Fake *FakeAppsV1alpha1
-	ns   string
 }
 
-var broadcastjobsResource = v1alpha1.SchemeGroupVersion.WithResource("broadcastjobs")
-
-var broadcastjobsKind = v1alpha1.SchemeGroupVersion.WithKind("BroadcastJob")
-
-// Get takes name of the broadcastJob, and returns the corresponding broadcastJob object, and an error if there is any.
-func (c *FakeBroadcastJobs) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.BroadcastJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(broadcastjobsResource, c.ns, name), &v1alpha1.BroadcastJob{})
-
-	if obj == nil {
-		return nil, err
+func newFakeBroadcastJobs(fake *FakeAppsV1alpha1, namespace string) appsv1alpha1.BroadcastJobInterface {
+	return &fakeBroadcastJobs{
+		gentype.NewFakeClientWithList[*v1alpha1.BroadcastJob, *v1alpha1.BroadcastJobList](
+			fake.Fake,
+			namespace,
+			v1alpha1.SchemeGroupVersion.WithResource("broadcastjobs"),
+			v1alpha1.SchemeGroupVersion.WithKind("BroadcastJob"),
+			func() *v1alpha1.BroadcastJob { return &v1alpha1.BroadcastJob{} },
+			func() *v1alpha1.BroadcastJobList { return &v1alpha1.BroadcastJobList{} },
+			func(dst, src *v1alpha1.BroadcastJobList) { dst.ListMeta = src.ListMeta },
+			func(list *v1alpha1.BroadcastJobList) []*v1alpha1.BroadcastJob {
+				return gentype.ToPointerSlice(list.Items)
+			},
+			func(list *v1alpha1.BroadcastJobList, items []*v1alpha1.BroadcastJob) {
+				list.Items = gentype.FromPointerSlice(items)
+			},
+		),
+		fake,
 	}
-	return obj.(*v1alpha1.BroadcastJob), err
-}
-
-// List takes label and field selectors, and returns the list of BroadcastJobs that match those selectors.
-func (c *FakeBroadcastJobs) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.BroadcastJobList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(broadcastjobsResource, broadcastjobsKind, c.ns, opts), &v1alpha1.BroadcastJobList{})
-
-	if obj == nil {
-		return nil, err
-	}
-
-	label, _, _ := testing.ExtractFromListOptions(opts)
-	if label == nil {
-		label = labels.Everything()
-	}
-	list := &v1alpha1.BroadcastJobList{ListMeta: obj.(*v1alpha1.BroadcastJobList).ListMeta}
-	for _, item := range obj.(*v1alpha1.BroadcastJobList).Items {
-		if label.Matches(labels.Set(item.Labels)) {
-			list.Items = append(list.Items, item)
-		}
-	}
-	return list, err
-}
-
-// Watch returns a watch.Interface that watches the requested broadcastJobs.
-func (c *FakeBroadcastJobs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(broadcastjobsResource, c.ns, opts))
-
-}
-
-// Create takes the representation of a broadcastJob and creates it.  Returns the server's representation of the broadcastJob, and an error, if there is any.
-func (c *FakeBroadcastJobs) Create(ctx context.Context, broadcastJob *v1alpha1.BroadcastJob, opts v1.CreateOptions) (result *v1alpha1.BroadcastJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(broadcastjobsResource, c.ns, broadcastJob), &v1alpha1.BroadcastJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.BroadcastJob), err
-}
-
-// Update takes the representation of a broadcastJob and updates it. Returns the server's representation of the broadcastJob, and an error, if there is any.
-func (c *FakeBroadcastJobs) Update(ctx context.Context, broadcastJob *v1alpha1.BroadcastJob, opts v1.UpdateOptions) (result *v1alpha1.BroadcastJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(broadcastjobsResource, c.ns, broadcastJob), &v1alpha1.BroadcastJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.BroadcastJob), err
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeBroadcastJobs) UpdateStatus(ctx context.Context, broadcastJob *v1alpha1.BroadcastJob, opts v1.UpdateOptions) (*v1alpha1.BroadcastJob, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(broadcastjobsResource, "status", c.ns, broadcastJob), &v1alpha1.BroadcastJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.BroadcastJob), err
-}
-
-// Delete takes name of the broadcastJob and deletes it. Returns an error if one occurs.
-func (c *FakeBroadcastJobs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(broadcastjobsResource, c.ns, name, opts), &v1alpha1.BroadcastJob{})
-
-	return err
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *FakeBroadcastJobs) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(broadcastjobsResource, c.ns, listOpts)
-
-	_, err := c.Fake.Invokes(action, &v1alpha1.BroadcastJobList{})
-	return err
-}
-
-// Patch applies the patch and returns the patched broadcastJob.
-func (c *FakeBroadcastJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.BroadcastJob, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(broadcastjobsResource, c.ns, name, pt, data, subresources...), &v1alpha1.BroadcastJob{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1alpha1.BroadcastJob), err
 }

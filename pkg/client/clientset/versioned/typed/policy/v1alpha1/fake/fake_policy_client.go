@@ -28,7 +28,7 @@ type FakePolicyV1alpha1 struct {
 }
 
 func (c *FakePolicyV1alpha1) PodUnavailableBudgets(namespace string) v1alpha1.PodUnavailableBudgetInterface {
-	return &FakePodUnavailableBudgets{c, namespace}
+	return newFakePodUnavailableBudgets(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

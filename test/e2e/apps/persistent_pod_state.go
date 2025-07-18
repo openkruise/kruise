@@ -24,6 +24,7 @@ import (
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -33,7 +34,6 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 var (
@@ -125,7 +125,7 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			}
 
 			// scale down, 5 -> 1
-			sts.Spec.Replicas = utilpointer.Int32Ptr(1)
+			sts.Spec.Replicas = ptr.To[int32](1)
 			tester.UpdateStatefulset(sts)
 			time.Sleep(time.Second * 3)
 
@@ -150,7 +150,7 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			}
 
 			// scale up, 1 -> 5
-			sts.Spec.Replicas = utilpointer.Int32Ptr(5)
+			sts.Spec.Replicas = ptr.To[int32](5)
 			tester.UpdateStatefulset(sts)
 			time.Sleep(time.Second * 3)
 
@@ -240,7 +240,7 @@ var _ = SIGDescribe("PersistentPodState", func() {
 			time.Sleep(time.Second * 3)
 
 			// scale down 5 -> 1
-			sts.Spec.Replicas = utilpointer.Int32Ptr(1)
+			sts.Spec.Replicas = ptr.To[int32](1)
 			tester.UpdateStatefulset(sts)
 			time.Sleep(time.Second * 3)
 

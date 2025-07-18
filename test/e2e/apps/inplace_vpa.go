@@ -31,13 +31,14 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
+var tester *framework.CloneSetTester
+
 var _ = SIGDescribe("InplaceVPA", func() {
+	//framework.TestContext.DeleteNamespaceOnFailure = false
 	f := framework.NewDefaultFramework("inplace-vpa")
 	var ns string
 	var c clientset.Interface
 	var kc kruiseclientset.Interface
-	var tester *framework.CloneSetTester
-	var randStr string
 	IsKubernetesVersionLessThan127 := func() bool {
 		if v, err := c.Discovery().ServerVersion(); err != nil {
 			framework.Logf("Failed to discovery server version: %v", err)
@@ -52,33 +53,12 @@ var _ = SIGDescribe("InplaceVPA", func() {
 		kc = f.KruiseClientSet
 		ns = f.Namespace.Name
 		tester = framework.NewCloneSetTester(c, kc, ns)
-		randStr = rand.String(10)
 
 		if IsKubernetesVersionLessThan127() {
 			ginkgo.Skip("skip this e2e case, it can only run on K8s >= 1.27")
 		}
 	})
 
-	oldResource := v1.ResourceRequirements{
-		Requests: map[v1.ResourceName]resource.Quantity{
-			v1.ResourceCPU:    resource.MustParse("200m"),
-			v1.ResourceMemory: resource.MustParse("200Mi"),
-		},
-		Limits: map[v1.ResourceName]resource.Quantity{
-			v1.ResourceCPU:    resource.MustParse("1"),
-			v1.ResourceMemory: resource.MustParse("1Gi"),
-		},
-	}
-	newResource := v1.ResourceRequirements{
-		Requests: map[v1.ResourceName]resource.Quantity{
-			v1.ResourceCPU:    resource.MustParse("100m"),
-			v1.ResourceMemory: resource.MustParse("100Mi"),
-		},
-		Limits: map[v1.ResourceName]resource.Quantity{
-			v1.ResourceCPU:    resource.MustParse("800m"),
-			v1.ResourceMemory: resource.MustParse("800Mi"),
-		},
-	}
 	// TODO(Abner-1)update only inplace resources may fail in kind e2e.
 	// I will resolve it in another PR
 	//framework.KruiseDescribe("CloneSet Updating with only inplace resource", func() {
@@ -158,7 +138,7 @@ var _ = SIGDescribe("InplaceVPA", func() {
 	//	}
 	//	testWithResizePolicy := func(resizePolicy []v1.ContainerResizePolicy) {
 	//		// This can't be Conformance yet.
-	//		ginkgo.FIt("in-place update resources scale down 1", func() {
+	//		ginkgo.It("in-place update resources scale down 1", func() {
 	//			fn := func(spec *v1.PodSpec) {
 	//				ginkgo.By("scale down cpu and memory request")
 	//				spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("100m")
@@ -166,7 +146,7 @@ var _ = SIGDescribe("InplaceVPA", func() {
 	//			}
 	//			testUpdateResource(fn, resizePolicy)
 	//		})
-	//		//ginkgo.FIt("in-place update resources scale down 2", func() {
+	//		//ginkgo.It("in-place update resources scale down 2", func() {
 	//		//	fn := func(spec *v1.PodSpec) {
 	//		//		ginkgo.By("scale down cpu and memory limit")
 	//		//		spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("800m")
@@ -174,7 +154,7 @@ var _ = SIGDescribe("InplaceVPA", func() {
 	//		//	}
 	//		//	testUpdateResource(fn, resizePolicy)
 	//		//})
-	//		//ginkgo.FIt("in-place update resources scale down 3", func() {
+	//		//ginkgo.It("in-place update resources scale down 3", func() {
 	//		//	fn := func(spec *v1.PodSpec) {
 	//		//		ginkgo.By("scale down cpu and memory request&limit")
 	//		//		spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("100m")
@@ -186,7 +166,7 @@ var _ = SIGDescribe("InplaceVPA", func() {
 	//		//})
 	//
 	//		// This can't be Conformance yet.
-	//		ginkgo.FIt("in-place update resources scale up 1", func() {
+	//		ginkgo.It("in-place update resources scale up 1", func() {
 	//			fn := func(spec *v1.PodSpec) {
 	//				ginkgo.By("scale up cpu and memory request")
 	//				spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("300m")
@@ -194,7 +174,7 @@ var _ = SIGDescribe("InplaceVPA", func() {
 	//			}
 	//			testUpdateResource(fn, resizePolicy)
 	//		})
-	//		//ginkgo.FIt("in-place update resources scale up 2", func() {
+	//		//ginkgo.It("in-place update resources scale up 2", func() {
 	//		//	fn := func(spec *v1.PodSpec) {
 	//		//		ginkgo.By("scale up cpu and memory limit")
 	//		//		spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
@@ -202,7 +182,7 @@ var _ = SIGDescribe("InplaceVPA", func() {
 	//		//	}
 	//		//	testUpdateResource(fn, resizePolicy)
 	//		//})
-	//		ginkgo.FIt("in-place update resources scale up 3", func() {
+	//		ginkgo.It("in-place update resources scale up 3", func() {
 	//			fn := func(spec *v1.PodSpec) {
 	//				ginkgo.By("scale up cpu and memory request&limit")
 	//				spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("300m")
@@ -214,21 +194,21 @@ var _ = SIGDescribe("InplaceVPA", func() {
 	//		})
 	//
 	//		// This can't be Conformance yet.
-	//		ginkgo.FIt("in-place update resources scale up only cpu 1", func() {
+	//		ginkgo.It("in-place update resources scale up only cpu 1", func() {
 	//			fn := func(spec *v1.PodSpec) {
 	//				ginkgo.By("scale up cpu request")
 	//				spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("300m")
 	//			}
 	//			testUpdateResource(fn, resizePolicy)
 	//		})
-	//		//ginkgo.FIt("in-place update resources scale up only cpu limit", func() {
+	//		//ginkgo.It("in-place update resources scale up only cpu limit", func() {
 	//		//	fn := func(spec *v1.PodSpec) {
 	//		//		ginkgo.By("scale up cpu limit")
 	//		//		spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
 	//		//	}
 	//		//	testUpdateResource(fn, resizePolicy)
 	//		//})
-	//		//ginkgo.FIt("in-place update resources scale up only cpu 3", func() {
+	//		//ginkgo.It("in-place update resources scale up only cpu 3", func() {
 	//		//	fn := func(spec *v1.PodSpec) {
 	//		//		ginkgo.By("scale up cpu request&limit")
 	//		//		spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("300m")
@@ -238,21 +218,21 @@ var _ = SIGDescribe("InplaceVPA", func() {
 	//		//})
 	//
 	//		// This can't be Conformance yet.
-	//		ginkgo.FIt("in-place update resources scale up only mem 1", func() {
+	//		ginkgo.It("in-place update resources scale up only mem 1", func() {
 	//			fn := func(spec *v1.PodSpec) {
 	//				ginkgo.By("scale up memory request")
 	//				spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("300Mi")
 	//			}
 	//			testUpdateResource(fn, resizePolicy)
 	//		})
-	//		//ginkgo.FIt("in-place update resources scale up only mem limit", func() {
+	//		//ginkgo.It("in-place update resources scale up only mem limit", func() {
 	//		//	fn := func(spec *v1.PodSpec) {
 	//		//		ginkgo.By("scale up memory limit")
 	//		//		spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("2Gi")
 	//		//	}
 	//		//	testUpdateResource(fn, resizePolicy)
 	//		//})
-	//		//ginkgo.FIt("in-place update resources scale up only mem 3", func() {
+	//		//ginkgo.It("in-place update resources scale up only mem 3", func() {
 	//		//	fn := func(spec *v1.PodSpec) {
 	//		//		ginkgo.By("scale up memory request&limit")
 	//		//		spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("300Mi")
@@ -304,182 +284,6 @@ var _ = SIGDescribe("InplaceVPA", func() {
 	//})
 
 	framework.KruiseDescribe("CloneSet failed to inplace update resource", func() {
-		var err error
-		largeResource := v1.ResourceRequirements{
-			Requests: map[v1.ResourceName]resource.Quantity{
-				v1.ResourceCPU:    resource.MustParse("100"),
-				v1.ResourceMemory: resource.MustParse("1000Gi"),
-			},
-			Limits: map[v1.ResourceName]resource.Quantity{
-				v1.ResourceCPU:    resource.MustParse("800"),
-				v1.ResourceMemory: resource.MustParse("8000Gi"),
-			},
-		}
-		testResizePolicyFailed := func(resizePolicy []v1.ContainerResizePolicy) {
-			testUpdateResource := func(fn func(pod *v1.PodTemplateSpec), resizePolicy []v1.ContainerResizePolicy) {
-				j, _ := json.Marshal(resizePolicy)
-				ginkgo.By(fmt.Sprintf("resize policy %v", string(j)))
-				cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
-				cs.Spec.Template.Spec.Containers[0].ResizePolicy = resizePolicy
-				cs.Spec.Template.Spec.Containers[0].Image = NginxImage
-				cs.Spec.Template.ObjectMeta.Labels["test-env"] = "foo"
-				cs.Spec.Template.Spec.Containers[0].Env = append(cs.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
-					Name:      "TEST_ENV",
-					ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.labels['test-env']"}},
-				})
-				cs, err = tester.CreateCloneSet(cs)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
-
-				ginkgo.By("Wait for replicas satisfied")
-				gomega.Eventually(func() int32 {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Status.Replicas
-				}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
-
-				ginkgo.By("Wait for all pods ready")
-				gomega.Eventually(func() int32 {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Status.ReadyReplicas
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
-
-				pods, err := tester.ListPodsForCloneSet(cs.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(len(pods)).Should(gomega.Equal(1))
-				oldPodUID := pods[0].UID
-				oldContainerStatus := pods[0].Status.ContainerStatuses[0]
-				oldPodResource := getPodResource(pods[0])
-
-				ginkgo.By("Update CloneSet with large resource")
-				err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
-					if cs.Annotations == nil {
-						cs.Annotations = map[string]string{}
-					}
-					fn(&cs.Spec.Template)
-					cs.Spec.Template.Spec.Containers[0].Resources = largeResource
-				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-				ginkgo.By("Wait for CloneSet generation consistent")
-				gomega.Eventually(func() bool {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Generation == cs.Status.ObservedGeneration
-				}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
-
-				updatedVersion := cs.Status.UpdateRevision
-				ginkgo.By("Wait for one pods updated and rejected")
-				gomega.Eventually(func() int32 {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					framework.Logf("Cloneset updatedReplicas %v updatedReady %v updatedAvailableReplicas %v ",
-						cs.Status.UpdatedReplicas, cs.Status.UpdatedReadyReplicas, cs.Status.UpdatedAvailableReplicas)
-
-					pods, err = tester.ListPodsForCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					for _, pod := range pods {
-						revision := pod.Labels[apps.ControllerRevisionHashLabelKey]
-						if strings.Contains(updatedVersion, revision) {
-							if pod.Status.Resize == v1.PodResizeStatusInfeasible {
-								return 1
-							}
-						}
-					}
-
-					SkipTestWhenCgroupError(pods[0])
-					return 0
-				}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
-
-				ginkgo.By("Update CloneSet with input resource")
-				err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
-					if cs.Annotations == nil {
-						cs.Annotations = map[string]string{}
-					}
-					fn(&cs.Spec.Template)
-				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-				ginkgo.By("Wait for CloneSet generation consistent")
-				gomega.Eventually(func() bool {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Generation == cs.Status.ObservedGeneration
-				}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
-
-				a, b, c := getResourcesInfo(pods[0])
-				ginkgo.By("Wait for all pods updated and ready")
-				gomega.Eventually(func() int32 {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					framework.Logf("Cloneset updatedReplicas %v updatedReady %v updatedAvailableReplicas %v ",
-						cs.Status.UpdatedReplicas, cs.Status.UpdatedReadyReplicas, cs.Status.UpdatedAvailableReplicas)
-
-					pods, err = tester.ListPodsForCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					a1, b1, c1 := getResourcesInfo(pods[0])
-					if a1 != a || b1 != b || c1 != c {
-						framework.Logf("updateSpec %v", a1)
-						framework.Logf("spec %v", b1)
-						framework.Logf("container status %v ", c1)
-						a, b, c = a1, b1, c1
-					}
-					SkipTestWhenCgroupError(pods[0])
-					return cs.Status.UpdatedAvailableReplicas
-				}, 600*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
-
-				ginkgo.By("Verify the containerID changed and restartCount should not be 0")
-				pods, err = tester.ListPodsForCloneSet(cs.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(len(pods)).Should(gomega.Equal(1))
-				newPodUID := pods[0].UID
-				newContainerStatus := pods[0].Status.ContainerStatuses[0]
-
-				gomega.Expect(oldPodUID).Should(gomega.Equal(newPodUID))
-				gomega.Expect(newContainerStatus.ContainerID).NotTo(gomega.Equal(oldContainerStatus.ContainerID))
-				gomega.Expect(newContainerStatus.RestartCount).ShouldNot(gomega.Equal(int32(0)))
-
-				pods, err = tester.ListPodsForCloneSet(cs.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(checkPodResource(pods, oldPodResource, []string{"redis"})).Should(gomega.Equal(true))
-			}
-			// This can't be Conformance yet.
-			ginkgo.It("in-place update image and resource", func() {
-				fn := func(pod *v1.PodTemplateSpec) {
-					spec := &pod.Spec
-					ginkgo.By("in-place update image and resource")
-					spec.Containers[0].Image = NewNginxImage
-					spec.Containers[0].Resources = newResource
-				}
-				testUpdateResource(fn, resizePolicy)
-			})
-
-			// This can't be Conformance yet.
-			ginkgo.FIt("in-place update resource and env from label", func() {
-				fn := func(pod *v1.PodTemplateSpec) {
-					spec := &pod.Spec
-					ginkgo.By("in-place update resource and env from label")
-					pod.Labels["test-env"] = "bar"
-					spec.Containers[0].Resources = newResource
-				}
-				testUpdateResource(fn, resizePolicy)
-			})
-
-			// This can't be Conformance yet.
-			ginkgo.It("in-place update image, resource and env from label", func() {
-				fn := func(pod *v1.PodTemplateSpec) {
-					spec := &pod.Spec
-					ginkgo.By("in-place update image, resource and env from label")
-					spec.Containers[0].Image = NewNginxImage
-					pod.Labels["test-env"] = "bar"
-					spec.Containers[0].Resources = newResource
-				}
-				testUpdateResource(fn, resizePolicy)
-			})
-
-		}
-
 		ginkgo.By("inplace update resources with RestartContainer policy")
 		testResizePolicyFailed([]v1.ContainerResizePolicy{
 			{
@@ -513,408 +317,6 @@ var _ = SIGDescribe("InplaceVPA", func() {
 	})
 
 	framework.KruiseDescribe("CloneSet Updating with inplace resource", func() {
-		var err error
-		testWithResizePolicy := func(resizePolicy []v1.ContainerResizePolicy) {
-			testUpdateResource := func(fn func(pod *v1.PodTemplateSpec), resizePolicy []v1.ContainerResizePolicy) {
-				j, _ := json.Marshal(resizePolicy)
-				ginkgo.By(fmt.Sprintf("resize policy %v", string(j)))
-				cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
-				cs.Spec.Template.Spec.Containers[0].ResizePolicy = resizePolicy
-				cs.Spec.Template.Spec.Containers[0].Image = NginxImage
-				cs.Spec.Template.ObjectMeta.Labels["test-env"] = "foo"
-				cs.Spec.Template.Spec.Containers[0].Env = append(cs.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
-					Name:      "TEST_ENV",
-					ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.labels['test-env']"}},
-				})
-				cs, err = tester.CreateCloneSet(cs)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
-
-				ginkgo.By("Wait for replicas satisfied")
-				gomega.Eventually(func() int32 {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Status.Replicas
-				}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
-
-				ginkgo.By("Wait for all pods ready")
-				gomega.Eventually(func() int32 {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Status.ReadyReplicas
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
-
-				pods, err := tester.ListPodsForCloneSet(cs.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(len(pods)).Should(gomega.Equal(1))
-				oldPodUID := pods[0].UID
-				oldContainerStatus := pods[0].Status.ContainerStatuses[0]
-				oldPodResource := getPodResource(pods[0])
-
-				ginkgo.By("Update CloneSet")
-				err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
-					if cs.Annotations == nil {
-						cs.Annotations = map[string]string{}
-					}
-					fn(&cs.Spec.Template)
-				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-				ginkgo.By("Wait for CloneSet generation consistent")
-				gomega.Eventually(func() bool {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Generation == cs.Status.ObservedGeneration
-				}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
-
-				a, b, c := getResourcesInfo(pods[0])
-				ginkgo.By("Wait for all pods updated and ready")
-				gomega.Eventually(func() int32 {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					framework.Logf("Cloneset updatedReplicas %v updatedReady %v updatedAvailableReplicas %v ",
-						cs.Status.UpdatedReplicas, cs.Status.UpdatedReadyReplicas, cs.Status.UpdatedAvailableReplicas)
-
-					pods, err = tester.ListPodsForCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					a1, b1, c1 := getResourcesInfo(pods[0])
-					if a1 != a || b1 != b || c1 != c {
-						framework.Logf("updateSpec %v", a1)
-						framework.Logf("spec %v", b1)
-						framework.Logf("container status %v ", c1)
-						a, b, c = a1, b1, c1
-					}
-					SkipTestWhenCgroupError(pods[0])
-					return cs.Status.UpdatedAvailableReplicas
-				}, 600*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
-
-				ginkgo.By("Verify the containerID changed and restartCount should be 1")
-				pods, err = tester.ListPodsForCloneSet(cs.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(len(pods)).Should(gomega.Equal(1))
-				newPodUID := pods[0].UID
-				newContainerStatus := pods[0].Status.ContainerStatuses[0]
-
-				gomega.Expect(oldPodUID).Should(gomega.Equal(newPodUID))
-				gomega.Expect(newContainerStatus.ContainerID).NotTo(gomega.Equal(oldContainerStatus.ContainerID))
-				gomega.Expect(newContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
-
-				pods, err = tester.ListPodsForCloneSet(cs.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(checkPodResource(pods, oldPodResource, []string{"redis"})).Should(gomega.Equal(true))
-			}
-			// This can't be Conformance yet.
-			ginkgo.It("in-place update image and resource", func() {
-				fn := func(pod *v1.PodTemplateSpec) {
-					spec := &pod.Spec
-					ginkgo.By("in-place update image and resource")
-					spec.Containers[0].Image = NewNginxImage
-					spec.Containers[0].Resources = newResource
-				}
-				testUpdateResource(fn, resizePolicy)
-			})
-
-			// This can't be Conformance yet.
-			ginkgo.FIt("in-place update resource and env from label", func() {
-				fn := func(pod *v1.PodTemplateSpec) {
-					spec := &pod.Spec
-					ginkgo.By("in-place update resource and env from label")
-					pod.Labels["test-env"] = "bar"
-					spec.Containers[0].Resources = newResource
-				}
-				testUpdateResource(fn, resizePolicy)
-			})
-
-			// This can't be Conformance yet.
-			ginkgo.It("in-place update image, resource and env from label", func() {
-				fn := func(pod *v1.PodTemplateSpec) {
-					spec := &pod.Spec
-					ginkgo.By("in-place update image, resource and env from label")
-					spec.Containers[0].Image = NewNginxImage
-					pod.Labels["test-env"] = "bar"
-					spec.Containers[0].Resources = newResource
-				}
-				testUpdateResource(fn, resizePolicy)
-			})
-
-			framework.ConformanceIt("in-place update two container image, resource with priorities successfully", func() {
-				cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
-				cs.Spec.Template.Spec.Containers[0].ResizePolicy = resizePolicy
-				cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
-					Name:      "redis",
-					Image:     RedisImage,
-					Command:   []string{"sleep", "999"},
-					Env:       []v1.EnvVar{{Name: appspub.ContainerLaunchPriorityEnvName, Value: "10"}},
-					Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
-				})
-				cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(3)
-				cs, err = tester.CreateCloneSet(cs)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
-
-				ginkgo.By("Wait for replicas satisfied")
-				gomega.Eventually(func() int32 {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Status.Replicas
-				}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
-
-				ginkgo.By("Wait for all pods ready")
-				gomega.Eventually(func() int32 {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Status.ReadyReplicas
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
-
-				pods, err := tester.ListPodsForCloneSet(cs.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(len(pods)).Should(gomega.Equal(1))
-				oldPodResource := getPodResource(pods[0])
-
-				ginkgo.By("Update images of nginx and redis")
-				err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
-					cs.Spec.Template.Spec.Containers[0].Image = NewNginxImage
-					cs.Spec.Template.Spec.Containers[1].Image = imageutils.GetE2EImage(imageutils.BusyBox)
-					cs.Spec.Template.Spec.Containers[0].Resources = newResource
-				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-				ginkgo.By("Wait for CloneSet generation consistent")
-				gomega.Eventually(func() bool {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Generation == cs.Status.ObservedGeneration
-				}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
-
-				ginkgo.By("Wait for all pods updated and ready")
-				a, b, c := getResourcesInfo(pods[0])
-				gomega.Eventually(func() int32 {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-					pods, err = tester.ListPodsForCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					a1, b1, c1 := getResourcesInfo(pods[0])
-					if a1 != a || b1 != b || c1 != c {
-						framework.Logf("updateSpec %v", a1)
-						framework.Logf("spec %v", b1)
-						framework.Logf("container status %v ", c1)
-						a, b, c = a1, b1, c1
-					}
-					SkipTestWhenCgroupError(pods[0])
-
-					return cs.Status.UpdatedAvailableReplicas
-				}, 600*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
-
-				ginkgo.By("Verify two containers have all updated in-place")
-				pods, err = tester.ListPodsForCloneSet(cs.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(len(pods)).Should(gomega.Equal(1))
-
-				pod := pods[0]
-				nginxContainerStatus := util.GetContainerStatus("nginx", pod)
-				redisContainerStatus := util.GetContainerStatus("redis", pod)
-				gomega.Expect(nginxContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
-				gomega.Expect(redisContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
-
-				ginkgo.By("Verify nginx should be stopped after new redis has started 10s")
-				gomega.Expect(nginxContainerStatus.LastTerminationState.Terminated.FinishedAt.After(redisContainerStatus.State.Running.StartedAt.Time.Add(time.Second*10))).
-					Should(gomega.Equal(true), fmt.Sprintf("nginx finish at %v is not after redis start %v + 10s",
-						nginxContainerStatus.LastTerminationState.Terminated.FinishedAt,
-						redisContainerStatus.State.Running.StartedAt))
-
-				ginkgo.By("Verify in-place update state in two batches")
-				inPlaceUpdateState := appspub.InPlaceUpdateState{}
-				gomega.Expect(pod.Annotations[appspub.InPlaceUpdateStateKey]).ShouldNot(gomega.BeEmpty())
-				err = json.Unmarshal([]byte(pod.Annotations[appspub.InPlaceUpdateStateKey]), &inPlaceUpdateState)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(len(inPlaceUpdateState.ContainerBatchesRecord)).Should(gomega.Equal(2))
-				gomega.Expect(inPlaceUpdateState.ContainerBatchesRecord[0].Containers).Should(gomega.Equal([]string{"redis"}))
-				gomega.Expect(inPlaceUpdateState.ContainerBatchesRecord[1].Containers).Should(gomega.Equal([]string{"nginx"}))
-				gomega.Expect(checkPodResource(pods, oldPodResource, []string{"redis"})).Should(gomega.Equal(true))
-			})
-
-			framework.ConformanceIt("in-place update two container image, resource with priorities, should not update the next when the previous one failed", func() {
-				cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
-				cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
-					Name:      "redis",
-					Image:     RedisImage,
-					Env:       []v1.EnvVar{{Name: appspub.ContainerLaunchPriorityEnvName, Value: "10"}},
-					Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
-				})
-				cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(3)
-				cs, err = tester.CreateCloneSet(cs)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
-
-				ginkgo.By("Wait for replicas satisfied")
-				gomega.Eventually(func() int32 {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Status.Replicas
-				}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
-
-				ginkgo.By("Wait for all pods ready")
-				gomega.Eventually(func() int32 {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Status.ReadyReplicas
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
-
-				pods, err := tester.ListPodsForCloneSet(cs.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(len(pods)).Should(gomega.Equal(1))
-				oldPodResource := getPodResource(pods[0])
-
-				ginkgo.By("Update images of nginx and redis")
-				err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
-					cs.Spec.Template.Spec.Containers[0].Image = NewNginxImage
-					cs.Spec.Template.Spec.Containers[1].Image = imageutils.GetE2EImage(imageutils.BusyBox)
-					cs.Spec.Template.Spec.Containers[0].Resources = newResource
-				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-				ginkgo.By("Wait for CloneSet generation consistent")
-				gomega.Eventually(func() bool {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Generation == cs.Status.ObservedGeneration
-				}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
-
-				ginkgo.By("Wait for redis failed to start")
-				var pod *v1.Pod
-				gomega.Eventually(func() *v1.ContainerStateTerminated {
-					pods, err = tester.ListPodsForCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					gomega.Expect(len(pods)).Should(gomega.Equal(1))
-					pod = pods[0]
-					redisContainerStatus := util.GetContainerStatus("redis", pod)
-					return redisContainerStatus.LastTerminationState.Terminated
-				}, 60*time.Second, time.Second).ShouldNot(gomega.BeNil())
-
-				gomega.Eventually(func() *v1.ContainerStateWaiting {
-					pods, err = tester.ListPodsForCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					gomega.Expect(len(pods)).Should(gomega.Equal(1))
-					pod = pods[0]
-					redisContainerStatus := util.GetContainerStatus("redis", pod)
-					return redisContainerStatus.State.Waiting
-				}, 60*time.Second, time.Second).ShouldNot(gomega.BeNil())
-
-				nginxContainerStatus := util.GetContainerStatus("nginx", pod)
-				gomega.Expect(nginxContainerStatus.RestartCount).Should(gomega.Equal(int32(0)))
-
-				ginkgo.By("Verify in-place update state only one batch and remain next")
-				inPlaceUpdateState := appspub.InPlaceUpdateState{}
-				gomega.Expect(pod.Annotations[appspub.InPlaceUpdateStateKey]).ShouldNot(gomega.BeEmpty())
-				err = json.Unmarshal([]byte(pod.Annotations[appspub.InPlaceUpdateStateKey]), &inPlaceUpdateState)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(len(inPlaceUpdateState.ContainerBatchesRecord)).Should(gomega.Equal(1))
-				gomega.Expect(inPlaceUpdateState.ContainerBatchesRecord[0].Containers).Should(gomega.Equal([]string{"redis"}))
-				gomega.Expect(inPlaceUpdateState.NextContainerImages).Should(gomega.Equal(map[string]string{"nginx": NewNginxImage}))
-				gomega.Expect(checkPodResource(pods, oldPodResource, []string{"redis"})).Should(gomega.Equal(false))
-			})
-
-			//This can't be Conformance yet.
-			ginkgo.It("in-place update two container image, resource and env from metadata with priorities", func() {
-				cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
-				cs.Spec.Template.Spec.Containers[0].ResizePolicy = resizePolicy
-				cs.Spec.Template.Annotations = map[string]string{"config": "foo"}
-				cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
-					Name:  "redis",
-					Image: RedisImage,
-					Env: []v1.EnvVar{
-						{Name: appspub.ContainerLaunchPriorityEnvName, Value: "10"},
-						{Name: "CONFIG", ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.annotations['config']"}}},
-					},
-					Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
-				})
-				cs, err = tester.CreateCloneSet(cs)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
-
-				ginkgo.By("Wait for replicas satisfied")
-				gomega.Eventually(func() int32 {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Status.Replicas
-				}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
-
-				ginkgo.By("Wait for all pods ready")
-				gomega.Eventually(func() int32 {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Status.ReadyReplicas
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
-
-				pods, err := tester.ListPodsForCloneSet(cs.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(len(pods)).Should(gomega.Equal(1))
-				oldPodResource := getPodResource(pods[0])
-
-				ginkgo.By("Update nginx image and config annotation")
-				err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
-					cs.Spec.Template.Spec.Containers[0].Image = NewNginxImage
-					cs.Spec.Template.Annotations["config"] = "bar"
-					cs.Spec.Template.Spec.Containers[0].Resources = newResource
-				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-				ginkgo.By("Wait for CloneSet generation consistent")
-				gomega.Eventually(func() bool {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return cs.Generation == cs.Status.ObservedGeneration
-				}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
-
-				ginkgo.By("Wait for all pods updated and ready")
-				a, b, c := getResourcesInfo(pods[0])
-				gomega.Eventually(func() int32 {
-					cs, err = tester.GetCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-					pods, err = tester.ListPodsForCloneSet(cs.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					a1, b1, c1 := getResourcesInfo(pods[0])
-					if a1 != a || b1 != b || c1 != c {
-						framework.Logf("updateSpec %v", a1)
-						framework.Logf("spec %v", b1)
-						framework.Logf("container status %v ", c1)
-						a, b, c = a1, b1, c1
-					}
-					SkipTestWhenCgroupError(pods[0])
-
-					return cs.Status.UpdatedAvailableReplicas
-				}, 600*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
-
-				ginkgo.By("Verify two containers have all updated in-place")
-				pods, err = tester.ListPodsForCloneSet(cs.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(len(pods)).Should(gomega.Equal(1))
-
-				pod := pods[0]
-				nginxContainerStatus := util.GetContainerStatus("nginx", pod)
-				redisContainerStatus := util.GetContainerStatus("redis", pod)
-				gomega.Expect(nginxContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
-				gomega.Expect(redisContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
-
-				ginkgo.By("Verify nginx should be stopped after new redis has started")
-				gomega.Expect(nginxContainerStatus.LastTerminationState.Terminated.FinishedAt.After(redisContainerStatus.State.Running.StartedAt.Time.Add(time.Second*10))).
-					Should(gomega.Equal(true), fmt.Sprintf("nginx finish at %v is not after redis start %v + 10s",
-						nginxContainerStatus.LastTerminationState.Terminated.FinishedAt,
-						redisContainerStatus.State.Running.StartedAt))
-
-				ginkgo.By("Verify in-place update state in two batches")
-				inPlaceUpdateState := appspub.InPlaceUpdateState{}
-				gomega.Expect(pod.Annotations[appspub.InPlaceUpdateStateKey]).ShouldNot(gomega.BeEmpty())
-				err = json.Unmarshal([]byte(pod.Annotations[appspub.InPlaceUpdateStateKey]), &inPlaceUpdateState)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(len(inPlaceUpdateState.ContainerBatchesRecord)).Should(gomega.Equal(2))
-				gomega.Expect(inPlaceUpdateState.ContainerBatchesRecord[0].Containers).Should(gomega.Equal([]string{"redis"}))
-				gomega.Expect(inPlaceUpdateState.ContainerBatchesRecord[1].Containers).Should(gomega.Equal([]string{"nginx"}))
-				gomega.Expect(checkPodResource(pods, oldPodResource, []string{"redis"})).Should(gomega.Equal(true))
-			})
-		}
 
 		ginkgo.By("inplace update resources with RestartContainer policy")
 		testWithResizePolicy([]v1.ContainerResizePolicy{
@@ -1070,7 +472,9 @@ var _ = SIGDescribe("InplaceVPA", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check that daemon pods launch on every node of the cluster")
-			err = wait.PollImmediate(framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, tester.CheckRunningOnAllNodes(ds))
+			err = wait.PollUntilContextTimeout(context.TODO(), framework.DaemonSetRetryPeriod, framework.DaemonSetRetryTimeout, true, func(ctx context.Context) (bool, error) {
+				return tester.CheckRunningOnAllNodes(ds)()
+			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to start")
 
 			err = tester.CheckDaemonStatus(dsName)
@@ -1106,13 +510,8 @@ var _ = SIGDescribe("InplaceVPA", func() {
 				oldPodList, err = tester.ListDaemonPods(label)
 				pod := &oldPodList.Items[lastId]
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				a1, b1, c1 := getResourcesInfo(pod)
-				if a1 != a || b1 != b || c1 != c {
-					framework.Logf("updateSpec %v", a1)
-					framework.Logf("spec %v", b1)
-					framework.Logf("container status %v ", c1)
-					a, b, c = a1, b1, c1
-				}
+				getNewestResourcesInfo(pod, &a, &b, &c)
+
 				SkipTestWhenCgroupError(pod)
 				return updatedAvailable
 			}, 600*time.Second, 3*time.Second).Should(gomega.Equal(int32(len(oldPodList.Items))))
@@ -1219,6 +618,7 @@ func baseValidFn(pods []v1.Pod, image string, revision string) {
 				revision))
 	}
 }
+
 func rollbackWithUpdateFnTest(c clientset.Interface, kc kruiseclientset.Interface, ns string, ss *appsv1beta1.StatefulSet,
 	updateFn, rollbackFn func(update *appsv1beta1.StatefulSet), validateFn1, validateFn2 func([]v1.Pod)) {
 	sst := framework.NewStatefulSetTester(c, kc)
@@ -1309,6 +709,20 @@ func SkipTestWhenCgroupError(pod *v1.Pod) {
 	}
 }
 
+func getNewestResourcesInfo(po *v1.Pod, a, b, c *string) {
+	if po == nil {
+		return
+	}
+	a1, b1, c1 := getResourcesInfo(po)
+
+	if a1 != *a || b1 != *b || c1 != *c {
+		framework.Logf("updateSpec %v", a1)
+		framework.Logf("spec %v", b1)
+		framework.Logf("container status %v ", c1)
+		a, b, c = &a1, &b1, &c1
+	}
+}
+
 func getResourcesInfo(po *v1.Pod) (string, string, string) {
 	if po == nil {
 		return "", "", ""
@@ -1324,6 +738,7 @@ func getResourcesInfo(po *v1.Pod) (string, string, string) {
 	containerStatusJson, _ := json.Marshal(containerStatus)
 	return lastState, string(specResourcesJson), string(containerStatusJson)
 }
+
 func IsPodCreateError(pod *v1.Pod) bool {
 	if pod == nil {
 		return false
@@ -1341,4 +756,486 @@ func IsPodCreateError(pod *v1.Pod) bool {
 		}
 	}
 	return false
+}
+
+var (
+	largeResource = v1.ResourceRequirements{
+		Requests: map[v1.ResourceName]resource.Quantity{
+			v1.ResourceCPU:    resource.MustParse("100"),
+			v1.ResourceMemory: resource.MustParse("1000Gi"),
+		},
+		Limits: map[v1.ResourceName]resource.Quantity{
+			v1.ResourceCPU:    resource.MustParse("800"),
+			v1.ResourceMemory: resource.MustParse("8000Gi"),
+		},
+	}
+	oldResource = v1.ResourceRequirements{
+		Requests: map[v1.ResourceName]resource.Quantity{
+			v1.ResourceCPU:    resource.MustParse("200m"),
+			v1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+		Limits: map[v1.ResourceName]resource.Quantity{
+			v1.ResourceCPU:    resource.MustParse("1"),
+			v1.ResourceMemory: resource.MustParse("1Gi"),
+		},
+	}
+	newResource = v1.ResourceRequirements{
+		Requests: map[v1.ResourceName]resource.Quantity{
+			v1.ResourceCPU:    resource.MustParse("100m"),
+			v1.ResourceMemory: resource.MustParse("100Mi"),
+		},
+		Limits: map[v1.ResourceName]resource.Quantity{
+			v1.ResourceCPU:    resource.MustParse("800m"),
+			v1.ResourceMemory: resource.MustParse("800Mi"),
+		},
+	}
+)
+
+func updateClone(tester *framework.CloneSetTester, fn func(pod *v1.PodTemplateSpec), cs *appsv1alpha1.CloneSet, injectFailedResource bool) {
+	err := tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+		if cs.Annotations == nil {
+			cs.Annotations = map[string]string{}
+		}
+		fn(&cs.Spec.Template)
+		if injectFailedResource {
+			cs.Spec.Template.Spec.Containers[0].Resources = largeResource
+		}
+	})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	ginkgo.By("Wait for CloneSet generation consistent")
+	gomega.Eventually(func() bool {
+		cs, err = tester.GetCloneSet(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		return cs.Generation == cs.Status.ObservedGeneration
+	}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
+}
+
+// add this to avoid the situation where the pod status keeps changing
+// TODO: Remove this for status change optimization, maybe in Kubernetes 1.33.
+func waitUtilAllConsistent(oldContainerId string, fn func() (pods []*v1.Pod, err error), a, b, c *string) {
+	ginkgo.By("Wait for the pod status to be consistent")
+	gomega.Eventually(func() string {
+		pods, err := fn()
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		getNewestResourcesInfo(pods[0], a, b, c)
+
+		SkipTestWhenCgroupError(pods[0])
+		return pods[0].Status.ContainerStatuses[0].ContainerID
+	}, 120*time.Second, 3*time.Second).Should(gomega.Not(gomega.Equal(oldContainerId)))
+}
+
+// todo: can only check 1 replica cloneset, optimize this if we need more replica cases
+func waitCloneSetUpdatedAndReady(tester *framework.CloneSetTester, cs *appsv1alpha1.CloneSet, oldContainerId string, pods []*v1.Pod) {
+	var err error
+	a, b, c := getResourcesInfo(pods[0])
+	ginkgo.By("Wait for all pods updated and ready")
+	gomega.Eventually(func() int32 {
+		cs, err = tester.GetCloneSet(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.Logf("Cloneset updatedReplicas %v updatedReady %v updatedAvailableReplicas %v ",
+			cs.Status.UpdatedReplicas, cs.Status.UpdatedReadyReplicas, cs.Status.UpdatedAvailableReplicas)
+
+		pods, err = tester.ListPodsForCloneSet(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		getNewestResourcesInfo(pods[0], &a, &b, &c)
+		SkipTestWhenCgroupError(pods[0])
+		return cs.Status.UpdatedAvailableReplicas
+	}, 600*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+	waitUtilAllConsistent(oldContainerId, func() (pods []*v1.Pod, err error) {
+		return tester.ListPodsForCloneSet(cs.Name)
+	}, &a, &b, &c)
+}
+
+func testUpdateResource(tester *framework.CloneSetTester, fn func(pod *v1.PodTemplateSpec), resizePolicy []v1.ContainerResizePolicy, injectFailedResource bool) {
+	var err error
+	randStr := rand.String(10)
+	j, _ := json.Marshal(resizePolicy)
+	ginkgo.By(fmt.Sprintf("resize policy %v", string(j)))
+	cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+	cs.Spec.Template.Spec.Containers[0].ResizePolicy = resizePolicy
+	cs.Spec.Template.Spec.Containers[0].Image = NginxImage
+	cs.Spec.Template.ObjectMeta.Labels["test-env"] = "foo"
+	cs.Spec.Template.Spec.Containers[0].Env = append(cs.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
+		Name:      "TEST_ENV",
+		ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.labels['test-env']"}},
+	})
+	cs, err = tester.CreateCloneSet(cs)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+
+	ginkgo.By("Wait for replicas satisfied")
+	gomega.Eventually(func() int32 {
+		cs, err = tester.GetCloneSet(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		return cs.Status.Replicas
+	}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
+
+	ginkgo.By("Wait for all pods ready")
+	gomega.Eventually(func() int32 {
+		cs, err = tester.GetCloneSet(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		return cs.Status.ReadyReplicas
+	}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+	pods, err := tester.ListPodsForCloneSet(cs.Name)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	gomega.Expect(len(pods)).Should(gomega.Equal(1))
+	oldPodUID := pods[0].UID
+	oldContainerStatus := pods[0].Status.ContainerStatuses[0]
+	oldPodResource := getPodResource(pods[0])
+
+	if injectFailedResource {
+		ginkgo.By("Update with large resource")
+		updateClone(tester, fn, cs, true)
+
+		ginkgo.By("Wait for one pods updated and rejected")
+		gomega.Eventually(func() int32 {
+			cs, err = tester.GetCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			updatedVersion := cs.Status.UpdateRevision
+
+			framework.Logf("Cloneset updatedReplicas %v updatedReady %v updatedAvailableReplicas %v ",
+				cs.Status.UpdatedReplicas, cs.Status.UpdatedReadyReplicas, cs.Status.UpdatedAvailableReplicas)
+
+			pods, err = tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, pod := range pods {
+				revision := pod.Labels[apps.ControllerRevisionHashLabelKey]
+				if strings.Contains(updatedVersion, revision) {
+					if pod.Status.Resize == v1.PodResizeStatusInfeasible {
+						return 1
+					}
+				}
+			}
+
+			SkipTestWhenCgroupError(pods[0])
+			return 0
+		}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+	}
+
+	ginkgo.By("Update with input resource")
+	updateClone(tester, fn, cs, false)
+
+	waitCloneSetUpdatedAndReady(tester, cs, oldContainerStatus.ContainerID, pods)
+
+	ginkgo.By("Verify the containerID changed and restartCount should not be 0")
+	pods, err = tester.ListPodsForCloneSet(cs.Name)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	gomega.Expect(len(pods)).Should(gomega.Equal(1))
+	newPodUID := pods[0].UID
+	newContainerStatus := pods[0].Status.ContainerStatuses[0]
+
+	gomega.Expect(oldPodUID).Should(gomega.Equal(newPodUID))
+	gomega.Expect(newContainerStatus.ContainerID).NotTo(gomega.Equal(oldContainerStatus.ContainerID))
+	gomega.Expect(newContainerStatus.RestartCount).ShouldNot(gomega.Equal(int32(0)))
+
+	pods, err = tester.ListPodsForCloneSet(cs.Name)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	gomega.Expect(checkPodResource(pods, oldPodResource, []string{"redis"})).Should(gomega.Equal(true))
+}
+
+func testResizePolicyFailed(resizePolicy []v1.ContainerResizePolicy) {
+	injectFailedResource := true
+	// This can't be Conformance yet.
+	ginkgo.It("in-place update image and resource", func() {
+		fn := func(pod *v1.PodTemplateSpec) {
+			spec := &pod.Spec
+			ginkgo.By("in-place update image and resource")
+			spec.Containers[0].Image = NewNginxImage
+			spec.Containers[0].Resources = newResource
+		}
+		testUpdateResource(tester, fn, resizePolicy, injectFailedResource)
+	})
+
+	// This can't be Conformance yet.
+	ginkgo.FIt("in-place update resource and env from label", func() {
+		fn := func(pod *v1.PodTemplateSpec) {
+			spec := &pod.Spec
+			ginkgo.By("in-place update resource and env from label")
+			pod.Labels["test-env"] = "bar"
+			spec.Containers[0].Resources = newResource
+		}
+		testUpdateResource(tester, fn, resizePolicy, injectFailedResource)
+	})
+
+	// This can't be Conformance yet.
+	ginkgo.It("in-place update image, resource and env from label", func() {
+		fn := func(pod *v1.PodTemplateSpec) {
+			spec := &pod.Spec
+			ginkgo.By("in-place update image, resource and env from label")
+			spec.Containers[0].Image = NewNginxImage
+			pod.Labels["test-env"] = "bar"
+			spec.Containers[0].Resources = newResource
+		}
+		testUpdateResource(tester, fn, resizePolicy, injectFailedResource)
+	})
+}
+
+func testWithResizePolicy(resizePolicy []v1.ContainerResizePolicy) {
+	var err error
+	randStr := rand.String(10)
+	injectFailedResource := false
+
+	// This can't be Conformance yet.
+	ginkgo.It("in-place update image and resource", func() {
+		fn := func(pod *v1.PodTemplateSpec) {
+			spec := &pod.Spec
+			ginkgo.By("in-place update image and resource")
+			spec.Containers[0].Image = NewNginxImage
+			spec.Containers[0].Resources = newResource
+		}
+		testUpdateResource(tester, fn, resizePolicy, injectFailedResource)
+	})
+
+	// This can't be Conformance yet.
+	ginkgo.It("in-place update resource and env from label", func() {
+		fn := func(pod *v1.PodTemplateSpec) {
+			spec := &pod.Spec
+			ginkgo.By("in-place update resource and env from label")
+			pod.Labels["test-env"] = "bar"
+			spec.Containers[0].Resources = newResource
+		}
+		testUpdateResource(tester, fn, resizePolicy, injectFailedResource)
+	})
+
+	// This can't be Conformance yet.
+	ginkgo.It("in-place update image, resource and env from label", func() {
+		fn := func(pod *v1.PodTemplateSpec) {
+			spec := &pod.Spec
+			ginkgo.By("in-place update image, resource and env from label")
+			spec.Containers[0].Image = NewNginxImage
+			pod.Labels["test-env"] = "bar"
+			spec.Containers[0].Resources = newResource
+		}
+		testUpdateResource(tester, fn, resizePolicy, injectFailedResource)
+	})
+
+	framework.ConformanceIt("in-place update two container image, resource with priorities successfully", func() {
+		cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+		cs.Spec.Template.Spec.Containers[0].ResizePolicy = resizePolicy
+		cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
+			Name:      "redis",
+			Image:     RedisImage,
+			Command:   []string{"sleep", "999"},
+			Env:       []v1.EnvVar{{Name: appspub.ContainerLaunchPriorityEnvName, Value: "10"}},
+			Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
+		})
+		cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(3)
+		cs, err = tester.CreateCloneSet(cs)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+
+		ginkgo.By("Wait for replicas satisfied")
+		gomega.Eventually(func() int32 {
+			cs, err = tester.GetCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			return cs.Status.Replicas
+		}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
+
+		ginkgo.By("Wait for all pods ready")
+		gomega.Eventually(func() int32 {
+			cs, err = tester.GetCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			return cs.Status.ReadyReplicas
+		}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+		pods, err := tester.ListPodsForCloneSet(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(len(pods)).Should(gomega.Equal(1))
+		oldPodResource := getPodResource(pods[0])
+
+		updateClone(tester, func(pod *v1.PodTemplateSpec) {
+			pod.Spec.Containers[0].Image = NewNginxImage
+			pod.Spec.Containers[1].Image = imageutils.GetE2EImage(imageutils.BusyBox)
+			pod.Spec.Containers[0].Resources = newResource
+		}, cs, false)
+
+		waitCloneSetUpdatedAndReady(tester, cs, pods[0].Status.ContainerStatuses[0].ContainerID, pods)
+
+		ginkgo.By("Verify two containers have all updated in-place")
+		pods, err = tester.ListPodsForCloneSet(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(len(pods)).Should(gomega.Equal(1))
+
+		pod := pods[0]
+		nginxContainerStatus := util.GetContainerStatus("nginx", pod)
+		redisContainerStatus := util.GetContainerStatus("redis", pod)
+		// in 1.32+, update resource and image will use patch+update
+		// if resize Policy is restart, restartCount will be 2, but 1.32- will be 1
+		//gomega.Expect(nginxContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
+		gomega.Expect(redisContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
+
+		ginkgo.By("Verify nginx should be stopped after new redis has started 10s")
+		gomega.Expect(nginxContainerStatus.LastTerminationState.Terminated.FinishedAt.After(redisContainerStatus.State.Running.StartedAt.Time.Add(time.Second*10))).
+			Should(gomega.Equal(true), fmt.Sprintf("nginx finish at %v is not after redis start %v + 10s",
+				nginxContainerStatus.LastTerminationState.Terminated.FinishedAt,
+				redisContainerStatus.State.Running.StartedAt))
+
+		ginkgo.By("Verify in-place update state in two batches")
+		inPlaceUpdateState := appspub.InPlaceUpdateState{}
+		gomega.Expect(pod.Annotations[appspub.InPlaceUpdateStateKey]).ShouldNot(gomega.BeEmpty())
+		err = json.Unmarshal([]byte(pod.Annotations[appspub.InPlaceUpdateStateKey]), &inPlaceUpdateState)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(len(inPlaceUpdateState.ContainerBatchesRecord)).Should(gomega.Equal(2))
+		gomega.Expect(inPlaceUpdateState.ContainerBatchesRecord[0].Containers).Should(gomega.Equal([]string{"redis"}))
+		gomega.Expect(inPlaceUpdateState.ContainerBatchesRecord[1].Containers).Should(gomega.Equal([]string{"nginx"}))
+		gomega.Expect(checkPodResource(pods, oldPodResource, []string{"redis"})).Should(gomega.Equal(true))
+	})
+
+	framework.ConformanceIt("in-place update two container image, resource with priorities, should not update the next when the previous one failed", func() {
+		cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+		cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
+			Name:      "redis",
+			Image:     RedisImage,
+			Env:       []v1.EnvVar{{Name: appspub.ContainerLaunchPriorityEnvName, Value: "10"}},
+			Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
+		})
+		cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(3)
+		cs, err = tester.CreateCloneSet(cs)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+
+		ginkgo.By("Wait for replicas satisfied")
+		gomega.Eventually(func() int32 {
+			cs, err = tester.GetCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			return cs.Status.Replicas
+		}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
+
+		ginkgo.By("Wait for all pods ready")
+		gomega.Eventually(func() int32 {
+			cs, err = tester.GetCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			return cs.Status.ReadyReplicas
+		}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+		pods, err := tester.ListPodsForCloneSet(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(len(pods)).Should(gomega.Equal(1))
+		oldPodResource := getPodResource(pods[0])
+
+		ginkgo.By("Update images of nginx and redis")
+		updateClone(tester, func(pod *v1.PodTemplateSpec) {
+			pod.Spec.Containers[0].Image = NewNginxImage
+			pod.Spec.Containers[1].Image = imageutils.GetE2EImage(imageutils.BusyBox)
+			pod.Spec.Containers[0].Resources = newResource
+		}, cs, false)
+
+		ginkgo.By("Wait for redis failed to start")
+		var pod *v1.Pod
+		gomega.Eventually(func() *v1.ContainerStateTerminated {
+			pods, err = tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).Should(gomega.Equal(1))
+			pod = pods[0]
+			redisContainerStatus := util.GetContainerStatus("redis", pod)
+			return redisContainerStatus.LastTerminationState.Terminated
+		}, 60*time.Second, time.Second).ShouldNot(gomega.BeNil())
+
+		gomega.Eventually(func() *v1.ContainerStateWaiting {
+			pods, err = tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).Should(gomega.Equal(1))
+			pod = pods[0]
+			redisContainerStatus := util.GetContainerStatus("redis", pod)
+			return redisContainerStatus.State.Waiting
+		}, 60*time.Second, time.Second).ShouldNot(gomega.BeNil())
+
+		nginxContainerStatus := util.GetContainerStatus("nginx", pod)
+		gomega.Expect(nginxContainerStatus.RestartCount).Should(gomega.Equal(int32(0)))
+
+		ginkgo.By("Verify in-place update state only one batch and remain next")
+		inPlaceUpdateState := appspub.InPlaceUpdateState{}
+		gomega.Expect(pod.Annotations[appspub.InPlaceUpdateStateKey]).ShouldNot(gomega.BeEmpty())
+		err = json.Unmarshal([]byte(pod.Annotations[appspub.InPlaceUpdateStateKey]), &inPlaceUpdateState)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(len(inPlaceUpdateState.ContainerBatchesRecord)).Should(gomega.Equal(1))
+		gomega.Expect(inPlaceUpdateState.ContainerBatchesRecord[0].Containers).Should(gomega.Equal([]string{"redis"}))
+		gomega.Expect(inPlaceUpdateState.NextContainerImages).Should(gomega.Equal(map[string]string{"nginx": NewNginxImage}))
+		gomega.Expect(checkPodResource(pods, oldPodResource, []string{"redis"})).Should(gomega.Equal(false))
+	})
+
+	//This can't be Conformance yet.
+	ginkgo.It("in-place update two container image, resource and env from metadata with priorities", func() {
+		cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
+		cs.Spec.Template.Spec.Containers[0].ResizePolicy = resizePolicy
+		cs.Spec.Template.Annotations = map[string]string{"config": "foo"}
+		cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
+			Name:  "redis",
+			Image: RedisImage,
+			Env: []v1.EnvVar{
+				{Name: appspub.ContainerLaunchPriorityEnvName, Value: "10"},
+				{Name: "CONFIG", ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.annotations['config']"}}},
+			},
+			Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
+		})
+		cs, err = tester.CreateCloneSet(cs)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+
+		ginkgo.By("Wait for replicas satisfied")
+		gomega.Eventually(func() int32 {
+			cs, err = tester.GetCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			return cs.Status.Replicas
+		}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
+
+		ginkgo.By("Wait for all pods ready")
+		gomega.Eventually(func() int32 {
+			cs, err = tester.GetCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			return cs.Status.ReadyReplicas
+		}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+		pods, err := tester.ListPodsForCloneSet(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(len(pods)).Should(gomega.Equal(1))
+		oldPodResource := getPodResource(pods[0])
+
+		ginkgo.By("Update nginx image and config annotation")
+
+		updateClone(tester, func(pod *v1.PodTemplateSpec) {
+			pod.Spec.Containers[0].Image = NewNginxImage
+			pod.Annotations["config"] = "bar"
+			pod.Spec.Containers[0].Resources = newResource
+		}, cs, false)
+
+		waitCloneSetUpdatedAndReady(tester, cs, pods[0].Status.ContainerStatuses[0].ContainerID, pods)
+
+		ginkgo.By("Verify two containers have all updated in-place")
+		pods, err = tester.ListPodsForCloneSet(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(len(pods)).Should(gomega.Equal(1))
+
+		pod := pods[0]
+		nginxContainerStatus := util.GetContainerStatus("nginx", pod)
+		redisContainerStatus := util.GetContainerStatus("redis", pod)
+		//gomega.Expect(nginxContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
+		gomega.Expect(redisContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
+
+		ginkgo.By("Verify nginx should be stopped after new redis has started")
+		var t time.Time
+		if nginxContainerStatus.LastTerminationState.Terminated != nil {
+			t = nginxContainerStatus.LastTerminationState.Terminated.FinishedAt.Time
+		} else {
+			// fix https://github.com/openkruise/kruise/issues/1925
+			t = nginxContainerStatus.State.Running.StartedAt.Time
+		}
+		gomega.Expect(t.After(redisContainerStatus.State.Running.StartedAt.Time.Add(time.Second*10))).
+			Should(gomega.Equal(true), fmt.Sprintf("nginx finish at %v is not after redis start %v + 10s",
+				nginxContainerStatus.LastTerminationState.Terminated.FinishedAt,
+				redisContainerStatus.State.Running.StartedAt))
+
+		ginkgo.By("Verify in-place update state in two batches")
+		inPlaceUpdateState := appspub.InPlaceUpdateState{}
+		gomega.Expect(pod.Annotations[appspub.InPlaceUpdateStateKey]).ShouldNot(gomega.BeEmpty())
+		err = json.Unmarshal([]byte(pod.Annotations[appspub.InPlaceUpdateStateKey]), &inPlaceUpdateState)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(len(inPlaceUpdateState.ContainerBatchesRecord)).Should(gomega.Equal(2))
+		gomega.Expect(inPlaceUpdateState.ContainerBatchesRecord[0].Containers).Should(gomega.Equal([]string{"redis"}))
+		gomega.Expect(inPlaceUpdateState.ContainerBatchesRecord[1].Containers).Should(gomega.Equal([]string{"nginx"}))
+		gomega.Expect(checkPodResource(pods, oldPodResource, []string{"redis"})).Should(gomega.Equal(true))
+	})
 }

@@ -18,15 +18,14 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"context"
-	"time"
+	context "context"
 
-	v1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	scheme "github.com/openkruise/kruise/pkg/client/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	rest "k8s.io/client-go/rest"
+	gentype "k8s.io/client-go/gentype"
 )
 
 // PodUnavailableBudgetsGetter has a method to return a PodUnavailableBudgetInterface.
@@ -37,158 +36,34 @@ type PodUnavailableBudgetsGetter interface {
 
 // PodUnavailableBudgetInterface has methods to work with PodUnavailableBudget resources.
 type PodUnavailableBudgetInterface interface {
-	Create(ctx context.Context, podUnavailableBudget *v1alpha1.PodUnavailableBudget, opts v1.CreateOptions) (*v1alpha1.PodUnavailableBudget, error)
-	Update(ctx context.Context, podUnavailableBudget *v1alpha1.PodUnavailableBudget, opts v1.UpdateOptions) (*v1alpha1.PodUnavailableBudget, error)
-	UpdateStatus(ctx context.Context, podUnavailableBudget *v1alpha1.PodUnavailableBudget, opts v1.UpdateOptions) (*v1alpha1.PodUnavailableBudget, error)
+	Create(ctx context.Context, podUnavailableBudget *policyv1alpha1.PodUnavailableBudget, opts v1.CreateOptions) (*policyv1alpha1.PodUnavailableBudget, error)
+	Update(ctx context.Context, podUnavailableBudget *policyv1alpha1.PodUnavailableBudget, opts v1.UpdateOptions) (*policyv1alpha1.PodUnavailableBudget, error)
+	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+	UpdateStatus(ctx context.Context, podUnavailableBudget *policyv1alpha1.PodUnavailableBudget, opts v1.UpdateOptions) (*policyv1alpha1.PodUnavailableBudget, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.PodUnavailableBudget, error)
-	List(ctx context.Context, opts v1.ListOptions) (*v1alpha1.PodUnavailableBudgetList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*policyv1alpha1.PodUnavailableBudget, error)
+	List(ctx context.Context, opts v1.ListOptions) (*policyv1alpha1.PodUnavailableBudgetList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PodUnavailableBudget, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *policyv1alpha1.PodUnavailableBudget, err error)
 	PodUnavailableBudgetExpansion
 }
 
 // podUnavailableBudgets implements PodUnavailableBudgetInterface
 type podUnavailableBudgets struct {
-	client rest.Interface
-	ns     string
+	*gentype.ClientWithList[*policyv1alpha1.PodUnavailableBudget, *policyv1alpha1.PodUnavailableBudgetList]
 }
 
 // newPodUnavailableBudgets returns a PodUnavailableBudgets
 func newPodUnavailableBudgets(c *PolicyV1alpha1Client, namespace string) *podUnavailableBudgets {
 	return &podUnavailableBudgets{
-		client: c.RESTClient(),
-		ns:     namespace,
+		gentype.NewClientWithList[*policyv1alpha1.PodUnavailableBudget, *policyv1alpha1.PodUnavailableBudgetList](
+			"podunavailablebudgets",
+			c.RESTClient(),
+			scheme.ParameterCodec,
+			namespace,
+			func() *policyv1alpha1.PodUnavailableBudget { return &policyv1alpha1.PodUnavailableBudget{} },
+			func() *policyv1alpha1.PodUnavailableBudgetList { return &policyv1alpha1.PodUnavailableBudgetList{} },
+		),
 	}
-}
-
-// Get takes name of the podUnavailableBudget, and returns the corresponding podUnavailableBudget object, and an error if there is any.
-func (c *podUnavailableBudgets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.PodUnavailableBudget, err error) {
-	result = &v1alpha1.PodUnavailableBudget{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("podunavailablebudgets").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of PodUnavailableBudgets that match those selectors.
-func (c *podUnavailableBudgets) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.PodUnavailableBudgetList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	result = &v1alpha1.PodUnavailableBudgetList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("podunavailablebudgets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested podUnavailableBudgets.
-func (c *podUnavailableBudgets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("podunavailablebudgets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
-}
-
-// Create takes the representation of a podUnavailableBudget and creates it.  Returns the server's representation of the podUnavailableBudget, and an error, if there is any.
-func (c *podUnavailableBudgets) Create(ctx context.Context, podUnavailableBudget *v1alpha1.PodUnavailableBudget, opts v1.CreateOptions) (result *v1alpha1.PodUnavailableBudget, err error) {
-	result = &v1alpha1.PodUnavailableBudget{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("podunavailablebudgets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(podUnavailableBudget).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Update takes the representation of a podUnavailableBudget and updates it. Returns the server's representation of the podUnavailableBudget, and an error, if there is any.
-func (c *podUnavailableBudgets) Update(ctx context.Context, podUnavailableBudget *v1alpha1.PodUnavailableBudget, opts v1.UpdateOptions) (result *v1alpha1.PodUnavailableBudget, err error) {
-	result = &v1alpha1.PodUnavailableBudget{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("podunavailablebudgets").
-		Name(podUnavailableBudget.Name).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(podUnavailableBudget).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *podUnavailableBudgets) UpdateStatus(ctx context.Context, podUnavailableBudget *v1alpha1.PodUnavailableBudget, opts v1.UpdateOptions) (result *v1alpha1.PodUnavailableBudget, err error) {
-	result = &v1alpha1.PodUnavailableBudget{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("podunavailablebudgets").
-		Name(podUnavailableBudget.Name).
-		SubResource("status").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(podUnavailableBudget).
-		Do(ctx).
-		Into(result)
-	return
-}
-
-// Delete takes name of the podUnavailableBudget and deletes it. Returns an error if one occurs.
-func (c *podUnavailableBudgets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("podunavailablebudgets").
-		Name(name).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *podUnavailableBudgets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	var timeout time.Duration
-	if listOpts.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
-	}
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("podunavailablebudgets").
-		VersionedParams(&listOpts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Body(&opts).
-		Do(ctx).
-		Error()
-}
-
-// Patch applies the patch and returns the patched podUnavailableBudget.
-func (c *podUnavailableBudgets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PodUnavailableBudget, err error) {
-	result = &v1alpha1.PodUnavailableBudget{}
-	err = c.client.Patch(pt).
-		Namespace(c.ns).
-		Resource("podunavailablebudgets").
-		Name(name).
-		SubResource(subresources...).
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Body(data).
-		Do(ctx).
-		Into(result)
-	return
 }

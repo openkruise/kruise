@@ -89,7 +89,7 @@ We encourage contributors to follow the [PR template](./.github/PULL_REQUEST_TEM
 As a contributor, if you want to make any contribution to the Kruise project, we should reach an agreement on the version of tools used in the development environment.
 Here are some dependencies with specific versions:
 
-- Golang : v1.18+
+- Golang : v1.22+
 - Kubernetes: v1.16+
 
 ### Developing guide

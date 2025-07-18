@@ -444,7 +444,7 @@ func TestDefaultPatchUpdateSpecToPod(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			gotPod, err := defaultPatchUpdateSpecToPod(givenPod.DeepCopy(), tc.spec, tc.state)
+			gotPod, _, err := defaultPatchUpdateSpecToPod(givenPod.DeepCopy(), tc.spec, tc.state)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1569,7 +1569,7 @@ func TestDefaultPatchUpdateSpecToPod_Resource(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlaceWorkloadVerticalScaling, tc.vpaEnabled)()
-			gotPod, err := defaultPatchUpdateSpecToPod(pod.DeepCopy(), tc.spec, tc.state)
+			gotPod, _, err := defaultPatchUpdateSpecToPod(pod.DeepCopy(), tc.spec, tc.state)
 			if err != nil {
 				t.Fatal(err)
 			}

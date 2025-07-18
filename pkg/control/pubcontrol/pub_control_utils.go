@@ -35,7 +35,9 @@ import (
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	kubeClient "github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/feature"
 )
 
 const (
@@ -251,9 +253,25 @@ func IsReferenceEqual(ref1, ref2 *policyv1alpha1.TargetReference) bool {
 
 func isNeedPubProtection(pub *policyv1alpha1.PodUnavailableBudget, operation policyv1alpha1.PubOperation) bool {
 	operationValue, ok := pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation]
+	enableInPlacePodVerticalScaling := feature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
+	operations := sets.New[policyv1alpha1.PubOperation]()
 	if !ok || operationValue == "" {
-		return true
+		// by default, protect delete, update, evict
+		operations.Insert(
+			policyv1alpha1.PubDeleteOperation,
+			policyv1alpha1.PubUpdateOperation,
+			policyv1alpha1.PubEvictOperation,
+		)
 	}
-	operations := sets.NewString(strings.Split(operationValue, ",")...)
-	return operations.Has(string(operation))
+
+	for _, action := range strings.Split(operationValue, ",") {
+		operations.Insert(policyv1alpha1.PubOperation(action))
+	}
+
+	// if featureGate InPlacePodVerticalScaling is disabled, resize will be treat as update
+	if !enableInPlacePodVerticalScaling && operations.Has(policyv1alpha1.PubUpdateOperation) {
+		operations.Insert(policyv1alpha1.PubResizeOperation)
+	}
+
+	return operations.Has(operation)
 }

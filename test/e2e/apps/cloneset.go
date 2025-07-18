@@ -86,6 +86,99 @@ var _ = SIGDescribe("CloneSet", func() {
 			}
 		})
 
+		framework.ConformanceIt("creates with lifecycle preNormal finalizer", func() {
+			cs := tester.NewCloneSetWithLifecycle("clone-"+randStr, 1, &appspub.Lifecycle{
+				PreNormal: &appspub.LifecycleHook{FinalizersHandler: []string{"finalizers.sigs.k8s.io/test"}},
+			}, []string{})
+
+			cs, err := tester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// pod is ready but lifecycle should stay at preparingNormal.
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			pods, err := tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			for _, pod := range pods {
+				// preNormal has not been not hooked.
+				gomega.Expect(pod.Labels[appspub.LifecycleStateKey]).Should(gomega.Equal(string(appspub.LifecycleStatePreparingNormal)))
+			}
+
+			// pod preNormal is hooked.
+			pod := pods[0].DeepCopy()
+			pod.Finalizers = []string{"finalizers.sigs.k8s.io/test"}
+			_, err = c.CoreV1().Pods(cs.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// pod lifecycle label should be Normal.
+			gomega.Eventually(func() string {
+				pods, err := tester.ListPodsForCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(pods).To(gomega.HaveLen(1))
+				for _, pod := range pods {
+					return pod.Labels[appspub.LifecycleStateKey]
+				}
+				return ""
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(string(appspub.LifecycleStateNormal)))
+
+			// remove pod finalizers.
+			pod, err = c.CoreV1().Pods(cs.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			pod.Finalizers = nil
+
+			_, err = c.CoreV1().Pods(cs.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+
+		framework.ConformanceIt("creates with unschedulable scheduler", func() {
+			cs := tester.NewCloneSetWithSpecificScheduler("clone-"+randStr, 1, "unschedulable")
+
+			cs, err := tester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.Replicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			// pod is pending and lifecycle should stay at preparingNormal.
+			gomega.Consistently(func() string {
+				pods, err := tester.ListPodsForCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				pod := pods[0]
+				if pod.Status.Phase == v1.PodPending {
+					return pod.Labels[appspub.LifecycleStateKey]
+				}
+
+				return ""
+			}, 10*time.Second, time.Second).Should(gomega.Equal(string(appspub.LifecycleStatePreparingNormal)))
+
+			// update schedulerName.
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) { cs.Spec.Template.Spec.SchedulerName = "" })
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			gomega.Eventually(func() string {
+				pods, err := tester.ListPodsForCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(pods).To(gomega.HaveLen(1))
+				for _, pod := range pods {
+					return pod.Labels[appspub.LifecycleStateKey]
+				}
+				return ""
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(string(appspub.LifecycleStateNormal)))
+		})
 	})
 
 	framework.KruiseDescribe("CloneSet Scaling", func() {

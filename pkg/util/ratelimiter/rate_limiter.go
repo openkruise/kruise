@@ -18,9 +18,9 @@ func init() {
 var baseDelay, maxDelay time.Duration
 var qps, bucketSize int
 
-func DefaultControllerRateLimiter() workqueue.RateLimiter {
-	return workqueue.NewMaxOfRateLimiter(
-		workqueue.NewItemExponentialFailureRateLimiter(baseDelay, maxDelay),
-		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(qps), bucketSize)},
+func DefaultControllerRateLimiter[T comparable]() workqueue.TypedRateLimiter[T] {
+	return workqueue.NewTypedMaxOfRateLimiter(
+		workqueue.NewTypedItemExponentialFailureRateLimiter[T](baseDelay, maxDelay),
+		&workqueue.TypedBucketRateLimiter[T]{Limiter: rate.NewLimiter(rate.Limit(qps), bucketSize)},
 	)
 }

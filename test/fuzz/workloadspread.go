@@ -18,10 +18,10 @@ package fuzz
 
 import (
 	"math"
-	"math/rand"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/configuration"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -165,7 +165,7 @@ func GenerateWorkloadSpreadSubsetPatch(cf *fuzz.ConsumeFuzzer, subset *appsv1alp
 }
 
 func GenerateWorkloadSpreadSubsetReplicas(cf *fuzz.ConsumeFuzzer, subset *appsv1alpha1.WorkloadSpreadSubset) error {
-	maxReplicas, err := GenerateSubsetReplicas(cf)
+	maxReplicas, err := GenerateIntOrString(cf)
 	if err != nil {
 		return err
 	}
@@ -183,12 +183,29 @@ func GenerateWorkloadSpreadNodeSelectorTerm(cf *fuzz.ConsumeFuzzer, subset *apps
 }
 
 func GenerateWorkloadSpreadTolerations(cf *fuzz.ConsumeFuzzer, subset *appsv1alpha1.WorkloadSpreadSubset) error {
-	tolerations := make([]corev1.Toleration, rand.Intn(2)+1)
+	tolerations := make([]corev1.Toleration, r.Intn(collectionMaxElements)+1)
 	for i := range tolerations {
 		if err := GenerateTolerations(cf, &tolerations[i]); err != nil {
 			return err
 		}
 	}
 	subset.Tolerations = tolerations
+	return nil
+}
+
+func GenerateWorkloadSpreadWhiteList(cf *fuzz.ConsumeFuzzer, whiteList *configuration.WSCustomWorkloadWhiteList) error {
+	sliceLen, err := cf.GetInt()
+	if err != nil {
+		return err
+	}
+	workloads := make([]configuration.CustomWorkload, sliceLen%3+1)
+	for i := range workloads {
+		workLoad := configuration.CustomWorkload{}
+		if err := cf.GenerateStruct(&workLoad); err != nil {
+			return err
+		}
+		workloads[i] = workLoad
+	}
+	whiteList.Workloads = workloads
 	return nil
 }

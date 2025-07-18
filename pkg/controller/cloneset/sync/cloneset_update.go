@@ -170,9 +170,19 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 	var state appspub.LifecycleStateType
 	switch lifecycle.GetPodLifecycleState(pod) {
 	case appspub.LifecycleStatePreparingNormal:
-		if cs.Spec.Lifecycle == nil ||
-			cs.Spec.Lifecycle.PreNormal == nil ||
-			lifecycle.IsPodAllHooked(cs.Spec.Lifecycle.PreNormal, pod) {
+		// 1.the pod lifecycle can be transformed from PreparingNormal to Normal only if Pod is scheduled.
+		// If lifecycle transformed from PreparingNormal to Normal immediately after pod created,
+		// it may trigger a BUG of old version kube-scheduler with some probability.  https://github.com/openkruise/kruise/issues/1485
+		// 2.the semantic of this hook, let's leave it as it is:
+		// PreNormalHook: only if all hooks are hooked (or no hook), the pod can be transformed to Normal
+		var shouldNormal bool
+		if cs.Spec.Lifecycle == nil || cs.Spec.Lifecycle.PreNormal == nil {
+			shouldNormal = util.HasPodScheduled(pod)
+		} else {
+			shouldNormal = lifecycle.IsPodAllHooked(cs.Spec.Lifecycle.PreNormal, pod)
+		}
+
+		if shouldNormal {
 			state = appspub.LifecycleStateNormal
 		}
 	case appspub.LifecycleStatePreparingUpdate:

@@ -24,8 +24,8 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 	criapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	criremote "k8s.io/cri-client/pkg"
 	"k8s.io/klog/v2"
-	criremote "k8s.io/kubernetes/pkg/kubelet/cri/remote"
 
 	runtimeimage "github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
@@ -93,7 +93,8 @@ func NewFactory(accountManager daemonutil.ImagePullAccountManager) (Factory, err
 			continue
 		}
 
-		runtimeService, err = criremote.NewRemoteRuntimeService(cfg.runtimeRemoteURI, time.Second*5, oteltrace.NewNoopTracerProvider())
+		logger := klog.Background()
+		runtimeService, err = criremote.NewRemoteRuntimeService(cfg.runtimeRemoteURI, time.Second*5, oteltrace.NewNoopTracerProvider(), &logger)
 		if err != nil {
 			klog.ErrorS(err, "Failed to new runtime service", "runtimeType", cfg.runtimeType, "runtimeURI", cfg.runtimeURI, "runtimeRemoteURI", cfg.runtimeRemoteURI)
 			continue

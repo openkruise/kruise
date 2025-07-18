@@ -34,7 +34,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/utils/integer"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -382,7 +382,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	status.ObservedGeneration = set.Generation
 	status.CurrentRevision = currentRevision.Name
 	status.UpdateRevision = updateRevision.Name
-	status.CollisionCount = utilpointer.Int32Ptr(collisionCount)
+	status.CollisionCount = ptr.To[int32](collisionCount)
 	status.LabelSelector = selector.String()
 	minReadySeconds := getMinReadySeconds(set)
 
@@ -475,7 +475,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	processReplicaFn := func(i int) (bool, bool, error) {
 		return ssc.processReplica(ctx, set, updateSet, monotonic, replicas, i, &status, scaleMaxUnavailable)
 	}
-	if shouldExit, err := runForAllWithBreak(replicas, processReplicaFn); shouldExit || err != nil {
+	if shouldExit, err := runForAllWithBreak(replicas, processReplicaFn, monotonic); shouldExit || err != nil {
 		ssc.updatePVCStatus(&status, set, replicas)
 		updateStatus(&status, minReadySeconds, currentRevision, updateRevision, replicas, condemned)
 		return &status, err
@@ -1076,7 +1076,7 @@ func (ssc *defaultStatefulSetControl) processCondemned(ctx context.Context, set 
 //
 // Returns:
 // - bool shouldExit: whether to exit.
-// - bool shouldBreak: whether to break the pod for-loop and proceed with the update logic.
+// - bool shouldBreak: whether to break out of the loop.
 // - An error if encountered during processing; nil otherwise.
 func (ssc *defaultStatefulSetControl) processReplica(
 	ctx context.Context,
@@ -1099,12 +1099,16 @@ func (ssc *defaultStatefulSetControl) processReplica(
 	// container, not by the reason for pod termination. We should restart the pod
 	// regardless of the exit code.
 	if isFailed(replicas[i]) || isSucceeded(replicas[i]) {
+		if decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
+			// We must wait for pods to finish terminating or we violate max scale
+			return false, true, nil
+		}
 		if replicas[i].DeletionTimestamp == nil {
 			if _, _, err := ssc.deletePod(set, replicas[i]); err != nil {
 				return true, false, err
 			}
 		}
-		// New pod should be generated on the next sync after the current pod is removed from etcd.
+		// Continue with next pods (unless monotonic)
 		return true, false, nil
 	}
 	// If we find a Pod that has not been created we create the Pod
@@ -1282,15 +1286,25 @@ func slowStartBatch(initialBatchSize int, remaining int, fn func(int) (bool, err
 //  3. An error object, in case an error occurs during function execution.
 //
 // Returns:
-// - A boolean indicating whether an exit condition was met or an error occurred during iteration.
+// - A boolean indicating whether an exit condition was met or an error occurred during iteration, only applicable to monotonic updates
 // - An error object, if an error was encountered during the execution of the provided function.
-func runForAllWithBreak(pods []*v1.Pod, fn func(i int) (bool, bool, error)) (bool, error) {
-	for i := range pods {
-		if shouldExit, shouldBreak, err := fn(i); shouldExit || err != nil {
-			return true, err
-		} else if shouldBreak {
-			//Introduce this branch to exit the for-loop while proceeding with subsequent update logic.
-			break
+func runForAllWithBreak(pods []*v1.Pod, fn func(i int) (bool, bool, error), monotonic bool) (bool, error) {
+	if monotonic {
+		for i := range pods {
+			if shouldExit, shouldBreak, err := fn(i); shouldExit || err != nil {
+				return true, err
+			} else if shouldBreak {
+				//Introduce this branch to exit the for-loop while proceeding with subsequent update logic.
+				break
+			}
+		}
+	} else {
+		for i := range pods {
+			if _, shouldBreak, err := fn(i); err != nil {
+				return true, err
+			} else if shouldBreak {
+				break
+			}
 		}
 	}
 	return false, nil

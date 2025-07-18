@@ -199,7 +199,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, labels map[string]s
 	}
 	// Be robust about making the namespace creation call.
 	var got *v1.Namespace
-	if err := wait.PollImmediate(Poll, 30*time.Second, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.TODO(), Poll, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 		var err error
 		got, err = c.CoreV1().Namespaces().Create(context.TODO(), namespaceObj, metav1.CreateOptions{})
 		if err != nil {
@@ -264,7 +264,7 @@ func deleteNS(c clientset.Interface, dynamicClient dynamic.Interface, namespace 
 	}
 
 	// wait for namespace to delete or timeout.
-	err := wait.PollImmediate(2*time.Second, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.TODO(), 2*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		if _, err := c.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
@@ -443,7 +443,7 @@ func hasRemainingContent(c clientset.Interface, dynamicClient dynamic.Interface,
 func waitForServerPreferredNamespacedResources(d discovery.DiscoveryInterface, timeout time.Duration) ([]*metav1.APIResourceList, error) {
 	Logf("Waiting up to %v for server preferred namespaced resources to be successfully discovered", timeout)
 	var resources []*metav1.APIResourceList
-	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
+	if err := wait.PollUntilContextTimeout(context.TODO(), Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		var err error
 		resources, err = d.ServerPreferredNamespacedResources()
 		if err == nil || isDynamicDiscoveryError(err) {
@@ -573,7 +573,7 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 	Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, TestContext.AllowedNotReadyNodes)
 
 	var notReady []*v1.Node
-	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.TODO(), Poll, timeout, true, func(ctx context.Context) (bool, error) {
 		notReady = nil
 		// It should be OK to list unschedulable Nodes here.
 		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
@@ -802,7 +802,9 @@ func waitForPodRunningInNamespaceSlow(c clientset.Interface, podName, namespace 
 
 // WaitTimeoutForPodRunningInNamespace waits default amount of time
 func WaitTimeoutForPodRunningInNamespace(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
-	return wait.PollImmediate(Poll, timeout, podRunning(c, podName, namespace))
+	return wait.PollUntilContextTimeout(context.TODO(), Poll, timeout, true, func(ctx context.Context) (bool, error) {
+		return podRunning(c, podName, namespace)()
+	})
 }
 
 func podRunning(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
@@ -1129,7 +1131,7 @@ func waitListSchedulableNodesOrDie(c clientset.Interface) *v1.NodeList {
 func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 	var nodes *v1.NodeList
 	var err error
-	if wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
+	if wait.PollUntilContextTimeout(context.TODO(), Poll, SingleCallTimeout, false, func(ctx context.Context) (bool, error) {
 		nodes, err = c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{FieldSelector: fields.Set{
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})

@@ -44,9 +44,9 @@ import (
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 )
 
-var _ handler.TypedEventHandler[*corev1.Pod] = &enqueueRequestForPod{}
+var _ handler.TypedEventHandler[*corev1.Pod, reconcile.Request] = &enqueueRequestForPod{}
 
-func newEnqueueRequestForPod(c client.Client) handler.TypedEventHandler[*corev1.Pod] {
+func newEnqueueRequestForPod(c client.Client) handler.TypedEventHandler[*corev1.Pod, reconcile.Request] {
 	e := &enqueueRequestForPod{client: c}
 	e.controllerFinder = controllerfinder.Finder
 	return e
@@ -57,21 +57,21 @@ type enqueueRequestForPod struct {
 	controllerFinder *controllerfinder.ControllerFinder
 }
 
-func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	p.addPod(q, evt.Object)
 }
 
-func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	p.updatePod(q, evt.ObjectOld, evt.ObjectNew)
 }
 
-func (p *enqueueRequestForPod) addPod(q workqueue.RateLimitingInterface, obj runtime.Object) {
+func (p *enqueueRequestForPod) addPod(q workqueue.TypedRateLimitingInterface[reconcile.Request], obj runtime.Object) {
 	pod, ok := obj.(*corev1.Pod)
 	if !ok {
 		return
@@ -134,7 +134,7 @@ func GetPubForPod(c client.Client, pod *corev1.Pod) (*policyv1alpha1.PodUnavaila
 	return nil, nil
 }
 
-func (p *enqueueRequestForPod) updatePod(q workqueue.RateLimitingInterface, old, cur runtime.Object) {
+func (p *enqueueRequestForPod) updatePod(q workqueue.TypedRateLimitingInterface[reconcile.Request], old, cur runtime.Object) {
 	newPod := cur.(*corev1.Pod)
 	oldPod := old.(*corev1.Pod)
 	if newPod.ResourceVersion == oldPod.ResourceVersion {
@@ -191,25 +191,25 @@ type SetEnqueueRequestForPUB struct {
 }
 
 // Create implements EventHandler
-func (e *SetEnqueueRequestForPUB) Create(ctx context.Context, evt event.CreateEvent, q workqueue.RateLimitingInterface) {
+func (e *SetEnqueueRequestForPUB) Create(ctx context.Context, evt event.CreateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	e.addSetRequest(evt.Object, q)
 }
 
 // Update implements EventHandler
-func (e *SetEnqueueRequestForPUB) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.RateLimitingInterface) {
+func (e *SetEnqueueRequestForPUB) Update(ctx context.Context, evt event.UpdateEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	e.addSetRequest(evt.ObjectNew, q)
 }
 
 // Delete implements EventHandler
-func (e *SetEnqueueRequestForPUB) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.RateLimitingInterface) {
+func (e *SetEnqueueRequestForPUB) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	e.addSetRequest(evt.Object, q)
 }
 
 // Generic implements EventHandler
-func (e *SetEnqueueRequestForPUB) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.RateLimitingInterface) {
+func (e *SetEnqueueRequestForPUB) Generic(ctx context.Context, evt event.GenericEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueue.RateLimitingInterface) {
+func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	gvk, _ := apiutil.GVKForObject(object, e.mgr.GetScheme())
 	targetRef := &policyv1alpha1.TargetReference{
 		APIVersion: gvk.GroupVersion().String(),

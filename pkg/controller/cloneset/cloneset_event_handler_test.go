@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
@@ -171,7 +172,12 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 		}
 
 		enqueueHandler := newTestPodEventHandler(fakeClient)
-		q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-queue")
+		q := workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+			workqueue.TypedRateLimitingQueueConfig[reconcile.Request]{
+				Name: "test-queue",
+			},
+		)
 		modifySatisfied := false
 		if testCase.alterExpectationCreationsKey != "" && len(testCase.alterExpectationCreationsAdds) > 0 {
 			for _, n := range testCase.alterExpectationCreationsAdds {
@@ -733,7 +739,12 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 			fakeClient.Create(context.TODO(), cs)
 		}
 		enqueueHandler := newTestPodEventHandler(fakeClient)
-		q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-queue")
+		q := workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+			workqueue.TypedRateLimitingQueueConfig[reconcile.Request]{
+				Name: "test-queue",
+			},
+		)
 
 		enqueueHandler.Update(context.TODO(), testCase.e, q)
 		time.Sleep(time.Millisecond * 10)

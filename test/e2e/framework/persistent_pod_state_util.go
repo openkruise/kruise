@@ -23,27 +23,28 @@ import (
 	"fmt"
 	"time"
 
-	kruiseappsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	"github.com/openkruise/kruise/pkg/util/configuration"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-
 	"github.com/onsi/gomega"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacvapi1 "k8s.io/api/rbac/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
+
+	kruiseappsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/util/configuration"
 )
 
 type PersistentPodStateTester struct {
@@ -75,7 +76,7 @@ func (s *PersistentPodStateTester) NewBaseStatefulset(namespace string) *appsv1.
 			Labels:      map[string]string{},
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas: utilpointer.Int32Ptr(5),
+			Replicas: ptr.To[int32](5),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "staticip",
@@ -96,7 +97,7 @@ func (s *PersistentPodStateTester) NewBaseStatefulset(namespace string) *appsv1.
 							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 						},
 					},
-					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(5),
+					TerminationGracePeriodSeconds: ptr.To(int64(5)),
 				},
 			},
 		},
@@ -104,8 +105,8 @@ func (s *PersistentPodStateTester) NewBaseStatefulset(namespace string) *appsv1.
 }
 
 func (s *PersistentPodStateTester) WaitForStatefulsetRunning(sts *appsv1.StatefulSet) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute*5,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute*5, true,
+		func(ctx context.Context) (bool, error) {
 			inner, err := s.c.AppsV1().StatefulSets(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, nil
@@ -192,7 +193,7 @@ func (s *PersistentPodStateTester) NewBaseStatefulsetLikeTest(namespace string) 
 			Labels:      map[string]string{},
 		},
 		Spec: StatefulSetLikeTestSpec{
-			Replicas: utilpointer.Int32Ptr(5),
+			Replicas: ptr.To[int32](5),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "staticip",
@@ -213,7 +214,7 @@ func (s *PersistentPodStateTester) NewBaseStatefulsetLikeTest(namespace string) 
 							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 						},
 					},
-					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(5),
+					TerminationGracePeriodSeconds: ptr.To(int64(5)),
 				},
 			},
 		},
@@ -254,7 +255,7 @@ func (s *PersistentPodStateTester) CreateStatefulsetLikeCRD(namespace string) {
 					Deprecated: false,
 					Schema: &apiextensionsv1.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-							XPreserveUnknownFields: utilpointer.BoolPtr(true),
+							XPreserveUnknownFields: ptr.To(true),
 							Type:                   "object",
 						},
 					},
@@ -383,8 +384,8 @@ func (s *PersistentPodStateTester) CreateStatefulsetLikePods(sts *StatefulSetLik
 }
 
 func (s *PersistentPodStateTester) waitStatefulsetLikePodsRunning(sts *StatefulSetLikeTest) {
-	pollErr := wait.PollImmediate(time.Second*3, time.Minute*5,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second*3, time.Minute*5, true,
+		func(ctx context.Context) (bool, error) {
 			options := metav1.ListOptions{LabelSelector: "app=staticip"}
 			items, err := s.c.CoreV1().Pods(sts.Namespace).List(context.TODO(), options)
 			if err != nil {

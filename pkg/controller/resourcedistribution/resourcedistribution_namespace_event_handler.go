@@ -29,9 +29,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-var _ handler.TypedEventHandler[*corev1.Namespace] = &enqueueRequestForNamespace{}
+var _ handler.TypedEventHandler[*corev1.Namespace, reconcile.Request] = &enqueueRequestForNamespace{}
 
 type matchFunc func(*corev1.Namespace, *appsv1alpha1.ResourceDistribution) (bool, error)
 
@@ -39,21 +40,21 @@ type enqueueRequestForNamespace struct {
 	reader client.Reader
 }
 
-func (p *enqueueRequestForNamespace) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Namespace], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForNamespace) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Namespace], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	p.addNamespace(q, evt.Object, matchViaTargets)
 }
-func (p *enqueueRequestForNamespace) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Namespace], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForNamespace) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Namespace], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	p.addNamespace(q, evt.Object, matchViaIncludedNamespaces)
 }
-func (p *enqueueRequestForNamespace) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Namespace], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForNamespace) Generic(ctx context.Context, evt event.TypedGenericEvent[*corev1.Namespace], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
-func (p *enqueueRequestForNamespace) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Namespace], q workqueue.RateLimitingInterface) {
+func (p *enqueueRequestForNamespace) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Namespace], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	p.updateNamespace(q, evt.ObjectOld, evt.ObjectNew)
 }
 
 // When a Namespace was created or deleted, figure out what ResourceDistribution it will work on it and enqueue them.
 // obj must have *v1.Namespace type.
-func (p *enqueueRequestForNamespace) addNamespace(q workqueue.RateLimitingInterface, obj runtime.Object, fn matchFunc) {
+func (p *enqueueRequestForNamespace) addNamespace(q workqueue.TypedRateLimitingInterface[reconcile.Request], obj runtime.Object, fn matchFunc) {
 	namespace, ok := obj.(*corev1.Namespace)
 	if !ok {
 		return
@@ -69,7 +70,7 @@ func (p *enqueueRequestForNamespace) addNamespace(q workqueue.RateLimitingInterf
 
 // When labels of a Namespace were updated, figure out what ResourceDistribution it will work on it and enqueue them.
 // objOld and objNew must have *v1.Namespace type.
-func (p *enqueueRequestForNamespace) updateNamespace(q workqueue.RateLimitingInterface, objOld, objNew runtime.Object) {
+func (p *enqueueRequestForNamespace) updateNamespace(q workqueue.TypedRateLimitingInterface[reconcile.Request], objOld, objNew runtime.Object) {
 	namespaceOld, okOld := objOld.(*corev1.Namespace)
 	namespaceNew, okNew := objNew.(*corev1.Namespace)
 	if !okOld || !okNew || reflect.DeepEqual(namespaceNew.ObjectMeta.Labels, namespaceOld.ObjectMeta.Labels) {

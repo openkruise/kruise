@@ -282,8 +282,8 @@ func (s *ResourceDistributionTester) DeleteResourceDistribution(resourceDistribu
 }
 
 func (s *ResourceDistributionTester) WaitForResourceDistributionCreated(name string, timeout time.Duration) {
-	pollErr := wait.PollImmediate(time.Second, timeout,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, timeout, false,
+		func(ctx context.Context) (bool, error) {
 			_, err := s.kc.AppsV1alpha1().ResourceDistributions().Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -296,8 +296,8 @@ func (s *ResourceDistributionTester) WaitForResourceDistributionCreated(name str
 }
 
 func (s *ResourceDistributionTester) WaitForNamespaceCreated(namespace *corev1.Namespace) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, false,
+		func(ctx context.Context) (bool, error) {
 			_, err := s.c.CoreV1().Namespaces().Get(context.TODO(), namespace.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -310,8 +310,8 @@ func (s *ResourceDistributionTester) WaitForNamespaceCreated(namespace *corev1.N
 }
 
 func (s *ResourceDistributionTester) WaitForSecretCreated(namespace, name string, timeout time.Duration) {
-	pollErr := wait.PollImmediate(time.Second, timeout,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, timeout, false,
+		func(ctx context.Context) (bool, error) {
 			_, err := s.c.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			Logf("wait for secret(%s) err %v", namespace, err)
 			if err != nil && errors.IsNotFound(err) {
@@ -327,8 +327,8 @@ func (s *ResourceDistributionTester) WaitForSecretCreated(namespace, name string
 }
 
 func (s *ResourceDistributionTester) WaitForNamespaceDeleted(namespace *corev1.Namespace) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, false,
+		func(ctx context.Context) (bool, error) {
 			_, err := s.c.CoreV1().Namespaces().Get(context.TODO(), namespace.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
@@ -344,8 +344,8 @@ func (s *ResourceDistributionTester) WaitForNamespaceDeleted(namespace *corev1.N
 }
 
 func (s *ResourceDistributionTester) WaitForResourceDistributionDeleted(resourceDistribution *appsv1alpha1.ResourceDistribution) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, false,
+		func(ctx context.Context) (bool, error) {
 			_, err := s.kc.AppsV1alpha1().ResourceDistributions().Get(context.TODO(), resourceDistribution.Name, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {

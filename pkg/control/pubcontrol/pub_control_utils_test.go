@@ -30,13 +30,15 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openkruise/kruise/apis/apps/pub"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	"github.com/openkruise/kruise/pkg/util/feature"
 )
 
 func init() {
@@ -91,7 +93,7 @@ var (
 					Kind:       "ReplicaSet",
 					Name:       "nginx",
 					UID:        types.UID("606132e0-85ef-460a-8cf5-cd8f915a8cc3"),
-					Controller: utilpointer.BoolPtr(true),
+					Controller: ptr.To(true),
 				},
 			},
 		},
@@ -133,7 +135,7 @@ var (
 			UID:       types.UID("f6d5b184-d82f-461c-a432-fbd59e2f0379"),
 		},
 		Spec: apps.DeploymentSpec{
-			Replicas: utilpointer.Int32Ptr(10),
+			Replicas: ptr.To[int32](10),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "nginx",
@@ -156,7 +158,7 @@ var (
 					Kind:       "Deployment",
 					Name:       "nginx",
 					UID:        types.UID("f6d5b184-d82f-461c-a432-fbd59e2f0379"),
-					Controller: utilpointer.BoolPtr(true),
+					Controller: ptr.To(true),
 				},
 			},
 			UID: types.UID("606132e0-85ef-460a-8cf5-cd8f915a8cc3"),
@@ -165,7 +167,7 @@ var (
 			},
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: utilpointer.Int32Ptr(10),
+			Replicas: ptr.To[int32](10),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "nginx",
@@ -430,6 +432,177 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 			}
 			if !cs.matchedPub && pub != nil {
 				t.Fatalf("GetPubForPod failed")
+			}
+		})
+	}
+}
+
+func TestIsNeedPubProtection(t *testing.T) {
+	cases := []struct {
+		name          string
+		getPub        func() *policyv1alpha1.PodUnavailableBudget
+		operation     policyv1alpha1.PubOperation
+		expectProtect bool
+		enableInplace bool
+	}{
+		{
+			name: "pub protect update by default",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:     policyv1alpha1.PubUpdateOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub protect delete by default",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:     policyv1alpha1.PubDeleteOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub protect evict by default",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:     policyv1alpha1.PubEvictOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub not protect resize by default when featureGate InPlacePodVerticalScaling is enabled",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:     policyv1alpha1.PubResizeOperation,
+			enableInplace: true,
+			expectProtect: false,
+		},
+		{
+			name: "pub protect resize by default when featureGate InPlacePodVerticalScaling is disabled",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				return pub
+			},
+			operation:     policyv1alpha1.PubResizeOperation,
+			enableInplace: false,
+			expectProtect: true,
+		},
+		{
+			name: "pub protect resize",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubResizeOperation),
+				}
+				return pub
+			},
+			operation:     policyv1alpha1.PubResizeOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub protect update",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubResizeOperation) + "," + string(policyv1alpha1.PubUpdateOperation),
+				}
+				return pub
+			},
+			operation:     policyv1alpha1.PubUpdateOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub won't protect update when resize set",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubResizeOperation) + "," + string(policyv1alpha1.PubDeleteOperation),
+				}
+				return pub
+			},
+			operation:     policyv1alpha1.PubUpdateOperation,
+			expectProtect: false,
+		},
+		{
+			name: "pub not protect update when resize not set",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubEvictOperation) + "," + string(policyv1alpha1.PubDeleteOperation),
+				}
+				return pub
+			},
+			operation:     policyv1alpha1.PubUpdateOperation,
+			expectProtect: false,
+		},
+		{
+			name: "pub protect resize when update set and featureGate InPlacePodVerticalScaling is disabled",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubEvictOperation) + "," + string(policyv1alpha1.PubUpdateOperation),
+				}
+				return pub
+			},
+			enableInplace: false,
+			operation:     policyv1alpha1.PubResizeOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub not protect resize when update set and featureGate InPlacePodVerticalScaling enabled",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubEvictOperation) + "," + string(policyv1alpha1.PubUpdateOperation),
+				}
+				return pub
+			},
+			enableInplace: true,
+			operation:     policyv1alpha1.PubResizeOperation,
+			expectProtect: false,
+		},
+		{
+			name: "pub not protect resize when featureGate InPlacePodVerticalScaling enabled",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubEvictOperation),
+				}
+				return pub
+			},
+			enableInplace: true,
+			operation:     policyv1alpha1.PubResizeOperation,
+			expectProtect: false,
+		},
+		{
+			name: "pub not protect resize when featureGate InPlacePodVerticalScaling disabled",
+			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubEvictOperation),
+				}
+				return pub
+			},
+			enableInplace: false,
+			operation:     policyv1alpha1.PubResizeOperation,
+			expectProtect: false,
+		},
+	}
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			if cs.enableInplace {
+				feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+			}
+			pub := cs.getPub()
+			protect := isNeedPubProtection(pub, cs.operation)
+			feature.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.InPlacePodVerticalScaling, false)
+			if cs.expectProtect != protect {
+				t.Fatalf("isNeedPubProtection failed, expect: %v, but got: %v", cs.expectProtect, protect)
 			}
 		})
 	}

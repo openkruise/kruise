@@ -6,18 +6,18 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/workqueue"
-	utilpointer "k8s.io/utils/pointer"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-
 	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/workqueue"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 var (
@@ -33,7 +33,7 @@ var (
 					Kind:       "ReplicaSet",
 					Name:       "nginx",
 					UID:        types.UID("606132e0-85ef-460a-8cf5-cd8f915a8cc3"),
-					Controller: utilpointer.BoolPtr(true),
+					Controller: ptr.To(true),
 				},
 			},
 		},
@@ -69,7 +69,9 @@ func TestPodUpdateEventHandler(t *testing.T) {
 	newPod := podDemo.DeepCopy()
 	newPod.ResourceVersion = fmt.Sprintf("%d", time.Now().Unix())
 
-	updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	updateQ := workqueue.NewTypedRateLimitingQueue(
+		workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+	)
 	updateEvent := event.TypedUpdateEvent[*corev1.Pod]{
 		ObjectOld: podDemo,
 		ObjectNew: newPod,
@@ -590,7 +592,9 @@ func TestPodUpdateEventHandler_v2(t *testing.T) {
 			}
 			_ = fakeClient.Create(context.TODO(), cs.getNode())
 			oldPod, newPod := cs.getPod()
-			updateQ := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+			updateQ := workqueue.NewTypedRateLimitingQueue(
+				workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+			)
 			updateEvent := event.TypedUpdateEvent[*corev1.Pod]{
 				ObjectOld: oldPod,
 				ObjectNew: newPod,

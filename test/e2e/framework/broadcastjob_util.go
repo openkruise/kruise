@@ -69,8 +69,8 @@ func (t *BroadcastJobTester) GetPodsOfJob(job *appsv1alpha1.BroadcastJob) (pods 
 }
 
 func (t *BroadcastJobTester) WaitForBroadcastJobCreated(job *appsv1alpha1.BroadcastJob) {
-	pollErr := wait.PollImmediate(time.Second, time.Minute,
-		func() (bool, error) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, true,
+		func(ctx context.Context) (bool, error) {
 			_, err := t.kc.AppsV1alpha1().BroadcastJobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err

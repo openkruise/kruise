@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // PersistentPodStateLister helps list PersistentPodStates.
@@ -29,7 +29,7 @@ import (
 type PersistentPodStateLister interface {
 	// List lists all PersistentPodStates in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.PersistentPodState, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.PersistentPodState, err error)
 	// PersistentPodStates returns an object that can list and get PersistentPodStates.
 	PersistentPodStates(namespace string) PersistentPodStateNamespaceLister
 	PersistentPodStateListerExpansion
@@ -37,25 +37,17 @@ type PersistentPodStateLister interface {
 
 // persistentPodStateLister implements the PersistentPodStateLister interface.
 type persistentPodStateLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*appsv1alpha1.PersistentPodState]
 }
 
 // NewPersistentPodStateLister returns a new PersistentPodStateLister.
 func NewPersistentPodStateLister(indexer cache.Indexer) PersistentPodStateLister {
-	return &persistentPodStateLister{indexer: indexer}
-}
-
-// List lists all PersistentPodStates in the indexer.
-func (s *persistentPodStateLister) List(selector labels.Selector) (ret []*v1alpha1.PersistentPodState, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.PersistentPodState))
-	})
-	return ret, err
+	return &persistentPodStateLister{listers.New[*appsv1alpha1.PersistentPodState](indexer, appsv1alpha1.Resource("persistentpodstate"))}
 }
 
 // PersistentPodStates returns an object that can list and get PersistentPodStates.
 func (s *persistentPodStateLister) PersistentPodStates(namespace string) PersistentPodStateNamespaceLister {
-	return persistentPodStateNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return persistentPodStateNamespaceLister{listers.NewNamespaced[*appsv1alpha1.PersistentPodState](s.ResourceIndexer, namespace)}
 }
 
 // PersistentPodStateNamespaceLister helps list and get PersistentPodStates.
@@ -63,36 +55,15 @@ func (s *persistentPodStateLister) PersistentPodStates(namespace string) Persist
 type PersistentPodStateNamespaceLister interface {
 	// List lists all PersistentPodStates in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.PersistentPodState, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.PersistentPodState, err error)
 	// Get retrieves the PersistentPodState from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.PersistentPodState, error)
+	Get(name string) (*appsv1alpha1.PersistentPodState, error)
 	PersistentPodStateNamespaceListerExpansion
 }
 
 // persistentPodStateNamespaceLister implements the PersistentPodStateNamespaceLister
 // interface.
 type persistentPodStateNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all PersistentPodStates in the indexer for a given namespace.
-func (s persistentPodStateNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.PersistentPodState, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.PersistentPodState))
-	})
-	return ret, err
-}
-
-// Get retrieves the PersistentPodState from the indexer for a given namespace and name.
-func (s persistentPodStateNamespaceLister) Get(name string) (*v1alpha1.PersistentPodState, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("persistentpodstate"), name)
-	}
-	return obj.(*v1alpha1.PersistentPodState), nil
+	listers.ResourceIndexer[*appsv1alpha1.PersistentPodState]
 }

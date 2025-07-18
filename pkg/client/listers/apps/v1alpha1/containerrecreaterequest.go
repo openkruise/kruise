@@ -18,10 +18,10 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/tools/cache"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	labels "k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers"
+	cache "k8s.io/client-go/tools/cache"
 )
 
 // ContainerRecreateRequestLister helps list ContainerRecreateRequests.
@@ -29,7 +29,7 @@ import (
 type ContainerRecreateRequestLister interface {
 	// List lists all ContainerRecreateRequests in the indexer.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.ContainerRecreateRequest, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.ContainerRecreateRequest, err error)
 	// ContainerRecreateRequests returns an object that can list and get ContainerRecreateRequests.
 	ContainerRecreateRequests(namespace string) ContainerRecreateRequestNamespaceLister
 	ContainerRecreateRequestListerExpansion
@@ -37,25 +37,17 @@ type ContainerRecreateRequestLister interface {
 
 // containerRecreateRequestLister implements the ContainerRecreateRequestLister interface.
 type containerRecreateRequestLister struct {
-	indexer cache.Indexer
+	listers.ResourceIndexer[*appsv1alpha1.ContainerRecreateRequest]
 }
 
 // NewContainerRecreateRequestLister returns a new ContainerRecreateRequestLister.
 func NewContainerRecreateRequestLister(indexer cache.Indexer) ContainerRecreateRequestLister {
-	return &containerRecreateRequestLister{indexer: indexer}
-}
-
-// List lists all ContainerRecreateRequests in the indexer.
-func (s *containerRecreateRequestLister) List(selector labels.Selector) (ret []*v1alpha1.ContainerRecreateRequest, err error) {
-	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.ContainerRecreateRequest))
-	})
-	return ret, err
+	return &containerRecreateRequestLister{listers.New[*appsv1alpha1.ContainerRecreateRequest](indexer, appsv1alpha1.Resource("containerrecreaterequest"))}
 }
 
 // ContainerRecreateRequests returns an object that can list and get ContainerRecreateRequests.
 func (s *containerRecreateRequestLister) ContainerRecreateRequests(namespace string) ContainerRecreateRequestNamespaceLister {
-	return containerRecreateRequestNamespaceLister{indexer: s.indexer, namespace: namespace}
+	return containerRecreateRequestNamespaceLister{listers.NewNamespaced[*appsv1alpha1.ContainerRecreateRequest](s.ResourceIndexer, namespace)}
 }
 
 // ContainerRecreateRequestNamespaceLister helps list and get ContainerRecreateRequests.
@@ -63,36 +55,15 @@ func (s *containerRecreateRequestLister) ContainerRecreateRequests(namespace str
 type ContainerRecreateRequestNamespaceLister interface {
 	// List lists all ContainerRecreateRequests in the indexer for a given namespace.
 	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.ContainerRecreateRequest, err error)
+	List(selector labels.Selector) (ret []*appsv1alpha1.ContainerRecreateRequest, err error)
 	// Get retrieves the ContainerRecreateRequest from the indexer for a given namespace and name.
 	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.ContainerRecreateRequest, error)
+	Get(name string) (*appsv1alpha1.ContainerRecreateRequest, error)
 	ContainerRecreateRequestNamespaceListerExpansion
 }
 
 // containerRecreateRequestNamespaceLister implements the ContainerRecreateRequestNamespaceLister
 // interface.
 type containerRecreateRequestNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all ContainerRecreateRequests in the indexer for a given namespace.
-func (s containerRecreateRequestNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.ContainerRecreateRequest, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.ContainerRecreateRequest))
-	})
-	return ret, err
-}
-
-// Get retrieves the ContainerRecreateRequest from the indexer for a given namespace and name.
-func (s containerRecreateRequestNamespaceLister) Get(name string) (*v1alpha1.ContainerRecreateRequest, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(v1alpha1.Resource("containerrecreaterequest"), name)
-	}
-	return obj.(*v1alpha1.ContainerRecreateRequest), nil
+	listers.ResourceIndexer[*appsv1alpha1.ContainerRecreateRequest]
 }

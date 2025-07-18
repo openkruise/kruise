@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -135,7 +136,7 @@ var (
 			UID:       types.UID("f6d5b184-d82f-461c-a432-fbd59e2f0379"),
 		},
 		Spec: apps.DeploymentSpec{
-			Replicas: utilpointer.Int32Ptr(10),
+			Replicas: ptr.To[int32](10),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "nginx",
@@ -167,7 +168,7 @@ var (
 			},
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: utilpointer.Int32Ptr(10),
+			Replicas: ptr.To[int32](10),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "nginx",
@@ -198,7 +199,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -212,7 +213,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[1].Name,
 							UID:        rs[1].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -258,7 +259,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -272,7 +273,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[1].Name,
 							UID:        rs[1].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -319,7 +320,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -333,7 +334,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[1].Name,
 							UID:        rs[1].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -385,7 +386,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -404,7 +405,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[1].Name,
 							UID:        rs[1].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -490,7 +491,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -539,7 +540,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -589,7 +590,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -638,7 +639,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					if i >= 7 {
@@ -692,7 +693,7 @@ func TestPubReconcile(t *testing.T) {
 							Kind:       "ReplicaSet",
 							Name:       rs[0].Name,
 							UID:        rs[0].UID,
-							Controller: utilpointer.BoolPtr(true),
+							Controller: ptr.To(true),
 						},
 					}
 					pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -951,12 +952,12 @@ func TestPubReconcile(t *testing.T) {
 			},
 			getDeployment: func() *apps.Deployment {
 				object := deploymentDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return object
 			},
 			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
@@ -1001,12 +1002,12 @@ func TestPubReconcile(t *testing.T) {
 			},
 			getDeployment: func() *apps.Deployment {
 				object := deploymentDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return object
 			},
 			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
@@ -1051,12 +1052,12 @@ func TestPubReconcile(t *testing.T) {
 			},
 			getDeployment: func() *apps.Deployment {
 				object := deploymentDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return object
 			},
 			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
@@ -1101,12 +1102,12 @@ func TestPubReconcile(t *testing.T) {
 			},
 			getDeployment: func() *apps.Deployment {
 				object := deploymentDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return object
 			},
 			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
@@ -1155,12 +1156,12 @@ func TestPubReconcile(t *testing.T) {
 			},
 			getDeployment: func() *apps.Deployment {
 				object := deploymentDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return object
 			},
 			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {
@@ -1214,12 +1215,12 @@ func TestPubReconcile(t *testing.T) {
 			},
 			getDeployment: func() *apps.Deployment {
 				object := deploymentDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return object
 			},
 			getReplicaSet: func() []*apps.ReplicaSet {
 				object := replicaSetDemo.DeepCopy()
-				object.Spec.Replicas = utilpointer.Int32Ptr(100)
+				object.Spec.Replicas = ptr.To[int32](100)
 				return []*apps.ReplicaSet{object}
 			},
 			getPub: func() *policyv1alpha1.PodUnavailableBudget {

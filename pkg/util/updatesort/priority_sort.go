@@ -44,7 +44,7 @@ func (ps *prioritySort) Sort(pods []*v1.Pod, indexes []int) []int {
 	f := func(i, j int) bool {
 		podI := pods[indexes[i]]
 		podJ := pods[indexes[j]]
-		return ps.compare(podI.Labels, podJ.Labels, indexes[i] > indexes[j])
+		return ps.compare(podI.Labels, podJ.Labels, i < j)
 	}
 
 	sort.SliceStable(indexes, f)

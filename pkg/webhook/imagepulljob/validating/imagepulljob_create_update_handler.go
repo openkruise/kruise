@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -101,7 +101,7 @@ func validate(obj *appsv1alpha1.ImagePullJob) error {
 		obj.Spec.PullPolicy = &appsv1alpha1.PullPolicy{}
 	}
 	if obj.Spec.PullPolicy.TimeoutSeconds == nil {
-		obj.Spec.PullPolicy.TimeoutSeconds = utilpointer.Int32Ptr(600)
+		obj.Spec.PullPolicy.TimeoutSeconds = ptr.To[int32](600)
 	}
 	switch obj.Spec.CompletionPolicy.Type {
 	case appsv1alpha1.Always:
