@@ -921,3 +921,162 @@ func TestSyncProgressingStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestHasProgressingConditionChanged(t *testing.T) {
+	now := time.Now()
+	oldCond := &appsv1alpha1.CloneSetCondition{
+		Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
+		Status:             v1.ConditionTrue,
+		Reason:             string(appsv1alpha1.CloneSetProgressUpdated),
+		Message:            "Old message",
+		LastUpdateTime:     metav1.NewTime(now),
+		LastTransitionTime: metav1.NewTime(now.Add(-time.Minute)),
+	}
+
+	newCond := &appsv1alpha1.CloneSetCondition{
+		Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
+		Status:             v1.ConditionTrue,
+		Reason:             string(appsv1alpha1.CloneSetProgressUpdated),
+		Message:            "New message",
+		LastUpdateTime:     metav1.NewTime(now),
+		LastTransitionTime: metav1.NewTime(now),
+	}
+
+	tests := []struct {
+		name           string
+		oldStatus      appsv1alpha1.CloneSetStatus
+		newStatus      appsv1alpha1.CloneSetStatus
+		expectedResult bool
+	}{
+		{
+			name:           "Both nil",
+			oldStatus:      appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{}},
+			newStatus:      appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{}},
+			expectedResult: false,
+		},
+		{
+			name:           "Old nil, new exists",
+			oldStatus:      appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{}},
+			newStatus:      appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{*newCond}},
+			expectedResult: true,
+		},
+		{
+			name:           "All fields same",
+			oldStatus:      appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{*oldCond}},
+			newStatus:      appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{*oldCond}},
+			expectedResult: false,
+		},
+		{
+			name:      "Status changed",
+			oldStatus: appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{*oldCond}},
+			newStatus: func() appsv1alpha1.CloneSetStatus {
+				c := *oldCond
+				c.Status = v1.ConditionFalse
+				return appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{c}}
+			}(),
+			expectedResult: true,
+		},
+		{
+			name:      "Reason changed",
+			oldStatus: appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{*oldCond}},
+			newStatus: func() appsv1alpha1.CloneSetStatus {
+				c := *oldCond
+				c.Reason = string(appsv1alpha1.CloneSetProgressPaused)
+				return appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{c}}
+			}(),
+			expectedResult: true,
+		},
+		{
+			name:      "Message changed",
+			oldStatus: appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{*oldCond}},
+			newStatus: func() appsv1alpha1.CloneSetStatus {
+				c := *oldCond
+				c.Message = "New message"
+				return appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{c}}
+			}(),
+			expectedResult: true,
+		},
+		{
+			name:      "LastUpdateTime changed",
+			oldStatus: appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{*oldCond}},
+			newStatus: func() appsv1alpha1.CloneSetStatus {
+				c := *oldCond
+				c.LastUpdateTime = metav1.NewTime(now.Add(time.Minute))
+				return appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{c}}
+			}(),
+			expectedResult: true,
+		},
+		{
+			name:      "LastTransitionTime changed",
+			oldStatus: appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{*oldCond}},
+			newStatus: func() appsv1alpha1.CloneSetStatus {
+				c := *oldCond
+				c.LastTransitionTime = metav1.NewTime(now.Add(time.Minute))
+				return appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{c}}
+			}(),
+			expectedResult: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := hasProgressingConditionChanged(tt.oldStatus, tt.newStatus); got != tt.expectedResult {
+				t.Errorf("hasProgressingConditionChanged() = %v, want %v", got, tt.expectedResult)
+			}
+		})
+	}
+}
+
+func TestGetRequeueSecondsFromCondition(t *testing.T) {
+	now := time.Now()
+	condition := &appsv1alpha1.CloneSetCondition{
+		LastUpdateTime: metav1.NewTime(now.Add(-5 * time.Second)), // 5秒前更新
+	}
+
+	tests := []struct {
+		name           string
+		condition      *appsv1alpha1.CloneSetCondition
+		pds            int32 // ProgressDeadlineSeconds
+		now            time.Time
+		expectedResult time.Duration
+	}{
+		{
+			name:           "Condition nil",
+			condition:      nil,
+			pds:            10,
+			now:            now,
+			expectedResult: -1,
+		},
+		{
+			name:           "Deadline not exceeded",
+			condition:      condition,
+			pds:            10, // 10秒截止
+			now:            now,
+			expectedResult: 6 * time.Second, // 5秒剩余 + 1秒
+		},
+		{
+			name:           "Deadline exceeded",
+			condition:      condition,
+			pds:            4, // 4秒截止
+			now:            now,
+			expectedResult: 0,
+		},
+		{
+			name: "Exactly at deadline",
+			condition: &appsv1alpha1.CloneSetCondition{
+				LastUpdateTime: metav1.NewTime(now.Add(-4 * time.Second)),
+			},
+			pds:            4,
+			now:            now,
+			expectedResult: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getRequeueSecondsFromCondition(tt.condition, tt.pds, tt.now); got != tt.expectedResult {
+				t.Errorf("getRequeueSecondsFromCondition() = %v, want %v", got, tt.expectedResult)
+			}
+		})
+	}
+}
