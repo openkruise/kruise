@@ -90,19 +90,26 @@ func (m *SubsetControl) CreateSubset(ud *alpha1.UnitedDeployment, subsetName str
 
 // UpdateSubset is used to update the subset. The target Subset workload can be found with the input subset.
 func (m *SubsetControl) UpdateSubset(subset *Subset, ud *alpha1.UnitedDeployment, revision string, replicas, partition int32) error {
-	set := m.adapter.NewResourceObject()
+	workload := m.adapter.NewResourceObject()
 	var updateError error
 	for i := 0; i < updateRetries; i++ {
-		getError := m.Client.Get(context.TODO(), m.objectKey(&subset.ObjectMeta), set)
+		getError := m.Client.Get(context.TODO(), m.objectKey(&subset.ObjectMeta), workload)
 		if getError != nil {
 			return getError
 		}
 
-		if err := m.adapter.ApplySubsetTemplate(ud, subset.Spec.SubsetName, revision, replicas, partition, set); err != nil {
+		if err := m.adapter.ApplySubsetTemplate(ud, subset.Spec.SubsetName, revision, replicas, partition, workload); err != nil {
 			return err
 		}
 
-		updateError = m.Client.Update(context.TODO(), set)
+		if subset.Status.UnschedulableStatus.Unschedulable && ud.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
+			maxUnavailable := subset.Spec.Replicas - subset.Status.ReadyReplicas + subset.Status.UnschedulableStatus.UpdateTimeoutPods
+			klog.V(3).InfoS("overwrite subset maxUnavailable",
+				"unitedDeployment", klog.KObj(ud), "maxUnavailable", maxUnavailable, "subset", subset.Name)
+			m.adapter.SetMaxUnavailable(workload, maxUnavailable)
+		}
+
+		updateError = m.Client.Update(context.TODO(), workload)
 		if updateError == nil {
 			break
 		}
@@ -112,13 +119,13 @@ func (m *SubsetControl) UpdateSubset(subset *Subset, ud *alpha1.UnitedDeployment
 		return updateError
 	}
 
-	return m.adapter.PostUpdate(ud, set, revision, partition)
+	return m.adapter.PostUpdate(ud, workload, revision, partition)
 }
 
 // DeleteSubset is called to delete the subset. The target Subset workload can be found with the input subset.
 func (m *SubsetControl) DeleteSubset(subSet *Subset) error {
 	set := subSet.Spec.SubsetRef.Resources[0].(client.Object)
-	return m.Delete(context.TODO(), set, client.PropagationPolicy(metav1.DeletePropagationBackground))
+	return m.Delete(context.Background(), set, client.PropagationPolicy(metav1.DeletePropagationBackground))
 }
 
 // GetSubsetFailure return the error message extracted form Subset workload status conditions.
@@ -170,7 +177,7 @@ func (m *SubsetControl) convertToSubset(set metav1.Object, updatedRevision strin
 	subset.Status.Replicas = m.adapter.GetStatusReplicas(set)
 	subset.Status.ReadyReplicas = m.adapter.GetStatusReadyReplicas(set)
 	subset.Status.UpdatedReplicas, subset.Status.UpdatedReadyReplicas = adapter.CalculateUpdatedReplicas(pods, updatedRevision)
-
+	subset.Status.UpdatedRevision = updatedRevision
 	return subset, nil
 }
 

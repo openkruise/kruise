@@ -108,10 +108,10 @@ func (r *ReconcileUnitedDeployment) constructUnitedDeploymentRevisions(ud *appsa
 	revisionCount := len(revisions)
 
 	if equalCount > 0 && history.EqualRevision(revisions[revisionCount-1], equalRevisions[equalCount-1]) {
-		// if the equivalent revision is immediately prior the update revision has not changed
+		// if the equivalent revision is immediately prior to the update revision has not changed
 		updateRevision = revisions[revisionCount-1]
 	} else if equalCount > 0 {
-		// if the equivalent revision is not immediately prior we will roll back by incrementing the
+		// if the equivalent revision is not immediately prior to we will roll back by incrementing the
 		// Revision of the equivalent revision
 		equalRevisions[equalCount-1].Revision = updateRevision.Revision
 		err := r.Client.Update(context.TODO(), equalRevisions[equalCount-1])

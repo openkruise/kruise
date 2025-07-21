@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/klog/v2"
 
@@ -85,6 +86,15 @@ func (a *DeploymentAdapter) GetStatusReadyReplicas(obj metav1.Object) int32 {
 // Deployment has no condition.
 func (a *DeploymentAdapter) GetSubsetFailure() *string {
 	return nil
+}
+
+func (a *DeploymentAdapter) SetMaxUnavailable(obj metav1.Object, val int32) metav1.Object {
+	deployment := obj.(*appsv1.Deployment)
+	if deployment.Spec.Strategy.RollingUpdate == nil {
+		deployment.Spec.Strategy.RollingUpdate = &appsv1.RollingUpdateDeployment{}
+	}
+	deployment.Spec.Strategy.RollingUpdate.MaxUnavailable = &intstr.IntOrString{Type: intstr.Int, IntVal: val}
+	return deployment
 }
 
 // ApplySubsetTemplate updates the subset to the latest revision, depending on the DeploymentTemplate.

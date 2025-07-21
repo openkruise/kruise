@@ -38,8 +38,8 @@ func (in *AdaptiveUnitedDeploymentStrategy) DeepCopyInto(out *AdaptiveUnitedDepl
 		*out = new(int32)
 		**out = **in
 	}
-	if in.UnschedulableLastSeconds != nil {
-		in, out := &in.UnschedulableLastSeconds, &out.UnschedulableLastSeconds
+	if in.UnschedulableDuration != nil {
+		in, out := &in.UnschedulableDuration, &out.UnschedulableDuration
 		*out = new(int32)
 		**out = **in
 	}

@@ -56,6 +56,12 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 		}
 	}
 
+	if spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() &&
+		(spec.Template.AdvancedStatefulSetTemplate != nil || spec.Template.StatefulSetTemplate != nil) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "scheduleStrategy"), spec.Topology.ScheduleStrategy,
+			"only stateless workloads (Deployment and CloneSet) are supported by reserved rescheduling"))
+	}
+
 	selector, err := metav1.LabelSelectorAsSelector(spec.Selector)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, ""))
@@ -101,8 +107,8 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 			allErrs = append(allErrs, apivalidation.ValidateTolerations(coreTolerations, fldPath.Child("topology", "subsets").Index(i).Child("tolerations"))...)
 		}
 
-		if subset.Replicas == nil {
-			continue
+		if subset.Replicas != nil && spec.Topology.ScheduleStrategy.IsAdaptive() {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("topology", "subsets").Index(i).Child("replicas"), "specify replicas use minReplicas/maxReplicas to enable adaptive strategy"))
 		}
 	}
 

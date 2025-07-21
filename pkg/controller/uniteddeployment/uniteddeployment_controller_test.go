@@ -27,6 +27,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -132,7 +135,7 @@ func TestReconcile(t *testing.T) {
 	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
 }
 
-func TestUnschedulableStatusManagement(t *testing.T) {
+func TestDefaultAdaptiveStrategy(t *testing.T) {
 	subsetName := "subset-1"
 	baseEnvFactory := func() (*corev1.Pod, *Subset, *appsv1alpha1.UnitedDeployment) {
 		pod := &corev1.Pod{
@@ -276,7 +279,7 @@ func TestUnschedulableStatusManagement(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			subset, ud := c.envFactory()
 			start := time.Now()
-			manageUnschedulableStatusForExistingSubset(subset.Name, subset, ud)
+			calculateSubsetsStatusForDefaultAdaptiveStrategy(subset.Name, subset, ud)
 			cost := time.Now().Sub(start)
 			if subset.Status.UnschedulableStatus.PendingPods != c.expectPendingPods {
 				t.Logf("case %s failed: expect pending pods %d, but got %d", c.name, c.expectPendingPods, subset.Status.UnschedulableStatus.PendingPods)
@@ -297,6 +300,311 @@ func TestUnschedulableStatusManagement(t *testing.T) {
 			if subset.Status.UnschedulableStatus.Unschedulable != c.unschedulable {
 				t.Logf("case %s failed: expect unschedulable %v, but got %v", c.name, c.unschedulable, subset.Status.UnschedulableStatus.Unschedulable)
 				t.Fail()
+			}
+		})
+	}
+}
+
+func TestCalculateSubsetsStatusForReservedAdaptiveStrategy(t *testing.T) {
+	now := time.Now()
+	subsetName := "subset-1"
+	modifyPod := func(pod *corev1.Pod, readyTime time.Time, creationTime time.Time, pending bool, patch string) {
+		pod.Status.Conditions = []corev1.PodCondition{}
+		if pending {
+			pod.Status.Phase = corev1.PodPending
+			pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
+				Type:   corev1.PodScheduled,
+				Status: corev1.ConditionFalse,
+				Reason: corev1.PodReasonUnschedulable,
+			}, corev1.PodCondition{
+				Type:               corev1.PodReady,
+				Status:             corev1.ConditionFalse,
+				LastTransitionTime: metav1.NewTime(readyTime),
+			})
+		} else {
+			pod.Status.Phase = corev1.PodRunning
+			pod.Status.Conditions = append(pod.Status.Conditions, corev1.PodCondition{
+				Type:   corev1.PodScheduled,
+				Status: corev1.ConditionTrue,
+			}, corev1.PodCondition{
+				Type:               corev1.PodReady,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.NewTime(readyTime),
+			})
+		}
+		pod.CreationTimestamp = metav1.NewTime(creationTime)
+		if patch != "" {
+			pod.Labels[appsv1alpha1.ReservedPodLabelKey] = patch
+		}
+	}
+	baseEnvFactory := func(subsetUnschedulableStatus corev1.ConditionStatus) (*Subset, *appsv1alpha1.UnitedDeployment, *corev1.Pod) {
+		pod := &corev1.Pod{}
+		pod.Labels = make(map[string]string)
+		subset := &Subset{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: subsetName,
+			},
+			Spec: SubsetSpec{
+				SubsetPods: []*corev1.Pod{pod},
+			},
+		}
+		return subset, &appsv1alpha1.UnitedDeployment{
+			Status: appsv1alpha1.UnitedDeploymentStatus{
+				SubsetStatuses: []appsv1alpha1.UnitedDeploymentSubsetStatus{
+					{
+						Name: subsetName,
+						Conditions: []appsv1alpha1.UnitedDeploymentSubsetCondition{
+							{
+								Type:   appsv1alpha1.UnitedDeploymentSubsetSchedulable,
+								Status: subsetUnschedulableStatus,
+							},
+						},
+					},
+				},
+			},
+			Spec: appsv1alpha1.UnitedDeploymentSpec{
+				Topology: appsv1alpha1.Topology{
+					ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
+						Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
+						Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
+							ReserveUnschedulablePods:  true,
+							RescheduleCriticalSeconds: ptr.To[int32](10),
+							UnschedulableDuration:     ptr.To[int32](30),
+						},
+					},
+				},
+			},
+		}, pod
+	}
+
+	cases := []struct {
+		name               string
+		envFactory         func() (*Subset, *appsv1alpha1.UnitedDeployment)
+		requeueAfter       time.Duration
+		expectReservedPods int32
+		unschedulable      bool
+		podsToPatch        int
+	}{
+		// RescheduleCriticalSeconds = 10s
+		// UnschedulableDuration = 30s
+		{
+			name: "Pod just created, pending",
+			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+				subset, ud, pod := baseEnvFactory(corev1.ConditionTrue)
+				// create -> 1s check
+				modifyPod(pod, now, now.Add(-1*time.Second), true, "")
+				return subset, ud
+			},
+			expectReservedPods: 0,
+			unschedulable:      false,
+			requeueAfter:       9 * time.Second,
+			podsToPatch:        1, // should patch to add the reserved
+		},
+		{
+			name: "Pod created, running within RescheduleCriticalSeconds",
+			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+				subset, ud, pod := baseEnvFactory(corev1.ConditionTrue)
+				// create -> 5s ready -> 3s check
+				modifyPod(pod, now.Add(-5*time.Second), now.Add(-8*time.Second), false, "false")
+				return subset, ud
+			},
+			expectReservedPods: 0,
+			unschedulable:      false,
+			requeueAfter:       0,
+			podsToPatch:        0,
+		},
+		{
+			name: "Pod created, pending until timeout",
+			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+				subset, ud, pod := baseEnvFactory(corev1.ConditionTrue)
+				// create -> 13s check
+				modifyPod(pod, now.Add(-13*time.Second), now.Add(-13*time.Second), true, "false")
+				return subset, ud
+			},
+			expectReservedPods: 1,
+			unschedulable:      true,
+			requeueAfter:       30 * time.Second,
+			podsToPatch:        1,
+		},
+		{
+			name: "Pod recovered, but not long enough",
+			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+				subset, ud, pod := baseEnvFactory(corev1.ConditionTrue)
+				// create -> 15s check as reserved -> 10s running, check
+				modifyPod(pod, now.Add(-10*time.Second), now.Add(-25*time.Second), false, "true")
+				return subset, ud
+			},
+			expectReservedPods: 1,
+			unschedulable:      true,
+			requeueAfter:       20 * time.Second,
+			podsToPatch:        0,
+		},
+		{
+			name: "Pod recovered, long enough",
+			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+				subset, ud, pod := baseEnvFactory(corev1.ConditionTrue)
+				// create -> 15s check as reserved -> 35s running
+				modifyPod(pod, now.Add(-35*time.Second), now.Add(-50*time.Second), false, "true")
+				return subset, ud
+			},
+			expectReservedPods: 0,
+			unschedulable:      false,
+			requeueAfter:       0,
+			podsToPatch:        1,
+		},
+		{
+			name: "Pod created in a previously unschedulable subset",
+			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+				subset, ud, pod := baseEnvFactory(corev1.ConditionFalse)
+				// create -> 1s check
+				modifyPod(pod, now, now.Add(-1*time.Second), true, "")
+				return subset, ud
+			},
+			expectReservedPods: 1,
+			unschedulable:      true,
+			requeueAfter:       0,
+			podsToPatch:        1,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			subset, ud := c.envFactory()
+			podsToPatch := calculateSubsetsStatusForReservedAdaptiveStrategy(subset.Name, subset, ud, now)
+			if len(podsToPatch) != c.podsToPatch {
+				t.Logf("case %s failed: expect pods to patch %d, but got %d", c.name, c.podsToPatch, len(podsToPatch))
+				t.Fail()
+			}
+			if subset.Status.UnschedulableStatus.ReservedPods != c.expectReservedPods {
+				t.Logf("case %s failed: expect reserved pods %d, but got %d", c.name, c.expectReservedPods, subset.Status.UnschedulableStatus.ReservedPods)
+				t.Fail()
+			}
+			status := ud.Status.GetSubsetStatus(subsetName)
+			if status == nil {
+				t.Logf("case %s failed: SubsetStatus not found", c.name)
+				t.Fail()
+			}
+			condition := status.GetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable)
+			if condition == nil {
+				t.Logf("case %s failed: Condition not found", c.name)
+				t.Fail()
+			}
+			if condition.Status != corev1.ConditionTrue && !c.unschedulable {
+				t.Logf("case %s failed: expect unschedulable false, but got true", c.name)
+				t.Fail()
+			}
+			if condition.Status != corev1.ConditionFalse && c.unschedulable {
+				t.Logf("case %s failed: expect unschedulable true, but got false", c.name)
+				t.Fail()
+			}
+			if after := durationStore.Pop(getUnitedDeploymentKey(ud)); after != c.requeueAfter {
+				t.Logf("case %s failed: expect requeueAfter %v, but got %v", c.name, c.requeueAfter, after)
+				t.Fail()
+			}
+		})
+	}
+}
+
+func TestPostProcessSubsetStatusForReservedAdaptiveStrategy(t *testing.T) {
+	tests := []struct {
+		name          string
+		replicas      int32
+		next          int32
+		unschedulable bool
+	}{
+		{
+			name:          "normal",
+			replicas:      10,
+			next:          10,
+			unschedulable: false,
+		},
+		{
+			name:          "scale up",
+			replicas:      10,
+			next:          15,
+			unschedulable: true,
+		},
+		{
+			name:          "scale down",
+			replicas:      15,
+			next:          10,
+			unschedulable: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ud := &appsv1alpha1.UnitedDeployment{
+				Status: appsv1alpha1.UnitedDeploymentStatus{
+					SubsetStatuses: []appsv1alpha1.UnitedDeploymentSubsetStatus{
+						{
+							Name: "subset-1",
+							Conditions: []appsv1alpha1.UnitedDeploymentSubsetCondition{
+								{
+									Type:   appsv1alpha1.UnitedDeploymentSubsetSchedulable,
+									Status: corev1.ConditionTrue,
+								},
+							},
+						},
+					},
+				},
+			}
+			subset := &Subset{
+				Spec: SubsetSpec{
+					Replicas: tt.replicas,
+				},
+				Status: SubsetStatus{
+					UnschedulableStatus: SubsetUnschedulableStatus{
+						MarkedAsUnschedulable: true,
+					},
+				},
+			}
+			postProcessSubsetStatusForReservedAdaptiveStrategy("subset-1", subset, ud, tt.next)
+			cond := ud.Status.GetSubsetStatus("subset-1").GetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable)
+			if (cond.Status == corev1.ConditionFalse) != tt.unschedulable {
+				t.Errorf("expected unschedulable true, but got false")
+			}
+		})
+	}
+
+}
+
+func TestPatchStagingChangedPods(t *testing.T) {
+	basicPod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "default",
+			Labels:    make(map[string]string),
+		},
+	}
+	tests := []struct {
+		name          string
+		reserved      bool
+		expectedLabel string
+	}{
+		{
+			name:          "reserved true",
+			reserved:      true,
+			expectedLabel: "true",
+		},
+		{
+			name:          "reserved false",
+			reserved:      false,
+			expectedLabel: "false",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pod := basicPod.DeepCopy()
+			cli := fake.NewClientBuilder().WithObjects(pod).Build()
+			r := ReconcileUnitedDeployment{
+				Client: cli,
+			}
+			_ = r.patchReservedStatusChangedPods([]podToPatchReservedLabel{
+				{pod, tt.reserved},
+			})
+			_ = cli.Get(context.Background(), client.ObjectKeyFromObject(pod), pod)
+			if pod.Labels[appsv1alpha1.ReservedPodLabelKey] != tt.expectedLabel {
+				t.Errorf("expected reserved %s, but got %s", tt.expectedLabel, pod.Labels[appsv1alpha1.ReservedPodLabelKey])
 			}
 		})
 	}

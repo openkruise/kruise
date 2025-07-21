@@ -22,12 +22,15 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog/v2"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/controller/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 )
 
@@ -93,7 +96,7 @@ func NewUnitedDeploymentCondition(condType appsv1alpha1.UnitedDeploymentConditio
 }
 
 // GetUnitedDeploymentCondition returns the condition with the provided type.
-func GetUnitedDeploymentCondition(status appsv1alpha1.UnitedDeploymentStatus, condType appsv1alpha1.UnitedDeploymentConditionType) *appsv1alpha1.UnitedDeploymentCondition {
+func GetUnitedDeploymentCondition(status *appsv1alpha1.UnitedDeploymentStatus, condType appsv1alpha1.UnitedDeploymentConditionType) *appsv1alpha1.UnitedDeploymentCondition {
 	for i := range status.Conditions {
 		c := status.Conditions[i]
 		if c.Type == condType {
@@ -106,7 +109,7 @@ func GetUnitedDeploymentCondition(status appsv1alpha1.UnitedDeploymentStatus, co
 // SetUnitedDeploymentCondition updates the UnitedDeployment to include the provided condition. If the condition that
 // we are about to add already exists and has the same status, reason and message then we are not going to update.
 func SetUnitedDeploymentCondition(status *appsv1alpha1.UnitedDeploymentStatus, condition *appsv1alpha1.UnitedDeploymentCondition) {
-	currentCond := GetUnitedDeploymentCondition(*status, condition.Type)
+	currentCond := GetUnitedDeploymentCondition(status, condition.Type)
 	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason {
 		return
 	}
@@ -139,3 +142,104 @@ func getUnitedDeploymentKey(ud *appsv1alpha1.UnitedDeployment) string {
 }
 
 var ResourceVersionExpectation = expectations.NewResourceVersionExpectation()
+
+// CheckPodReallyInReservedStatus checks whether the Pod is in the Reserved state.
+// The Reserved state is defined as: the Pod enters Reserved after being in the Pending state for a specified duration,
+// and exits Reserved after remaining in the Ready state for a certain period.
+//
+// Parameters:
+//   - pod: the Pod object to be checked.
+//   - subset: the Subset object associated with the Pod.
+//   - updatedCondition: "Updated" Condition of UnitedDeployment.
+//   - pendingTimeout: the timeout duration for the Pod to remain in the Pending state.
+//   - minReadySeconds: the duration threshold for the Pod to remain in the Ready state.
+//
+// Returns:
+//   - isReserved: true if the Pod is in the Reserved state; otherwise, false.
+//   - nextCheckAfter: the duration until the next check if the Pod has not reached the Reserved state; otherwise, -1.
+func CheckPodReallyInReservedStatus(pod *corev1.Pod, subset *Subset, updatedCondition *appsv1alpha1.UnitedDeploymentCondition,
+	pendingTimeout time.Duration, minReadySeconds time.Duration, now time.Time) (isReserved bool, nextCheckAfter time.Duration) {
+	podRevision, _ := GetPodLabel(pod, appsv1alpha1.ControllerRevisionHashLabelKey)
+	if reserved, _ := IsPodMarkedAsReserved(pod); reserved {
+		if pod.Status.Phase == corev1.PodRunning && podRevision == subset.Status.UpdatedRevision {
+			readyCondition := getPodCondition(pod, corev1.PodReady)
+			if readyCondition != nil && readyCondition.Status == corev1.ConditionTrue {
+				if readyCondition.LastTransitionTime.Time.Add(minReadySeconds).Before(now) {
+					return false, -1
+				} else {
+					return true, readyCondition.LastTransitionTime.Time.Add(minReadySeconds).Sub(now)
+				}
+			}
+		}
+		// at least after minReadySeconds will the pod get out of Reserved state
+		return true, minReadySeconds
+	} else {
+		var timeout bool
+		var after time.Duration
+		if podRevision == subset.Status.UpdatedRevision {
+			timeout, after = util.GetTimeBeforePendingTimeout(pod, pendingTimeout, now)
+		} else {
+			timeout, after = util.GetTimeBeforeUpdateTimeout(pod, updatedCondition, pendingTimeout, now)
+			if timeout {
+				subset.Status.UnschedulableStatus.UpdateTimeoutPods++
+			}
+			klog.InfoS("GetTimeBeforeUpdateTimeout", "pod", pod.Name, "after", after, "timeout", timeout)
+		}
+		if timeout {
+			return true, minReadySeconds
+		} else {
+			return false, after
+		}
+	}
+}
+
+// IsPodMarkedAsReserved checks whether the Pod is in the Reserved state.
+// The Reserved state is defined as: the Pod has the reserved "apps.kruise.io/united-deployment-reserved-pod" set to "true".
+//
+// Parameters:
+//   - pod: the Pod object to be checked.
+//
+// Returns:
+//   - reserved: true if the Pod is in the Reserved state; otherwise, false.
+//   - ok: true if the Pod has the "apps.kruise.io/united-deployment-reserved-pod" reserved; otherwise, false.
+func IsPodMarkedAsReserved(pod *corev1.Pod) (reserved bool, ok bool) {
+	if label, ok := GetPodLabel(pod, appsv1alpha1.ReservedPodLabelKey); ok {
+		return label == "true", true
+	} else {
+		return false, false
+	}
+}
+
+// GetPodLabel makes it compatible with the tests where pod.Label not set.
+func GetPodLabel(pod *corev1.Pod, key string) (string, bool) {
+	if pod.Labels != nil {
+		label, ok := pod.Labels[key]
+		return label, ok
+	} else {
+		return "", false
+	}
+}
+
+func getPodCondition(pod *corev1.Pod, tp corev1.PodConditionType) *corev1.PodCondition {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == tp {
+			return &condition
+		}
+	}
+	return nil
+}
+
+func initStatus(u *appsv1alpha1.UnitedDeployment) {
+	update := len(u.Status.SubsetStatuses) > 0 // subset list changed
+	for _, subset := range u.Spec.Topology.Subsets {
+		if u.Status.GetSubsetStatus(subset.Name) == nil {
+			status := appsv1alpha1.UnitedDeploymentSubsetStatus{Name: subset.Name}
+			if update && u.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
+				status.SetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable, corev1.ConditionFalse, "created",
+					"newly-created subsets in reservation strategy")
+			}
+			u.Status.SubsetStatuses = append(u.Status.SubsetStatuses, status)
+		}
+	}
+	return
+}
