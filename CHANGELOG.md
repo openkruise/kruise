@@ -1,5 +1,11 @@
 # Change Log
 
+## v1.8.2
+> Change log since v1.8.1
+
+### Bug fixes
+- Fix kruise-daemon panic exception due to PodProbeMarker when container is nil. ([#1974](https://github.com/openkruise/kruise/pull/1974), [@zmberg](https://github.com/zmberg))
+
 ## v1.8.1
 > Change log since v1.8.0
 
