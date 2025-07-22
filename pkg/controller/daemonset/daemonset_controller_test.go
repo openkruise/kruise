@@ -219,7 +219,10 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 	fakeRecorder := record.NewFakeRecorder(100)
 	dsc.eventRecorder = fakeRecorder
 	podControl := newFakePodControl()
-	dsc.podControl = podControl
+	dsControl := &dsPodControl{
+		PodControlInterface: podControl,
+	}
+	dsc.podControl = dsControl
 	podControl.podStore = informerFactory.Core().V1().Pods().Informer().GetStore()
 
 	newDsc := &daemonSetsController{
@@ -253,7 +256,7 @@ func NewDaemonSetController(
 		kubeClient:    kubeClient,
 		kruiseClient:  kruiseClient,
 		eventRecorder: recorder,
-		podControl:    controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
+		podControl:    &dsPodControl{PodControlInterface: controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder}},
 		crControl: controller.RealControllerRevisionControl{
 			KubeClient: kubeClient,
 		},

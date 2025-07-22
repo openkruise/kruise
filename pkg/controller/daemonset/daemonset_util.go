@@ -17,8 +17,10 @@ limitations under the License.
 package daemonset
 
 import (
+	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,11 +33,15 @@ import (
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/tools/record"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/utils/integer"
 )
@@ -45,6 +51,12 @@ var (
 	newPodForDSCache sync.Map
 	newPodForDSLock  sync.Mutex
 )
+
+type dsPodControl struct {
+	recorder  record.EventRecorder
+	objectMgr kruiseutil.ObjectManager
+	kubecontroller.PodControlInterface
+}
 
 type newPodForDS struct {
 	generation int64
@@ -370,4 +382,104 @@ func podAvailableWaitingTime(pod *corev1.Pod, minReadySeconds int32, now time.Ti
 		return minReadySecondsDuration
 	}
 	return minReadySecondsDuration - now.Sub(c.LastTransitionTime.Time)
+}
+
+func getPersistentVolumeClaimName(ds *appsv1alpha1.DaemonSet, claim *corev1.PersistentVolumeClaim, nodeName string) string {
+	return fmt.Sprintf("%s-%s-%s", claim.Name, ds.Name, nodeName)
+}
+
+func getPersistentVolumeClaims(ds *appsv1alpha1.DaemonSet, nodeName string) map[string]corev1.PersistentVolumeClaim {
+	templates := ds.Spec.VolumeClaimTemplates
+	claims := make(map[string]corev1.PersistentVolumeClaim, len(templates))
+	for i := range templates {
+		claim := templates[i].DeepCopy()
+		claim.Name = getPersistentVolumeClaimName(ds, claim, nodeName)
+		claim.Namespace = ds.Namespace
+		if claim.Labels != nil {
+			for key, value := range ds.Spec.Selector.MatchLabels {
+				claim.Labels[key] = value
+			}
+		} else {
+			claim.Labels = ds.Spec.Selector.MatchLabels
+		}
+		claims[templates[i].Name] = *claim
+	}
+	return claims
+}
+
+func updateStorage(ds *appsv1alpha1.DaemonSet, template *corev1.PodTemplateSpec, nodeName string) {
+	currentVolumes := template.Spec.Volumes
+	claims := getPersistentVolumeClaims(ds, nodeName)
+	newVolumes := make([]corev1.Volume, 0, len(claims))
+	for name, claim := range claims {
+		newVolumes = append(newVolumes, corev1.Volume{
+			Name: name,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: claim.Name,
+					ReadOnly:  false,
+				},
+			},
+		})
+	}
+	for i := range currentVolumes {
+		if _, ok := claims[currentVolumes[i].Name]; !ok {
+			newVolumes = append(newVolumes, currentVolumes[i])
+		}
+	}
+	template.Spec.Volumes = newVolumes
+}
+
+// recordClaimEvent records an event for verb applied to the PersistentVolumeClaim of a Pod in a Daemonset. If err is
+// nil the generated event will have a reason of v1.EventTypeNormal. If err is not nil the generated event will have a
+// reason of v1.EventTypeWarning.
+func (dsc *dsPodControl) recordClaimEvent(verb string, ds *appsv1alpha1.DaemonSet, nodeName string, claim *corev1.PersistentVolumeClaim, err error) {
+	if err == nil {
+		reason := fmt.Sprintf("Successful%s", strings.Title(verb))
+		message := fmt.Sprintf("%s Daemonset %s Claim %s in Node %s success",
+			strings.ToLower(verb), ds.Name, claim.Name, nodeName)
+		dsc.recorder.Event(ds, corev1.EventTypeNormal, reason, message)
+	} else {
+		reason := fmt.Sprintf("Failed%s", strings.Title(verb))
+		message := fmt.Sprintf("%s Claim %s for Daemonset %s in Node %s failed error: %s",
+			strings.ToLower(verb), claim.Name, ds.Name, nodeName, err)
+		dsc.recorder.Event(ds, corev1.EventTypeWarning, reason, message)
+	}
+}
+
+func (dsc *dsPodControl) createPersistentVolumeClaims(ds *appsv1alpha1.DaemonSet, nodeName string) error {
+	var errs []error
+	for _, claim := range getPersistentVolumeClaims(ds, nodeName) {
+		pvc, err := dsc.objectMgr.GetClaim(claim.Namespace, claim.Name)
+		switch {
+		case apierrors.IsNotFound(err):
+			err := dsc.objectMgr.CreateClaim(&claim)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to create PVC %s: %s", claim.Name, err))
+			}
+			if err == nil || !apierrors.IsAlreadyExists(err) {
+				dsc.recordClaimEvent("Create", ds, nodeName, &claim, err)
+			}
+		case err != nil:
+			errs = append(errs, fmt.Errorf("failed to retrieve PVC %s: %s", claim.Name, err))
+			dsc.recordClaimEvent("Create", ds, nodeName, &claim, err)
+		default:
+			if pvc.DeletionTimestamp != nil {
+				errs = append(errs, fmt.Errorf("pvc %s is to be deleted", claim.Name))
+			}
+		}
+	}
+	return errorutils.NewAggregate(errs)
+}
+
+// CreatePod creates a pod from a template. and create pvc if needed.
+func (dsc *dsPodControl) CreatePod(ctx context.Context, namespace string, template *corev1.PodTemplateSpec,
+	ds *appsv1alpha1.DaemonSet, controllerRef *metav1.OwnerReference, nodeName string) error {
+	tmpl := template.DeepCopy()
+	if err := dsc.createPersistentVolumeClaims(ds, nodeName); err != nil {
+		return err
+	}
+
+	updateStorage(ds, tmpl, nodeName)
+	return dsc.CreatePods(ctx, namespace, tmpl, ds, controllerRef)
 }
