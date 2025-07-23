@@ -147,26 +147,11 @@ func (r *realStatusUpdater) calculateProgressingStatus(cs *appsv1alpha1.CloneSet
 		return getRequeueSecondsFromCondition(condition, *cs.Spec.ProgressDeadlineSeconds, timer.Now())
 	}
 
-	klog.V(5).InfoS("Sync progressing status", "cloneSet", klog.KObj(cs), "newStatus", newStatus, "oldStatus", oldStatus, "cond", cond)
+	klog.V(5).InfoS("Calculate progressing status", "cloneSet", klog.KObj(cs), "newStatus", newStatus, "oldStatus", oldStatus, "cond", cond)
 	isTimeoutCloneSet := cond != nil && cond.Reason == string(appsv1alpha1.CloneSetProgressDeadlineExceeded)
 	isAvailableCloneSet := newStatus.CurrentRevision == newStatus.UpdateRevision && cond != nil && cond.Reason == string(appsv1alpha1.CloneSetAvailable)
 
 	if !isTimeoutCloneSet && !isAvailableCloneSet {
-		if newStatus.CurrentRevision == newStatus.UpdateRevision {
-			klog.V(5).InfoS("CloneSet current revision equals to update revision, waiting available ready",
-				"cloneSet", klog.KObj(cs), "newStatus", newStatus, "oldStatus", oldStatus, "cond", cond)
-			if cond == nil {
-				// legacy cs without progressing condition.
-				// TODO: rollback with the same revision?
-				klog.V(5).InfoS("Legacy CloneSet is scaling", "cloneSet", klog.KObj(cs),
-					"newStatus", newStatus, "csStatus", cs.Status, "cond", cond)
-				condition := clonesetutils.NewCloneSetCondition(appsv1alpha1.CloneSetConditionTypeProgressing,
-					v1.ConditionTrue, appsv1alpha1.CloneSetAvailable, "CloneSet is available", timer.Now())
-				clonesetutils.SetCloneSetCondition(newStatus, *condition)
-				return time.Duration(-1)
-			}
-		}
-
 		switch {
 		case clonesetutils.CloneSetPaused(cs):
 			klog.V(5).InfoS("CloneSet is paused", "cloneSet", klog.KObj(cs),
@@ -220,6 +205,10 @@ func (r *realStatusUpdater) calculateProgressingStatus(cs *appsv1alpha1.CloneSet
 	klog.V(5).InfoS("CloneSet stays at previous condition", "cloneSet", klog.KObj(cs),
 		"newStatus", newStatus, "oldStatus", oldStatus, "cond", cond)
 	newStatus.Conditions = oldStatus.Conditions
+
+	if cond != nil && cond.Reason == string(appsv1alpha1.CloneSetProgressUpdated) {
+		return getRequeueSecondsFromCondition(cond, *cs.Spec.ProgressDeadlineSeconds, timer.Now())
+	}
 
 	return time.Duration(-1)
 }
