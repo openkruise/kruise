@@ -325,7 +325,7 @@ func CloneSetPartitionAvailable(cs *appsv1alpha1.CloneSet, newStatus *appsv1alph
 
 func CloneSetPaused(cs *appsv1alpha1.CloneSet) bool {
 	cond := GetCloneSetCondition(cs.Status, appsv1alpha1.CloneSetConditionTypeProgressing)
-	return cs.Spec.UpdateStrategy.Paused && !(cond != nil && cond.Reason == string(appsv1alpha1.CloneSetProgressPaused))
+	return cs.Spec.UpdateStrategy.Paused && (cond == nil || cond.Reason != string(appsv1alpha1.CloneSetProgressPaused))
 }
 
 func CloneSetProgressing(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) bool {
