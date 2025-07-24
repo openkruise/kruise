@@ -15,6 +15,7 @@ package util
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
@@ -34,6 +35,10 @@ func UpdateFinalizer(c client.Client, object client.Object, op FinalizerOpType, 
 	case AddFinalizerOpType, RemoveFinalizerOpType:
 	default:
 		panic("UpdateFinalizer Func 'op' parameter must be 'Add' or 'Remove'")
+	}
+
+	if finalizer == "" {
+		return fmt.Errorf("finalizer name cannot be empty")
 	}
 
 	key := client.ObjectKeyFromObject(object)

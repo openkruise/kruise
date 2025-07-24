@@ -357,28 +357,13 @@ func TestUpdateFinalizer_EmptyFinalizerName(t *testing.T) {
 
 	// Test adding empty finalizer name
 	err := UpdateFinalizer(fakeClient, pod, AddFinalizerOpType, "")
-	assert.NoError(t, err)
-
-	// Verify empty finalizer was added
-	updatedPod := &corev1.Pod{}
-	err = fakeClient.Get(context.TODO(), types.NamespacedName{
-		Name:      pod.Name,
-		Namespace: pod.Namespace,
-	}, updatedPod)
-	assert.NoError(t, err)
-	assert.Contains(t, updatedPod.Finalizers, "")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "finalizer name cannot be empty")
 
 	// Test removing empty finalizer name
 	err = UpdateFinalizer(fakeClient, pod, RemoveFinalizerOpType, "")
-	assert.NoError(t, err)
-
-	// Verify empty finalizer was removed
-	err = fakeClient.Get(context.TODO(), types.NamespacedName{
-		Name:      pod.Name,
-		Namespace: pod.Namespace,
-	}, updatedPod)
-	assert.NoError(t, err)
-	assert.NotContains(t, updatedPod.Finalizers, "")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "finalizer name cannot be empty")
 }
 
 func TestFinalizerOpType_Constants(t *testing.T) {
