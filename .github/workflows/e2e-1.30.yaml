@@ -265,7 +265,7 @@ jobs:
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
-          tools/hack/run-kruise-e2e-test.sh --focus '\[apps\] (CloneSet|InplaceVPA)' --print-info
+          tools/hack/run-kruise-e2e-test.sh --focus '\[apps\] (CloneSet|InplaceVPA)' --print-info --disable-parallel
 
   other:
     runs-on: ubuntu-24.04
