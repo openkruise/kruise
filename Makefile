@@ -157,11 +157,8 @@ $(TESTBIN):
 ENVTEST ?= $(TESTBIN)/setup-envtest
 
 .PHONY: envtest
-envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
-$(ENVTEST): $(TESTBIN)
-ifeq (, $(shell ls $(TESTBIN)/setup-envtest 2>/dev/null))
-	GOBIN=$(TESTBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20250517180713-32e5e9e948a5
-endif
+envtest: $(TESTBIN) ## Download/update envtest-setup to latest version.
+	GOBIN=$(TESTBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
 # create-cluster creates a kube cluster with kind.
 .PHONY: create-cluster
