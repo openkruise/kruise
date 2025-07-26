@@ -254,14 +254,14 @@ func (r *ReconcileResourceDistribution) distributeResource(distributor *appsv1al
 		if getErr != nil && errors.IsNotFound(getErr) {
 			newResource := makeResourceObject(distributor, namespace, resource, resourceHashCode, nil)
 			if createErr := r.Client.Create(context.TODO(), newResource.(client.Object)); createErr != nil {
-				klog.ErrorS(createErr, "Error occurred when creating resource in namespace", "namespace", namespace, "resourceDistribution", klog.KObj(distributor))
+				klog.ErrorS(createErr, "[ResourceDistribution] Failed to CREATE resource", "kind", resourceKind, "name", resourceName, "namespace", namespace, "resourceDistribution", klog.KObj(distributor))
 				return &UnexpectedError{
 					err:         createErr,
 					namespace:   namespace,
 					conditionID: CreateConditionID,
 				}
 			}
-			klog.V(3).InfoS("ResourceDistribution created resource in namespace", "resourceDistribution", klog.KObj(distributor), "resourceKind", resourceKind, "resourceName", resourceName, "namespace", namespace)
+			klog.InfoS("[ResourceDistribution] Resource CREATED", "kind", resourceKind, "name", resourceName, "namespace", namespace, "resourceDistribution", klog.KObj(distributor))
 			return nil
 		}
 
@@ -279,14 +279,14 @@ func (r *ReconcileResourceDistribution) distributeResource(distributor *appsv1al
 		if needToUpdate(oldResource, utils.ConvertToUnstructured(resource)) {
 			newResource := makeResourceObject(distributor, namespace, resource, resourceHashCode, oldResource)
 			if updateErr := r.Client.Update(context.TODO(), newResource.(client.Object)); updateErr != nil {
-				klog.ErrorS(updateErr, "Error occurred when updating resource in namespace", "namespace", namespace, "resourceDistribution", klog.KObj(distributor))
+				klog.ErrorS(updateErr, "[ResourceDistribution] Failed to UPDATE resource", "kind", resourceKind, "name", resourceName, "namespace", namespace, "resourceDistribution", klog.KObj(distributor))
 				return &UnexpectedError{
 					err:         updateErr,
 					namespace:   namespace,
 					conditionID: UpdateConditionID,
 				}
 			}
-			klog.V(3).InfoS("ResourceDistribution updated for namespaces", "resourceDistribution", klog.KObj(distributor), "resourceKind", resourceKind, "resourceName", resourceName, "namespace", namespace)
+			klog.InfoS("[ResourceDistribution] Resource UPDATED", "kind", resourceKind, "name", resourceName, "namespace", namespace, "resourceDistribution", klog.KObj(distributor))
 		}
 		return nil
 	})
@@ -326,14 +326,14 @@ func (r *ReconcileResourceDistribution) cleanResource(distributor *appsv1alpha1.
 
 		// 3. else clean the resource
 		if deleteErr := r.Client.Delete(context.TODO(), oldResource); deleteErr != nil && !errors.IsNotFound(deleteErr) {
-			klog.ErrorS(deleteErr, "Error occurred when deleting resource in namespace from client", "namespace", namespace, "resourceDistribution", klog.KObj(distributor))
+			klog.ErrorS(deleteErr, "[ResourceDistribution] Failed to DELETE resource", "kind", resourceKind, "name", resourceName, "namespace", namespace, "resourceDistribution", klog.KObj(distributor))
 			return &UnexpectedError{
 				err:         deleteErr,
 				namespace:   namespace,
 				conditionID: DeleteConditionID,
 			}
 		}
-		klog.V(3).InfoS("ResourceDistribution deleted in namespace", "resourceDistribution", klog.KObj(distributor), "resourceKind", resourceKind, "resourceName", resourceName, "namespace", namespace)
+		klog.InfoS("[ResourceDistribution] Resource DELETED", "kind", resourceKind, "name", resourceName, "namespace", namespace, "resourceDistribution", klog.KObj(distributor))
 		return nil
 	})
 }
