@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -185,6 +186,13 @@ func main() {
 			syncPeriod = &d
 		}
 	}
+	webhookBindIP, err := utilnet.ResolveBindAddress(nil)
+	if err != nil {
+		setupLog.Error(err, "unable to resolve webhook bind address")
+		os.Exit(1)
+	}
+	setupLog.Info("resolved webhook bind address", "address", webhookBindIP.String())
+
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
@@ -203,7 +211,7 @@ func main() {
 			DefaultNamespaces: getCacheNamespacesFromFlag(namespace),
 		},
 		WebhookServer: ctrlwebhook.NewServer(ctrlwebhook.Options{
-			Host:    "0.0.0.0",
+			Host:    webhookBindIP.String(),
 			Port:    webhookutil.GetPort(),
 			CertDir: webhookutil.GetCertDir(),
 		}),
