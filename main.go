@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"math/rand"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -28,6 +29,7 @@ import (
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -77,6 +79,23 @@ var (
 	restConfigQPS   = flag.Int("rest-config-qps", 30, "QPS of rest config.")
 	restConfigBurst = flag.Int("rest-config-burst", 50, "Burst of rest config.")
 )
+
+func getWebhookBindAddress() string {
+	// If WEBHOOK_HOST is explicitly set, respect that for backward compatibility
+	if host := webhookutil.GetHost(); len(host) > 0 {
+		return host
+	}
+
+	// use ResolveBindAddress to choose the first non-local address, following apiserver logic
+	// pass net.IPv4zero (0.0.0.0) to get the first non-local address
+	bindAddr, err := utilnet.ResolveBindAddress(net.IPv4zero)
+	if err != nil {
+		setupLog.Error(err, "Failed to resolve webhook bind address, falling back to 0.0.0.0")
+		return "0.0.0.0"
+	}
+	setupLog.Info("Resolved webhook bind address", "address", bindAddr.String())
+	return bindAddr.String()
+}
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
@@ -203,7 +222,7 @@ func main() {
 			DefaultNamespaces: getCacheNamespacesFromFlag(namespace),
 		},
 		WebhookServer: ctrlwebhook.NewServer(ctrlwebhook.Options{
-			Host:    "0.0.0.0",
+			Host:    getWebhookBindAddress(),
 			Port:    webhookutil.GetPort(),
 			CertDir: webhookutil.GetCertDir(),
 		}),
