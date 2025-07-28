@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"math/rand"
 	"net/http"
@@ -42,7 +43,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	ctrlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
@@ -59,6 +59,7 @@ import (
 	_ "github.com/openkruise/kruise/pkg/util/metrics/leadership"
 	"github.com/openkruise/kruise/pkg/webhook"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
+	ctrlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -185,6 +186,7 @@ func main() {
 			syncPeriod = &d
 		}
 	}
+
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
@@ -203,7 +205,7 @@ func main() {
 			DefaultNamespaces: getCacheNamespacesFromFlag(namespace),
 		},
 		WebhookServer: ctrlwebhook.NewServer(ctrlwebhook.Options{
-			Host:    "0.0.0.0",
+			Host:    "127.0.0.1",
 			Port:    webhookutil.GetPort(),
 			CertDir: webhookutil.GetCertDir(),
 		}),
@@ -280,5 +282,28 @@ func getCacheNamespacesFromFlag(ns string) map[string]cache.Config {
 	}
 	return map[string]cache.Config{
 		ns: {},
+	}
+}
+
+// createSecureTLSConfig creates a secure TLS configuration
+func createSecureTLSConfig() *tls.Config {
+	return &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		MaxVersion: tls.VersionTLS13,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+		},
+		CurvePreferences: []tls.CurveID{
+			tls.X25519,
+			tls.CurveP256,
+			tls.CurveP384,
+		},
+		PreferServerCipherSuites: true,
+		SessionTicketsDisabled:   true,
 	}
 }

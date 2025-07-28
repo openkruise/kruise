@@ -18,6 +18,7 @@ package webhook
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"time"
@@ -42,6 +43,29 @@ var (
 	HandlerMap   = HandlerPath2GetterMap{}
 	handlerGates = map[string]GateFunc{}
 )
+
+// createSecureTLSConfig creates a secure TLS configuration for webhook server
+func createSecureTLSConfig() *tls.Config {
+	return &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		MaxVersion: tls.VersionTLS13,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+		},
+		CurvePreferences: []tls.CurveID{
+			tls.X25519,
+			tls.CurveP256,
+			tls.CurveP384,
+		},
+		PreferServerCipherSuites: true,
+		SessionTicketsDisabled:   true,
+	}
+}
 
 func addHandlers(m HandlerPath2GetterMap) {
 	addHandlersWithGate(m, nil)
