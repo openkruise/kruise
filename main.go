@@ -23,6 +23,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"strings"
 	"time"
 	_ "time/tzdata" // for AdvancedCronJob Time Zone support
 
@@ -83,18 +84,72 @@ var (
 func getWebhookBindAddress() string {
 	// If WEBHOOK_HOST is explicitly set, respect that for backward compatibility
 	if host := webhookutil.GetHost(); len(host) > 0 {
+		setupLog.Info("Using explicit WEBHOOK_HOST", "address", host)
 		return host
 	}
 
-	// use ResolveBindAddress to choose the first non-local address, following apiserver logic
-	// pass net.IPv4zero (0.0.0.0) to get the first non-local address
+	// check for kind cluster environment first - kind clusters often need 0.0.0.0 for proper service routing
+	if isKindClusterEnvironment() {
+		setupLog.Info("Detected kind cluster environment, using 0.0.0.0 for service accessibility")
+		return "0.0.0.0"
+	}
+
+	// Try ResolveBindAddress for non-kind environments
 	bindAddr, err := utilnet.ResolveBindAddress(net.IPv4zero)
 	if err != nil {
 		setupLog.Error(err, "Failed to resolve webhook bind address, falling back to 0.0.0.0")
 		return "0.0.0.0"
 	}
-	setupLog.Info("Resolved webhook bind address", "address", bindAddr.String())
-	return bindAddr.String()
+
+	resolvedAddr := bindAddr.String()
+	setupLog.Info("ResolveBindAddress returned", "address", resolvedAddr)
+
+	// Validate that the resolved address is actually bindable
+	if !isAddressBindable(resolvedAddr) {
+		setupLog.Info("Resolved address not bindable, falling back to 0.0.0.0", "address", resolvedAddr)
+		return "0.0.0.0"
+	}
+
+	setupLog.Info("Using resolved secure webhook bind address", "address", resolvedAddr)
+	return resolvedAddr
+}
+
+// isKindClusterEnvironment detects if we're running in a kind cluster
+func isKindClusterEnvironment() bool {
+	if os.Getenv("KIND_CLUSTER_NAME") != "" {
+		return true
+	}
+
+	if hostname, err := os.Hostname(); err == nil {
+		if strings.Contains(hostname, "kind") ||
+			strings.Contains(hostname, "control-plane") ||
+			strings.Contains(hostname, "worker") {
+			return true
+		}
+	}
+	if os.Getenv("CI") == "true" || os.Getenv("GITHUB_ACTIONS") == "true" {
+		return true
+	}
+
+	// check for Kubernetes service host
+	if apiHost := os.Getenv("KUBERNETES_SERVICE_HOST"); apiHost != "" {
+		if strings.HasPrefix(apiHost, "172.") || strings.HasPrefix(apiHost, "10.") {
+			return true
+		}
+	}
+	return false
+}
+
+// isAddressBindable tests if we can actually bind to the given address
+func isAddressBindable(addr string) bool {
+	listener, err := net.Listen("tcp", addr+":0")
+	if err != nil {
+		setupLog.Info("Address bind test failed", "address", addr, "error", err.Error())
+		return false
+	}
+	listener.Close()
+	setupLog.Info("Address bind test successful", "address", addr)
+	return true
 }
 
 func init() {
