@@ -25,6 +25,7 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/pkg/util"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type prioritySort struct {
@@ -57,8 +58,8 @@ func (ps *prioritySort) compare(podI, podJ map[string]string, defaultVal bool) b
 			return wI > wJ
 		}
 	} else if len(ps.strategy.OrderPriority) > 0 {
-		levelI, orderI := ps.getPodOrderPriority(podI)
-		levelJ, orderJ := ps.getPodOrderPriority(podJ)
+		levelI, orderI := ps.getPodOrderPriorityWithAnnotations(podI)
+		levelJ, orderJ := ps.getPodOrderPriorityWithAnnotations(podJ)
 		if levelI != levelJ {
 			return levelI < levelJ
 		} else if orderI != orderJ {
@@ -68,6 +69,24 @@ func (ps *prioritySort) compare(podI, podJ map[string]string, defaultVal bool) b
 	return defaultVal
 }
 
+// getPodOrderPriorityWithAnnotations supports both label and annotation keys.
+func (ps *prioritySort) getPodOrderPriorityWithAnnotations(pod map[string]string) (int64, int64) {
+	for i, p := range ps.strategy.OrderPriority {
+		if len(p.OrderedKey) > 10 && p.OrderedKey[:10] == "annotation:" {
+			key := p.OrderedKey[10:]
+			if value, ok := pod["__annotation__:"+key]; ok {
+				return int64(i), getIntFromStringSuffix(value)
+			}
+		} else {
+			if value, ok := pod[p.OrderedKey]; ok {
+				return int64(i), getIntFromStringSuffix(value)
+			}
+		}
+	}
+	return -1, 0
+}
+
+// getPodWeightPriority supports both label and annotation selectors.
 func (ps *prioritySort) getPodWeightPriority(podLabels map[string]string) int64 {
 	var weight int64
 	for _, p := range ps.strategy.WeightPriority {
@@ -75,11 +94,44 @@ func (ps *prioritySort) getPodWeightPriority(podLabels map[string]string) int64 
 		if err != nil {
 			continue
 		}
-		if selector.Matches(labels.Set(podLabels)) {
-			weight += int64(p.Weight)
+		// If selector is for annotation, use annotation keys.
+		if isAnnotationSelector(p.MatchSelector) {
+			if selector.Matches(labels.Set(convertAnnotationsToSelectorSet(podLabels))) {
+				weight += int64(p.Weight)
+			}
+		} else {
+			if selector.Matches(labels.Set(podLabels)) {
+				weight += int64(p.Weight)
+			}
 		}
 	}
 	return weight
+}
+
+// Helper: check if selector is for annotation (custom logic, e.g., key prefix 'annotation:').
+func isAnnotationSelector(sel metav1.LabelSelector) bool {
+	for _, req := range sel.MatchExpressions {
+		if len(req.Key) > 10 && req.Key[:10] == "annotation:" {
+			return true
+		}
+	}
+	for _, key := range sel.MatchLabels {
+		if len(key) > 10 && key[:10] == "annotation:" {
+			return true
+		}
+	}
+	return false
+}
+
+// Helper: convert annotation keys to selector set with '__annotation__:' prefix.
+func convertAnnotationsToSelectorSet(pod map[string]string) map[string]string {
+	set := map[string]string{}
+	for k, v := range pod {
+		if len(k) > 14 && k[:14] == "__annotation__:" {
+			set[k] = v
+		}
+	}
+	return set
 }
 
 func (ps *prioritySort) getPodOrderPriority(podLabels map[string]string) (int64, int64) {

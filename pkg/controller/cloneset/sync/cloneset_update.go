@@ -334,6 +334,12 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 
 // SortUpdateIndexes sorts the given oldRevisionIndexes of Pods to update according to the CloneSet strategy.
 func SortUpdateIndexes(coreControl clonesetcore.Control, strategy appsv1alpha1.CloneSetUpdateStrategy, pods []*v1.Pod, waitUpdateIndexes []int) []int {
+	// Inject pod annotations into label map for annotation-based sorting
+	for _, pod := range pods {
+		for k, v := range pod.Annotations {
+			pod.Labels["__annotation__:"+k] = v
+		}
+	}
 	// Sort Pods with default sequence
 	sort.Slice(waitUpdateIndexes, coreControl.GetPodsSortFunc(pods, waitUpdateIndexes))
 
