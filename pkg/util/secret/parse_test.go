@@ -128,6 +128,21 @@ func TestConvertToRegistryAuths(t *testing.T) {
 			if !tt.expectError && err != nil {
 				t.Errorf("ConvertToRegistryAuths() unexpected error: %v", err)
 			}
+
+			// check specific credentials for docker config secret test
+			if tt.name == "docker config secret" && len(result) > 0 {
+				found := false
+				for _, auth := range result {
+					if auth.Username == "testuser" && auth.Password == "testpass" {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Error("Expected to find testuser/testpass credentials in AuthInfo results")
+				}
+			}
+
 			if tt.expectEmpty && len(result) > 0 {
 				// Note: may find existing credentials from environment, so this is informational
 				t.Logf("ConvertToRegistryAuths() found %d existing credentials from environment", len(result))
