@@ -127,6 +127,17 @@ type CloneSetUpdateStrategy struct {
 	Paused bool `json:"paused,omitempty"`
 	// Priorities are the rules for calculating the priority of updating pods.
 	// Each pod to be updated, will pass through these terms and get a sum of weights.
+	// Supports both label and annotation keys:
+	// - For labels, use the key directly (e.g., 'topology.kubernetes.io/zone').
+	// - For annotations, prefix with 'annotation:' (e.g., 'annotation:apps.kruise.io/update-priority').
+	// Example for zone-priority update:
+	// priorityStrategy:
+	//   orderPriority:
+	//   - orderedKey: topology.kubernetes.io/zone
+	// Example for annotation-based update:
+	// priorityStrategy:
+	//   orderPriority:
+	//   - orderedKey: annotation:apps.kruise.io/update-priority
 	PriorityStrategy *appspub.UpdatePriorityStrategy `json:"priorityStrategy,omitempty"`
 	// ScatterStrategy defines the scatter rules to make pods been scattered when update.
 	// This will avoid pods with the same key-value to be updated in one batch.
