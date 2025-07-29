@@ -116,7 +116,7 @@ CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
 
 # controller-gen@v0.16.5 comply with k8s.io/api v0.30.x
-ifeq ("$(shell $(CONTROLLER_GEN) --version 2> /dev/null)", "Version: v0.16.5")
+ifeq ("$(shell $(CONTROLLER_GEN) --version 2> /dev/null)", "Version: v0.17.3")
 else
 	rm -rf $(CONTROLLER_GEN)
 	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.3)
