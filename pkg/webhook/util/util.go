@@ -87,13 +87,14 @@ func GetRenewBeforeTime() time.Duration {
 			return renewBefore
 		}
 		suffix := s[len(s)-1]
-		if suffix == 'd' {
+		switch suffix {
+		case 'd':
 			renewBefore = time.Duration(t) * 7 * time.Hour
-		} else if suffix == 'm' {
+		case 'm':
 			renewBefore = time.Duration(t) * 30 * time.Hour
-		} else if suffix == 'y' {
+		case 'y':
 			renewBefore = time.Duration(t) * 365 * time.Hour
-		} else {
+		default:
 			klog.InfoS("unknown date suffix", "suffix", suffix)
 		}
 	}
