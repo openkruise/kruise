@@ -26,29 +26,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// --- Fakes & Helpers ---
+type myCertGenerator struct{}
 
-type fakeCertGenerator struct{}
-
-func (g *fakeCertGenerator) Generate(dnsName string) (*generator.Artifacts, error) {
+func (g *myCertGenerator) Generate(dnsName string) (*generator.Artifacts, error) {
 	return &generator.Artifacts{
-		CAKey:  []byte("fake-ca-key"),
-		CACert: []byte("fake-ca-cert"),
-		Cert:   []byte("fake-cert"),
-		Key:    []byte("fake-key"),
+		CAKey:  []byte("my-ca-key"),
+		CACert: []byte("my-ca-cert"),
+		Cert:   []byte("my-cert"),
+		Key:    []byte("my-key"),
 	}, nil
 }
 
-func (g *fakeCertGenerator) SetCA(_ []byte, _ []byte) {
-	// no-op for test
+func (g *myCertGenerator) SetCA(_ []byte, _ []byte) {
 }
 
 func setupTestDir(t *testing.T) string {
 	t.Helper()
 	return t.TempDir()
 }
-
-// --- Tests ---
 
 func TestNewFSCertWriter_Validation(t *testing.T) {
 	cases := []struct {
@@ -60,7 +55,7 @@ func TestNewFSCertWriter_Validation(t *testing.T) {
 			name: "valid options",
 			options: FSCertWriterOptions{
 				Path:          t.TempDir(),
-				CertGenerator: &fakeCertGenerator{},
+				CertGenerator: &myCertGenerator{},
 			},
 			wantErr: false,
 		},
@@ -88,7 +83,7 @@ func TestFSCertWriter_EnsureCert_WritesCerts(t *testing.T) {
 
 	writer, err := NewFSCertWriter(FSCertWriterOptions{
 		Path:          dir,
-		CertGenerator: &fakeCertGenerator{},
+		CertGenerator: &myCertGenerator{},
 	})
 	require.NoError(t, err)
 
@@ -100,8 +95,8 @@ func TestFSCertWriter_EnsureCert_WritesCerts(t *testing.T) {
 	assert.True(t, changed)
 
 	t.Run("artifacts match", func(t *testing.T) {
-		assert.Equal(t, []byte("fake-cert"), artifacts.Cert)
-		assert.Equal(t, []byte("fake-key"), artifacts.Key)
+		assert.Equal(t, []byte("my-cert"), artifacts.Cert)
+		assert.Equal(t, []byte("my-key"), artifacts.Key)
 	})
 
 	t.Run("files written", func(t *testing.T) {
@@ -124,7 +119,7 @@ func TestFSCertWriter_Read_ReturnsCorrectArtifacts(t *testing.T) {
 
 	writer, err := NewFSCertWriter(FSCertWriterOptions{
 		Path:          dir,
-		CertGenerator: &fakeCertGenerator{},
+		CertGenerator: &myCertGenerator{},
 	})
 	require.NoError(t, err)
 
@@ -137,10 +132,10 @@ func TestFSCertWriter_Read_ReturnsCorrectArtifacts(t *testing.T) {
 	readArtifacts, err := fsWriter.read()
 	require.NoError(t, err)
 
-	assert.Equal(t, []byte("fake-ca-key"), readArtifacts.CAKey)
-	assert.Equal(t, []byte("fake-ca-cert"), readArtifacts.CACert)
-	assert.Equal(t, []byte("fake-cert"), readArtifacts.Cert)
-	assert.Equal(t, []byte("fake-key"), readArtifacts.Key)
+	assert.Equal(t, []byte("my-ca-key"), readArtifacts.CAKey)
+	assert.Equal(t, []byte("my-ca-cert"), readArtifacts.CACert)
+	assert.Equal(t, []byte("my-cert"), readArtifacts.Cert)
+	assert.Equal(t, []byte("my-key"), readArtifacts.Key)
 }
 
 func TestFSCertWriter_Read_FailsIfMissingFiles(t *testing.T) {
