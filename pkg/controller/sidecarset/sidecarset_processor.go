@@ -158,6 +158,17 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 
 func (p *Processor) updatePods(control sidecarcontrol.SidecarControl, pods []*corev1.Pod) error {
 	sidecarset := control.GetSidecarset()
+	for _, pod := range pods {
+		if sidecarcontrol.IsPodSidecarUpdated(sidecarset, pod) {
+			currentState := sidecarcontrol.GetPodSidecarSetUpgradeState(sidecarset.Name, pod)
+			if currentState != sidecarcontrol.SidecarSetUpgradeStateCompleted {
+				if err := p.setPodUpgradeState(pod, sidecarset.Name, sidecarcontrol.SidecarSetUpgradeStateCompleted, "Pod already up-to-date"); err != nil {
+					klog.ErrorS(err, "Failed to set pod upgrade state to Completed for up-to-date pod", "sidecarSet", klog.KObj(sidecarset), "pod", klog.KObj(pod))
+				}
+			}
+		}
+	}
+
 	// compute next updated pods based on the sidecarset upgrade strategy
 	upgradePods, notUpgradablePods := NewStrategy().GetNextUpgradePods(control, pods)
 	for _, pod := range notUpgradablePods {
@@ -176,15 +187,38 @@ func (p *Processor) updatePods(control sidecarcontrol.SidecarControl, pods []*co
 		klog.V(3).InfoS("SidecarSet next update was nil, skip this round", "sidecarSet", klog.KObj(sidecarset))
 		return nil
 	}
+
+	for _, pod := range upgradePods {
+		if err := p.setPodUpgradeState(pod, sidecarset.Name, sidecarcontrol.SidecarSetUpgradeStatePending, "Pod selected for upgrade"); err != nil {
+			klog.ErrorS(err, "Failed to set pod upgrade state to Pending", "sidecarSet", klog.KObj(sidecarset), "pod", klog.KObj(pod))
+		}
+	}
+
 	// mark upgrade pods list
 	podNames := make([]string, 0, len(upgradePods))
 	// upgrade pod sidecar
 	for _, pod := range upgradePods {
 		podNames = append(podNames, pod.Name)
+
+		//set upgrade state to "Upgrading" before starting the upgrade
+		if err := p.setPodUpgradeState(pod, sidecarset.Name, sidecarcontrol.SidecarSetUpgradeStateUpgrading, "Pod upgrade in progress"); err != nil {
+			klog.ErrorS(err, "Failed to set pod upgrade state to Upgrading", "sidecarSet", klog.KObj(sidecarset), "pod", klog.KObj(pod))
+		}
+
 		if err := p.updatePodSidecarAndHash(control, pod); err != nil {
 			klog.ErrorS(err, "UpdatePodSidecarAndHash error", "sidecarSet", klog.KObj(sidecarset), "pod", klog.KObj(pod))
+			//set upgrade state to "Failed" if upgrade fails
+			if setErr := p.setPodUpgradeState(pod, sidecarset.Name, sidecarcontrol.SidecarSetUpgradeStateFailed, fmt.Sprintf("Pod upgrade failed: %v", err)); setErr != nil {
+				klog.ErrorS(setErr, "Failed to set pod upgrade state to Failed", "sidecarSet", klog.KObj(sidecarset), "pod", klog.KObj(pod))
+			}
 			return err
 		}
+
+		//set upgrade state to "Completed" after successful upgrade
+		if err := p.setPodUpgradeState(pod, sidecarset.Name, sidecarcontrol.SidecarSetUpgradeStateCompleted, "Pod upgrade completed successfully"); err != nil {
+			klog.ErrorS(err, "Failed to set pod upgrade state to Completed", "sidecarSet", klog.KObj(sidecarset), "pod", klog.KObj(pod))
+		}
+
 		sidecarcontrol.UpdateExpectations.ExpectUpdated(sidecarset.Name, sidecarcontrol.GetSidecarSetRevision(sidecarset), pod)
 	}
 
@@ -690,4 +724,20 @@ func (p *Processor) updatePodSidecarSetUpgradableCondition(sidecarset *appsv1alp
 	}
 	klog.V(3).InfoS("SidecarSet updated pod condition success", "sidecarSet", klog.KObj(sidecarset), "pod", klog.KObj(pod), "conditionType", sidecarcontrol.SidecarSetUpgradable, "conditionStatus", condition.Status)
 	return nil
+}
+
+// setPodUpgradeState sets the upgrade state for a specific SidecarSet in pod annotations
+func (p *Processor) setPodUpgradeState(pod *corev1.Pod, sidecarSetName string, state sidecarcontrol.SidecarSetUpgradeState, message string) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		podClone := &corev1.Pod{}
+		if err := p.Client.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, podClone); err != nil {
+			return err
+		}
+
+		if err := sidecarcontrol.SetPodSidecarSetUpgradeState(podClone, sidecarSetName, state, message); err != nil {
+			return err
+		}
+
+		return p.Client.Update(context.TODO(), podClone)
+	})
 }

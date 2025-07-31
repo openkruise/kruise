@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+	"time"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
@@ -1390,5 +1391,261 @@ func TestGetInjectedVolumeDevices(t *testing.T) {
 				t.Fatalf("expect(%v), but get(%v)", cs.expect, vd)
 			}
 		})
+	}
+}
+
+func TestGetPodSidecarSetUpgradeState(t *testing.T) {
+	cases := []struct {
+		name           string
+		pod            *corev1.Pod
+		sidecarSetName string
+		expectedState  SidecarSetUpgradeState
+	}{
+		{
+			name: "pod with no annotations",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+			},
+			sidecarSetName: "test-sidecarset",
+			expectedState:  "",
+		},
+		{
+			name: "pod with upgrade state pending",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					Annotations: map[string]string{
+						SidecarSetHashAnnotation: `{"test-sidecarset":{"hash":"abc123","sidecarSetName":"test-sidecarset","upgradeState":"Pending"}}`,
+					},
+				},
+			},
+			sidecarSetName: "test-sidecarset",
+			expectedState:  SidecarSetUpgradeStatePending,
+		},
+		{
+			name: "pod with upgrade state upgrading",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					Annotations: map[string]string{
+						SidecarSetHashAnnotation: `{"test-sidecarset":{"hash":"abc123","sidecarSetName":"test-sidecarset","upgradeState":"Upgrading"}}`,
+					},
+				},
+			},
+			sidecarSetName: "test-sidecarset",
+			expectedState:  SidecarSetUpgradeStateUpgrading,
+		},
+		{
+			name: "pod with upgrade state completed",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					Annotations: map[string]string{
+						SidecarSetHashAnnotation: `{"test-sidecarset":{"hash":"abc123","sidecarSetName":"test-sidecarset","upgradeState":"Completed"}}`,
+					},
+				},
+			},
+			sidecarSetName: "test-sidecarset",
+			expectedState:  SidecarSetUpgradeStateCompleted,
+		},
+		{
+			name: "pod with upgrade state failed",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					Annotations: map[string]string{
+						SidecarSetHashAnnotation: `{"test-sidecarset":{"hash":"abc123","sidecarSetName":"test-sidecarset","upgradeState":"Failed"}}`,
+					},
+				},
+			},
+			sidecarSetName: "test-sidecarset",
+			expectedState:  SidecarSetUpgradeStateFailed,
+		},
+		{
+			name: "pod with different sidecarset",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					Annotations: map[string]string{
+						SidecarSetHashAnnotation: `{"other-sidecarset":{"hash":"abc123","sidecarSetName":"other-sidecarset","upgradeState":"Pending"}}`,
+					},
+				},
+			},
+			sidecarSetName: "test-sidecarset",
+			expectedState:  "",
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			state := GetPodSidecarSetUpgradeState(cs.sidecarSetName, cs.pod)
+			if state != cs.expectedState {
+				t.Fatalf("expected upgrade state %v, but got %v", cs.expectedState, state)
+			}
+		})
+	}
+}
+
+func TestSetPodSidecarSetUpgradeState(t *testing.T) {
+	cases := []struct {
+		name           string
+		pod            *corev1.Pod
+		sidecarSetName string
+		state          SidecarSetUpgradeState
+		message        string
+		expectError    bool
+	}{
+		{
+			name: "set upgrade state on pod with no annotations",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+				},
+			},
+			sidecarSetName: "test-sidecarset",
+			state:          SidecarSetUpgradeStatePending,
+			message:        "Pod selected for upgrade",
+			expectError:    false,
+		},
+		{
+			name: "set upgrade state on pod with existing annotations",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					Annotations: map[string]string{
+						SidecarSetHashAnnotation: `{"test-sidecarset":{"hash":"abc123","sidecarSetName":"test-sidecarset"}}`,
+					},
+				},
+			},
+			sidecarSetName: "test-sidecarset",
+			state:          SidecarSetUpgradeStateUpgrading,
+			message:        "Pod upgrade in progress",
+			expectError:    false,
+		},
+		{
+			name: "set upgrade state to completed",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					Annotations: map[string]string{
+						SidecarSetHashAnnotation: `{"test-sidecarset":{"hash":"abc123","sidecarSetName":"test-sidecarset","upgradeState":"Upgrading"}}`,
+					},
+				},
+			},
+			sidecarSetName: "test-sidecarset",
+			state:          SidecarSetUpgradeStateCompleted,
+			message:        "Pod upgrade completed successfully",
+			expectError:    false,
+		},
+		{
+			name: "set upgrade state to failed",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					Annotations: map[string]string{
+						SidecarSetHashAnnotation: `{"test-sidecarset":{"hash":"abc123","sidecarSetName":"test-sidecarset","upgradeState":"Upgrading"}}`,
+					},
+				},
+			},
+			sidecarSetName: "test-sidecarset",
+			state:          SidecarSetUpgradeStateFailed,
+			message:        "Pod upgrade failed: timeout",
+			expectError:    false,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			err := SetPodSidecarSetUpgradeState(cs.pod, cs.sidecarSetName, cs.state, cs.message)
+			if cs.expectError && err == nil {
+				t.Fatalf("expected error but got none")
+			}
+			if !cs.expectError && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if !cs.expectError {
+				// Verify the state was set correctly
+				actualState := GetPodSidecarSetUpgradeState(cs.sidecarSetName, cs.pod)
+				if actualState != cs.state {
+					t.Fatalf("expected upgrade state %v, but got %v", cs.state, actualState)
+				}
+
+				// Verify the message was set correctly
+				upgradeSpec := GetPodSidecarSetUpgradeSpecInAnnotations(cs.sidecarSetName, SidecarSetHashAnnotation, cs.pod)
+				if upgradeSpec.UpgradeMessage != cs.message {
+					t.Fatalf("expected upgrade message %v, but got %v", cs.message, upgradeSpec.UpgradeMessage)
+				}
+
+				// Verify timestamps are set appropriately
+				switch cs.state {
+				case SidecarSetUpgradeStateUpgrading:
+					if upgradeSpec.UpgradeStartTime == nil {
+						t.Fatalf("expected UpgradeStartTime to be set for Upgrading state")
+					}
+				case SidecarSetUpgradeStateCompleted, SidecarSetUpgradeStateFailed:
+					if upgradeSpec.UpgradeEndTime == nil {
+						t.Fatalf("expected UpgradeEndTime to be set for %v state", cs.state)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestUpdatePodSidecarSetHashPreservesUpgradeState(t *testing.T) {
+	now := metav1.Now()
+	sidecarSet := &appsv1alpha1.SidecarSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-sidecarset",
+			Annotations: map[string]string{
+				SidecarSetHashAnnotation: "new-hash-123",
+			},
+		},
+		Spec: appsv1alpha1.SidecarSetSpec{
+			Containers: []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name: "sidecar-1",
+					},
+				},
+			},
+		},
+		Status: appsv1alpha1.SidecarSetStatus{
+			LatestRevision: "revision-123",
+		},
+	}
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pod",
+			Annotations: map[string]string{
+				SidecarSetHashAnnotation: `{"test-sidecarset":{"hash":"old-hash-456","sidecarSetName":"test-sidecarset","upgradeState":"Upgrading","upgradeStartTime":"` + now.Format(time.RFC3339) + `","upgradeMessage":"Pod upgrade in progress"}}`,
+			},
+		},
+	}
+
+	UpdatePodSidecarSetHash(pod, sidecarSet)
+	upgradeSpec := GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSet.Name, SidecarSetHashAnnotation, pod)
+
+	if upgradeSpec.SidecarSetHash != "new-hash-123" {
+		t.Fatalf("expected hash to be updated to new-hash-123, but got %v", upgradeSpec.SidecarSetHash)
+	}
+	if upgradeSpec.UpgradeState != SidecarSetUpgradeStateUpgrading {
+		t.Fatalf("expected upgrade state to be preserved as Upgrading, but got %v", upgradeSpec.UpgradeState)
+	}
+	if upgradeSpec.UpgradeMessage != "Pod upgrade in progress" {
+		t.Fatalf("expected upgrade message to be preserved, but got %v", upgradeSpec.UpgradeMessage)
+	}
+	if upgradeSpec.UpgradeStartTime == nil {
+		t.Fatalf("expected upgrade start time to be preserved")
+	}
+	if upgradeSpec.SidecarSetName != sidecarSet.Name {
+		t.Fatalf("expected sidecarset name to be %v, but got %v", sidecarSet.Name, upgradeSpec.SidecarSetName)
+	}
+	if upgradeSpec.SidecarSetControllerRevision != sidecarSet.Status.LatestRevision {
+		t.Fatalf("expected controller revision to be %v, but got %v", sidecarSet.Status.LatestRevision, upgradeSpec.SidecarSetControllerRevision)
 	}
 }
