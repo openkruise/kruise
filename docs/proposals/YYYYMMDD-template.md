@@ -24,7 +24,7 @@ superseded-by:
 <!-- BEGIN Remove before PR -->
 To get started with this template:
 1. **Make a copy of this template.**
-  Copy this template into `docs/enhancements` and name it `YYYYMMDD-my-title.md`, where `YYYYMMDD` is the date the proposal was first drafted.
+  Copy this template into `docs/proposals` and name it `YYYYMMDD-my-title.md`, where `YYYYMMDD` is the date the proposal was first drafted.
 1. **Fill out the required sections.**
 1. **Create a PR.**
   Aim for single topic PRs to keep discussions focused.
@@ -188,4 +188,3 @@ Consider the following in developing an upgrade strategy for this enhancement:
 - [ ] MM/DD/YYYY: First round of feedback from community
 - [ ] MM/DD/YYYY: Present proposal at a [community meeting]
 - [ ] MM/DD/YYYY: Open proposal PR
-
