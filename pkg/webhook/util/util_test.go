@@ -105,9 +105,9 @@ func TestGetRenewBeforeTime(t *testing.T) {
 		expected time.Duration
 	}{
 		{"default", "", 6 * 30 * 24 * time.Hour},
-		{"10d", "10d", 10 * 7 * time.Hour},
-		{"2m", "2m", 2 * 30 * time.Hour},
-		{"1y", "1y", 365 * time.Hour},
+		{"10d", "10d", 10 * 24 * time.Hour},
+		{"2m", "2m", 2 * 30 * 24 * time.Hour},
+		{"1y", "1y", 365 * 24 * time.Hour},
 		{"invalid suffix", "5x", 6 * 30 * 24 * time.Hour},
 		{"invalid format", "oops", 6 * 30 * 24 * time.Hour},
 	}
