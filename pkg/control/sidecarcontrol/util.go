@@ -76,12 +76,26 @@ var (
 	UpdateExpectations = expectations.NewUpdateExpectations(RevisionAdapterImpl)
 )
 
+type SidecarSetUpgradeState string
+
+const (
+	SidecarSetUpgradeStatePending   SidecarSetUpgradeState = "Pending"
+	SidecarSetUpgradeStateUpgrading SidecarSetUpgradeState = "Upgrading"
+	SidecarSetUpgradeStateCompleted SidecarSetUpgradeState = "Completed"
+	SidecarSetUpgradeStateFailed    SidecarSetUpgradeState = "Failed"
+)
+
 type SidecarSetUpgradeSpec struct {
 	UpdateTimestamp              metav1.Time `json:"updateTimestamp"`
 	SidecarSetHash               string      `json:"hash"`
 	SidecarSetName               string      `json:"sidecarSetName"`
 	SidecarList                  []string    `json:"sidecarList"`                  // sidecarSet container list
 	SidecarSetControllerRevision string      `json:"controllerRevision,omitempty"` // sidecarSet controllerRevision name
+
+	UpgradeState     SidecarSetUpgradeState `json:"upgradeState,omitempty"`
+	UpgradeStartTime *metav1.Time           `json:"upgradeStartTime,omitempty"`
+	UpgradeEndTime   *metav1.Time           `json:"upgradeEndTime,omitempty"`
+	UpgradeMessage   string                 `json:"upgradeMessage,omitempty"`
 }
 
 // PodMatchSidecarSet determines if pod match Selector of sidecar.
@@ -200,6 +214,57 @@ func GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetName, annotationKey stri
 	return sidecarSetHash[sidecarSetName]
 }
 
+// GetPodSidecarSetUpgradeState returns the upgrade state of a specific SidecarSet for a pod
+func GetPodSidecarSetUpgradeState(sidecarSetName string, pod metav1.Object) SidecarSetUpgradeState {
+	upgradeSpec := GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetName, SidecarSetHashAnnotation, pod)
+	return upgradeSpec.UpgradeState
+}
+
+// SetPodSidecarSetUpgradeState sets the upgrade state for a specific SidecarSet in pod annotations
+func SetPodSidecarSetUpgradeState(pod *corev1.Pod, sidecarSetName string, state SidecarSetUpgradeState, message string) error {
+	hashKey := SidecarSetHashAnnotation
+	sidecarSetHash := make(map[string]SidecarSetUpgradeSpec)
+
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+
+	if err := json.Unmarshal([]byte(pod.Annotations[hashKey]), &sidecarSetHash); err != nil {
+		klog.ErrorS(err, "Failed to unmarshal pod annotations", "pod", klog.KObj(pod), "annotations", hashKey)
+		sidecarSetHash = make(map[string]SidecarSetUpgradeSpec)
+	}
+
+	upgradeSpec, exists := sidecarSetHash[sidecarSetName]
+	if !exists {
+		upgradeSpec = SidecarSetUpgradeSpec{
+			SidecarSetName: sidecarSetName,
+		}
+	}
+
+	now := metav1.Now()
+	upgradeSpec.UpgradeState = state
+	upgradeSpec.UpgradeMessage = message
+
+	switch state {
+	case SidecarSetUpgradeStateUpgrading:
+		if upgradeSpec.UpgradeStartTime == nil {
+			upgradeSpec.UpgradeStartTime = &now
+		}
+	case SidecarSetUpgradeStateCompleted, SidecarSetUpgradeStateFailed:
+		if upgradeSpec.UpgradeEndTime == nil {
+			upgradeSpec.UpgradeEndTime = &now
+		}
+	}
+
+	sidecarSetHash[sidecarSetName] = upgradeSpec
+	newHash, err := json.Marshal(sidecarSetHash)
+	if err != nil {
+		return err
+	}
+	pod.Annotations[hashKey] = string(newHash)
+	return nil
+}
+
 func GetPodSidecarSetWithoutImageRevision(sidecarSetName string, pod metav1.Object) string {
 	upgradeSpec := GetPodSidecarSetUpgradeSpecInAnnotations(sidecarSetName, SidecarSetHashWithoutImageAnnotation, pod)
 	return upgradeSpec.SidecarSetHash
@@ -244,13 +309,23 @@ func UpdatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSe
 	}
 
 	sidecarList := listSidecarNameInSidecarSet(sidecarSet)
-	sidecarSetHash[sidecarSet.Name] = SidecarSetUpgradeSpec{
+	existingSpec, exists := sidecarSetHash[sidecarSet.Name]
+	newSpec := SidecarSetUpgradeSpec{
 		UpdateTimestamp:              metav1.Now(),
 		SidecarSetHash:               GetSidecarSetRevision(sidecarSet),
 		SidecarSetName:               sidecarSet.Name,
 		SidecarList:                  sidecarList.List(),
 		SidecarSetControllerRevision: sidecarSet.Status.LatestRevision,
 	}
+
+	if exists {
+		newSpec.UpgradeState = existingSpec.UpgradeState
+		newSpec.UpgradeStartTime = existingSpec.UpgradeStartTime
+		newSpec.UpgradeEndTime = existingSpec.UpgradeEndTime
+		newSpec.UpgradeMessage = existingSpec.UpgradeMessage
+	}
+
+	sidecarSetHash[sidecarSet.Name] = newSpec
 	newHash, _ := json.Marshal(sidecarSetHash)
 	pod.Annotations[hashKey] = string(newHash)
 }

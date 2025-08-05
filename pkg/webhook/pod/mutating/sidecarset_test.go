@@ -1438,24 +1438,28 @@ func TestInjectInitContainer(t *testing.T) {
 					SidecarSetHash:  "sidecarset-1-hash",
 					SidecarSetName:  "sidecarset-1",
 					SidecarList:     []string{"init-1"},
+					UpgradeState:    sidecarcontrol.SidecarSetUpgradeStateCompleted,
 				}
 				sidecarSetHash["sidecarset-2"] = sidecarcontrol.SidecarSetUpgradeSpec{
 					UpdateTimestamp: metav1.Now(),
 					SidecarSetHash:  "sidecarset-2-hash",
 					SidecarSetName:  "sidecarset-2",
 					SidecarList:     []string{"hot-init"},
+					UpgradeState:    sidecarcontrol.SidecarSetUpgradeStateCompleted,
 				}
 				sidecarSetHashWithoutImage["sidecarset-1"] = sidecarcontrol.SidecarSetUpgradeSpec{
 					UpdateTimestamp: metav1.Now(),
 					SidecarSetHash:  "sidecarset-1-without-image-hash",
 					SidecarSetName:  "sidecarset-1",
 					SidecarList:     []string{"init-1"},
+					UpgradeState:    sidecarcontrol.SidecarSetUpgradeStateCompleted,
 				}
 				sidecarSetHashWithoutImage["sidecarset-2"] = sidecarcontrol.SidecarSetUpgradeSpec{
 					UpdateTimestamp: metav1.Now(),
 					SidecarSetHash:  "sidecarset-2-without-image-hash",
 					SidecarSetName:  "sidecarset-2",
 					SidecarList:     []string{"hot-init"},
+					UpgradeState:    sidecarcontrol.SidecarSetUpgradeStateCompleted,
 				}
 				by, _ := json.Marshal(sidecarSetHash)
 				obj.Annotations[sidecarcontrol.SidecarSetHashAnnotation] = string(by)
@@ -1908,5 +1912,33 @@ func TestBuildSidecarVolumes_WithDifferentVolumeScenarios(t *testing.T) {
 				t.Fatalf("expected volumes %v, but got %v", cs.exceptVolumesInSidecars, volumesInSidecars)
 			}
 		})
+	}
+}
+
+func TestSidecarSetUpgradeStateInitialization(t *testing.T) {
+	//test that newly injected pods get the "Completed" upgrade state
+	podIn := pod1.DeepCopy()
+	podIn.Annotations = map[string]string{}
+
+	sidecarSetIn := sidecarSet1.DeepCopy()
+
+	decoder := admission.NewDecoder(scheme.Scheme)
+	c := fake.NewClientBuilder().WithObjects(sidecarSetIn).WithIndex(
+		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+	).Build()
+
+	podOut := podIn.DeepCopy()
+	podHandler := &PodCreateHandler{Decoder: decoder, Client: c}
+	req := newAdmission(admissionv1.Create, runtime.RawExtension{}, runtime.RawExtension{}, "")
+	_, err := podHandler.sidecarsetMutatingPod(context.Background(), req, podOut)
+	if err != nil {
+		t.Fatalf("inject sidecar into pod failed, err: %v", err)
+	}
+
+	// verify that the upgrade state is set to "Completed" for newly injected pods
+	upgradeState := sidecarcontrol.GetPodSidecarSetUpgradeState(sidecarSetIn.Name, podOut)
+	if upgradeState != sidecarcontrol.SidecarSetUpgradeStateCompleted {
+		t.Fatalf("expected upgrade state to be %v for newly injected pod, but got %v",
+			sidecarcontrol.SidecarSetUpgradeStateCompleted, upgradeState)
 	}
 }
