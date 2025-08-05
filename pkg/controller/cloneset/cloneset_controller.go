@@ -20,6 +20,7 @@ package cloneset
 import (
 	"context"
 	"flag"
+	"fmt"
 	"time"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -49,6 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -248,20 +250,13 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 			// Therefore, a touting mechanism is needed to ensure that clonesets can continue to work.
 			klog.InfoS("Expectation unsatisfied overtime", "cloneSet", request, "scaleDirtyPods", scaleDirtyPods, "overTime", unsatisfiedDuration)
 			CloneSetScaleExpectationLeakageMetrics.WithLabelValues(request.Namespace, request.Name).Add(1)
-			// TODO: check the existence of resource in apiserver using client-go directly
-			/*for _, pods := range scaleDirtyPods {
-				for _, name := range pods {
-					_, err = kubeClient.GetGenericClient().KubeClient.CoreV1().Pods(request.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
-					if err == nil {
-						klog.Warningf("CloneSet(%s/%s) ScaleExpectations leakage, but Pod(%s) already exist", request.Namespace, request.Name, name)
-						return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
-					} else if !errors.IsNotFound(err) {
-						klog.ErrorS(err, "Failed to get Pod", "cloneSet", request, "pod", name)
-						return reconcile.Result{RequeueAfter: 3 * time.Second}, nil
-					}
-				}
+			
+			// Check the existence of resources in apiserver using client-go directly
+			if err := r.checkResourceExistence(request, scaleDirtyPods); err != nil {
+				klog.ErrorS(err, "Failed to check resource existence", "cloneSet", request)
+				return reconcile.Result{RequeueAfter: 3 * time.Second}, nil
 			}
-			klog.InfoS("CloneSet ScaleExpectation DirtyPods no longer exists, and delete ScaleExpectation", "cloneSet", request)*/
+			
 			if utilfeature.DefaultFeatureGate.Enabled(features.ForceDeleteTimeoutExpectationFeatureGate) {
 				klog.InfoS("Expectation unsatisfied overtime, and force delete the timeout Expectation", "cloneSet", request, "scaleDirtyPods", scaleDirtyPods, "overTime", unsatisfiedDuration)
 				clonesetutils.ScaleExpectations.DeleteExpectations(request.String())
@@ -734,4 +729,37 @@ func (r *ReconcileCloneSet) deleteOnePVC(cs *appsv1alpha1.CloneSet, pvc *v1.Pers
 func updateClaimOwnerRefToPod(pvc *v1.PersistentVolumeClaim, cs *appsv1alpha1.CloneSet, pod *v1.Pod) bool {
 	util.RemoveOwnerRef(pvc, cs)
 	return util.SetOwnerRef(pvc, pod, schema.GroupVersionKind{Version: "v1", Kind: "Pod"})
+}
+
+// checkResourceExistence checks if the expected pods actually exist in the apiserver
+// using client-go directly to handle expectation timeouts and potential event loss.
+func (r *ReconcileCloneSet) checkResourceExistence(request reconcile.Request, scaleDirtyPods map[expectations.ScaleAction][]string) error {
+	for action, podNames := range scaleDirtyPods {
+		for _, name := range podNames {
+			// Use the controller-runtime client to check pod existence
+			pod := &v1.Pod{}
+			err := r.Client.Get(context.TODO(), types.NamespacedName{
+				Namespace: request.Namespace,
+				Name:      name,
+			}, pod)
+			
+			if err == nil {
+				// Pod exists, which indicates expectation leakage
+				klog.Warningf("CloneSet(%s/%s) ScaleExpectations leakage, but Pod(%s) already exists for action %s", 
+					request.Namespace, request.Name, name, action)
+				// Return early to trigger a requeue with delay
+				return fmt.Errorf("expectation leakage detected for pod %s with action %s", name, action)
+			} else if !errors.IsNotFound(err) {
+				// Non-NotFound error indicates a real problem
+				klog.ErrorS(err, "Failed to get Pod", "cloneSet", request, "pod", name, "action", action)
+				return fmt.Errorf("failed to check pod %s existence for action %s: %w", name, action, err)
+			}
+			// Pod not found is expected for delete actions or when pods were actually deleted
+		}
+	}
+	
+	// All expected pods are confirmed to not exist, which means the expectations can be safely cleared
+	klog.InfoS("CloneSet ScaleExpectation DirtyPods no longer exist, and delete ScaleExpectation", "cloneSet", request)
+	clonesetutils.ScaleExpectations.DeleteExpectations(request.String())
+	return nil
 }
