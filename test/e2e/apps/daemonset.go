@@ -47,8 +47,23 @@ var _ = SIGDescribe("DaemonSet", func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
 				framework.DumpDebugInfo(c, ns)
 			}
+			ds, err := tester.GetDaemonSet(dsName)
+			if err != nil {
+				if !errors.IsNotFound(err) {
+					framework.Logf("Failed to get DaemonSet %s/%s: %v", ns, dsName, err)
+				}
+				return
+			}
+			nodes := tester.SchedulableNodes(ds)
 			framework.Logf("Deleting DaemonSet %s/%s in cluster", ns, dsName)
 			tester.DeleteDaemonSet(ns, dsName)
+
+			pvcs, err := tester.ListDaemonPvcs(ds.Spec.Selector.MatchLabels)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pvcs.Items)).Should(gomega.Equal(len(nodes)))
+			framework.Logf("Deleting PVCs in cluster")
+			err = tester.DeleteDaemonPvcs(ds.Spec.Selector.MatchLabels)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		/*

@@ -163,6 +163,18 @@ type DaemonSetSpec struct {
 	// Currently, we only support pre-delete hook for Advanced DaemonSet.
 	// +optional
 	Lifecycle *appspub.Lifecycle `json:"lifecycle,omitempty"`
+
+	// volumeClaimTemplates is a list of claims that pods are allowed to reference.
+	// The DaemonSet controller is responsible for mapping network identities to
+	// claims in a way that maintains the identity of a pod. Every claim in
+	// this list must have at least one matching (by name) volumeMount in one
+	// container in the template. A claim in this list takes precedence over
+	// any volumes in the template, with the same name.
+	// TODO: Define the behavior if a claim already exists with the same name.
+	// +optional
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Schemaless
+	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 }
 
 // DaemonSetStatus defines the observed state of DaemonSet
