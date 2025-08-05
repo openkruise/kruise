@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	utilpointer "k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -177,6 +178,22 @@ func SetDefaultsAdvancedCronJob(obj *v1alpha1.AdvancedCronJob, injectTemplateDef
 	if obj.Spec.FailedJobsHistoryLimit == nil {
 		obj.Spec.FailedJobsHistoryLimit = new(int32)
 		*obj.Spec.FailedJobsHistoryLimit = 1
+	}
+}
+
+// SetDefaults_ConfigMapSet set default values for BroadcastJob.
+func SetDefaultsConfigMapSet(obj *v1alpha1.ConfigMapSet) {
+	partitionValue := int32(0) // 默认partition为0
+	maxUnavailableValue := intstr.FromInt32(1)
+	if obj.Spec.UpdateStrategy.Partition == nil && len(obj.Spec.UpdateStrategy.Distributions) == 0 {
+		v := intstr.FromInt32(partitionValue)
+		obj.Spec.UpdateStrategy.Partition = &v
+	}
+	if obj.Spec.UpdateStrategy.MaxUnavailable == nil {
+		obj.Spec.UpdateStrategy.MaxUnavailable = &maxUnavailableValue
+	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = utilpointer.Int32(5)
 	}
 }
 

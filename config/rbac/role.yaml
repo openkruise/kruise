@@ -127,6 +127,7 @@ rules:
   - advancedcronjobs
   - broadcastjobs
   - clonesets
+  - configmapsets
   - containerrecreaterequests
   - daemonsets
   - imagelistpulljobs
@@ -152,6 +153,7 @@ rules:
   - advancedcronjobs/finalizers
   - broadcastjobs/finalizers
   - clonesets/finalizers
+  - configmapsets/finalizers
   - containerrecreaterequests/finalizers
   - daemonsets/finalizers
   - imagelistpulljobs/finalizers
@@ -173,6 +175,7 @@ rules:
   - advancedcronjobs/status
   - broadcastjobs/status
   - clonesets/status
+  - configmapsets/status
   - containerrecreaterequests/status
   - daemonsets/status
   - ephemeraljobs/finalizers
