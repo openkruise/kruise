@@ -176,7 +176,7 @@ var _ reconcile.Reconciler = &ReconcileCloneSet{}
 type ReconcileCloneSet struct {
 	client.Client
 	scheme        *runtime.Scheme
-	reconcileFunc func(request reconcile.Request) (reconcile.Result, error)
+	reconcileFunc func(ctx context.Context, request reconcile.Request) (reconcile.Result, error)
 
 	recorder          record.EventRecorder
 	controllerHistory history.Interface
@@ -196,11 +196,11 @@ type ReconcileCloneSet struct {
 
 // Reconcile reads that state of the cluster for a CloneSet object and makes changes based on the state read
 // and what is in the CloneSet.Spec
-func (r *ReconcileCloneSet) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
-	return r.reconcileFunc(request)
+func (r *ReconcileCloneSet) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	return r.reconcileFunc(ctx, request)
 }
 
-func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcile.Result, retErr error) {
+func (r *ReconcileCloneSet) doReconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, retErr error) {
 	startTime := time.Now()
 	defer func() {
 		if retErr == nil {
@@ -218,7 +218,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 
 	// Fetch the CloneSet instance
 	instance := &appsv1alpha1.CloneSet{}
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.Get(ctx, request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -252,7 +252,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 			CloneSetScaleExpectationLeakageMetrics.WithLabelValues(request.Namespace, request.Name).Add(1)
 			
 			// Check the existence of resources in apiserver using client-go directly
-			if err := r.checkResourceExistence(request, scaleDirtyPods); err != nil {
+			if err := r.checkResourceExistence(ctx, request, scaleDirtyPods); err != nil {
 				klog.ErrorS(err, "Failed to check resource existence", "cloneSet", request)
 				return reconcile.Result{RequeueAfter: 3 * time.Second}, nil
 			}
@@ -276,7 +276,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		return reconcile.Result{}, err
 	}
 	// filteredPVCS's ownerRef is CloneSet
-	filteredPVCs, err := r.getOwnedPVCs(instance)
+	filteredPVCs, err := r.getOwnedPVCs(ctx, instance)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -284,7 +284,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	// If cloneSet doesn't want to reuse pvc, clean up
 	// the existing pvc first, which are owned by inactive or deleted pods.
 	if instance.Spec.ScaleStrategy.DisablePVCReuse {
-		filteredPVCs, err = r.cleanupPVCs(instance, filteredPods, filterOutPods, filteredPVCs)
+		filteredPVCs, err = r.cleanupPVCs(ctx, instance, filteredPods, filterOutPods, filteredPVCs)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -377,7 +377,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		return reconcile.Result{}, err
 	}
 
-	if err = r.truncatePodsToDelete(instance, filteredPods); err != nil {
+	if err = r.truncatePodsToDelete(ctx, instance, filteredPods); err != nil {
 		klog.ErrorS(err, "Failed to truncate podsToDelete for CloneSet", "cloneSet", request)
 	}
 
@@ -527,14 +527,14 @@ func (r *ReconcileCloneSet) getOwnedPods(cs *appsv1alpha1.CloneSet) ([]*v1.Pod, 
 	return clonesetutils.GetActiveAndInactivePods(r.Client, opts)
 }
 
-func (r *ReconcileCloneSet) getOwnedPVCs(cs *appsv1alpha1.CloneSet) ([]*v1.PersistentVolumeClaim, error) {
+func (r *ReconcileCloneSet) getOwnedPVCs(ctx context.Context, cs *appsv1alpha1.CloneSet) ([]*v1.PersistentVolumeClaim, error) {
 	opts := &client.ListOptions{
 		Namespace:     cs.Namespace,
 		FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(cs.UID)}),
 	}
 
 	pvcList := v1.PersistentVolumeClaimList{}
-	if err := r.List(context.TODO(), &pvcList, opts, utilclient.DisableDeepCopy); err != nil {
+	if err := r.List(ctx, &pvcList, opts, utilclient.DisableDeepCopy); err != nil {
 		return nil, err
 	}
 	var filteredPVCs []*v1.PersistentVolumeClaim
@@ -549,7 +549,7 @@ func (r *ReconcileCloneSet) getOwnedPVCs(cs *appsv1alpha1.CloneSet) ([]*v1.Persi
 }
 
 // truncatePodsToDelete truncates any non-live pod names in spec.scaleStrategy.podsToDelete.
-func (r *ReconcileCloneSet) truncatePodsToDelete(cs *appsv1alpha1.CloneSet, pods []*v1.Pod) error {
+func (r *ReconcileCloneSet) truncatePodsToDelete(ctx context.Context, cs *appsv1alpha1.CloneSet, pods []*v1.Pod) error {
 	if len(cs.Spec.ScaleStrategy.PodsToDelete) == 0 {
 		return nil
 	}
@@ -572,7 +572,7 @@ func (r *ReconcileCloneSet) truncatePodsToDelete(cs *appsv1alpha1.CloneSet, pods
 
 	newCS := cs.DeepCopy()
 	newCS.Spec.ScaleStrategy.PodsToDelete = newPodsToDelete
-	return r.Update(context.TODO(), newCS)
+	return r.Update(ctx, newCS)
 }
 
 // truncateHistory truncates any non-live ControllerRevisions in revisions from cs's history. The UpdateRevision and
@@ -650,6 +650,7 @@ func (r *ReconcileCloneSet) claimPods(instance *appsv1alpha1.CloneSet, pods []*v
 // If pvc owner pod does not exist, the pvc can be deleted directly,
 // else update pvc's ownerReference to pod.
 func (r *ReconcileCloneSet) cleanupPVCs(
+	ctx context.Context,
 	cs *appsv1alpha1.CloneSet,
 	activePods, inactivePods []*v1.Pod,
 	pvcs []*v1.PersistentVolumeClaim,
@@ -692,7 +693,7 @@ func (r *ReconcileCloneSet) cleanupPVCs(
 		// There is no need to judge whether the ownerRef has met expectations
 		// because the pvc(listed in the previous list)'s ownerRef must be CloneSet
 		_ = updateClaimOwnerRefToPod(pvc, cs, pod)
-		if err := r.updateOnePVC(cs, pvc); err != nil && !errors.IsNotFound(err) {
+		if err := r.updateOnePVC(ctx, cs, pvc); err != nil && !errors.IsNotFound(err) {
 			return nil, err
 		}
 		klog.V(3).InfoS("Updated CloneSet pvc's ownerRef to Pod", "cloneSet", klog.KObj(cs), "pvc", klog.KObj(pvc))
@@ -700,7 +701,7 @@ func (r *ReconcileCloneSet) cleanupPVCs(
 	// delete pvc directly
 	for i := range toDeletePVCs {
 		pvc := toDeletePVCs[i]
-		if err := r.deleteOnePVC(cs, pvc); err != nil && !errors.IsNotFound(err) {
+		if err := r.deleteOnePVC(ctx, cs, pvc); err != nil && !errors.IsNotFound(err) {
 			return nil, err
 		}
 		klog.V(3).InfoS("Deleted CloneSet pvc directly", "cloneSet", klog.KObj(cs), "pvc", klog.KObj(pvc))
@@ -708,17 +709,17 @@ func (r *ReconcileCloneSet) cleanupPVCs(
 	return activePVCs, nil
 }
 
-func (r *ReconcileCloneSet) updateOnePVC(cs *appsv1alpha1.CloneSet, pvc *v1.PersistentVolumeClaim) error {
-	if err := r.Client.Update(context.TODO(), pvc); err != nil {
+func (r *ReconcileCloneSet) updateOnePVC(ctx context.Context, cs *appsv1alpha1.CloneSet, pvc *v1.PersistentVolumeClaim) error {
+	if err := r.Client.Update(ctx, pvc); err != nil {
 		r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedUpdate", "failed to update PVC %s: %v", pvc.Name, err)
 		return err
 	}
 	return nil
 }
 
-func (r *ReconcileCloneSet) deleteOnePVC(cs *appsv1alpha1.CloneSet, pvc *v1.PersistentVolumeClaim) error {
+func (r *ReconcileCloneSet) deleteOnePVC(ctx context.Context, cs *appsv1alpha1.CloneSet, pvc *v1.PersistentVolumeClaim) error {
 	clonesetutils.ScaleExpectations.ExpectScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pvc.Name)
-	if err := r.Delete(context.TODO(), pvc); err != nil {
+	if err := r.Delete(ctx, pvc); err != nil {
 		clonesetutils.ScaleExpectations.ObserveScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pvc.Name)
 		r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedDelete", "failed to clean up PVC %s: %v", pvc.Name, err)
 		return err
@@ -733,12 +734,12 @@ func updateClaimOwnerRefToPod(pvc *v1.PersistentVolumeClaim, cs *appsv1alpha1.Cl
 
 // checkResourceExistence checks if the expected pods actually exist in the apiserver
 // using client-go directly to handle expectation timeouts and potential event loss.
-func (r *ReconcileCloneSet) checkResourceExistence(request reconcile.Request, scaleDirtyPods map[expectations.ScaleAction][]string) error {
+func (r *ReconcileCloneSet) checkResourceExistence(ctx context.Context, request reconcile.Request, scaleDirtyPods map[expectations.ScaleAction][]string) error {
 	for action, podNames := range scaleDirtyPods {
 		for _, name := range podNames {
 			// Use the controller-runtime client to check pod existence
 			pod := &v1.Pod{}
-			err := r.Client.Get(context.TODO(), types.NamespacedName{
+			err := r.Client.Get(ctx, types.NamespacedName{
 				Namespace: request.Namespace,
 				Name:      name,
 			}, pod)
