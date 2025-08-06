@@ -92,6 +92,13 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetSpec(spec, oldSpec *appsv1
 	allErrs = append(allErrs, h.validateScaleStrategy(&spec.ScaleStrategy, oldScaleStrategy, metadata, fldPath.Child("scaleStrategy"))...)
 	allErrs = append(allErrs, h.validateUpdateStrategy(&spec.UpdateStrategy, int(*spec.Replicas), fldPath.Child("updateStrategy"))...)
 
+	if spec.ProgressDeadlineSeconds != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.ProgressDeadlineSeconds), fldPath.Child("progressDeadlineSeconds"))...)
+		if *spec.ProgressDeadlineSeconds <= spec.MinReadySeconds {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("progressDeadlineSeconds"), spec.ProgressDeadlineSeconds, "must be greater than minReadySeconds"))
+		}
+	}
+
 	return allErrs
 }
 

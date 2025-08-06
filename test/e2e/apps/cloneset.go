@@ -38,6 +38,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -84,12 +85,20 @@ var _ = SIGDescribe("CloneSet", func() {
 				ginkgo.By("hostPort should defaults to containerPort")
 				gomega.Expect(pod.Spec.Containers[0].Ports[0].HostPort).To(gomega.Equal(pod.Spec.Containers[0].Ports[0].ContainerPort))
 			}
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
 		})
 
 		framework.ConformanceIt("creates with lifecycle preNormal finalizer", func() {
 			cs := tester.NewCloneSetWithLifecycle("clone-"+randStr, 1, &appspub.Lifecycle{
 				PreNormal: &appspub.LifecycleHook{FinalizersHandler: []string{"finalizers.sigs.k8s.io/test"}},
 			}, []string{})
+			cs.Spec.ProgressDeadlineSeconds = ptr.To(int32(11))
 
 			cs, err := tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -100,6 +109,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			// pod availableReplicas not reached 1.
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetDeadlineExceededCondition(cs.Status.UpdateRevision)))
 
 			pods, err := tester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -132,10 +148,24 @@ var _ = SIGDescribe("CloneSet", func() {
 
 			_, err = c.CoreV1().Pods(cs.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				cs, err := tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				if cs.Status.AvailableReplicas != 1 {
+					return nil
+				}
+
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetDeadlineExceededCondition(cs.Status.UpdateRevision)))
 		})
 
 		framework.ConformanceIt("creates with unschedulable scheduler", func() {
 			cs := tester.NewCloneSetWithSpecificScheduler("clone-"+randStr, 1, "unschedulable")
+			cs.Spec.ProgressDeadlineSeconds = ptr.To(int32(8))
 
 			cs, err := tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -159,6 +189,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				return ""
 			}, 10*time.Second, time.Second).Should(gomega.Equal(string(appspub.LifecycleStatePreparingNormal)))
 
+			ginkgo.By("Check cloneSet progressing with deadline exceeded reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 20*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetDeadlineExceededCondition(cs.Status.UpdateRevision)))
+
 			// update schedulerName.
 			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) { cs.Spec.Template.Spec.SchedulerName = "" })
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -178,6 +215,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				}
 				return ""
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(string(appspub.LifecycleStateNormal)))
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
 		})
 	})
 
@@ -205,6 +249,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
 		})
 
 		framework.ConformanceIt("scales with minReadySeconds and scaleStrategy", func() {
@@ -216,6 +267,13 @@ var _ = SIGDescribe("CloneSet", func() {
 			cs.Spec.ScaleStrategy.MaxUnavailable = &intstr.IntOrString{Type: intstr.Int, IntVal: scaleMaxUnavailable}
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 2*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -230,6 +288,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(replicas))
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
 
 			ginkgo.By("check create time of pods")
 			pods, err := tester.ListPodsForCloneSet(cs.Name)
@@ -266,6 +331,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
+
+			ginkgo.By("Check cloneSet progressing condition with paused reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetPausedCondition()))
 		})
 
 		framework.ConformanceIt("specific delete a Pod, when scalingExcludePreparingDelete is disabled", func() {
@@ -293,6 +365,14 @@ var _ = SIGDescribe("CloneSet", func() {
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
 
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
+			condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+
 			oldPods, err := tester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(oldPods).To(gomega.HaveLen(int(cs.Status.Replicas)))
@@ -316,6 +396,11 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.Replicas
 			}, 5*time.Second, time.Second).Should(gomega.Equal(int32(3)))
+
+			ginkgo.By("Check cloneSet progressing condition with origin available reason")
+			waitPreDeleteProgressingCondition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(waitPreDeleteProgressingCondition).To(gomega.Equal(condition))
 
 			newPods, err := tester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -349,6 +434,11 @@ var _ = SIGDescribe("CloneSet", func() {
 
 			keepOldPods := util.GetPodNames(newPods).Intersection(util.GetPodNames(oldPods)).List()
 			gomega.Expect(keepOldPods).To(gomega.HaveLen(2))
+
+			ginkgo.By("Check cloneSet progressing condition with origin available reason")
+			finalProgressingCondition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(finalProgressingCondition).To(gomega.Equal(condition))
 		})
 
 		framework.ConformanceIt("specific scale down with lifecycle and then scale up, when scalingExcludePreparingDelete is enabled", func() {
@@ -377,6 +467,16 @@ var _ = SIGDescribe("CloneSet", func() {
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
 
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
+
+			condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 			oldPods, err := tester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(oldPods).To(gomega.HaveLen(int(cs.Status.Replicas)))
@@ -400,6 +500,11 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Status.Replicas).To(gomega.Equal(int32(3)))
 
+			ginkgo.By("Check cloneSet progressing condition with origin available reason")
+			AfterPreDeleteProgressingCondition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(AfterPreDeleteProgressingCondition).To(gomega.Equal(condition))
+
 			ginkgo.By("Scale up to 3 again and wait status.replicas to be 4")
 			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
 				cs.Spec.Replicas = utilpointer.Int32(3)
@@ -411,6 +516,11 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.Replicas
 			}, 10*time.Second, 3*time.Second).Should(gomega.Equal(int32(4)))
+
+			ginkgo.By("Check cloneSet progressing condition with origin available reason")
+			AfterScaleUpProgressingCondition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(AfterScaleUpProgressingCondition).To(gomega.Equal(condition))
 
 			ginkgo.By("Remove lifecycle hook label and wait it to be deleted")
 			patchBody := []byte(`{"metadata":{"labels":{"lifecycle-hook":null}}}`)
@@ -439,6 +549,11 @@ var _ = SIGDescribe("CloneSet", func() {
 
 			keepOldPods := util.GetPodNames(newPods).Intersection(util.GetPodNames(oldPods)).List()
 			gomega.Expect(keepOldPods).To(gomega.HaveLen(2))
+
+			ginkgo.By("Check cloneSet progressing condition with origin available reason")
+			finalProgressingCondition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(finalProgressingCondition).To(gomega.Equal(condition))
 		})
 	})
 
@@ -452,6 +567,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			imageConfig.SetRegistry("docker.io/library")
 			imageConfig.SetVersion("alpine")
 			cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
+			cs.Spec.MinReadySeconds = 10
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
@@ -463,12 +579,26 @@ var _ = SIGDescribe("CloneSet", func() {
 				return cs.Status.Replicas
 			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(1)))
 
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
+
 			ginkgo.By("Wait for all pods ready")
 			gomega.Eventually(func() int32 {
 				cs, err = tester.GetCloneSet(cs.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
 
 			pods, err := tester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -493,6 +623,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				return cs.Generation == cs.Status.ObservedGeneration
 			}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
 
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
+
 			ginkgo.By("Wait for all pods updated and ready")
 			gomega.Eventually(func() int32 {
 				cs, err = tester.GetCloneSet(cs.Name)
@@ -510,6 +647,13 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(oldPodUID).Should(gomega.Equal(newPodUID))
 			gomega.Expect(newContainerStatus.ContainerID).NotTo(gomega.Equal(oldContainerStatus.ContainerID))
 			gomega.Expect(newContainerStatus.ImageID).Should(gomega.Equal(oldContainerStatus.ImageID))
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
 		})
 
 		// This can't be Conformance yet.
@@ -521,9 +665,17 @@ var _ = SIGDescribe("CloneSet", func() {
 				Name:      "TEST_ENV",
 				ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.labels['test-env']"}},
 			})
+			cs.Spec.MinReadySeconds = 10
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -538,6 +690,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
 
 			pods, err := tester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -554,6 +713,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				cs.Spec.Template.Spec.Containers[0].Image = NewNginxImage
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 
 			ginkgo.By("Wait for CloneSet generation consistent")
 			gomega.Eventually(func() bool {
@@ -579,6 +745,13 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(oldPodUID).Should(gomega.Equal(newPodUID))
 			gomega.Expect(newContainerStatus.ContainerID).NotTo(gomega.Equal(oldContainerStatus.ContainerID))
 			gomega.Expect(newContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
 		})
 
 		framework.ConformanceIt("in-place update two container images with priorities successfully", func() {
@@ -591,9 +764,17 @@ var _ = SIGDescribe("CloneSet", func() {
 				Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
 			})
 			cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(3)
+			cs.Spec.MinReadySeconds = 10
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -609,6 +790,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
 
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
+
 			pods, err := tester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(len(pods)).Should(gomega.Equal(1))
@@ -619,6 +807,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				cs.Spec.Template.Spec.Containers[1].Image = imageutils.GetE2EImage(imageutils.BusyBox)
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 
 			ginkgo.By("Wait for CloneSet generation consistent")
 			gomega.Eventually(func() bool {
@@ -633,6 +828,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.UpdatedReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
 
 			ginkgo.By("Verify two containers have all updated in-place")
 			pods, err = tester.ListPodsForCloneSet(cs.Name)
@@ -670,9 +872,17 @@ var _ = SIGDescribe("CloneSet", func() {
 				Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
 			})
 			cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(3)
+			cs.Spec.MinReadySeconds = 10
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -688,6 +898,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
 
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
+
 			pods, err := tester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(len(pods)).Should(gomega.Equal(1))
@@ -698,6 +915,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				cs.Spec.Template.Spec.Containers[1].Image = imageutils.GetE2EImage(imageutils.BusyBox)
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 
 			ginkgo.By("Wait for CloneSet generation consistent")
 			gomega.Eventually(func() bool {
@@ -737,6 +961,13 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(len(inPlaceUpdateState.ContainerBatchesRecord)).Should(gomega.Equal(1))
 			gomega.Expect(inPlaceUpdateState.ContainerBatchesRecord[0].Containers).Should(gomega.Equal([]string{"redis"}))
 			gomega.Expect(inPlaceUpdateState.NextContainerImages).Should(gomega.Equal(map[string]string{"nginx": NewNginxImage}))
+
+			ginkgo.By("Check cloneSet progressing condition still with updated reason")
+			gomega.Consistently(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 30*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 		})
 
 		// This can't be Conformance yet.
@@ -752,9 +983,17 @@ var _ = SIGDescribe("CloneSet", func() {
 				},
 				Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
 			})
+			cs.Spec.MinReadySeconds = 10
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -770,6 +1009,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
 
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
+
 			pods, err := tester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(len(pods)).Should(gomega.Equal(1))
@@ -780,6 +1026,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				cs.Spec.Template.Annotations["config"] = "bar"
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 
 			ginkgo.By("Wait for CloneSet generation consistent")
 			gomega.Eventually(func() bool {
@@ -794,6 +1047,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.UpdatedReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
 
 			ginkgo.By("Verify two containers have all updated in-place")
 			pods, err = tester.ListPodsForCloneSet(cs.Name)
@@ -833,9 +1093,17 @@ var _ = SIGDescribe("CloneSet", func() {
 			imageConfig.SetRegistry("docker.io/library")
 			imageConfig.SetVersion("alpine")
 			cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
+			cs.Spec.MinReadySeconds = 10
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -851,6 +1119,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(4)))
 
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
+
 			pods, err := tester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(len(pods)).Should(gomega.Equal(4))
@@ -865,6 +1140,13 @@ var _ = SIGDescribe("CloneSet", func() {
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
+
 			ginkgo.By("Wait for CloneSet generation consistent")
 			gomega.Eventually(func() bool {
 				cs, err = tester.GetCloneSet(cs.Name)
@@ -878,6 +1160,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.UpdatedReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Check cloneSet progressing condition with partition available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetPartitionAvailableCondition()))
 
 			time.Sleep(10 * time.Second)
 			ginkgo.By("Wait for one pods updated, check again after 10s")
@@ -908,6 +1197,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			imageConfig := imageutils.GetConfig(imageutils.Nginx)
 			imageConfig.SetRegistry("docker.io/library")
 			imageConfig.SetVersion("alpine")
+			cs.Spec.MinReadySeconds = 10
 			cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
 			cs.Spec.VolumeClaimTemplates = []v1.PersistentVolumeClaim{
 				{
@@ -932,6 +1222,13 @@ var _ = SIGDescribe("CloneSet", func() {
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.RecreateCloneSetUpdateStrategyType))
+
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -966,6 +1263,16 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(ref.Kind).To(gomega.Equal("CloneSet"))
 			}
 
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
+
+			condition, err := tester.GetCloneSetProgressingCondition(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 			ginkgo.By("delete pod, and reused pvc")
 			for _, pod := range pods {
 				err = c.CoreV1().Pods(ns).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
@@ -978,6 +1285,12 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(4)))
+
+			// condition should be changed.
+			newCondition, err := tester.GetCloneSetProgressingCondition(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(newCondition).Should(gomega.Equal(condition))
+
 			// check pvc reused
 			pvcs, err = tester.ListPVCForCloneSet()
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -996,6 +1309,11 @@ var _ = SIGDescribe("CloneSet", func() {
 				cs.Spec.ScaleStrategy.DisablePVCReuse = true
 			})
 			time.Sleep(time.Second)
+
+			newCondition, err = tester.GetCloneSetProgressingCondition(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(newCondition).Should(gomega.Equal(condition))
+
 			ginkgo.By("delete pod, and reused pvc")
 			for _, pod := range pods {
 				err = c.CoreV1().Pods(ns).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
@@ -1008,6 +1326,10 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(4)))
+
+			newCondition, err = tester.GetCloneSetProgressingCondition(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(newCondition).Should(gomega.Equal(condition))
 
 			// check pvc un-reused
 			pods, err = tester.ListPodsForCloneSet(cs.Name)
@@ -1050,6 +1372,8 @@ var _ = SIGDescribe("CloneSet", func() {
 			}
 			cs.Spec.Lifecycle = &lifecycleHooks
 			cs.Spec.Template.Labels[updateHookLabel] = "true"
+			cs.Spec.MinReadySeconds = 10
+			cs.Spec.ProgressDeadlineSeconds = ptr.To(int32(120))
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
@@ -1060,6 +1384,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.ReadyReplicas
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(2)))
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
 
 			pods, err := tester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1134,6 +1465,16 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(len(updated)).Should(gomega.Equal(0))
 			gomega.Expect(len(preUpdateIndex)).Should(gomega.Equal(1))
 
+			ginkgo.By("Check cloneSet progressing condition with DeadlineExceeded reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 180*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetDeadlineExceededCondition(cs.Status.UpdateRevision)))
+
+			condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 			ginkgo.By("scale up cloneSet to 3 replicas")
 			tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
 				cs.Spec.Replicas = utilpointer.Int32(3)
@@ -1184,6 +1525,10 @@ var _ = SIGDescribe("CloneSet", func() {
 				updated, current, preUpdateIndex = groupPodsByRevision(pods)
 				return len(updated) == 3 && len(current) == 0 && len(preUpdateIndex) == 0
 			}, 120*time.Second, 3*time.Second).Should(gomega.BeTrue())
+
+			newCondition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(newCondition).To(gomega.Equal(condition))
 		})
 
 		ginkgo.It(`CloneSet Update with VolumeClaimTemplate changes`, func() {
@@ -1193,7 +1538,6 @@ var _ = SIGDescribe("CloneSet", func() {
 		ginkgo.It(`change resource and qos -> succeed to recreate`, func() {
 			testChangePodQOS(tester, randStr, c)
 		})
-
 	})
 
 	framework.KruiseDescribe("CloneSet pre-download images", func() {
@@ -1202,10 +1546,18 @@ var _ = SIGDescribe("CloneSet", func() {
 		framework.ConformanceIt("pre-download for new image", func() {
 			partition := intstr.FromInt(1)
 			cs := tester.NewCloneSet("clone-"+randStr, 5, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, Partition: &partition})
+			cs.Spec.MinReadySeconds = 10
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
 			gomega.Expect(cs.Spec.UpdateStrategy.MaxUnavailable).To(gomega.Equal(func() *intstr.IntOrString { i := intstr.FromString("20%"); return &i }()))
+
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 
 			ginkgo.By("Wait for replicas satisfied")
 			gomega.Eventually(func() int32 {
@@ -1213,6 +1565,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return cs.Status.Replicas
 			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(5)))
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
 
 			ginkgo.By("Update image to new nginx")
 			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
@@ -1223,6 +1582,13 @@ var _ = SIGDescribe("CloneSet", func() {
 				cs.Spec.Template.Spec.Containers[0].Image = NewNginxImage
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 
 			ginkgo.By("Should get the ImagePullJob")
 			var job *appsv1alpha1.ImagePullJob
@@ -1238,6 +1604,13 @@ var _ = SIGDescribe("CloneSet", func() {
 			ginkgo.By("Check the ImagePullJob spec and status")
 			gomega.Expect(job.Spec.Image).To(gomega.Equal(NewNginxImage))
 			gomega.Expect(job.Spec.Parallelism.IntValue()).To(gomega.Equal(2))
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetPartitionAvailableCondition()))
 		})
 	})
 })
@@ -1250,9 +1623,17 @@ func testChangePodQOS(tester *framework.CloneSetTester, randStr string, c client
 		Name:      "TEST_ENV",
 		ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.labels['test-env']"}},
 	})
+	cs.Spec.MinReadySeconds = 10
 	cs, err := tester.CreateCloneSet(cs)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+
+	ginkgo.By("Check cloneSet progressing condition with updated reason")
+	gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+		condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		return condition
+	}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 
 	ginkgo.By("Wait for replicas satisfied")
 	gomega.Eventually(func() int32 {
@@ -1267,6 +1648,13 @@ func testChangePodQOS(tester *framework.CloneSetTester, randStr string, c client
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		return cs.Status.ReadyReplicas
 	}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+	ginkgo.By("Check cloneSet progressing condition with available reason")
+	gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+		condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		return condition
+	}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
 
 	pods, err := tester.ListPodsForCloneSet(cs.Name)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -1287,6 +1675,13 @@ func testChangePodQOS(tester *framework.CloneSetTester, randStr string, c client
 		}
 	})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+	ginkgo.By("Check cloneSet progressing condition with updated reason")
+	gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+		condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		return condition
+	}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetUpdatedCondition()))
 
 	ginkgo.By("Wait for CloneSet generation consistent")
 	gomega.Eventually(func() bool {
@@ -1309,6 +1704,13 @@ func testChangePodQOS(tester *framework.CloneSetTester, randStr string, c client
 	newPodUID := pods[0].UID
 
 	gomega.Expect(oldPodUID).ShouldNot(gomega.Equal(newPodUID))
+
+	ginkgo.By("Check cloneSet progressing condition with available reason")
+	gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+		condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		return condition
+	}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
 }
 
 func checkPVCsDoRecreate(numsOfPVCs int, recreate bool) func(instanceIds, newInstanceIds, pvcIds sets.String, pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim) {
@@ -1356,6 +1758,13 @@ func changeCloneSetAndWaitReady(tester *framework.CloneSetTester, cs *appsv1alph
 		return cs.Status.UpdatedReadyReplicas
 	}, 120*time.Second, 3*time.Second).Should(gomega.Equal(*cs.Spec.Replicas))
 
+	ginkgo.By("Check cloneSet progressing condition with available reason")
+	gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+		condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		return condition
+	}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
+
 	pods, err := tester.ListPodsForCloneSet(cs.Name)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	gomega.Expect(int32(len(pods))).Should(gomega.Equal(replica))
@@ -1386,6 +1795,7 @@ func testUpdateVolumeClaimTemplates(tester *framework.CloneSetTester, randStr st
 	updateStrategy := appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.RecreateCloneSetUpdateStrategyType}
 	var replicas int = 4
 	cs := tester.NewCloneSet("clone-"+randStr, int32(replicas), updateStrategy)
+	cs.Spec.MinReadySeconds = 10
 	imageConfig := imageutils.GetConfig(imageutils.Nginx)
 	imageConfig.SetRegistry("docker.io/library")
 	imageConfig.SetVersion("alpine")
