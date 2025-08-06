@@ -310,20 +310,8 @@ func SetDefaultsDaemonSet(obj *v1alpha1.DaemonSet) {
 			obj.Spec.UpdateStrategy.RollingUpdate = &v1alpha1.RollingUpdateDaemonSet{}
 		}
 
-		// Make it compatible with the predicated Surging
-		if obj.Spec.UpdateStrategy.RollingUpdate.Type == v1alpha1.DeprecatedSurgingRollingUpdateType {
-			if obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge == nil {
-				maxSurge := intstr.FromInt(1)
-				obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge = &maxSurge
-			}
-			if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
-				maxUnavailable := intstr.FromInt(0)
-				obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
-			}
-		}
-
-		// Default and convert to Standard
-		if obj.Spec.UpdateStrategy.RollingUpdate.Type == "" || obj.Spec.UpdateStrategy.RollingUpdate.Type == v1alpha1.DeprecatedSurgingRollingUpdateType {
+		// Default to Standard if not specified
+		if obj.Spec.UpdateStrategy.RollingUpdate.Type == "" {
 			obj.Spec.UpdateStrategy.RollingUpdate.Type = v1alpha1.StandardRollingUpdateType
 		}
 

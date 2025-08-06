@@ -689,9 +689,7 @@ func TestGetTemplateGeneration(t *testing.T) {
 				ds: &appsv1alpha1.DaemonSet{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
-						Annotations: map[string]string{
-							apps.DeprecatedTemplateGeneration: "1000",
-						},
+						Generation: 1000,
 					},
 					Spec:   appsv1alpha1.DaemonSetSpec{},
 					Status: appsv1alpha1.DaemonSetStatus{},

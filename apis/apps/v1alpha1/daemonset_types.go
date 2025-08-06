@@ -52,9 +52,7 @@ const (
 	// InplaceRollingUpdateType update container image without killing the pod if possible.
 	InplaceRollingUpdateType RollingUpdateType = "InPlaceIfPossible"
 
-	// DeprecatedSurgingRollingUpdateType is a depreciated alias for Standard.
-	// Deprecated: Just use Standard instead.
-	DeprecatedSurgingRollingUpdateType RollingUpdateType = "Surging"
+
 )
 
 // Spec to control the desired behavior of daemon set rolling update.
