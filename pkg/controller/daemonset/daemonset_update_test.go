@@ -676,7 +676,6 @@ func TestGetTemplateGeneration(t *testing.T) {
 	type args struct {
 		ds *appsv1alpha1.DaemonSet
 	}
-	constNum := int64(1000)
 	tests := []struct {
 		name    string
 		args    args
@@ -684,18 +683,20 @@ func TestGetTemplateGeneration(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "GetTemplateGeneration",
+			name: "GetTemplateGeneration returns nil",
 			args: args{
 				ds: &appsv1alpha1.DaemonSet{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
-						Generation: 1000,
+						Annotations: map[string]string{
+							"some.annotation": "value",
+						},
 					},
 					Spec:   appsv1alpha1.DaemonSetSpec{},
 					Status: appsv1alpha1.DaemonSetStatus{},
 				},
 			},
-			want:    &constNum,
+			want:    nil,
 			wantErr: false,
 		},
 	}
@@ -706,7 +707,7 @@ func TestGetTemplateGeneration(t *testing.T) {
 				t.Errorf("GetTemplateGeneration() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if *got != *tt.want {
+			if got != tt.want {
 				t.Errorf("GetTemplateGeneration() = %v, want %v", got, tt.want)
 			}
 		})
