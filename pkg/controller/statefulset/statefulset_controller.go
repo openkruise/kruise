@@ -133,12 +133,29 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		return nil, err
 	}
 
-	statefulSetLister := kruiseappslisters.NewStatefulSetLister(statefulSetInformer.(toolscache.SharedIndexInformer).GetIndexer())
-	podLister := corelisters.NewPodLister(podInformer.(toolscache.SharedIndexInformer).GetIndexer())
-	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcInformer.(toolscache.SharedIndexInformer).GetIndexer())
+	statefulSetSharedInformer, ok := statefulSetInformer.(toolscache.SharedIndexInformer)
+	if !ok {
+		return nil, fmt.Errorf("statefulSetInformer %T from cache is not a SharedIndexInformer", statefulSetInformer)
+	}
+	podSharedInformer, ok := podInformer.(toolscache.SharedIndexInformer)
+	if !ok {
+		return nil, fmt.Errorf("podInformer %T from cache is not a SharedIndexInformer", podInformer)
+	}
+	pvcSharedInformer, ok := pvcInformer.(toolscache.SharedIndexInformer)
+	if !ok {
+		return nil, fmt.Errorf("pvcInformer %T from cache is not a SharedIndexInformer", pvcInformer)
+	}
+
+	statefulSetLister := kruiseappslisters.NewStatefulSetLister(statefulSetSharedInformer.GetIndexer())
+	podLister := corelisters.NewPodLister(podSharedInformer.GetIndexer())
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcSharedInformer.GetIndexer())
 	var scLister storagelisters.StorageClassLister
 	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoResizePVCGate) {
-		scLister = storagelisters.NewStorageClassLister(scInformer.(toolscache.SharedIndexInformer).GetIndexer())
+		scSharedInformer, ok := scInformer.(toolscache.SharedIndexInformer)
+		if !ok {
+			return nil, fmt.Errorf("scInformer %T from cache is not a SharedIndexInformer", scInformer)
+		}
+		scLister = storagelisters.NewStorageClassLister(scSharedInformer.GetIndexer())
 	}
 
 	genericClient := client.GetGenericClientWithName("statefulset-controller")

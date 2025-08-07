@@ -172,10 +172,27 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		return nil, err
 	}
 
-	dsLister := kruiseappslisters.NewDaemonSetLister(dsInformer.(cache.SharedIndexInformer).GetIndexer())
-	historyLister := appslisters.NewControllerRevisionLister(revInformer.(cache.SharedIndexInformer).GetIndexer())
-	podLister := corelisters.NewPodLister(podInformer.(cache.SharedIndexInformer).GetIndexer())
-	nodeLister := corelisters.NewNodeLister(nodeInformer.(cache.SharedIndexInformer).GetIndexer())
+	dsSharedInformer, ok := dsInformer.(cache.SharedIndexInformer)
+	if !ok {
+		return nil, fmt.Errorf("dsInformer %T from cache is not a SharedIndexInformer", dsInformer)
+	}
+	revSharedInformer, ok := revInformer.(cache.SharedIndexInformer)
+	if !ok {
+		return nil, fmt.Errorf("revInformer %T from cache is not a SharedIndexInformer", revInformer)
+	}
+	podSharedInformer, ok := podInformer.(cache.SharedIndexInformer)
+	if !ok {
+		return nil, fmt.Errorf("podInformer %T from cache is not a SharedIndexInformer", podInformer)
+	}
+	nodeSharedInformer, ok := nodeInformer.(cache.SharedIndexInformer)
+	if !ok {
+		return nil, fmt.Errorf("nodeInformer %T from cache is not a SharedIndexInformer", nodeInformer)
+	}
+
+	dsLister := kruiseappslisters.NewDaemonSetLister(dsSharedInformer.GetIndexer())
+	historyLister := appslisters.NewControllerRevisionLister(revSharedInformer.GetIndexer())
+	podLister := corelisters.NewPodLister(podSharedInformer.GetIndexer())
+	nodeLister := corelisters.NewNodeLister(nodeSharedInformer.GetIndexer())
 	failedPodsBackoff := flowcontrol.NewBackOff(1*time.Second, 15*time.Minute)
 	revisionAdapter := revisionadapter.NewDefaultImpl()
 
