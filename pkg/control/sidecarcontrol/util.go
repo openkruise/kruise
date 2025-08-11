@@ -73,7 +73,8 @@ var (
 	// SubPathExprEnvReg format: $(ODD_NAME)、$(POD_NAME)...
 	SubPathExprEnvReg, _ = regexp.Compile(`\$\(([-._a-zA-Z][-._a-zA-Z0-9]*)\)`)
 
-	UpdateExpectations = expectations.NewUpdateExpectations(RevisionAdapterImpl)
+	UpdateExpectations          = expectations.NewUpdateExpectations(RevisionAdapterImpl)
+	ResourceVersionExpectations = expectations.NewResourceVersionExpectation()
 )
 
 type SidecarSetUpgradeSpec struct {
