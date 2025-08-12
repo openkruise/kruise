@@ -38,11 +38,19 @@ Here's the template:
 
 ## Changes since v1.2.0
 
-### New CRD and Controller: XXX
+### New CRD and Controller: [Controller-Name] (if applicable)
+- Describe the new controller and its purpose
+- Include any important configuration options
+- Mention any breaking changes if applicable
 
 ### CloneSet
+- List significant changes to CloneSet
+- Include any new features or important fixes
+- Note any behavior changes
 
-### XXX
+### [Other Component Name]
+- Update this section for other components with changes
+- Follow the same format as above
 
 ### Others
 
