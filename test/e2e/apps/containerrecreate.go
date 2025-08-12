@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -37,7 +37,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-var _ = SIGDescribe("ContainerRecreateRequest", func() {
+var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecreateRequest", "operation"), func() {
 	f := framework.NewDefaultFramework("containerrecreaterequests")
 	var ns string
 	var c clientset.Interface
@@ -60,9 +60,9 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 
-	framework.KruiseDescribe("ContainerRecreateRequest", func() {
+	ginkgo.Context("ContainerRecreateRequest", func() {
 
-		framework.ConformanceIt("recreates simple containers", func() {
+		ginkgo.It("recreates simple containers", func() {
 
 			ginkgo.By("Create CloneSet and wait Pods ready")
 			pods = tester.CreateTestCloneSetAndGetPods(randStr, 2, []v1.Container{
@@ -175,8 +175,7 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 			}
 		})
 
-		framework.ConformanceIt("recreates containers with postStartHook", func() {
-
+		ginkgo.It("recreates containers with postStartHook", func() {
 			ginkgo.By("Create CloneSet and wait Pods ready")
 			pods = tester.CreateTestCloneSetAndGetPods(randStr, 2, []v1.Container{
 				{
@@ -302,7 +301,7 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 
 		})
 
-		framework.ConformanceIt("recreates containers with preStopHook", func() {
+		ginkgo.It("recreates containers with preStopHook", func() {
 
 			ginkgo.By("Create CloneSet and wait Pods ready")
 			pods = tester.CreateTestCloneSetAndGetPods(randStr, 3, []v1.Container{
@@ -501,7 +500,7 @@ var _ = SIGDescribe("ContainerRecreateRequest", func() {
 
 		})
 
-		framework.ConformanceIt("recreates containers by force", func() {
+		ginkgo.It("recreates containers by force", func() {
 			ginkgo.By("Create CloneSet and wait Pods ready")
 			pods = tester.CreateTestCloneSetAndGetPods(randStr, 2, []v1.Container{
 				{

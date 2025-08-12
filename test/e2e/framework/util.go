@@ -31,7 +31,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -775,6 +775,15 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 
 		l, _ := RunKubectl("logs", s.Name, fmt.Sprintf("--namespace=%v", ns), "--tail=100")
 		Logf("\nLast 100 log lines of %v:\n%v", s.Name, l)
+	}
+}
+
+// DumpDebugInfo dumps debug info
+func DumpPodInfo(c clientset.Interface, ns string) {
+	sl, _ := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Everything().String()})
+	for _, s := range sl.Items {
+		desc, _ := RunKubectl("describe", "po", s.Name, fmt.Sprintf("--namespace=%v", ns))
+		Logf("\nOutput of kubectl describe %v:\n%v", s.Name, desc)
 	}
 }
 

@@ -22,7 +22,7 @@ import (
 
 	"github.com/openkruise/kruise/pkg/util"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -39,7 +39,7 @@ const (
 	priorityOrdered    = "Ordered"
 )
 
-var _ = SIGDescribe("containerpriority", func() {
+var _ = ginkgo.Describe("ContainerPriority", ginkgo.Label("ContainerPriority", "operation"), func() {
 	f := framework.NewDefaultFramework("containerpriority")
 	var ns string
 	var c clientset.Interface
@@ -66,8 +66,8 @@ var _ = SIGDescribe("containerpriority", func() {
 		replicas = int32(len(nodes))
 	})
 
-	framework.KruiseDescribe("start a pod with different container priorities", func() {
-		framework.ConformanceIt("container priority created by CloneSet", func() {
+	ginkgo.Context("start a pod with different container priorities", func() {
+		ginkgo.It("container priority created by CloneSet", func() {
 			cs = cloneSetTester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
@@ -139,7 +139,7 @@ var _ = SIGDescribe("containerpriority", func() {
 			}
 		})
 
-		framework.ConformanceIt("container priority created by Deployment", func() {
+		ginkgo.It("container priority created by Deployment", func() {
 			dp := deploymentTester.NewDeployment("deploy-"+randStr, replicas)
 			dp.Spec.Template.Spec.Containers = append(dp.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
@@ -211,7 +211,7 @@ var _ = SIGDescribe("containerpriority", func() {
 			}
 		})
 
-		framework.ConformanceIt("run with no container priority", func() {
+		ginkgo.It("run with no container priority", func() {
 			cs = cloneSetTester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
@@ -261,7 +261,7 @@ var _ = SIGDescribe("containerpriority", func() {
 			}
 		})
 
-		framework.ConformanceIt("run with priorityAnnotation set", func() {
+		ginkgo.It("run with priorityAnnotation set", func() {
 			cs = cloneSetTester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.Containers[0].Lifecycle = &v1.Lifecycle{
 				PostStart: &v1.LifecycleHandler{

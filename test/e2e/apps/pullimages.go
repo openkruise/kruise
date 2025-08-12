@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -44,7 +44,7 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
-var _ = SIGDescribe("PullImage", func() {
+var _ = ginkgo.Describe("PullImage", ginkgo.Label("PullImage", "operation"), ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("pullimages")
 	var ns string
 	var c clientset.Interface
@@ -56,7 +56,7 @@ var _ = SIGDescribe("PullImage", func() {
 	f.AfterEachActions = []func(){
 		func() {
 			// Print debug info if it fails
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				nodeImageList, err := testerForNodeImage.ListNodeImages()
 				if err != nil {
 					framework.Logf("[FAILURE_DEBUG] List NodeImages error: %v", err)
@@ -105,15 +105,15 @@ var _ = SIGDescribe("PullImage", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 
-	framework.KruiseDescribe("ImagePullJob pulling images functionality [ImagePullJob]", func() {
+	ginkgo.Context("ImagePullJob pulling images functionality [ImagePullJob]", func() {
 		var baseJob *appsv1alpha1.ImagePullJob
-		intorstr4 := intstr.FromInt(4)
+		intorstr4 := intstr.FromInt32(4)
 
 		ginkgo.BeforeEach(func() {
 			baseJob = &appsv1alpha1.ImagePullJob{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "test-imagepulljob"}}
 		})
 
-		framework.ConformanceIt("pull image with secret", func() {
+		ginkgo.It("pull image with secret", func() {
 			var err error
 			base64Code := "eyJhdXRocyI6eyJodHRwczovL2luZGV4LmRvY2tlci5pby92MS8iOnsidXNlcm5hbWUiOiJtaW5jaG91IiwicGFzc3dvcmQiOiJtaW5nemhvdS5zd3giLCJlbWFpbCI6InZlYy5nLnN1bkBnbWFpbC5jb20iLCJhdXRoIjoiYldsdVkyaHZkVHB0YVc1bmVtaHZkUzV6ZDNnPSJ9fX0="
 			bytes, err := base64.StdEncoding.DecodeString(base64Code)
@@ -200,7 +200,7 @@ var _ = SIGDescribe("PullImage", func() {
 			}, 10*time.Second, time.Second).Should(gomega.Equal(true))
 		})
 
-		framework.ConformanceIt("never completion pull job with updated pull secrets", func() {
+		ginkgo.It("never completion pull job with updated pull secrets", func() {
 			var err error
 			base64Code := "eyJhdXRocyI6eyJodHRwczovL2luZGV4LmRvY2tlci5pby92MS8iOnsidXNlcm5hbWUiOiJtaW5jaG91IiwicGFzc3dvcmQiOiJtaW5nemhvdS5zd3giLCJlbWFpbCI6InZlYy5nLnN1bkBnbWFpbC5jb20iLCJhdXRoIjoiYldsdVkyaHZkVHB0YVc1bmVtaHZkUzV6ZDNnPSJ9fX0="
 			newBase64Code := "eyJhdXRocyI6eyJodHRwczovL2luZGV4LmRvY2tlci5pby92MS8iOnsidXNlcm5hbWUiOiJtaW5jaG91IiwicGFzc3dvcmQiOiJtaW5nemhvdS50ZXN0IiwiZW1haWwiOiJ2ZWMuZy5zdW5AZ21haWwuY29tIiwiYXV0aCI6ImJXbHVZMmh2ZFRwdGFXNW5lbWh2ZFM1MFpYTjAifX19"
@@ -304,7 +304,7 @@ var _ = SIGDescribe("PullImage", func() {
 			}, 10*time.Second, time.Second).Should(gomega.Equal(true))
 		})
 
-		framework.ConformanceIt("create an always job to pull an image on all real nodes", func() {
+		ginkgo.It("create an always job to pull an image on all real nodes", func() {
 			job := baseJob.DeepCopy()
 			job.Spec = appsv1alpha1.ImagePullJobSpec{
 				Image: NginxImage,
@@ -368,7 +368,7 @@ var _ = SIGDescribe("PullImage", func() {
 			}, 10*time.Second, time.Second).Should(gomega.Equal(false))
 		})
 
-		framework.ConformanceIt("create an always job to pull an image on one real node", func() {
+		ginkgo.It("create an always job to pull an image on one real node", func() {
 			job := baseJob.DeepCopy()
 			job.Spec = appsv1alpha1.ImagePullJobSpec{
 				Image: NewNginxImage,
@@ -414,7 +414,7 @@ var _ = SIGDescribe("PullImage", func() {
 			}, 10*time.Second, time.Second).Should(gomega.Equal(false))
 		})
 
-		framework.ConformanceIt("create a never job to pull an image on all nodes", func() {
+		ginkgo.It("create a never job to pull an image on all nodes", func() {
 			job := baseJob.DeepCopy()
 			job.Spec = appsv1alpha1.ImagePullJobSpec{
 				Image: WebserverImage,
@@ -456,7 +456,7 @@ var _ = SIGDescribe("PullImage", func() {
 			//gomega.Expect(len(job.Status.FailedNodes)).To(gomega.Equal(1))
 		})
 
-		framework.ConformanceIt("create two jobs to pull a same image", func() {
+		ginkgo.It("create two jobs to pull a same image", func() {
 			ginkgo.By("Create job1")
 			job1 := baseJob.DeepCopy()
 			job1.Name = baseJob.Name + "-1"

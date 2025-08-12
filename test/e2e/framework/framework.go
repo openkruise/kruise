@@ -38,12 +38,11 @@ import (
 
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 const (
-	maxKubectlExecRetries           = 5
 	DefaultNamespaceDeletionTimeout = 5 * time.Minute
 )
 
@@ -134,9 +133,9 @@ func (f *Framework) BeforeEach() {
 		ginkgo.By("Creating a kubernetes client")
 		config, err := LoadConfig()
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		testDesc := ginkgo.CurrentGinkgoTestDescription()
-		if len(testDesc.ComponentTexts) > 0 {
-			componentTexts := strings.Join(testDesc.ComponentTexts, " ")
+		testDesc := ginkgo.CurrentSpecReport()
+		if len(testDesc.FullText()) > 0 {
+			componentTexts := testDesc.FullText()
 			config.UserAgent = fmt.Sprintf(
 				"%v -- %v",
 				rest.DefaultKubernetesUserAgent(),
@@ -218,7 +217,7 @@ func (f *Framework) AfterEach() {
 		// Whether to delete namespace is determined by 3 factors: delete-namespace flag, delete-namespace-on-failure flag and the test result
 		// if delete-namespace set to false, namespace will always be preserved.
 		// if delete-namespace is true and delete-namespace-on-failure is false, namespace will be preserved if test failed.
-		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !ginkgo.CurrentGinkgoTestDescription().Failed) {
+		if TestContext.DeleteNamespace && (TestContext.DeleteNamespaceOnFailure || !ginkgo.CurrentSpecReport().Failed()) {
 			for _, ns := range f.namespacesToDelete {
 				ginkgo.By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
 				timeout := DefaultNamespaceDeletionTimeout
@@ -249,7 +248,7 @@ func (f *Framework) AfterEach() {
 
 		// if we had errors deleting, report them now.
 		if len(nsDeletionErrors) != 0 {
-			messages := []string{}
+			messages := make([]string, 0, len(nsDeletionErrors))
 			for namespaceKey, namespaceErr := range nsDeletionErrors {
 				messages = append(messages, fmt.Sprintf("Couldn't delete ns: %q: %s (%#v)", namespaceKey, namespaceErr, namespaceErr))
 			}
@@ -258,7 +257,7 @@ func (f *Framework) AfterEach() {
 	}()
 
 	// Print events if the test failed.
-	if ginkgo.CurrentGinkgoTestDescription().Failed && TestContext.DumpLogsOnFailure {
+	if ginkgo.CurrentSpecReport().Failed() && TestContext.DumpLogsOnFailure {
 		// Pass both unversioned client and versioned clientset, till we have removed all uses of the unversioned client.
 		if !f.SkipNamespaceCreation {
 			DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
@@ -308,19 +307,4 @@ func (f *Framework) AddNamespacesToDelete(namespaces ...*v1.Namespace) {
 // WaitForPodRunning waits for the pod to run in the namespace.
 func (f *Framework) WaitForPodRunning(podName string) error {
 	return WaitForPodNameRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
-}
-
-// KruiseDescribe is a wrapper function for ginkgo describe.  Adds namespacing.
-func KruiseDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[kruise.io] "+text, body)
-}
-
-// KruisePDescribe is a wrapper function for ginkgo describe.  Adds namespacing.
-func KruisePDescribe(text string, body func()) bool {
-	return ginkgo.PDescribe("[kruise.io] "+text, body)
-}
-
-// ConformanceIt is a wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
-func ConformanceIt(text string, body interface{}, timeout ...float64) bool {
-	return ginkgo.It(text+" [Conformance]", body, timeout...)
 }

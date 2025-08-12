@@ -27,13 +27,13 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework"
 	"k8s.io/utils/ptr"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-var _ = SIGDescribe("SidecarSet", func() {
+var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), func() {
 	f := framework.NewDefaultFramework("sidecarset")
 	var ns string
 	var c clientset.Interface
@@ -47,9 +47,9 @@ var _ = SIGDescribe("SidecarSet", func() {
 		tester = framework.NewSidecarSetTester(c, kc)
 	})
 
-	framework.KruiseDescribe("SidecarSet HotUpgrade functionality [SidecarSetHotUpgrade]", func() {
+	ginkgo.Context("SidecarSet HotUpgrade functionality [SidecarSetHotUpgrade]", func() {
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all SidecarSet in cluster")
@@ -57,7 +57,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			tester.DeleteDeployments(ns)
 		})
 
-		framework.ConformanceIt("sidecarSet inject pod hot upgrade sidecar container", func() {
+		ginkgo.It("sidecarSet inject pod hot upgrade sidecar container", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet(ns)
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
@@ -96,7 +96,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			ginkgo.By("sidecarSet inject pod hot upgrade sidecar container done")
 		})
 
-		framework.ConformanceIt("sidecarSet upgrade hot sidecar container image", func() {
+		ginkgo.It("sidecarSet upgrade hot sidecar container image", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet(ns)
 			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
@@ -207,7 +207,7 @@ var _ = SIGDescribe("SidecarSet", func() {
 			ginkgo.By("sidecarSet upgrade hot sidecar container image done")
 		})
 
-		framework.ConformanceIt("sidecarSet upgrade hot sidecar container failed image", func() {
+		ginkgo.It("sidecarSet upgrade hot sidecar container failed image", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet(ns)
 			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{

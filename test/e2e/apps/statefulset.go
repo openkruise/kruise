@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -53,7 +53,7 @@ import (
 
 // GCE Quota requirements: 3 pds, one per stateful pod manifest declared above.
 // GCE Api requirements: nodes and master need storage r/w permissions.
-var _ = SIGDescribe("AppStatefulSetStorage", func() {
+var _ = ginkgo.Describe("VolumeExpansion", ginkgo.Label("VolumeExpansion"), func() {
 	f := framework.NewDefaultFramework("statefulset-storage")
 	var ns string
 	var c clientset.Interface
@@ -80,7 +80,7 @@ var _ = SIGDescribe("AppStatefulSetStorage", func() {
 	})
 	_ = serverMinorVersion
 
-	ginkgo.Describe("Resize PVC", func() {
+	ginkgo.Context("Resize PVC", func() {
 		oldSize, newSize := "1Gi", "2Gi"
 		injectSC := func(podUpdatePolicy appsv1beta1.PodUpdateStrategyType, ss *appsv1beta1.StatefulSet, volumeClaimUpdateStrategy appsv1beta1.VolumeClaimUpdateStrategyType, scNames ...string) {
 			if podUpdatePolicy == appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType {
@@ -129,7 +129,7 @@ var _ = SIGDescribe("AppStatefulSetStorage", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
@@ -336,7 +336,7 @@ var _ = SIGDescribe("AppStatefulSetStorage", func() {
 			validateExpandVCT(2, injectFn, updateFn, true)
 		})
 
-		framework.ConformanceIt("should perform rolling updates with specified-deleted with pvc", func() {
+		ginkgo.It("should perform rolling updates with specified-deleted with pvc", func() {
 			ginkgo.By("Creating a new StatefulSet")
 			vms := []v1.VolumeMount{}
 			for i := 0; i < 1; i++ {
@@ -372,7 +372,7 @@ var _ = SIGDescribe("AppStatefulSetStorage", func() {
 		})
 	})
 
-	ginkgo.Describe("Resize PVC only", func() {
+	ginkgo.Context("Resize PVC only", func() {
 		oldSize, newSize := "1Gi", "2Gi"
 		injectSC := func(podUpdatePolicy appsv1beta1.PodUpdateStrategyType, ss *appsv1beta1.StatefulSet, volumeClaimUpdateStrategy appsv1beta1.VolumeClaimUpdateStrategyType, scNames ...string) {
 			if podUpdatePolicy == appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType {
@@ -421,7 +421,7 @@ var _ = SIGDescribe("AppStatefulSetStorage", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
@@ -614,7 +614,7 @@ var _ = SIGDescribe("AppStatefulSetStorage", func() {
 		})
 	})
 
-	ginkgo.Describe("Resize PVC with rollback", func() {
+	ginkgo.Context("Resize PVC with rollback", func() {
 		oldSize, newSize := "1Gi", "2Gi"
 		injectSC := func(podUpdatePolicy appsv1beta1.PodUpdateStrategyType, ss *appsv1beta1.StatefulSet, volumeClaimUpdateStrategy appsv1beta1.VolumeClaimUpdateStrategyType, scNames ...string) {
 			if podUpdatePolicy == appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType {
@@ -664,7 +664,7 @@ var _ = SIGDescribe("AppStatefulSetStorage", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
@@ -922,7 +922,7 @@ var _ = SIGDescribe("AppStatefulSetStorage", func() {
 
 // GCE Quota requirements: 3 pds, one per stateful pod manifest declared above.
 // GCE Api requirements: nodes and master need storage r/w permissions.
-var _ = SIGDescribe("StatefulSet", func() {
+var _ = ginkgo.Describe("StatefulSet", ginkgo.Label("StatefulSet", "workload"), func() {
 	f := framework.NewDefaultFramework("statefulset")
 	var ns string
 	var c clientset.Interface
@@ -942,7 +942,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		}
 	})
 
-	framework.KruiseDescribe("Basic StatefulSet functionality [StatefulSetBasic]", func() {
+	ginkgo.Context("Basic StatefulSet functionality [StatefulSetBasic]", func() {
 		ssName := "ss"
 		labels := map[string]string{
 			"foo": "bar",
@@ -964,7 +964,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
@@ -1145,7 +1145,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Testname: StatefulSet, Rolling Update
 			Description: StatefulSet MUST support the RollingUpdate strategy to automatically replace Pods one at a time when the Pod template changes. The StatefulSet's status MUST indicate the CurrentRevision and UpdateRevision. If the template is changed to match a prior revision, StatefulSet MUST detect this as a rollback instead of creating a new revision. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("should perform rolling updates and roll backs of template modifications", func() {
+		ginkgo.It("should perform rolling updates and roll backs of template modifications", func() {
 			ginkgo.By("Creating a new StatefulSet")
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			rollbackTest(c, kc, ns, ss)
@@ -1156,7 +1156,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Testname: StatefulSet, Rolling Update with Partition
 			Description: StatefulSet's RollingUpdate strategy MUST support the Partition parameter for canaries and phased rollouts. If a Pod is deleted while a rolling update is in progress, StatefulSet MUST restore the Pod without violating the Partition. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("should perform canary updates and phased rolling updates of template modifications", func() {
+		ginkgo.It("should perform canary updates and phased rolling updates of template modifications", func() {
 			ginkgo.By("Creating a new StaefulSet")
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c, kc)
@@ -1451,7 +1451,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Testname: AdvancedStatefulSet, InPlaceUpdate
 			Description: StatefulSet MUST in-place update pods for pod inplace update strategy. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("should in-place update pods when the pod update strategy is InPlace", func() {
+		ginkgo.It("should in-place update pods when the pod update strategy is InPlace", func() {
 			ginkgo.By("Creating a new StatefulSet")
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c, kc)
@@ -1544,7 +1544,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 		})
 
-		framework.ConformanceIt("should in-place update env from label", func() {
+		ginkgo.It("should in-place update env from label", func() {
 			ginkgo.By("Creating a new StatefulSet")
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c, kc)
@@ -1633,7 +1633,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 		})
 
-		framework.ConformanceIt("should recreate update when pod qos changed", func() {
+		ginkgo.It("should recreate update when pod qos changed", func() {
 			ginkgo.By("Creating a new StatefulSet")
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c, kc)
@@ -1738,7 +1738,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Testname: StatefulSet, Scaling
 			Description: StatefulSet MUST create Pods in ascending order by ordinal index when scaling up, and delete Pods in descending order when scaling down. Scaling up or down MUST pause if any Pods belonging to the StatefulSet are unhealthy. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("Scaling should happen in predictable order and halt if any stateful pod is unhealthy", func() {
+		ginkgo.It("Scaling should happen in predictable order and halt if any stateful pod is unhealthy", func() {
 			psLabels := klabels.Set(labels)
 			ginkgo.By("Initializing watcher for selector " + psLabels.String())
 			watcher, err := f.ClientSet.CoreV1().Pods(ns).Watch(context.TODO(), metav1.ListOptions{
@@ -1823,7 +1823,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Testname: StatefulSet, Burst Scaling
 			Description: StatefulSet MUST support the Parallel PodManagementPolicy for burst scaling. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("Burst scaling should run to completion even with unhealthy pods", func() {
+		ginkgo.It("Burst scaling should run to completion even with unhealthy pods", func() {
 			psLabels := klabels.Set(labels)
 
 			ginkgo.By("Creating stateful set " + ssName + " in namespace " + ns)
@@ -1866,7 +1866,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Testname: StatefulSet, Recreate Failed Pod
 			Description: StatefulSet MUST delete and recreate Pods it owns that go into a Failed state, such as when they are rejected or evicted by a Node. This test does not depend on a preexisting default StorageClass or a dynamic provisioner.
 		*/
-		framework.ConformanceIt("Should recreate evicted statefulset", func() {
+		ginkgo.It("Should recreate evicted statefulset", func() {
 			podName := "test-pod"
 			statefulPodName := ssName + "-0"
 			ginkgo.By("Looking for a node to schedule stateful set and pod")
@@ -1959,7 +1959,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Newly created StatefulSet resource MUST have a scale of one.
 			Bring the scale of the StatefulSet resource up to two. StatefulSet scale MUST be at two replicas.
 		*/
-		framework.ConformanceIt("should have a working scale subresource", func() {
+		ginkgo.It("should have a working scale subresource", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c, kc)
@@ -2001,7 +2001,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Description: StatefulSet resource MUST support the MaxUnavailable ScaleStrategy for scaling.
 			It only affects when create new pod, terminating pod and unavailable pod at the Parallel PodManagementPolicy.
 		*/
-		framework.ConformanceIt("Should can update pods when the statefulset scale strategy is set", func() {
+		ginkgo.It("Should can update pods when the statefulset scale strategy is set", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			maxUnavailable := intstr.FromInt32(2)
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 3, nil, nil, labels)
@@ -2076,7 +2076,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			Testname: StatefulSet, Specified delete
 			Description: Specified delete pod MUST under maxUnavailable constrain.
 		*/
-		framework.ConformanceIt("should perform rolling updates with specified-deleted", func() {
+		ginkgo.It("should perform rolling updates with specified-deleted", func() {
 			ginkgo.By("Creating a new StatefulSet")
 			ss = framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			testWithSpecifiedDeleted(c, kc, ns, ss)
@@ -2192,7 +2192,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 	//	}
 	//})
 
-	ginkgo.Describe("Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC]", func() {
+	ginkgo.Context("Non-retain StatefulSetPersistentVolumeClaimPolicy [Feature:StatefulSetAutoDeletePVC]", func() {
 		ssName := "ss"
 		labels := map[string]string{
 			"foo": "bar",
@@ -2214,7 +2214,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
@@ -2368,7 +2368,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 	})
 
-	ginkgo.Describe("Automatically recreate PVC for pending pod when PVC is missing", func() {
+	ginkgo.Context("Automatically recreate PVC for pending pod when PVC is missing", func() {
 		ssName := "ss"
 		labels := map[string]string{
 			"foo": "bar",
@@ -2384,7 +2384,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
@@ -2480,7 +2480,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 	})
 
-	ginkgo.Describe("Scaling StatefulSetStartOrdinal", func() {
+	ginkgo.Context("Scaling StatefulSetStartOrdinal", func() {
 		ssName := "ss"
 		labels := map[string]string{
 			"foo": "bar",
@@ -2501,7 +2501,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)

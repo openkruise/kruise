@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -17,7 +17,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-var _ = SIGDescribe("uniteddeployment", func() {
+var _ = ginkgo.Describe("UnitedDeployment", ginkgo.Label("UnitedDeployment", "workload"), ginkgo.FlakeAttempts(3), func() {
 	f := framework.NewDefaultFramework("uniteddeployment")
 	var ns string
 	var c clientset.Interface

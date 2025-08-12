@@ -29,7 +29,7 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -37,7 +37,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-var _ = SIGDescribe("ResourceDistribution", func() {
+var _ = ginkgo.Describe("ResourceDistribution", ginkgo.Serial, ginkgo.Label("ResourceDistribution", "operation"), func() {
 	f := framework.NewDefaultFramework("resourcedistribution")
 	var ns, secretName string
 	var c clientset.Interface
@@ -52,16 +52,16 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 		tester = framework.NewResourceDistributionTester(c, kc)
 	})
 
-	framework.KruiseDescribe("ResourceDistribution distributing functionality [ResourceDistributionInject]", func() {
+	ginkgo.Context("ResourceDistribution distributing functionality [ResourceDistributionInject]", func() {
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all ResourceDistribution in cluster")
 		})
 
-		framework.ConformanceIt("namespace event checker", func() {
+		ginkgo.It("namespace event checker", func() {
 			prefix := "resourcedistribution-e2e-test1"
 			// clean resource to avoid conflict
 			tester.DeleteResourceDistributions(prefix)
@@ -117,7 +117,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 			ginkgo.By("Done!")
 		})
 
-		framework.ConformanceIt("resource event checker", func() {
+		ginkgo.It("resource event checker", func() {
 			prefix := "resourcedistribution-e2e-test2"
 			// clean resource to avoid conflict
 			tester.DeleteResourceDistributions(prefix)
@@ -176,7 +176,7 @@ var _ = SIGDescribe("ResourceDistribution", func() {
 			ginkgo.By("Done!")
 		})
 
-		framework.ConformanceIt("resourcedistribution functionality checker", func() {
+		ginkgo.It("resourcedistribution functionality checker", func() {
 			prefix := "resourcedistribution-e2e-test3"
 			// clean resource to avoid conflict
 			tester.DeleteResourceDistributions(prefix)

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -19,7 +19,7 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
-var _ = SIGDescribe("SidecarTerminator", func() {
+var _ = ginkgo.Describe("SidecarTerminator", ginkgo.Label("SidecarTerminator", "operation"), func() {
 	f := framework.NewDefaultFramework("sidecarterminator")
 	var ns string
 	var c clientset.Interface
@@ -33,7 +33,7 @@ var _ = SIGDescribe("SidecarTerminator", func() {
 		randStr = rand.String(10)
 	})
 
-	framework.KruiseDescribe("SidecarTerminator checker", func() {
+	ginkgo.Context("SidecarTerminator checker", func() {
 		ginkgo.It("job and broadcast job with sidecar", func() {
 			mainContainer := v1.Container{
 				Name:            "main",

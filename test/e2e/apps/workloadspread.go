@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -50,7 +50,7 @@ var (
 	controllerKindDep     = appsv1.SchemeGroupVersion.WithKind("Deployment")
 )
 
-var _ = SIGDescribe("workloadspread", func() {
+var _ = ginkgo.Describe("WorkloadSpread", ginkgo.Label("WorkloadSpread", "operation"), func() {
 	f := framework.NewDefaultFramework("workloadspread")
 	workloadSpreadName := "test-workload-spread"
 	var c clientset.Interface
@@ -117,14 +117,14 @@ var _ = SIGDescribe("workloadspread", func() {
 		tester.SetNodeLabel(c, worker2, WorkloadSpreadFakeZoneKey, "zone-b")
 	})
 
-	framework.KruiseDescribe("WorkloadSpread functionality", func() {
+	ginkgo.Context("WorkloadSpread functionality", func() {
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 		})
 
-		framework.ConformanceIt("deploy in two zone, the type of maxReplicas is Integer", func() {
+		ginkgo.It("deploy in two zone, the type of maxReplicas is Integer", func() {
 			cloneSet := tester.NewBaseCloneSet(ns)
 			// create workloadSpread
 			targetRef := appsv1alpha1.TargetReference{
@@ -385,7 +385,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			ginkgo.By("deploy in two zone, the type of maxReplicas is Integer, done")
 		})
 
-		framework.ConformanceIt("elastic deployment, zone-a=2, zone-b=nil", func() {
+		ginkgo.It("elastic deployment, zone-a=2, zone-b=nil", func() {
 			cloneSet := tester.NewBaseCloneSet(ns)
 			// create workloadSpread
 			targetRef := appsv1alpha1.TargetReference{
@@ -642,7 +642,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			ginkgo.By("elastic deployment, zone-a=2, zone-b=nil, done")
 		})
 
-		framework.ConformanceIt("reschedule subset-a", func() {
+		ginkgo.It("reschedule subset-a", func() {
 			cloneSet := tester.NewBaseCloneSet(ns)
 			// create workloadSpread
 			targetRef := appsv1alpha1.TargetReference{
@@ -825,7 +825,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			ginkgo.By("workloadSpread reschedule subset-a, done")
 		})
 
-		framework.ConformanceIt("manage the pods that were created before workloadspread", func() {
+		ginkgo.It("manage the pods that were created before workloadspread", func() {
 			// build cloneSet, default to schedule its pods to zone-a
 			cloneSet := tester.NewBaseCloneSet(ns)
 			cloneSet.Spec.Replicas = ptr.To(int32(4))
@@ -1022,7 +1022,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			gomega.Expect(uninjectPods).To(gomega.Equal(0))
 		})
 
-		framework.ConformanceIt("only one subset, zone-a=nil", func() {
+		ginkgo.It("only one subset, zone-a=nil", func() {
 			priorityClass := &schedulingv1.PriorityClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-priority-class",
@@ -1185,7 +1185,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			ginkgo.By("elastic deployment, zone-a=2, zone-b=nil, done")
 		})
 
-		framework.ConformanceIt("only one subset, zone-a=2", func() {
+		ginkgo.It("only one subset, zone-a=2", func() {
 			cloneSet := tester.NewBaseCloneSet(ns)
 			// create workloadSpread
 			targetRef := appsv1alpha1.TargetReference{
@@ -1335,7 +1335,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			ginkgo.By("elastic deployment, zone-a=2, zone-b=nil, done")
 		})
 
-		framework.ConformanceIt("manage existing pods by only preferredNodeSelector, then deletion subset-b", func() {
+		ginkgo.It("manage existing pods by only preferredNodeSelector, then deletion subset-b", func() {
 			cs := tester.NewBaseCloneSet(ns)
 			// create workloadSpread
 			targetRef := appsv1alpha1.TargetReference{
@@ -1473,7 +1473,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			ginkgo.By("manage existing pods by only preferredNodeSelector, then deletion subset-b, done")
 		})
 
-		framework.ConformanceIt("manage statefulset pods only with patch", func() {
+		ginkgo.It("manage statefulset pods only with patch", func() {
 			sts, svc := tester.NewBaseHeadlessStatefulSet(ns)
 			// create workloadSpread
 			targetRef := appsv1alpha1.TargetReference{
@@ -1552,7 +1552,7 @@ var _ = SIGDescribe("workloadspread", func() {
 			ginkgo.By("manage statefulset pods only with patch, done")
 		})
 
-		framework.ConformanceIt("job-like custom workload", func() {
+		ginkgo.It("job-like custom workload", func() {
 			newTargetReference := func(name string, apiVersion, kind string) *appsv1alpha1.TargetReference {
 				return &appsv1alpha1.TargetReference{
 					APIVersion: apiVersion,
