@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"flag"
 	"io"
+	"os"
 	"testing"
 
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
@@ -31,12 +32,15 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
-// init suppresses the klog output during tests for a cleaner result
 func init() {
 	klog.InitFlags(nil)
 	flag.Set("logtostderr", "false")
 	flag.Set("alsologtostderr", "false")
 	klog.SetOutput(io.Discard)
+
+	if tmp, err := os.MkdirTemp("", "docker-config-"); err == nil {
+		os.Setenv("DOCKER_CONFIG", tmp)
+	}
 }
 
 // createDockerConfigSecret correctly creates a Kubernetes secret of type kubernetes.io/dockerconfigjson
@@ -108,6 +112,8 @@ func TestConvertToRegistryAuths(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			// Because the original parse.go uses a global keyring, we must reset it here.
+			keyring = nil
 			auths, err := ConvertToRegistryAuths(tc.secrets, tc.repo)
 			if tc.expectErr {
 				assert.Error(t, err)
@@ -161,6 +167,8 @@ func TestAuthInfos(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			// Because the original parse.go uses a global keyring, we must reset it here.
+			keyring = nil
 			auths := AuthInfos(context.TODO(), tc.imageName, tc.tag, tc.secrets)
 			assert.ElementsMatch(t, tc.expectAuths, auths)
 		})
