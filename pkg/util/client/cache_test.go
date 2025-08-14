@@ -194,8 +194,8 @@ func (m *mockCache) List(ctx context.Context, list client.ObjectList, opts ...cl
 func (m *mockCache) GetInformerForKind(ctx context.Context, gvk schema.GroupVersionKind, opts ...ctrcache.InformerGetOption) (ctrcache.Informer, error) {
 	informer := cache.NewSharedIndexInformer(
 		&mockListerWatcher{},
-		&corev1.Pod{}, 
-		0,             
+		&corev1.Pod{},
+		0,
 		cache.Indexers{},
 	)
 	return informer, nil
