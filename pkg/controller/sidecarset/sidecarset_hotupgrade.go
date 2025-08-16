@@ -50,6 +50,7 @@ func (p *Processor) flipPodSidecarContainer(control sidecarcontrol.SidecarContro
 		// update pod in store
 		updateErr := p.Client.Update(context.TODO(), podClone)
 		if updateErr == nil {
+			sidecarcontrol.ResourceVersionExpectations.Expect(podClone)
 			return nil
 		}
 

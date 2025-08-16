@@ -23,10 +23,6 @@ import (
 	"strings"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	controlutil "github.com/openkruise/kruise/pkg/controller/util"
@@ -39,12 +35,14 @@ import (
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/utils/integer"
 	"k8s.io/utils/pointer"
@@ -98,6 +96,11 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 	// in case of informer cache latency
 	for _, pod := range pods {
 		sidecarcontrol.UpdateExpectations.ObserveUpdated(sidecarSet.Name, sidecarcontrol.GetSidecarSetRevision(sidecarSet), pod)
+		sidecarcontrol.ResourceVersionExpectations.Observe(pod)
+		if expected, duration := sidecarcontrol.ResourceVersionExpectations.IsSatisfied(pod); !expected {
+			klog.V(3).InfoS("Sidecarset matched pods has some update in flight, will sync later", "pod", klog.KObj(pod), "duration", duration.Seconds())
+			return reconcile.Result{RequeueAfter: time.Second}, nil
+		}
 	}
 	allUpdated, _, inflightPods := sidecarcontrol.UpdateExpectations.SatisfiedExpectations(sidecarSet.Name, sidecarcontrol.GetSidecarSetRevision(sidecarSet))
 	if !allUpdated {
@@ -138,8 +141,11 @@ func (p *Processor) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) (recon
 				podsInHotUpgrading = append(podsInHotUpgrading, pod)
 			}
 		}
-		if err := p.flipHotUpgradingContainers(control, podsInHotUpgrading); err != nil {
-			return reconcile.Result{}, err
+		if len(podsInHotUpgrading) > 0 {
+			if err := p.flipHotUpgradingContainers(control, podsInHotUpgrading); err != nil {
+				return reconcile.Result{}, err
+			}
+			return reconcile.Result{}, nil
 		}
 	}
 
