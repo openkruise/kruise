@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -47,7 +47,7 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
-var _ = SIGDescribe("CloneSet", func() {
+var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func() {
 	f := framework.NewDefaultFramework("clonesets")
 	var ns string
 	var c clientset.Interface
@@ -63,9 +63,9 @@ var _ = SIGDescribe("CloneSet", func() {
 		randStr = rand.String(10)
 	})
 
-	framework.KruiseDescribe("CloneSet Creating", func() {
+	ginkgo.Context("CloneSet Creating", func() {
 
-		framework.ConformanceIt("creates with hostNetwork pod, specified containerPort without specifying hostPort", func() {
+		ginkgo.It("creates with hostNetwork pod, specified containerPort without specifying hostPort", func() {
 			cs := tester.NewCloneSet("hostnetwork-port-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.HostNetwork = true
 			cs.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 80}}
@@ -86,7 +86,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			}
 		})
 
-		framework.ConformanceIt("creates with lifecycle preNormal finalizer", func() {
+		ginkgo.It("creates with lifecycle preNormal finalizer", func() {
 			cs := tester.NewCloneSetWithLifecycle("clone-"+randStr, 1, &appspub.Lifecycle{
 				PreNormal: &appspub.LifecycleHook{FinalizersHandler: []string{"finalizers.sigs.k8s.io/test"}},
 			}, []string{})
@@ -134,7 +134,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
-		framework.ConformanceIt("creates with unschedulable scheduler", func() {
+		ginkgo.It("creates with unschedulable scheduler", func() {
 			cs := tester.NewCloneSetWithSpecificScheduler("clone-"+randStr, 1, "unschedulable")
 
 			cs, err := tester.CreateCloneSet(cs)
@@ -181,10 +181,10 @@ var _ = SIGDescribe("CloneSet", func() {
 		})
 	})
 
-	framework.KruiseDescribe("CloneSet Scaling", func() {
+	ginkgo.Context("CloneSet Scaling", func() {
 		var err error
 
-		framework.ConformanceIt("scales in normal cases", func() {
+		ginkgo.It("scales in normal cases", func() {
 			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -207,7 +207,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
 		})
 
-		framework.ConformanceIt("scales with minReadySeconds and scaleStrategy", func() {
+		ginkgo.It("scales with minReadySeconds and scaleStrategy", func() {
 			const replicas int32 = 4
 			const scaleMaxUnavailable int32 = 1
 			cs := tester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{})
@@ -245,7 +245,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			}
 		})
 
-		framework.ConformanceIt("pods should be ready when paused=true", func() {
+		ginkgo.It("pods should be ready when paused=true", func() {
 			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1alpha1.CloneSetUpdateStrategy{
 				Type:   appsv1alpha1.RecreateCloneSetUpdateStrategyType,
 				Paused: true,
@@ -268,7 +268,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
 		})
 
-		framework.ConformanceIt("specific delete a Pod, when scalingExcludePreparingDelete is disabled", func() {
+		ginkgo.It("specific delete a Pod, when scalingExcludePreparingDelete is disabled", func() {
 			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Labels["lifecycle-hook"] = "true"
 			cs.Spec.Lifecycle = &appspub.Lifecycle{
@@ -351,7 +351,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(keepOldPods).To(gomega.HaveLen(2))
 		})
 
-		framework.ConformanceIt("specific scale down with lifecycle and then scale up, when scalingExcludePreparingDelete is enabled", func() {
+		ginkgo.It("specific scale down with lifecycle and then scale up, when scalingExcludePreparingDelete is enabled", func() {
 			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Labels = map[string]string{appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey: "true"}
 			cs.Spec.Template.Labels["lifecycle-hook"] = "true"
@@ -442,7 +442,7 @@ var _ = SIGDescribe("CloneSet", func() {
 		})
 	})
 
-	framework.KruiseDescribe("CloneSet Updating", func() {
+	ginkgo.Context("CloneSet Updating", func() {
 		var err error
 
 		// This can't be Conformance yet.
@@ -581,7 +581,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(newContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 		})
 
-		framework.ConformanceIt("in-place update two container images with priorities successfully", func() {
+		ginkgo.It("in-place update two container images with priorities successfully", func() {
 			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:      "redis",
@@ -661,7 +661,7 @@ var _ = SIGDescribe("CloneSet", func() {
 			gomega.Expect(inPlaceUpdateState.ContainerBatchesRecord[1].Containers).Should(gomega.Equal([]string{"nginx"}))
 		})
 
-		framework.ConformanceIt("in-place update two container images with priorities, should not update the next when the previous one failed", func() {
+		ginkgo.It("in-place update two container images with priorities, should not update the next when the previous one failed", func() {
 			cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:      "redis",
@@ -1196,11 +1196,11 @@ var _ = SIGDescribe("CloneSet", func() {
 
 	})
 
-	framework.KruiseDescribe("CloneSet pre-download images", func() {
+	ginkgo.Context("CloneSet pre-download images", func() {
 		var err error
 
-		framework.ConformanceIt("pre-download for new image", func() {
-			partition := intstr.FromInt(1)
+		ginkgo.It("pre-download for new image", func() {
+			partition := intstr.FromInt32(1)
 			cs := tester.NewCloneSet("clone-"+randStr, 5, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, Partition: &partition})
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())

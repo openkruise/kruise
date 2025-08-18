@@ -19,18 +19,15 @@ package e2e
 
 import (
 	"flag"
-	"math/rand"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"os"
 	"testing"
-	"time"
-
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
 	// directory contains a Ginkgo test suite.
 	// See https://github.com/kubernetes/kubernetes/issues/74827
-	// "github.com/onsi/ginkgo"
+	// "github.com/onsi/ginkgo/v2"
 
 	kruiseapis "github.com/openkruise/kruise/apis"
 	"github.com/openkruise/kruise/test/e2e/framework"
@@ -69,7 +66,6 @@ func TestMain(m *testing.M) {
 		testfiles.AddFileSource(testfiles.RootFileSource{Root: framework.TestContext.RepoRoot})
 	}
 
-	rand.Seed(time.Now().UnixNano())
 	os.Exit(m.Run())
 }
 

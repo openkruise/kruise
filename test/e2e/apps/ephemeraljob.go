@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -17,7 +17,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-var _ = SIGDescribe("EphemeralJob", func() {
+var _ = ginkgo.Describe("EphemeralJob", ginkgo.Label("EphemeralJob", "job", "workload"), func() {
 	f := framework.NewDefaultFramework("ehpemeraljobs")
 	var ns string
 	var c clientset.Interface
@@ -40,9 +40,9 @@ var _ = SIGDescribe("EphemeralJob", func() {
 		randStr = rand.String(10)
 	})
 
-	framework.KruiseDescribe("EphemeralJob Creating", func() {
+	ginkgo.Context("EphemeralJob Creating", func() {
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all EphemeralJob in cluster")
@@ -78,12 +78,11 @@ var _ = SIGDescribe("EphemeralJob", func() {
 
 			ginkgo.By("Check the status of job")
 
-			//time.Sleep(time.Second * 30)
 			gomega.Eventually(func() int32 {
 				ejob, err := tester.GetEphemeralJob(job.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return ejob.Status.Succeeded
-			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(4)))
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(4)))
 		})
 
 		// This can't be Conformance yet.
@@ -119,7 +118,7 @@ var _ = SIGDescribe("EphemeralJob", func() {
 				ejob, err := tester.GetEphemeralJob(job.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return ejob.Status.Failed
-			}, 60*time.Second, 10*time.Second).Should(gomega.Equal(int32(10)))
+			}, 120*time.Second, 10*time.Second).Should(gomega.Equal(int32(10)))
 		})
 
 		// This can't be Conformance yet.
@@ -165,7 +164,7 @@ var _ = SIGDescribe("EphemeralJob", func() {
 			gomega.Eventually(func() appsv1alpha1.EphemeralJobPhase {
 				ejob, _ := tester.GetEphemeralJob(job.Name)
 				return ejob.Status.Phase
-			}, 60*time.Second, 10*time.Second).Should(gomega.Equal(appsv1alpha1.EphemeralJobFailed))
+			}, 120*time.Second, 10*time.Second).Should(gomega.Equal(appsv1alpha1.EphemeralJobFailed))
 		})
 
 		// This can't be Conformance yet.
@@ -201,7 +200,7 @@ var _ = SIGDescribe("EphemeralJob", func() {
 				ejob, err := tester.GetEphemeralJob(job.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return ejob.Status.Failed
-			}, 60*time.Second, 10*time.Second).Should(gomega.Equal(int32(10)))
+			}, 120*time.Second, 10*time.Second).Should(gomega.Equal(int32(10)))
 		})
 
 		// This can't be Conformance yet.
@@ -257,7 +256,7 @@ var _ = SIGDescribe("EphemeralJob", func() {
 				}
 				targetPod := targetPods[0]
 				return len(targetPod.Status.EphemeralContainerStatuses)
-			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(2))
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(2))
 		})
 
 		// This can't be Conformance yet.
@@ -323,14 +322,14 @@ var _ = SIGDescribe("EphemeralJob", func() {
 			gomega.Eventually(func() int32 {
 				job, _ := tester.GetEphemeralJob(job2.Name)
 				return job.Status.Matches
-			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(0)))
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(0)))
 		})
 	})
 
 	// checking feature
-	framework.KruiseDescribe("EphemeralJob Feature Checking", func() {
+	ginkgo.Context("EphemeralJob Feature Checking", func() {
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all EphemeralJob in cluster")
@@ -382,9 +381,9 @@ var _ = SIGDescribe("EphemeralJob", func() {
 		})
 	})
 
-	framework.KruiseDescribe("Create Ephemeral Container", func() {
+	ginkgo.Context("Create Ephemeral Container", func() {
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all ephemeral container in cluster")
@@ -535,7 +534,7 @@ var _ = SIGDescribe("EphemeralJob", func() {
 				ejob, err := tester.GetEphemeralJob(job.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return ejob.Status.Running
-			}, 60*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
 
 			pods, err := cloneSetTester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())

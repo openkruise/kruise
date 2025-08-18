@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,7 +35,7 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
-var _ = SIGDescribe("PullImages", func() {
+var _ = ginkgo.Describe("PullImages", ginkgo.Label("PullImages", "operation"), ginkgo.Serial, func() {
 	f := framework.NewDefaultFramework("imagelistpulljobs")
 	var ns string
 	var c clientset.Interface
@@ -49,7 +49,7 @@ var _ = SIGDescribe("PullImages", func() {
 	f.AfterEachActions = []func(){
 		func() {
 			// Print debug info if it fails
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				imagePullJobList, err := testerForImagePullJob.ListJobs(ns)
 				if err != nil {
 					framework.Logf("[FAILURE_DEBUG] List ImagePullJobs in %s error: %v", ns, err)
@@ -86,15 +86,15 @@ var _ = SIGDescribe("PullImages", func() {
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
 
-	framework.KruiseDescribe("ImageListPullJob pulling images functionality [ImageListPullJob]", func() {
+	ginkgo.Context("ImageListPullJob pulling images functionality [ImageListPullJob]", func() {
 		var baseJob *appsv1alpha1.ImageListPullJob
-		intorstr4 := intstr.FromInt(4)
+		intorstr4 := intstr.FromInt32(4)
 
 		ginkgo.BeforeEach(func() {
 			baseJob = &appsv1alpha1.ImageListPullJob{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "test-imagelistpulljob"}}
 		})
 
-		framework.ConformanceIt("create an always job to pull two images on all real nodes", func() {
+		ginkgo.It("create an always job to pull two images on all real nodes", func() {
 			job := baseJob.DeepCopy()
 			job.Spec = appsv1alpha1.ImageListPullJobSpec{
 				Images: []string{NginxImage, BusyboxImage},
@@ -154,7 +154,7 @@ var _ = SIGDescribe("PullImages", func() {
 			}, 10*time.Second, time.Second).Should(gomega.Equal(false))
 		})
 
-		framework.ConformanceIt("create an always job to pull two images on one real node", func() {
+		ginkgo.It("create an always job to pull two images on one real node", func() {
 			job := baseJob.DeepCopy()
 			job.Spec = appsv1alpha1.ImageListPullJobSpec{
 				Images: []string{NewNginxImage, BusyboxImage},
@@ -210,7 +210,7 @@ var _ = SIGDescribe("PullImages", func() {
 			}, time.Minute, time.Second).Should(gomega.BeTrue())
 		})
 
-		framework.ConformanceIt("create an always job to pull an image on all nodes", func() {
+		ginkgo.It("create an always job to pull an image on all nodes", func() {
 			job := baseJob.DeepCopy()
 			job.Spec = appsv1alpha1.ImageListPullJobSpec{
 				Images: []string{WebserverImage},
@@ -258,7 +258,7 @@ var _ = SIGDescribe("PullImages", func() {
 
 		})
 
-		framework.ConformanceIt("create a never job to pull an image on all nodes", func() {
+		ginkgo.It("create a never job to pull an image on all nodes", func() {
 			job := baseJob.DeepCopy()
 			job.Spec = appsv1alpha1.ImageListPullJobSpec{
 				Images: []string{WebserverImage},

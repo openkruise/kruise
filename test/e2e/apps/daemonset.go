@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -26,7 +26,7 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
-var _ = SIGDescribe("DaemonSet", func() {
+var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func() {
 	f := framework.NewDefaultFramework("daemonset")
 	var ns string
 	var c clientset.Interface
@@ -40,11 +40,11 @@ var _ = SIGDescribe("DaemonSet", func() {
 		tester = framework.NewDaemonSetTester(c, kc, ns)
 	})
 
-	framework.KruiseDescribe("Basic DaemonSet functionality [DaemonSetBasic]", func() {
+	ginkgo.Context("Basic DaemonSet functionality [DaemonSetBasic]", func() {
 		dsName := "e2e-ds"
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting DaemonSet %s/%s in cluster", ns, dsName)
@@ -56,7 +56,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 		  Description: A conformant Kubernetes distribution MUST support the creation of DaemonSets. When a DaemonSet
 		  Pod is deleted, the DaemonSet controller MUST create a replacement Pod.
 		*/
-		framework.ConformanceIt("should run and stop simple daemon", func() {
+		ginkgo.It("should run and stop simple daemon", func() {
 			label := map[string]string{framework.DaemonSetNameLabel: dsName}
 			ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
 			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{}))
@@ -91,7 +91,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 		  Description: A conformant Kubernetes distribution MUST support DaemonSet Pod node selection via label
 		  selectors.
 		*/
-		framework.ConformanceIt("should run and stop complex daemon", func() {
+		ginkgo.It("should run and stop complex daemon", func() {
 			complexLabel := map[string]string{framework.DaemonSetNameLabel: dsName}
 			nodeSelector := map[string]string{framework.DaemonSetColorLabel: "blue"}
 			framework.Logf("Creating daemon %q with a node selector", dsName)
@@ -148,7 +148,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 		  Testname: DaemonSet-FailedPodCreation
 		  Description: A conformant Kubernetes distribution MUST create new DaemonSet Pods when they fail.
 		*/
-		framework.ConformanceIt("should retry creating failed daemon pods", func() {
+		ginkgo.It("should retry creating failed daemon pods", func() {
 			label := map[string]string{framework.DaemonSetNameLabel: dsName}
 
 			ginkgo.By(fmt.Sprintf("Creating a simple DaemonSet %q", dsName))
@@ -183,7 +183,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for the failed daemon pod to be completely deleted")
 		})
 
-		framework.ConformanceIt("should only inplace image if update daemonset image with inplace update strategy", func() {
+		ginkgo.It("should only inplace image if update daemonset image with inplace update strategy", func() {
 			label := map[string]string{framework.DaemonSetNameLabel: dsName}
 
 			ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
@@ -249,7 +249,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 			gomega.Expect(tester.CheckPodHasNotRecreate(oldPodList.Items, newPodList.Items)).Should(gomega.Equal(true))
 		})
 
-		framework.ConformanceIt("Should upgrade inplace if update image and recreate if update others", func() {
+		ginkgo.It("Should upgrade inplace if update image and recreate if update others", func() {
 			label := map[string]string{framework.DaemonSetNameLabel: dsName}
 
 			cases := []struct {
@@ -344,7 +344,7 @@ var _ = SIGDescribe("DaemonSet", func() {
 			}
 		})
 
-		framework.ConformanceIt("should upgrade one by one on steps if there is pre-delete hook", func() {
+		ginkgo.It("should upgrade one by one on steps if there is pre-delete hook", func() {
 			label := map[string]string{framework.DaemonSetNameLabel: dsName}
 			hookKey := "my-pre-delete"
 
@@ -446,12 +446,12 @@ var _ = SIGDescribe("DaemonSet", func() {
 
 		})
 
-		framework.ConformanceIt("should successfully surging update daemonset with minReadySeconds", func() {
+		ginkgo.It("should successfully surging update daemonset with minReadySeconds", func() {
 			label := map[string]string{framework.DaemonSetNameLabel: dsName}
 
 			ginkgo.By(fmt.Sprintf("Creating DaemonSet %q", dsName))
 			maxSurge := intstr.FromString("100%")
-			maxUnavailable := intstr.FromInt(0)
+			maxUnavailable := intstr.FromInt32(0)
 			ds := tester.NewDaemonSet(dsName, label, WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{
 				Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
 				RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{

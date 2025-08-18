@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -33,7 +33,7 @@ import (
 
 var tester *framework.CloneSetTester
 
-var _ = SIGDescribe("InplaceVPA", func() {
+var _ = ginkgo.Describe("InplaceVPA", ginkgo.Label("InplaceVPA", "operation"), func() {
 	//framework.TestContext.DeleteNamespaceOnFailure = false
 	f := framework.NewDefaultFramework("inplace-vpa")
 	var ns string
@@ -61,7 +61,7 @@ var _ = SIGDescribe("InplaceVPA", func() {
 
 	// TODO(Abner-1)update only inplace resources may fail in kind e2e.
 	// I will resolve it in another PR
-	//framework.KruiseDescribe("CloneSet Updating with only inplace resource", func() {
+	//ginkgo.Context("CloneSet Updating with only inplace resource", func() {
 	//	var err error
 	//	testUpdateResource := func(fn func(spec *v1.PodSpec), resizePolicy []v1.ContainerResizePolicy) {
 	//		cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
@@ -283,74 +283,85 @@ var _ = SIGDescribe("InplaceVPA", func() {
 	//	})
 	//})
 
-	framework.KruiseDescribe("CloneSet failed to inplace update resource", func() {
-		ginkgo.By("inplace update resources with RestartContainer policy")
-		testResizePolicyFailed([]v1.ContainerResizePolicy{
-			{
-				ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer,
-			},
-			{
-				ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer,
-			},
+	ginkgo.Context("CloneSet failed to inplace update resource", func() {
+		ginkgo.Context("inplace update resources with RestartContainer policy", func() {
+			testResizePolicyFailed([]v1.ContainerResizePolicy{
+				{
+					ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer,
+				},
+				{
+					ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer,
+				},
+			})
 		})
-		ginkgo.By("inplace update resources with memory RestartContainer policy")
-		testResizePolicyFailed([]v1.ContainerResizePolicy{
-			{
-				ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer,
-			},
+
+		ginkgo.Context("inplace update resources with memory RestartContainer policy", func() {
+			testResizePolicyFailed([]v1.ContainerResizePolicy{
+				{
+					ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer,
+				},
+			})
 		})
-		ginkgo.By("inplace update resources with cpu RestartContainer policy")
-		testResizePolicyFailed([]v1.ContainerResizePolicy{
-			{
-				ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer,
-			},
+
+		ginkgo.Context("inplace update resources with cpu RestartContainer policy", func() {
+			testResizePolicyFailed([]v1.ContainerResizePolicy{
+				{
+					ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer,
+				},
+			})
 		})
-		ginkgo.By("inplace update resources with NotRequired policy")
-		testResizePolicyFailed([]v1.ContainerResizePolicy{
-			{
-				ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired,
-			},
-			{
-				ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired,
-			},
+		ginkgo.Context("inplace update resources with NotRequired policy", func() {
+			testResizePolicyFailed([]v1.ContainerResizePolicy{
+				{
+					ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired,
+				},
+				{
+					ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired,
+				},
+			})
 		})
 	})
 
-	framework.KruiseDescribe("CloneSet Updating with inplace resource", func() {
+	ginkgo.Context("CloneSet Updating with inplace resource", func() {
+		ginkgo.Context("inplace update resources with RestartContainer policy", func() {
+			testWithResizePolicy([]v1.ContainerResizePolicy{
+				{
+					ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer,
+				},
+				{
+					ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer,
+				},
+			})
+		})
+		ginkgo.Context("inplace update resources with memory RestartContainer policy", func() {
+			testWithResizePolicy([]v1.ContainerResizePolicy{
+				{
+					ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer,
+				},
+			})
+		})
 
-		ginkgo.By("inplace update resources with RestartContainer policy")
-		testWithResizePolicy([]v1.ContainerResizePolicy{
-			{
-				ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer,
-			},
-			{
-				ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer,
-			},
+		ginkgo.Context("inplace update resources with cpu RestartContainer policy", func() {
+			testWithResizePolicy([]v1.ContainerResizePolicy{
+				{
+					ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer,
+				},
+			})
 		})
-		ginkgo.By("inplace update resources with memory RestartContainer policy")
-		testWithResizePolicy([]v1.ContainerResizePolicy{
-			{
-				ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer,
-			},
-		})
-		ginkgo.By("inplace update resources with cpu RestartContainer policy")
-		testWithResizePolicy([]v1.ContainerResizePolicy{
-			{
-				ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer,
-			},
-		})
-		ginkgo.By("inplace update resources with NotRequired policy")
-		testWithResizePolicy([]v1.ContainerResizePolicy{
-			{
-				ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired,
-			},
-			{
-				ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired,
-			},
+
+		ginkgo.Context("inplace update resources with NotRequired policy", func() {
+			testWithResizePolicy([]v1.ContainerResizePolicy{
+				{
+					ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired,
+				},
+				{
+					ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired,
+				},
+			})
 		})
 	})
 
-	framework.KruiseDescribe("Basic StatefulSet functionality [StatefulSetBasic]", func() {
+	ginkgo.Context("Basic StatefulSet functionality [StatefulSetBasic]", func() {
 		ssName := "ss"
 		labels := map[string]string{
 			"foo": "bar",
@@ -435,7 +446,7 @@ var _ = SIGDescribe("InplaceVPA", func() {
 
 	})
 
-	framework.KruiseDescribe("Basic DaemonSet functionality [DaemonSetBasic]", func() {
+	ginkgo.Context("Basic DaemonSet functionality [DaemonSetBasic]", func() {
 		var tester *framework.DaemonSetTester
 		ginkgo.BeforeEach(func() {
 			c = f.ClientSet
@@ -446,14 +457,14 @@ var _ = SIGDescribe("InplaceVPA", func() {
 		dsName := "e2e-ds"
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting DaemonSet %s/%s in cluster", ns, dsName)
 			tester.DeleteDaemonSet(ns, dsName)
 		})
 		newImage := NewNginxImage
-		framework.ConformanceIt("should upgrade resources and image one by one on steps if there is pre-update hook", func() {
+		ginkgo.It("should upgrade resources and image one by one on steps if there is pre-update hook", func() {
 			label := map[string]string{framework.DaemonSetNameLabel: dsName}
 			hookKey := "my-pre-update"
 
@@ -950,7 +961,7 @@ func testResizePolicyFailed(resizePolicy []v1.ContainerResizePolicy) {
 	})
 
 	// This can't be Conformance yet.
-	ginkgo.FIt("in-place update resource and env from label", func() {
+	ginkgo.It("in-place update resource and env from label", func() {
 		fn := func(pod *v1.PodTemplateSpec) {
 			spec := &pod.Spec
 			ginkgo.By("in-place update resource and env from label")
@@ -1012,7 +1023,7 @@ func testWithResizePolicy(resizePolicy []v1.ContainerResizePolicy) {
 		testUpdateResource(tester, fn, resizePolicy, injectFailedResource)
 	})
 
-	framework.ConformanceIt("in-place update two container image, resource with priorities successfully", func() {
+	ginkgo.It("in-place update two container image, resource with priorities successfully", func() {
 		cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
 		cs.Spec.Template.Spec.Containers[0].ResizePolicy = resizePolicy
 		cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
@@ -1084,7 +1095,7 @@ func testWithResizePolicy(resizePolicy []v1.ContainerResizePolicy) {
 		gomega.Expect(checkPodResource(pods, oldPodResource, []string{"redis"})).Should(gomega.Equal(true))
 	})
 
-	framework.ConformanceIt("in-place update two container image, resource with priorities, should not update the next when the previous one failed", func() {
+	ginkgo.It("in-place update two container image, resource with priorities, should not update the next when the previous one failed", func() {
 		cs := tester.NewCloneSet("clone-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType})
 		cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 			Name:      "redis",

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
@@ -39,7 +39,7 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
-var _ = SIGDescribe("PodUnavailableBudget", func() {
+var _ = ginkgo.Describe("PodUnavailableBudget", ginkgo.Label("PodUnavailableBudget", "policy"), func() {
 	f := framework.NewDefaultFramework("podunavailablebudget")
 	var ns string
 	var c clientset.Interface
@@ -55,10 +55,10 @@ var _ = SIGDescribe("PodUnavailableBudget", func() {
 		sidecarTester = framework.NewSidecarSetTester(c, kc)
 	})
 
-	framework.KruiseDescribe("podUnavailableBudget functionality [podUnavailableBudget]", func() {
+	ginkgo.Context("podUnavailableBudget functionality [podUnavailableBudget]", func() {
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all PodUnavailableBudgets and Deployments in cluster")

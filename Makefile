@@ -131,7 +131,7 @@ golangci-lint: ## Download golangci-lint locally if necessary.
 
 GINKGO = $(shell pwd)/bin/ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
-	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/ginkgo@v1.16.4)
+	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@latest)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -189,11 +189,11 @@ kube-load-image: $(tools/kind)
 .PHONY: install-kruise
 install-kruise:
 	kubectl create namespace kruise-system;
-ifeq ($(DISABLE_E2E_CONFIG), true)
-	@echo "Skipping e2e config application...";
-else
+ifeq ($(ENABLE_E2E_CONFIG), true)
 	@echo "Applying e2e config...";
 	kubectl apply -f test/kruise-e2e-config.yaml;
+else
+	@echo "Skipping e2e config application...";
 endif
 	tools/hack/install-kruise.sh $(IMG)
 

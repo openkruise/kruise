@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -50,7 +50,7 @@ const (
 	deleteForbiddenMessage = "forbidden by ResourcesProtectionDeletion"
 )
 
-var _ = SIGDescribe("DeletionProtection", func() {
+var _ = ginkgo.Describe("DeletionProtection", ginkgo.Label("DeletionProtection", "policy"), func() {
 	f := framework.NewDefaultFramework("deletionprotection")
 	var ns string
 	var c clientset.Interface
@@ -69,7 +69,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 		_ = ns
 	})
 
-	framework.KruiseDescribe("namespace deletion", func() {
+	ginkgo.Context("namespace deletion", func() {
 		ginkgo.It("ns should be protected", func() {
 			ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{
 				Name:   "kruise-e2e-deletion-protection-" + randStr,
@@ -167,7 +167,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 		})
 	})
 
-	framework.KruiseDescribe("CRD deletion", func() {
+	ginkgo.Context("CRD deletion", func() {
 		ginkgo.It("should be protected", func() {
 			crd := &apiextensionsv1.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{
@@ -232,7 +232,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 		})
 	})
 
-	framework.KruiseDescribe("Workload deletion", func() {
+	ginkgo.Context("Workload deletion", func() {
 		var err error
 		ginkgo.It("CloneSet should be protected", func() {
 			ginkgo.By("Create a CloneSet with Always")
@@ -348,7 +348,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 		})
 	})
 
-	framework.KruiseDescribe("Service deletion", func() {
+	ginkgo.Context("Service deletion", func() {
 		ginkgo.It("should be protected", func() {
 			ginkgo.By("Create a Service with Always")
 			name := "svc-" + randStr
@@ -384,7 +384,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 		})
 	})
 
-	framework.KruiseDescribe("Ingress deletion", func() {
+	ginkgo.Context("Ingress deletion", func() {
 		ginkgo.It("should be protected", func() {
 			ginkgo.By("Create a Ingress with Always")
 			name := "ing-" + randStr
@@ -445,7 +445,7 @@ var _ = SIGDescribe("DeletionProtection", func() {
 												PathType: &pathType,
 												Backend: networkingv1beta1.IngressBackend{
 													ServiceName: "test",
-													ServicePort: intstr.FromInt(80),
+													ServicePort: intstr.FromInt32(80),
 												},
 											},
 										},

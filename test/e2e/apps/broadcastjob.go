@@ -27,17 +27,16 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/utils/integer"
 )
 
-var _ = SIGDescribe("BroadcastJob", func() {
+var _ = ginkgo.Describe("BroadcastJob", ginkgo.Label("BroadcastJob", "job", "workload"), func() {
 	f := framework.NewDefaultFramework("broadcastjobs")
 	var ns string
 	var c clientset.Interface
@@ -63,7 +62,7 @@ var _ = SIGDescribe("BroadcastJob", func() {
 	f.AfterEachActions = []func(){
 		func() {
 			// Print debug info if it fails
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				allNodes, err := nodeTester.ListNodesWithFake()
 				if err != nil {
 					framework.Logf("[FAILURE_DEBUG] List Nodes error: %v", err)
@@ -79,10 +78,8 @@ var _ = SIGDescribe("BroadcastJob", func() {
 			}
 		},
 	}
-
-	framework.KruiseDescribe("BroadcastJob dispatching", func() {
-
-		framework.ConformanceIt("succeeds for parallelism < number of node", func() {
+	ginkgo.Context("BroadcastJob dispatching", func() {
+		ginkgo.It("succeeds for parallelism < number of node", func() {
 			ginkgo.By("Create Fake Node " + randStr)
 			fakeNode, err := nodeTester.CreateFakeNode(randStr)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -108,7 +105,7 @@ var _ = SIGDescribe("BroadcastJob", func() {
 
 			nodes, err := nodeTester.ListRealNodesWithFake(job.Spec.Template.Spec.Tolerations)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			parallelism := intstr.FromInt(integer.IntMax(len(nodes)-1, integer.IntMin(len(nodes), 1)))
+			parallelism := intstr.FromInt(max(len(nodes)-1, min(len(nodes), 1)))
 			job.Spec.Parallelism = &parallelism
 
 			job, err = tester.CreateBroadcastJob(job)

@@ -19,8 +19,8 @@ package e2e
 import (
 	"testing"
 
-	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"k8s.io/klog/v2"
 
@@ -51,13 +51,9 @@ func RunE2ETests(t *testing.T) {
 
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	// Disable skipped tests unless they are explicitly requested.
-	if len(config.GinkgoConfig.FocusStrings) == 0 && len(config.GinkgoConfig.SkipStrings) == 0 {
-		config.GinkgoConfig.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}
-	}
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
-	var r []ginkgo.Reporter
 	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
 
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kruise e2e suite", r)
+	ginkgo.RunSpecs(t, "Kruise e2e suite")
 }

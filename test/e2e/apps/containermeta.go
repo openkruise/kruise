@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +35,7 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
-var _ = SIGDescribe("ContainerMeta", func() {
+var _ = ginkgo.Describe("ContainerMeta", ginkgo.Label("ContainerMeta", "operation"), func() {
 	f := framework.NewDefaultFramework("containermeta")
 	var ns string
 	var c clientset.Interface
@@ -59,7 +59,7 @@ var _ = SIGDescribe("ContainerMeta", func() {
 		replicas = int32(len(nodes))
 	})
 
-	framework.KruiseDescribe("In-place update env from metadata", func() {
+	ginkgo.Context("In-place update env from metadata", func() {
 		var err error
 
 		// This can't be Conformance yet.

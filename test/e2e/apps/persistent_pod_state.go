@@ -26,7 +26,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/utils/ptr"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
@@ -41,7 +41,7 @@ var (
 	podStateNodeTopologyLabel = "kubernetes.io/hostname"
 )
 
-var _ = SIGDescribe("PersistentPodState", func() {
+var _ = ginkgo.Describe("PersistentPodState", ginkgo.Label("PersistentPodState", "operation"), func() {
 	f := framework.NewDefaultFramework("persistentpodstates")
 	var ns string
 	var c clientset.Interface
@@ -59,10 +59,10 @@ var _ = SIGDescribe("PersistentPodState", func() {
 		tester = framework.NewPersistentPodStateTester(c, kc, d, a)
 	})
 
-	framework.KruiseDescribe("PersistentPodState functionality", func() {
+	ginkgo.Context("PersistentPodState functionality", func() {
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 		})

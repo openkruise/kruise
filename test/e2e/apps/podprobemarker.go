@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,7 +42,7 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework"
 )
 
-var _ = SIGDescribe("PodProbeMarker", func() {
+var _ = ginkgo.Describe("PodProbeMarker", ginkgo.Label("PodProbeMarker", "operation"), func() {
 	f := framework.NewDefaultFramework("podprobemarkers")
 	var ns string
 	var c clientset.Interface
@@ -58,11 +58,12 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 		randStr = rand.String(10)
 	})
 
-	framework.KruiseDescribe("PodProbeMarker with exec functionality", func() {
+	ginkgo.Context("PodProbeMarker with exec functionality", func() {
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.DumpDebugInfo(c, ns)
+			if ginkgo.CurrentSpecReport().Failed() {
+				framework.DumpPodInfo(c, ns)
+				dumpNodePodProbes(kc, ns)
 			}
 		})
 
@@ -96,14 +97,18 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			// create pod probe marker
 			ppmList := tester.NewPodProbeMarker(ns, randStr)
 			ppm1, ppm2 := &ppmList[0], &ppmList[1]
+			ginkgo.By(fmt.Sprintf("Create podprobemarker(%s/%s) that should succeed", ppm1.Namespace, ppm1.Name))
 			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Create(context.TODO(), ppm1, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			time.Sleep(time.Second * 10)
+			tester.WaitForPodProbeMarkerProcessed(ppm1)
 
 			// check finalizer
 			ppm1, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(controllerutil.ContainsFinalizer(ppm1, podprobemarker.PodProbeMarkerFinalizer)).To(gomega.BeTrue())
+
+			ginkgo.By("wait for pods becomes healthy for the first time")
+			tester.WaitForPodLabeled(ns, "nginx", "healthy")
 
 			pods, err := tester.ListActivePods(ns)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -140,9 +145,14 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 				}
 			}
 			// create other pod probe marker
+			ginkgo.By(fmt.Sprintf("Create podprobemarker(%s/%s) that should succeed", ppm2.Namespace, ppm2.Name))
 			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Create(context.TODO(), ppm2, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			time.Sleep(time.Second * 10)
+			tester.WaitForPodProbeMarkerProcessed(ppm2)
+
+			ginkgo.By("wait for pods annotated with pod-deletion-cost")
+			tester.WaitForPodAnnotated(ns, "controller.kubernetes.io/pod-deletion-cost", "10")
+			tester.WaitForPodLabeled(ns, "nginx", "healthy")
 
 			pods, err = tester.ListActivePods(ns)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -161,6 +171,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			}
 
 			// update failed probe
+			ginkgo.By(fmt.Sprintf("update podprobemarker(%s/%s) so that it always fails", ppm1.Namespace, ppm1.Name))
 			ppm1, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			ppm1.Spec.Probes[0].Probe.Exec = &v1.ExecAction{
@@ -168,7 +179,9 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			}
 			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Update(context.TODO(), ppm1, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			tester.WaitForPodProbeMarkerProcessed(ppm1)
 
+			ginkgo.By(fmt.Sprintf("update podprobemarker(%s/%s) so that it always fails", ppm2.Namespace, ppm2.Name))
 			ppm2, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm2.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			ppm2.Spec.Probes[0].Probe.Exec = &v1.ExecAction{
@@ -176,7 +189,11 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			}
 			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Update(context.TODO(), ppm2, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			time.Sleep(time.Second * 10)
+			tester.WaitForPodProbeMarkerProcessed(ppm2)
+
+			ginkgo.By("wait for pods become unhealth")
+			tester.WaitForPodLabeled(ns, "nginx", "")
+			tester.WaitForPodAnnotated(ns, "controller.kubernetes.io/pod-deletion-cost", "-10")
 
 			pods, err = tester.ListActivePods(ns)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -195,6 +212,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			}
 
 			// update success probe
+			ginkgo.By(fmt.Sprintf("update podprobemarker(%s/%s) so that it back to succeed", ppm1.Namespace, ppm1.Name))
 			ppm1, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			ppm1.Spec.Probes[0].Probe.Exec = &v1.ExecAction{
@@ -202,13 +220,18 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			}
 			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Update(context.TODO(), ppm1, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			tester.WaitForPodProbeMarkerProcessed(ppm1)
+
 			// scale down
 			sts, err = kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			sts.Spec.Replicas = ptr.To[int32](1)
 			_, err = kc.AppsV1beta1().StatefulSets(ns).Update(context.TODO(), sts, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			time.Sleep(time.Second * 10)
+			tester.WaitForStatefulSetRunning(sts)
+
+			ginkgo.By("wait for pods become healthy again")
+			tester.WaitForPodLabeled(ns, "nginx", "healthy")
 
 			pods, err = tester.ListActivePods(ns)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -239,13 +262,17 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			}
 
 			// scale up
+			ginkgo.By("scale up statefulset")
 			sts, err = kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			sts.Spec.Replicas = ptr.To(int32(nodeLen))
 			_, err = kc.AppsV1beta1().StatefulSets(ns).Update(context.TODO(), sts, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			tester.WaitForStatefulSetRunning(sts)
-			time.Sleep(time.Second * 10)
+
+			ginkgo.By("wait for newly created pods becomes healthy")
+			tester.WaitForPodLabeled(ns, "nginx", "healthy")
+			tester.WaitForPodAnnotated(ns, "controller.kubernetes.io/pod-deletion-cost", "-10")
 
 			pods, err = tester.ListActivePods(ns)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -280,7 +307,9 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 				err = kc.AppsV1alpha1().PodProbeMarkers(ns).Delete(context.TODO(), ppm.Name, metav1.DeleteOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			}
-			time.Sleep(time.Second * 3)
+			for _, ppm := range ppmList {
+				tester.WaitForPodProbeMarkerDeleted(&ppm)
+			}
 			nppList, err = kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, npp := range nppList.Items {
@@ -405,10 +434,11 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 		})
 	})
 
-	framework.KruiseDescribe("PodProbeMarker with tcpCheck functionality", func() {
+	ginkgo.Context("PodProbeMarker with tcpCheck functionality", func() {
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.DumpDebugInfo(c, ns)
+			if ginkgo.CurrentSpecReport().Failed() {
+				framework.DumpPodInfo(c, ns)
+				dumpNodePodProbes(kc, ns)
 			}
 		})
 
@@ -442,18 +472,22 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			// create pod probe marker
 			ppmList := tester.NewPodProbeMarkerForTcpCheck(ns, randStr)
 			ppm1 := &ppmList[0]
+
+			ginkgo.By(fmt.Sprintf("Create podprobemarker(%s/%s) that should succeed", ppm1.Namespace, ppm1.Name))
 			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Create(context.TODO(), ppm1, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			time.Sleep(time.Second * 10)
+			tester.WaitForPodProbeMarkerProcessed(ppm1)
 
 			// check finalizer
 			ppm1, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(controllerutil.ContainsFinalizer(ppm1, podprobemarker.PodProbeMarkerFinalizer)).To(gomega.BeTrue())
 
+			ginkgo.By("wait for pods becomes healthy for the first time")
+			tester.WaitForPodLabeled(ns, "nginx", "healthy")
+
 			pods, err := tester.ListActivePods(ns)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
 			validPods := sets.NewString()
 			for _, pod := range pods {
 				validPods.Insert(string(pod.UID))
@@ -488,6 +522,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			}
 
 			// update failed probe, tcp port check from 80 ---> 8081
+			ginkgo.By(fmt.Sprintf("update podprobemarker(%s/%s) so that tcp port check from 80 ---> 8081", ppm1.Namespace, ppm1.Name))
 			ppm1, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			ppm1.Spec.Probes[0].Probe.TCPSocket = &v1.TCPSocketAction{
@@ -495,10 +530,13 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			}
 			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Update(context.TODO(), ppm1, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			time.Sleep(time.Second * 60)
+			tester.WaitForPodProbeMarkerProcessed(ppm1)
+
+			ginkgo.By("wait for pods becomes unhealthy for the first time")
+			tester.WaitForPodLabeled(ns, "nginx", "")
+
 			pods, err = tester.ListActivePods(ns)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
 			for _, pod := range pods {
 				// healthy probe
 				gomega.Expect(pod.Labels["nginx"]).To(gomega.Equal(""))
@@ -508,6 +546,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			}
 
 			// update success probe
+			ginkgo.By(fmt.Sprintf("update podprobemarker(%s/%s) so that tcp port check from 8081 ---> 80", ppm1.Namespace, ppm1.Name))
 			ppm1, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			ppm1.Spec.Probes[0].Probe.TCPSocket = &v1.TCPSocketAction{
@@ -515,6 +554,7 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			}
 			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Update(context.TODO(), ppm1, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			tester.WaitForPodProbeMarkerProcessed(ppm1)
 
 			// scale down
 			sts, err = kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), sts.Name, metav1.GetOptions{})
@@ -522,11 +562,13 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			sts.Spec.Replicas = ptr.To[int32](1)
 			_, err = kc.AppsV1beta1().StatefulSets(ns).Update(context.TODO(), sts, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			time.Sleep(time.Second * 60)
+			tester.WaitForStatefulSetRunning(sts)
+
+			ginkgo.By("wait for pods becomes healthy again")
+			tester.WaitForPodLabeled(ns, "nginx", "healthy")
 
 			pods, err = tester.ListActivePods(ns)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(len(pods)).To(gomega.Equal(1))
 			validPods = sets.NewString()
 			for _, pod := range pods {
 				validPods.Insert(string(pod.UID))
@@ -554,7 +596,9 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			_, err = kc.AppsV1beta1().StatefulSets(ns).Update(context.TODO(), sts, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			tester.WaitForStatefulSetRunning(sts)
-			time.Sleep(time.Second * 100)
+
+			ginkgo.By("wait for newly created pods becomes healthy again")
+			tester.WaitForPodLabeled(ns, "nginx", "healthy")
 
 			pods, err = tester.ListActivePods(ns)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -584,7 +628,10 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 				err = kc.AppsV1alpha1().PodProbeMarkers(ns).Delete(context.TODO(), ppm.Name, metav1.DeleteOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			}
-			time.Sleep(time.Second * 5)
+			for _, ppm := range ppmList {
+				tester.WaitForPodProbeMarkerDeleted(&ppm)
+			}
+
 			nppList, err = kc.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, npp := range nppList.Items {
@@ -595,10 +642,11 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 		})
 	})
 
-	framework.KruiseDescribe("PodProbeMarker with httpCheck functionality", func() {
+	ginkgo.Context("PodProbeMarker with httpCheck functionality", func() {
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.DumpDebugInfo(c, ns)
+			if ginkgo.CurrentSpecReport().Failed() {
+				framework.DumpPodInfo(c, ns)
+				dumpNodePodProbes(kc, ns)
 			}
 		})
 
@@ -631,9 +679,11 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			// create pod probe marker
 			ppmList := tester.NewPodProbeMarkerForHttpCheck(ns, randStr)
 			ppm1 := &ppmList[0]
+
+			ginkgo.By(fmt.Sprintf("Create podprobemarker(%s/%s) that should succeed", ppm1.Namespace, ppm1.Name))
 			_, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Create(context.TODO(), ppm1, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			time.Sleep(time.Second * 10)
+			tester.WaitForPodProbeMarkerProcessed(ppm1)
 
 			// check finalizer
 			ppm1, err = kc.AppsV1alpha1().PodProbeMarkers(ns).Get(context.TODO(), ppm1.Name, metav1.GetOptions{})
@@ -643,6 +693,10 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 			pods, err := tester.ListActivePods(ns)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
+
+			ginkgo.By("wait for pods labeled with healthy")
+			tester.WaitForPodLabeled(ns, "nginx", "healthy")
+
 			validPods := sets.NewString()
 			for _, pod := range pods {
 				validPods.Insert(string(pod.UID))
@@ -678,3 +732,11 @@ var _ = SIGDescribe("PodProbeMarker", func() {
 		})
 	})
 })
+
+func dumpNodePodProbes(c kruiseclientset.Interface, ns string) {
+	sl, _ := c.AppsV1alpha1().NodePodProbes().List(context.TODO(), metav1.ListOptions{})
+	for _, s := range sl.Items {
+		desc, _ := framework.RunKubectl("get", "nodepodprobe", s.Name, "-o", "yaml")
+		framework.Logf("\nOutput of kubectl get nodepodprobe %v:\n%v", s.Name, desc)
+	}
+}

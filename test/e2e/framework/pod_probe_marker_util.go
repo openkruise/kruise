@@ -19,6 +19,7 @@ package framework
 import (
 	"context"
 	"fmt"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -198,7 +199,7 @@ func (s *PodProbeMarkerTester) NewPodProbeMarkerForHttpCheck(ns, randStr string)
 								HTTPGet: &corev1.HTTPGetAction{
 									Path:   "/",
 									Scheme: corev1.URISchemeHTTP,
-									Port:   intstr.FromInt(80),
+									Port:   intstr.FromInt32(80),
 								},
 							},
 						},
@@ -361,6 +362,78 @@ func (s *PodProbeMarkerTester) WaitForStatefulSetRunning(sts *appsv1beta1.Statef
 		})
 	if pollErr != nil {
 		Failf("Failed waiting for statefulset to enter running: %v", pollErr)
+	}
+}
+
+func (s *PodProbeMarkerTester) WaitForPodProbeMarkerProcessed(ppm *appsv1alpha1.PodProbeMarker) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, 2*time.Minute, true,
+		func(ctx context.Context) (bool, error) {
+			inner, err := s.kc.AppsV1alpha1().PodProbeMarkers(ppm.Namespace).Get(context.TODO(), ppm.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, nil
+			}
+			if inner.Generation != inner.Status.ObservedGeneration {
+				return false, nil
+			}
+			return true, nil
+		})
+	if pollErr != nil {
+		Failf("Failed waiting for podprobemarker to be processed: %v", pollErr)
+	}
+}
+
+func (s *PodProbeMarkerTester) WaitForPodProbeMarkerDeleted(ppm *appsv1alpha1.PodProbeMarker) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, 2*time.Minute, true,
+		func(ctx context.Context) (bool, error) {
+			_, err := s.kc.AppsV1alpha1().PodProbeMarkers(ppm.Namespace).Get(context.TODO(), ppm.Name, metav1.GetOptions{})
+			if err != nil && apierrors.IsNotFound(err) {
+				return true, nil
+			}
+
+			return false, err
+		})
+	if pollErr != nil {
+		Failf("Failed waiting for podprobemarker to be deleted: %v", pollErr)
+	}
+}
+
+func (s *PodProbeMarkerTester) WaitForPodLabeled(ns string, label string, value string) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), 20*time.Second, 2*time.Minute, true,
+		func(ctx context.Context) (bool, error) {
+			pods, err := s.ListActivePods(ns)
+			if err != nil {
+				return false, nil
+			}
+
+			for _, pod := range pods {
+				if pod.Labels[label] != value {
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+	if pollErr != nil {
+		Failf("Failed waiting for pod labels to be updated: %v", pollErr)
+	}
+}
+
+func (s *PodProbeMarkerTester) WaitForPodAnnotated(ns string, annotation string, value string) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), 10*time.Second, 2*time.Minute, true,
+		func(ctx context.Context) (bool, error) {
+			pods, err := s.ListActivePods(ns)
+			if err != nil {
+				return false, nil
+			}
+
+			for _, pod := range pods {
+				if pod.Annotations[annotation] != value {
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+	if pollErr != nil {
+		Failf("Failed waiting for pod annotations to be updated: %v", pollErr)
 	}
 }
 
