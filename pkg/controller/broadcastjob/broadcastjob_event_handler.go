@@ -164,6 +164,10 @@ func nodeInSameCondition(old []v1.NodeCondition, cur []v1.NodeCondition) bool {
 }
 
 func shouldIgnoreNodeUpdate(oldNode, curNode v1.Node) bool {
+	// If it has, this is an important update and should NOT be ignored
+	if oldNode.Spec.Unschedulable != curNode.Spec.Unschedulable {
+		return false
+	}
 	if !nodeInSameCondition(oldNode.Status.Conditions, curNode.Status.Conditions) {
 		return false
 	}
