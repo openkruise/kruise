@@ -35,6 +35,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (dsc *ReconcileDaemonSet) constructHistory(ctx context.Context, ds *appsv1alpha1.DaemonSet) (cur *apps.ControllerRevision, old []*apps.ControllerRevision, err error) {
@@ -106,10 +107,31 @@ func (dsc *ReconcileDaemonSet) controlledHistories(ctx context.Context, ds *apps
 
 	// List all histories to include those that don't match the selector anymore
 	// but have a ControllerRef pointing to the controller.
-	histories, err := dsc.historyLister.ControllerRevisions(ds.Namespace).List(labels.Everything())
-	if err != nil {
-		return nil, err
+	var histories []*apps.ControllerRevision
+	if dsc.Client != nil {
+		var revList apps.ControllerRevisionList
+		if err := dsc.Client.List(ctx, &revList, runtimeclient.InNamespace(ds.Namespace)); err != nil {
+			return nil, err
+		}
+		for i := range revList.Items {
+			if selector.Matches(labels.Set(revList.Items[i].Labels)) {
+				histories = append(histories, &revList.Items[i])
+				continue
+			}
+			if controller := metav1.GetControllerOf(&revList.Items[i]); controller != nil && controller.Kind == controllerKind.Kind && controller.UID == ds.UID {
+				histories = append(histories, &revList.Items[i])
+			}
+		}
+	} else if dsc.historyLister != nil {
+		list, err := dsc.historyLister.ControllerRevisions(ds.Namespace).List(labels.Everything())
+		if err != nil {
+			return nil, err
+		}
+		histories = list
+	} else {
+		histories = nil
 	}
+
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := kubecontroller.RecheckDeletionTimestamp(func(ctx context.Context) (metav1.Object, error) {

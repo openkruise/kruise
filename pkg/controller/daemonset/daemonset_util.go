@@ -17,6 +17,7 @@ limitations under the License.
 package daemonset
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"sync"
@@ -38,6 +39,8 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/utils/integer"
+
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -149,15 +152,15 @@ func (dsc *ReconcileDaemonSet) GetPodDaemonSets(pod *corev1.Pod) ([]*appsv1alpha
 		return nil, fmt.Errorf("no daemon sets found for pod %v because it has no labels", pod.Name)
 	}
 
-	dsList, err := dsc.dsLister.DaemonSets(pod.Namespace).List(labels.Everything())
-	if err != nil {
+	var dsList appsv1alpha1.DaemonSetList
+	if err := dsc.Client.List(context.Background(), &dsList, runtimeclient.InNamespace(pod.Namespace)); err != nil {
 		return nil, err
 	}
 
-	var selector labels.Selector
 	var daemonSets []*appsv1alpha1.DaemonSet
-	for _, ds := range dsList {
-		selector, err = kruiseutil.ValidatedLabelSelectorAsSelector(ds.Spec.Selector)
+	for i := range dsList.Items {
+		ds := &dsList.Items[i]
+		selector, err := kruiseutil.ValidatedLabelSelectorAsSelector(ds.Spec.Selector)
 		if err != nil {
 			// this should not happen if the DaemonSet passed validation
 			return nil, err

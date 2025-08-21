@@ -30,7 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
@@ -38,9 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	appslisters "k8s.io/client-go/listers/apps/v1"
-	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
@@ -78,6 +74,9 @@ import (
 	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	"github.com/openkruise/kruise/pkg/util/requeueduration"
 	"github.com/openkruise/kruise/pkg/util/revisionadapter"
+	"k8s.io/apimachinery/pkg/labels"
+	appslisters "k8s.io/client-go/listers/apps/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
 )
 
 func init() {
@@ -153,46 +152,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: genericClient.KubeClient.CoreV1().Events("")})
 
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "daemonset-controller"})
-	cacher := mgr.GetCache()
 
-	dsInformer, err := cacher.GetInformerForKind(context.TODO(), controllerKind)
-	if err != nil {
-		return nil, err
-	}
-	podInformer, err := cacher.GetInformerForKind(context.TODO(), corev1.SchemeGroupVersion.WithKind("Pod"))
-	if err != nil {
-		return nil, err
-	}
-	nodeInformer, err := cacher.GetInformerForKind(context.TODO(), corev1.SchemeGroupVersion.WithKind("Node"))
-	if err != nil {
-		return nil, err
-	}
-	revInformer, err := cacher.GetInformerForKind(context.TODO(), apps.SchemeGroupVersion.WithKind("ControllerRevision"))
-	if err != nil {
-		return nil, err
-	}
-
-	dsSharedInformer, ok := dsInformer.(cache.SharedIndexInformer)
-	if !ok {
-		return nil, fmt.Errorf("dsInformer %T from cache is not a SharedIndexInformer", dsInformer)
-	}
-	revSharedInformer, ok := revInformer.(cache.SharedIndexInformer)
-	if !ok {
-		return nil, fmt.Errorf("revInformer %T from cache is not a SharedIndexInformer", revInformer)
-	}
-	podSharedInformer, ok := podInformer.(cache.SharedIndexInformer)
-	if !ok {
-		return nil, fmt.Errorf("podInformer %T from cache is not a SharedIndexInformer", podInformer)
-	}
-	nodeSharedInformer, ok := nodeInformer.(cache.SharedIndexInformer)
-	if !ok {
-		return nil, fmt.Errorf("nodeInformer %T from cache is not a SharedIndexInformer", nodeInformer)
-	}
-
-	dsLister := kruiseappslisters.NewDaemonSetLister(dsSharedInformer.GetIndexer())
-	historyLister := appslisters.NewControllerRevisionLister(revSharedInformer.GetIndexer())
-	podLister := corelisters.NewPodLister(podSharedInformer.GetIndexer())
-	nodeLister := corelisters.NewNodeLister(nodeSharedInformer.GetIndexer())
 	failedPodsBackoff := flowcontrol.NewBackOff(1*time.Second, 15*time.Minute)
 	revisionAdapter := revisionadapter.NewDefaultImpl()
 
@@ -209,15 +169,11 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		lifecycleControl:            lifecycle.New(cli),
 		expectations:                kubecontroller.NewControllerExpectations(),
 		resourceVersionExpectations: kruiseExpectations.NewResourceVersionExpectation(),
-		dsLister:                    dsLister,
-		historyLister:               historyLister,
-		podLister:                   podLister,
-		nodeLister:                  nodeLister,
 		failedPodsBackoff:           failedPodsBackoff,
 		inplaceControl:              inplaceupdate.New(cli, revisionAdapter),
 		revisionAdapter:             revisionAdapter,
 	}
-	return dsc, err
+	return dsc, nil
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -296,14 +252,11 @@ type ReconcileDaemonSet struct {
 	// A cache of pod resourceVersion expecatations
 	resourceVersionExpectations kruiseExpectations.ResourceVersionExpectation
 
-	// dsLister can list/get daemonsets from the shared informer's store
-	dsLister kruiseappslisters.DaemonSetLister
-	// historyLister get list/get history from the shared informers's store
+	// legacy listers kept for tests; not used in production code
+	dsLister      kruiseappslisters.DaemonSetLister
 	historyLister appslisters.ControllerRevisionLister
-	// podLister get list/get pods from the shared informers's store
-	podLister corelisters.PodLister
-	// nodeLister can list/get nodes from the shared informer's store
-	nodeLister corelisters.NodeLister
+	podLister     corelisters.PodLister
+	nodeLister    corelisters.NodeLister
 
 	failedPodsBackoff *flowcontrol.Backoff
 
@@ -357,9 +310,24 @@ func (dsc *ReconcileDaemonSet) getDaemonPods(ctx context.Context, ds *appsv1alph
 
 	// List all pods to include those that don't match the selector anymore but
 	// have a ControllerRef pointing to this controller.
-	pods, err := dsc.podLister.Pods(ds.Namespace).List(labels.Everything())
-	if err != nil {
-		return nil, err
+	var pods []*corev1.Pod
+	if dsc.Client != nil {
+		var podList corev1.PodList
+		if err := dsc.Client.List(ctx, &podList, runtimeclient.InNamespace(ds.Namespace)); err != nil {
+			return nil, err
+		}
+		pods = make([]*corev1.Pod, 0, len(podList.Items))
+		for i := range podList.Items {
+			pods = append(pods, &podList.Items[i])
+		}
+	} else if dsc.podLister != nil {
+		list, err := dsc.podLister.Pods(ds.Namespace).List(labels.Everything())
+		if err != nil {
+			return nil, err
+		}
+		pods = list
+	} else {
+		pods = nil
 	}
 
 	// If any adoptions are attempted, we should first recheck for deletion with
@@ -383,14 +351,29 @@ func (dsc *ReconcileDaemonSet) getDaemonPods(ctx context.Context, ds *appsv1alph
 func (dsc *ReconcileDaemonSet) syncDaemonSet(ctx context.Context, request reconcile.Request) error {
 	logger := klog.FromContext(ctx)
 	dsKey := request.NamespacedName.String()
-	ds, err := dsc.dsLister.DaemonSets(request.Namespace).Get(request.Name)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			klog.V(4).InfoS("DaemonSet has been deleted", "daemonSet", request)
-			dsc.expectations.DeleteExpectations(logger, dsKey)
-			return nil
+	var dsObj appsv1alpha1.DaemonSet
+	var ds *appsv1alpha1.DaemonSet
+	if dsc.dsLister != nil {
+		got, err := dsc.dsLister.DaemonSets(request.Namespace).Get(request.Name)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				klog.V(4).InfoS("DaemonSet has been deleted", "daemonSet", request)
+				dsc.expectations.DeleteExpectations(logger, dsKey)
+				return nil
+			}
+			return fmt.Errorf("unable to retrieve DaemonSet %s from store: %v", dsKey, err)
 		}
-		return fmt.Errorf("unable to retrieve DaemonSet %s from store: %v", dsKey, err)
+		ds = got
+	} else {
+		if err := dsc.Client.Get(ctx, types.NamespacedName{Namespace: request.Namespace, Name: request.Name}, &dsObj); err != nil {
+			if errors.IsNotFound(err) {
+				klog.V(4).InfoS("DaemonSet has been deleted", "daemonSet", request)
+				dsc.expectations.DeleteExpectations(logger, dsKey)
+				return nil
+			}
+			return fmt.Errorf("unable to retrieve DaemonSet %s from store: %v", dsKey, err)
+		}
+		ds = &dsObj
 	}
 
 	// Don't process a daemon set until all its creations and deletions have been processed.
@@ -406,9 +389,25 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(ctx context.Context, request reconc
 		return nil
 	}
 
-	nodeList, err := dsc.nodeLister.List(labels.Everything())
-	if err != nil {
-		return fmt.Errorf("couldn't get list of nodes when syncing DaemonSet %#v: %v", ds, err)
+	var nodeList []*corev1.Node
+	if dsc.nodeLister != nil {
+		list, err := dsc.nodeLister.List(labels.Everything())
+		if err != nil {
+			return fmt.Errorf("couldn't get list of nodes when syncing DaemonSet %#v: %v", ds, err)
+		}
+		nodeList = make([]*corev1.Node, 0, len(list))
+		for i := range list {
+			nodeList = append(nodeList, list[i])
+		}
+	} else {
+		var nodeListObjs corev1.NodeList
+		if err := dsc.Client.List(ctx, &nodeListObjs); err != nil {
+			return fmt.Errorf("couldn't get list of nodes when syncing DaemonSet %#v: %v", ds, err)
+		}
+		nodeList = make([]*corev1.Node, 0, len(nodeListObjs.Items))
+		for i := range nodeListObjs.Items {
+			nodeList = append(nodeList, &nodeListObjs.Items[i])
+		}
 	}
 
 	// Construct histories of the DaemonSet, and get the hash of current history
@@ -830,11 +829,24 @@ func (dsc *ReconcileDaemonSet) syncNodes(ctx context.Context, ds *appsv1alpha1.D
 
 func (dsc *ReconcileDaemonSet) syncWithPreparingDelete(ds *appsv1alpha1.DaemonSet, podsToDelete []string) (podsCanDelete []string, err error) {
 	for _, podName := range podsToDelete {
-		pod, err := dsc.podLister.Pods(ds.Namespace).Get(podName)
-		if errors.IsNotFound(err) {
-			continue
-		} else if err != nil {
-			return nil, err
+		var pod *corev1.Pod
+		if dsc.Client != nil {
+			var got corev1.Pod
+			if getErr := dsc.Client.Get(context.Background(), types.NamespacedName{Namespace: ds.Namespace, Name: podName}, &got); errors.IsNotFound(getErr) {
+				continue
+			} else if getErr != nil {
+				return nil, getErr
+			} else {
+				pod = &got
+			}
+		} else {
+			got, err := dsc.podLister.Pods(ds.Namespace).Get(podName)
+			if errors.IsNotFound(err) {
+				continue
+			} else if err != nil {
+				return nil, err
+			}
+			pod = got
 		}
 		if !lifecycle.IsPodHooked(ds.Spec.Lifecycle.PreDelete, pod) {
 			podsCanDelete = append(podsCanDelete, podName)

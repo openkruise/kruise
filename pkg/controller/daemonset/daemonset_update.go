@@ -36,6 +36,7 @@ import (
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
+	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // rollingUpdate identifies the set of old pods to in-place update, delete, or additional pods to create on nodes,
@@ -340,13 +341,24 @@ func (dsc *ReconcileDaemonSet) filterDaemonPodsNodeToUpdate(ds *appsv1alpha1.Dae
 		}
 
 		if selector != nil {
-			node, err := dsc.nodeLister.Get(nodeName)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get node %v: %v", nodeName, err)
-			}
-			if selector.Matches(labels.Set(node.Labels)) {
-				selected = append(selected, nodeName)
-				continue
+			if dsc.Client != nil {
+				var node corev1.Node
+				if err := dsc.Client.Get(context.Background(), runtimeclient.ObjectKey{Name: nodeName}, &node); err != nil {
+					return nil, fmt.Errorf("failed to get node %v: %v", nodeName, err)
+				}
+				if selector.Matches(labels.Set(node.Labels)) {
+					selected = append(selected, nodeName)
+					continue
+				}
+			} else if dsc.nodeLister != nil {
+				node, err := dsc.nodeLister.Get(nodeName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get node %v: %v", nodeName, err)
+				}
+				if selector.Matches(labels.Set(node.Labels)) {
+					selected = append(selected, nodeName)
+					continue
+				}
 			}
 		}
 
@@ -393,12 +405,12 @@ func (dsc *ReconcileDaemonSet) canPodInPlaceUpdate(pod *corev1.Pod, curRevision 
 func (dsc *ReconcileDaemonSet) inPlaceUpdatePods(ds *appsv1alpha1.DaemonSet, podNames []string, curRevision *apps.ControllerRevision, oldRevisions []*apps.ControllerRevision) (podsNeedDelete []string, err error) {
 	var podsToUpdate []*corev1.Pod
 	for _, name := range podNames {
-		pod, err := dsc.podLister.Pods(ds.Namespace).Get(name)
-		if err != nil || !dsc.canPodInPlaceUpdate(pod, curRevision, oldRevisions) {
+		var podObj corev1.Pod
+		if getErr := dsc.Client.Get(context.Background(), runtimeclient.ObjectKey{Namespace: ds.Namespace, Name: name}, &podObj); getErr != nil || !dsc.canPodInPlaceUpdate(&podObj, curRevision, oldRevisions) {
 			podsNeedDelete = append(podsNeedDelete, name)
 			continue
 		}
-		podsToUpdate = append(podsToUpdate, pod)
+		podsToUpdate = append(podsToUpdate, &podObj)
 	}
 
 	updateDiff := len(podsToUpdate)
