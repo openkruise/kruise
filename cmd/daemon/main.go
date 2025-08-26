@@ -54,6 +54,12 @@ var (
 	// preventing the consumption of all available disk IOPS or network bandwidth,
 	// which could otherwise impact the performance of other running pods.
 	maxWorkersForPullImage = flag.Int("max-workers-for-pull-image", -1, "The maximum number of workers for pulling images.")
+
+	// CRR controller configuration flags
+	crrWorkers        = flag.Int("crr-workers", 32, "Number of worker goroutines for CRR controller")
+	crrMinBackoff     = flag.Duration("crr-min-backoff", 500*time.Millisecond, "Minimum backoff duration for CRR rate limiting")
+	crrMaxBackoff     = flag.Duration("crr-max-backoff", 50*time.Second, "Maximum backoff duration for CRR rate limiting")
+	crrMaxJitterMs    = flag.Int("crr-max-jitter-ms", 5000, "Maximum jitter in milliseconds for CRR rate limiting")
 )
 
 func main() {
@@ -78,7 +84,7 @@ func main() {
 		}()
 	}
 	ctx := signals.SetupSignalHandler()
-	d, err := daemon.NewDaemon(cfg, *bindAddr, *maxWorkersForPullImage)
+	d, err := daemon.NewDaemon(cfg, *bindAddr, *maxWorkersForPullImage, *crrWorkers, *crrMinBackoff, *crrMaxBackoff, *crrMaxJitterMs)
 	if err != nil {
 		klog.Fatalf("Failed to new daemon: %v", err)
 	}
