@@ -242,9 +242,6 @@ func SetDefaultsCloneSet(obj *v1alpha1.CloneSet, injectTemplateDefaults bool) {
 		maxSurge := intstr.FromInt(0)
 		obj.Spec.UpdateStrategy.MaxSurge = &maxSurge
 	}
-	if obj.Spec.ProgressDeadlineSeconds == nil {
-		obj.Spec.ProgressDeadlineSeconds = ptr.To(int32(600))
-	}
 }
 
 // SetDefaults_DaemonSet set default values for DaemonSet.

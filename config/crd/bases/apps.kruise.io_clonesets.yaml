@@ -167,7 +167,7 @@ spec:
                   ProgressDeadlineSeconds specifies the maximum time for the CloneSet to reach available
                   or paused state due to partitioning. The controller will set a ProgressDeadlineExceeded
                   condition when timeout occurs, while excluding paused state duration from the deadline calculation.
-                  It continues processing failed CloneSets and defaults to 600 seconds which can be overridden explicitly.
+                  This field is optional. If not set, the controller will not track progress deadlines or add the condition.
                 format: int32
                 type: integer
               replicas:

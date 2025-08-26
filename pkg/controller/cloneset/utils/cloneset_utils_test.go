@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -28,6 +29,15 @@ func TestHasProgressDeadline(t *testing.T) {
 		{
 			name:     "No ProgressDeadlineSeconds",
 			cs:       &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{}},
+			expected: false,
+		},
+		{
+			name: "ProgressDeadlineSeconds with MaxInt32",
+			cs: &appsv1alpha1.CloneSet{
+				Spec: appsv1alpha1.CloneSetSpec{
+					ProgressDeadlineSeconds: ptr.To(int32(math.MaxInt32)),
+				},
+			},
 			expected: false,
 		},
 	}
@@ -597,13 +607,19 @@ func TestRemoveCloneSetCondition(t *testing.T) {
 	condType := appsv1alpha1.CloneSetConditionTypeProgressing
 	tests := []struct {
 		name           string
-		initialStatus  appsv1alpha1.CloneSetStatus
+		initialStatus  *appsv1alpha1.CloneSetStatus
 		removeType     appsv1alpha1.CloneSetConditionType
-		expectedStatus appsv1alpha1.CloneSetStatus
+		expectedStatus *appsv1alpha1.CloneSetStatus
 	}{
 		{
+			name:           "Nil Status",
+			initialStatus:  nil,
+			removeType:     condType,
+			expectedStatus: nil,
+		},
+		{
 			name: "Condition exists",
-			initialStatus: appsv1alpha1.CloneSetStatus{
+			initialStatus: &appsv1alpha1.CloneSetStatus{
 				Conditions: []appsv1alpha1.CloneSetCondition{
 					{
 						Type:   appsv1alpha1.CloneSetConditionTypeProgressing,
@@ -616,7 +632,7 @@ func TestRemoveCloneSetCondition(t *testing.T) {
 				},
 			},
 			removeType: condType,
-			expectedStatus: appsv1alpha1.CloneSetStatus{
+			expectedStatus: &appsv1alpha1.CloneSetStatus{
 				Conditions: []appsv1alpha1.CloneSetCondition{
 					{
 						Type:   appsv1alpha1.CloneSetConditionFailedUpdate,
@@ -627,7 +643,7 @@ func TestRemoveCloneSetCondition(t *testing.T) {
 		},
 		{
 			name: "Condition does not exist",
-			initialStatus: appsv1alpha1.CloneSetStatus{
+			initialStatus: &appsv1alpha1.CloneSetStatus{
 				Conditions: []appsv1alpha1.CloneSetCondition{
 					{
 						Type:   appsv1alpha1.CloneSetConditionFailedUpdate,
@@ -636,7 +652,7 @@ func TestRemoveCloneSetCondition(t *testing.T) {
 				},
 			},
 			removeType: condType,
-			expectedStatus: appsv1alpha1.CloneSetStatus{
+			expectedStatus: &appsv1alpha1.CloneSetStatus{
 				Conditions: []appsv1alpha1.CloneSetCondition{
 					{
 						Type:   appsv1alpha1.CloneSetConditionFailedUpdate,
@@ -647,11 +663,11 @@ func TestRemoveCloneSetCondition(t *testing.T) {
 		},
 		{
 			name: "Empty Conditions",
-			initialStatus: appsv1alpha1.CloneSetStatus{
+			initialStatus: &appsv1alpha1.CloneSetStatus{
 				Conditions: nil,
 			},
 			removeType: condType,
-			expectedStatus: appsv1alpha1.CloneSetStatus{
+			expectedStatus: &appsv1alpha1.CloneSetStatus{
 				Conditions: nil,
 			},
 		},
@@ -659,16 +675,22 @@ func TestRemoveCloneSetCondition(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			RemoveCloneSetCondition(&tt.initialStatus, tt.removeType)
-			if len(tt.initialStatus.Conditions) != len(tt.expectedStatus.Conditions) {
-				t.Errorf("Expected %d conditions, got %d", len(tt.expectedStatus.Conditions), len(tt.initialStatus.Conditions))
-				return
-			}
-			for i := range tt.expectedStatus.Conditions {
-				if tt.initialStatus.Conditions[i].Type != tt.expectedStatus.Conditions[i].Type ||
-					tt.initialStatus.Conditions[i].Status != tt.expectedStatus.Conditions[i].Status {
-					t.Errorf("Condition mismatch: got %+v, want %+v",
-						tt.initialStatus.Conditions[i], tt.expectedStatus.Conditions[i])
+			RemoveCloneSetCondition(tt.initialStatus, tt.removeType)
+			if tt.initialStatus == nil {
+				if tt.expectedStatus != nil {
+					t.Errorf("Expected nil status, got %+v", tt.expectedStatus)
+				}
+			} else {
+				if len(tt.initialStatus.Conditions) != len(tt.expectedStatus.Conditions) {
+					t.Errorf("Expected %d conditions, got %d", len(tt.expectedStatus.Conditions), len(tt.initialStatus.Conditions))
+					return
+				}
+				for i := range tt.expectedStatus.Conditions {
+					if tt.initialStatus.Conditions[i].Type != tt.expectedStatus.Conditions[i].Type ||
+						tt.initialStatus.Conditions[i].Status != tt.expectedStatus.Conditions[i].Status {
+						t.Errorf("Condition mismatch: got %+v, want %+v",
+							tt.initialStatus.Conditions[i], tt.expectedStatus.Conditions[i])
+					}
 				}
 			}
 		})
