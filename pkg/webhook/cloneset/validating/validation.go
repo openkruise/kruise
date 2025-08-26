@@ -3,6 +3,7 @@ package validating
 import (
 	"context"
 	"fmt"
+	"math"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -94,7 +95,7 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetSpec(spec, oldSpec *appsv1
 
 	if spec.ProgressDeadlineSeconds != nil {
 		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.ProgressDeadlineSeconds), fldPath.Child("progressDeadlineSeconds"))...)
-		if *spec.ProgressDeadlineSeconds <= spec.MinReadySeconds {
+		if *spec.ProgressDeadlineSeconds != math.MaxInt32 && *spec.ProgressDeadlineSeconds <= spec.MinReadySeconds {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("progressDeadlineSeconds"), spec.ProgressDeadlineSeconds, "must be greater than minReadySeconds"))
 		}
 	}
@@ -202,8 +203,9 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetUpdate(cloneSet, oldCloneS
 	clone.Spec.Lifecycle = oldCloneSet.Spec.Lifecycle
 	clone.Spec.RevisionHistoryLimit = oldCloneSet.Spec.RevisionHistoryLimit
 	clone.Spec.VolumeClaimTemplates = oldCloneSet.Spec.VolumeClaimTemplates
+	clone.Spec.ProgressDeadlineSeconds = oldCloneSet.Spec.ProgressDeadlineSeconds
 	if !apiequality.Semantic.DeepEqual(clone.Spec, oldCloneSet.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to cloneset spec for fields other than 'replicas', 'template', 'lifecycle', 'scaleStrategy', 'updateStrategy', 'minReadySeconds', 'volumeClaimTemplates' and 'revisionHistoryLimit' are forbidden"))
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to cloneset spec for fields other than 'replicas', 'template', 'lifecycle', 'scaleStrategy', 'updateStrategy', 'minReadySeconds', 'progressDeadlineSeconds', 'volumeClaimTemplates' and 'revisionHistoryLimit' are forbidden"))
 	}
 
 	coreControl := clonesetcore.New(cloneSet)
