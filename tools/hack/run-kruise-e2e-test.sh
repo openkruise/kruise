@@ -15,7 +15,7 @@
 
 set -e
 # default value
-FOCUS_DEFAULT='\[apps\] StatefulSet'
+FOCUS_DEFAULT='StatefulSet'
 FOCUS=${FOCUS_DEFAULT}
 SKIP=""
 TIMEOUT="60m"

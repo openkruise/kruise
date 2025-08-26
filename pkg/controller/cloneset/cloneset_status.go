@@ -126,6 +126,11 @@ func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus
 }
 
 func (r *realStatusUpdater) calculateProgressingStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) time.Duration {
+	if !clonesetutils.HasProgressDeadline(cs) {
+		clonesetutils.RemoveCloneSetCondition(newStatus, appsv1alpha1.CloneSetConditionTypeProgressing)
+		return time.Duration(-1)
+	}
+
 	oldStatus := cs.Status
 	cond := clonesetutils.GetCloneSetCondition(oldStatus, appsv1alpha1.CloneSetConditionTypeProgressing)
 
@@ -218,7 +223,7 @@ func hasProgressingConditionChanged(oldStatus appsv1alpha1.CloneSetStatus, newSt
 		return false
 	}
 
-	if oldCond == nil {
+	if oldCond == nil || newCond == nil {
 		return true
 	}
 

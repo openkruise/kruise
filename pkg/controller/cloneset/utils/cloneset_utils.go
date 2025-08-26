@@ -19,6 +19,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -254,7 +255,7 @@ func DoItSlowly(count int, initialBatchSize int, fn func() error) (int, error) {
 }
 
 func HasProgressDeadline(cs *appsv1alpha1.CloneSet) bool {
-	return cs.Spec.ProgressDeadlineSeconds != nil
+	return cs.Spec.ProgressDeadlineSeconds != nil && *cs.Spec.ProgressDeadlineSeconds != math.MaxInt32
 }
 
 func GetCloneSetCondition(status appsv1alpha1.CloneSetStatus, condType appsv1alpha1.CloneSetConditionType) *appsv1alpha1.CloneSetCondition {
@@ -294,6 +295,9 @@ func SetCloneSetCondition(status *appsv1alpha1.CloneSetStatus, condition appsv1a
 }
 
 func RemoveCloneSetCondition(status *appsv1alpha1.CloneSetStatus, condType appsv1alpha1.CloneSetConditionType) {
+	if status == nil {
+		return
+	}
 	status.Conditions = filterOutCondition(status.Conditions, condType)
 }
 
