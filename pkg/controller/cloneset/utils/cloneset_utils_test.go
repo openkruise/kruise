@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -28,6 +29,15 @@ func TestHasProgressDeadline(t *testing.T) {
 		{
 			name:     "No ProgressDeadlineSeconds",
 			cs:       &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{}},
+			expected: false,
+		},
+		{
+			name: "ProgressDeadlineSeconds with MaxInt32",
+			cs: &appsv1alpha1.CloneSet{
+				Spec: appsv1alpha1.CloneSetSpec{
+					ProgressDeadlineSeconds: ptr.To(int32(math.MaxInt32)),
+				},
+			},
 			expected: false,
 		},
 	}

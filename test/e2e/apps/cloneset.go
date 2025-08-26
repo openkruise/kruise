@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -55,6 +56,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 	var kc kruiseclientset.Interface
 	var tester *framework.CloneSetTester
 	var randStr string
+	var tenMinutes int32 = 600
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
@@ -70,6 +72,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 			cs := tester.NewCloneSet("hostnetwork-port-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.Template.Spec.HostNetwork = true
 			cs.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 80}}
+			cs.Spec.ProgressDeadlineSeconds = &tenMinutes
 			cs, err := tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "creation should be success")
 
@@ -223,6 +226,116 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 				return condition
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
 		})
+
+		ginkgo.It("creates with maxInt32 progressDeadlineSeconds", func() {
+			cs := tester.NewCloneSet("pds-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs.Spec.ProgressDeadlineSeconds = ptr.To(int32(math.MaxInt32))
+
+			cs, err := tester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "creation should be success")
+
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(cs.Spec.ProgressDeadlineSeconds).NotTo(gomega.BeNil())
+				return *cs.Spec.ProgressDeadlineSeconds
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(math.MaxInt32)))
+
+			ginkgo.By("Check cloneSet progressing condition should be nil")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.BeNil())
+
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) { cs.Spec.ProgressDeadlineSeconds = &tenMinutes })
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return *cs.Spec.ProgressDeadlineSeconds
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(600)))
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
+		})
+
+		ginkgo.It("creates with maxInt32 minReadySeconds and maxInt32 progressDeadlineSeconds", func() {
+			cs := tester.NewCloneSet("pds-"+randStr, 1, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs.Spec.MinReadySeconds, cs.Spec.ProgressDeadlineSeconds = math.MaxInt32, ptr.To(int32(math.MaxInt32))
+
+			cs, err := tester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "creation should be success")
+
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Spec.MinReadySeconds
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(math.MaxInt32)))
+
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(cs.Spec.ProgressDeadlineSeconds).NotTo(gomega.BeNil())
+				return *cs.Spec.ProgressDeadlineSeconds
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(math.MaxInt32)))
+
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Spec.MinReadySeconds
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(math.MaxInt32)))
+
+			ginkgo.By("Check cloneSet progressing condition should be nil")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.BeNil())
+
+			// update minReadySeconds to 10s and pds to nil.
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+				cs.Spec.MinReadySeconds = 10
+				cs.Spec.ProgressDeadlineSeconds = nil
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(1)))
+
+			ginkgo.By("Check cloneSet progressing condition should be nil")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.BeNil())
+		})
 	})
 
 	ginkgo.Context("CloneSet Scaling", func() {
@@ -230,6 +343,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 
 		ginkgo.It("scales in normal cases", func() {
 			cs := tester.NewCloneSet("clone-"+randStr, 3, appsv1alpha1.CloneSetUpdateStrategy{})
+			cs.Spec.ProgressDeadlineSeconds = &tenMinutes
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -263,6 +377,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 			const scaleMaxUnavailable int32 = 1
 			cs := tester.NewCloneSet("clone-"+randStr, replicas, appsv1alpha1.CloneSetUpdateStrategy{})
 			cs.Spec.MinReadySeconds = 10
+			cs.Spec.ProgressDeadlineSeconds = &tenMinutes
 			cs.Spec.Template.Spec.Containers[0].ImagePullPolicy = "IfNotPresent"
 			cs.Spec.ScaleStrategy.MaxUnavailable = &intstr.IntOrString{Type: intstr.Int, IntVal: scaleMaxUnavailable}
 			cs, err = tester.CreateCloneSet(cs)
@@ -315,6 +430,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 				Type:   appsv1alpha1.RecreateCloneSetUpdateStrategyType,
 				Paused: true,
 			})
+			cs.Spec.ProgressDeadlineSeconds = &tenMinutes
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -348,6 +464,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 					LabelsHandler: map[string]string{"lifecycle-hook": "true"},
 				},
 			}
+			cs.Spec.ProgressDeadlineSeconds = &tenMinutes
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -450,6 +567,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 					LabelsHandler: map[string]string{"lifecycle-hook": "true"},
 				},
 			}
+			cs.Spec.ProgressDeadlineSeconds = &tenMinutes
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -567,7 +685,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 			imageConfig.SetRegistry("docker.io/library")
 			imageConfig.SetVersion("alpine")
 			cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
-			cs.Spec.MinReadySeconds = 10
+			cs.Spec.MinReadySeconds, cs.Spec.ProgressDeadlineSeconds = 10, &tenMinutes
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
@@ -665,7 +783,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 				Name:      "TEST_ENV",
 				ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.labels['test-env']"}},
 			})
-			cs.Spec.MinReadySeconds = 10
+			cs.Spec.MinReadySeconds, cs.Spec.ProgressDeadlineSeconds = 10, &tenMinutes
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
@@ -764,7 +882,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 				Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
 			})
 			cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(3)
-			cs.Spec.MinReadySeconds = 10
+			cs.Spec.MinReadySeconds, cs.Spec.ProgressDeadlineSeconds = 10, &tenMinutes
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
@@ -872,7 +990,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 				Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
 			})
 			cs.Spec.Template.Spec.TerminationGracePeriodSeconds = utilpointer.Int64(3)
-			cs.Spec.MinReadySeconds = 10
+			cs.Spec.MinReadySeconds, cs.Spec.ProgressDeadlineSeconds = 10, &tenMinutes
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
@@ -983,7 +1101,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 				},
 				Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{Exec: &v1.ExecAction{Command: []string{"sleep", "10"}}}},
 			})
-			cs.Spec.MinReadySeconds = 10
+			cs.Spec.MinReadySeconds, cs.Spec.ProgressDeadlineSeconds = 10, &tenMinutes
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
@@ -1093,7 +1211,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 			imageConfig.SetRegistry("docker.io/library")
 			imageConfig.SetVersion("alpine")
 			cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
-			cs.Spec.MinReadySeconds = 10
+			cs.Spec.MinReadySeconds, cs.Spec.ProgressDeadlineSeconds = 10, &tenMinutes
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
@@ -1197,7 +1315,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 			imageConfig := imageutils.GetConfig(imageutils.Nginx)
 			imageConfig.SetRegistry("docker.io/library")
 			imageConfig.SetVersion("alpine")
-			cs.Spec.MinReadySeconds = 10
+			cs.Spec.MinReadySeconds, cs.Spec.ProgressDeadlineSeconds = 10, &tenMinutes
 			cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
 			cs.Spec.VolumeClaimTemplates = []v1.PersistentVolumeClaim{
 				{
@@ -1372,8 +1490,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 			}
 			cs.Spec.Lifecycle = &lifecycleHooks
 			cs.Spec.Template.Labels[updateHookLabel] = "true"
-			cs.Spec.MinReadySeconds = 10
-			cs.Spec.ProgressDeadlineSeconds = ptr.To(int32(120))
+			cs.Spec.MinReadySeconds, cs.Spec.ProgressDeadlineSeconds = 10, ptr.To(int32(120))
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
@@ -1546,7 +1663,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 		ginkgo.It("pre-download for new image", func() {
 			partition := intstr.FromInt32(1)
 			cs := tester.NewCloneSet("clone-"+randStr, 5, appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, Partition: &partition})
-			cs.Spec.MinReadySeconds = 10
+			cs.Spec.MinReadySeconds, cs.Spec.ProgressDeadlineSeconds = 10, &tenMinutes
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
@@ -1623,7 +1740,7 @@ func testChangePodQOS(tester *framework.CloneSetTester, randStr string, c client
 		Name:      "TEST_ENV",
 		ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{FieldPath: "metadata.labels['test-env']"}},
 	})
-	cs.Spec.MinReadySeconds = 10
+	cs.Spec.MinReadySeconds, cs.Spec.ProgressDeadlineSeconds = 10, ptr.To(int32(600))
 	cs, err := tester.CreateCloneSet(cs)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
@@ -1795,7 +1912,7 @@ func testUpdateVolumeClaimTemplates(tester *framework.CloneSetTester, randStr st
 	updateStrategy := appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.RecreateCloneSetUpdateStrategyType}
 	var replicas int = 4
 	cs := tester.NewCloneSet("clone-"+randStr, int32(replicas), updateStrategy)
-	cs.Spec.MinReadySeconds = 10
+	cs.Spec.MinReadySeconds, cs.Spec.ProgressDeadlineSeconds = 10, ptr.To(int32(600))
 	imageConfig := imageutils.GetConfig(imageutils.Nginx)
 	imageConfig.SetRegistry("docker.io/library")
 	imageConfig.SetVersion("alpine")

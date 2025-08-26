@@ -1,6 +1,7 @@
 package cloneset
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -44,6 +45,36 @@ func TestSyncProgressingStatus(t *testing.T) {
 		wantCond      *appsv1alpha1.CloneSetCondition
 		expectEnqueue time.Duration
 	}{
+		{
+			name: "legacy cs starts with nil pds, should remove the condition",
+			cs: &appsv1alpha1.CloneSet{
+				Spec: appsv1alpha1.CloneSetSpec{ProgressDeadlineSeconds: nil, Replicas: ptr.To(int32(10))},
+				Status: appsv1alpha1.CloneSetStatus{
+					Conditions:      nil,
+					CurrentRevision: "1",
+					UpdateRevision:  "1",
+				},
+			},
+			timer:         testingclock.NewFakeClock(time.Unix(0, 0)),
+			newStatus:     newStatus(5, 4, 3, 2, 1, 1, 2, "1", "2"),
+			wantCond:      nil,
+			expectEnqueue: time.Duration(-1),
+		},
+		{
+			name: "legacy cs starts with MaxInt32 pds, should remove the condition",
+			cs: &appsv1alpha1.CloneSet{
+				Spec: appsv1alpha1.CloneSetSpec{ProgressDeadlineSeconds: ptr.To(int32(math.MaxInt32)), Replicas: ptr.To(int32(10))},
+				Status: appsv1alpha1.CloneSetStatus{
+					Conditions:      nil,
+					CurrentRevision: "1",
+					UpdateRevision:  "1",
+				},
+			},
+			timer:         testingclock.NewFakeClock(time.Unix(0, 0)),
+			newStatus:     newStatus(5, 4, 3, 2, 1, 1, 2, "1", "2"),
+			wantCond:      nil,
+			expectEnqueue: time.Duration(-1),
+		},
 		{
 			name: "legacy cs starts deploying",
 			cs: &appsv1alpha1.CloneSet{
@@ -1083,6 +1114,12 @@ func TestHasProgressingConditionChanged(t *testing.T) {
 			name:           "Old nil, new exists",
 			oldStatus:      appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{}},
 			newStatus:      appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{*newCond}},
+			expectedResult: true,
+		},
+		{
+			name:           "New nil, old exists",
+			oldStatus:      appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{*newCond}},
+			newStatus:      appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{}},
 			expectedResult: true,
 		},
 		{
