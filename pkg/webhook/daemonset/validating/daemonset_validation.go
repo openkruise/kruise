@@ -124,12 +124,8 @@ func validateRollingUpdateDaemonSet(rollingUpdate *appsv1alpha1.RollingUpdateDae
 		if hasSurge {
 			allErrs = append(allErrs, field.Required(fldPath.Child("maxSurge"), "must be 0 for InPlaceIfPossible type"))
 		}
-	case appsv1alpha1.DeprecatedSurgingRollingUpdateType:
-		if hasUnavailable {
-			allErrs = append(allErrs, field.Required(fldPath.Child("maxUnavailable"), "must be 0 for Surging type"))
-		}
 	default:
-		validValues := []string{string(appsv1alpha1.StandardRollingUpdateType), string(appsv1alpha1.DeprecatedSurgingRollingUpdateType), string(appsv1alpha1.InplaceRollingUpdateType)}
+		validValues := []string{string(appsv1alpha1.StandardRollingUpdateType), string(appsv1alpha1.InplaceRollingUpdateType)}
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rollingUpdate").Child("type"), rollingUpdate.Type, validValues))
 	}
 
