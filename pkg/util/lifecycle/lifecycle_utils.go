@@ -76,6 +76,9 @@ func NewForInformer(informer coreinformers.PodInformer) Interface {
 }
 
 func GetPodLifecycleState(pod *v1.Pod) appspub.LifecycleStateType {
+	if pod == nil || pod.Labels == nil {
+		return ""
+	}
 	return appspub.LifecycleStateType(pod.Labels[appspub.LifecycleStateKey])
 }
 
@@ -95,6 +98,9 @@ func IsLifecycleMarkPodNotReady(lifecycle *appspub.Lifecycle) bool {
 
 func SetPodLifecycle(state appspub.LifecycleStateType) func(*v1.Pod) {
 	return func(pod *v1.Pod) {
+		if pod == nil {
+			return
+		}
 		if pod.Labels == nil {
 			pod.Labels = make(map[string]string)
 		}
