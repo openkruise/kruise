@@ -2,6 +2,7 @@ package validating
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -246,6 +247,33 @@ func TestValidate(t *testing.T) {
 					Partition:      util.GetIntOrStrPointer(intstr.FromInt32(2)),
 					MaxUnavailable: &intOrStr1,
 				},
+			},
+		},
+		{
+			// test for all progressDeadlineSeconds and minReadySeconds changes to MaxInt32
+			spec: &appsv1alpha1.CloneSetSpec{
+				Replicas: &val1,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: validPodTemplate.Template,
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
+					MaxUnavailable: &intOrStr1,
+				},
+				ProgressDeadlineSeconds: ptr.To(int32(math.MaxInt32)),
+				MinReadySeconds:         math.MaxInt32,
+			},
+			oldSpec: &appsv1alpha1.CloneSetSpec{
+				Replicas: &val1,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: validPodTemplate.Template,
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.RecreateCloneSetUpdateStrategyType,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt32(2)),
+					MaxUnavailable: &intOrStr1,
+				},
+				ProgressDeadlineSeconds: ptr.To(int32(10)),
+				MinReadySeconds:         5,
 			},
 		},
 	}
@@ -508,6 +536,74 @@ func TestValidate(t *testing.T) {
 				},
 			},
 			expectField: "spec.updateStrategy.maxUnavailable",
+		},
+		"invalid-negative-progressDeadlineSeconds": {
+			spec: &appsv1alpha1.CloneSetSpec{
+				Replicas: &val1,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: validPodTemplate.Template,
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt32(2)),
+					MaxUnavailable: &intOrStr1,
+				},
+				ProgressDeadlineSeconds: ptr.To(int32(-1)),
+			},
+			expectField: "spec.progressDeadlineSeconds",
+		},
+		"invalid-progressDeadlineSeconds-equals-to-minReadySeconds": {
+			spec: &appsv1alpha1.CloneSetSpec{
+				Replicas: &val1,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: validPodTemplate.Template,
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
+					MaxUnavailable: &intOrStr1,
+				},
+				ProgressDeadlineSeconds: ptr.To(int32(10)),
+				MinReadySeconds:         10,
+			},
+			oldSpec: &appsv1alpha1.CloneSetSpec{
+				Replicas: &val1,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: validPodTemplate.Template,
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.RecreateCloneSetUpdateStrategyType,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt32(2)),
+					MaxUnavailable: &intOrStr1,
+				},
+				ProgressDeadlineSeconds: ptr.To(int32(10)),
+				MinReadySeconds:         5,
+			},
+			expectField: "spec.progressDeadlineSeconds",
+		},
+		"invalid-progressDeadlineSeconds-less-than-minReadySeconds": {
+			spec: &appsv1alpha1.CloneSetSpec{
+				Replicas: &val1,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: validPodTemplate.Template,
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt(2)),
+					MaxUnavailable: &intOrStr1,
+				},
+				ProgressDeadlineSeconds: ptr.To(int32(10)),
+				MinReadySeconds:         15,
+			},
+			oldSpec: &appsv1alpha1.CloneSetSpec{
+				Replicas: &val1,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: validPodTemplate.Template,
+				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.RecreateCloneSetUpdateStrategyType,
+					Partition:      util.GetIntOrStrPointer(intstr.FromInt32(2)),
+					MaxUnavailable: &intOrStr1,
+				},
+				ProgressDeadlineSeconds: ptr.To(int32(10)),
+				MinReadySeconds:         5,
+			},
+			expectField: "spec.progressDeadlineSeconds",
 		},
 	}
 
