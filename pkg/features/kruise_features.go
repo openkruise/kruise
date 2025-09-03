@@ -150,6 +150,11 @@ const (
 	// Under this feature, kruise will think all legal pod-vertical-scaling actions must success.
 	// PodUnavailableBudget will specifically protect the resize actions of individual Pods.
 	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
+
+	// ConfigMapSidecarContainerCLP 使用kruise的Container Launch Priority控制configmapset纳管的pod中容器启动优先级
+	// 如果kubernetes的版本 >= 1.28, 推荐关闭该feature, 使用k8s原生的Sidecar Container
+	// CLP means Container Launch Priority
+	ConfigMapSidecarContainerCLP featuregate.Feature = "ConfigMapSidecarContainerCLP"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -190,6 +195,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	EnablePodProbeMarkerOnServerless:         {Default: false, PreRelease: featuregate.Alpha},
 	EnableSortSidecarContainerByName:         {Default: false, PreRelease: featuregate.Alpha},
 	InPlacePodVerticalScaling:                {Default: false, PreRelease: featuregate.Alpha},
+	ConfigMapSidecarContainerCLP:             {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {
