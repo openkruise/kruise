@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/onsi/gomega"
+	"github.com/openkruise/kruise/apis"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,7 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"github.com/openkruise/kruise/apis"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesettest "github.com/openkruise/kruise/pkg/controller/cloneset/test"
 	"github.com/openkruise/kruise/pkg/util"

@@ -343,9 +343,9 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		UpdateRevision:     updateRevision.Name,
 		CollisionCount:     new(int32),
 		LabelSelector:      selector.String(),
+		Conditions:         instance.Status.Conditions,
 	}
 	*newStatus.CollisionCount = collisionCount
-
 	if !isPreDownloadDisabled {
 		if currentRevision.Name != updateRevision.Name {
 			// get clone pre-download annotation
@@ -377,7 +377,6 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 
 	// scale and update pods
 	syncErr := r.syncCloneSet(instance, &newStatus, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
-
 	// update new status
 	if err = r.statusUpdater.UpdateCloneSetStatus(instance, &newStatus, filteredPods); err != nil {
 		return reconcile.Result{}, err
@@ -422,12 +421,13 @@ func (r *ReconcileCloneSet) syncCloneSet(
 
 	scaling, podsScaleErr = r.syncControl.Scale(currentSet, updateSet, currentRevision.Name, updateRevision.Name, filteredPods, filteredPVCs)
 	if podsScaleErr != nil {
-		newStatus.Conditions = append(newStatus.Conditions, appsv1alpha1.CloneSetCondition{
+		cond := appsv1alpha1.CloneSetCondition{
 			Type:               appsv1alpha1.CloneSetConditionFailedScale,
 			Status:             v1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
 			Message:            podsScaleErr.Error(),
-		})
+		}
+		clonesetutils.SetCloneSetCondition(newStatus, cond)
 		err = podsScaleErr
 	}
 	if scaling {
@@ -436,12 +436,13 @@ func (r *ReconcileCloneSet) syncCloneSet(
 
 	podsUpdateErr = r.syncControl.Update(updateSet, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
 	if podsUpdateErr != nil {
-		newStatus.Conditions = append(newStatus.Conditions, appsv1alpha1.CloneSetCondition{
+		cond := appsv1alpha1.CloneSetCondition{
 			Type:               appsv1alpha1.CloneSetConditionFailedUpdate,
 			Status:             v1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
 			Message:            podsUpdateErr.Error(),
-		})
+		}
+		clonesetutils.SetCloneSetCondition(newStatus, cond)
 		if err == nil {
 			err = podsUpdateErr
 		}

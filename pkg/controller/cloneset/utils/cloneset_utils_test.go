@@ -8,6 +8,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 )
 
@@ -354,13 +355,6 @@ func TestCloneSetDeadlineExceeded(t *testing.T) {
 			wantTimedOut: true,
 		},
 		{
-			name: "Already available",
-			modifyStatus: func(cs *appsv1alpha1.CloneSet) {
-				cs.Status.Conditions[0].Reason = string(appsv1alpha1.CloneSetAvailable)
-			},
-			wantTimedOut: false,
-		},
-		{
 			name: "Recently updated",
 			modifyStatus: func(cs *appsv1alpha1.CloneSet) {
 				cs.Status.Conditions[0].LastUpdateTime = metav1.NewTime(now)
@@ -382,7 +376,7 @@ func TestCloneSetDeadlineExceeded(t *testing.T) {
 			if tt.modifyStatus != nil {
 				tt.modifyStatus(testCS)
 			}
-			if got := CloneSetDeadlineExceeded(testCS, now); got != tt.wantTimedOut {
+			if got := CloneSetDeadlineExceeded(testCS, &testCS.Status, now); got != tt.wantTimedOut {
 				t.Errorf("CloneSetDeadlineExceeded() = %v, want %v", got, tt.wantTimedOut)
 			}
 		})
@@ -394,6 +388,13 @@ func TestCloneSetAvailable(t *testing.T) {
 	cs := &appsv1alpha1.CloneSet{
 		Spec: appsv1alpha1.CloneSetSpec{
 			Replicas: &replicas,
+		},
+		Status: appsv1alpha1.CloneSetStatus{
+			CurrentRevision:          "1",
+			UpdateRevision:           "1",
+			Replicas:                 replicas,
+			UpdatedReplicas:          replicas,
+			UpdatedAvailableReplicas: replicas,
 		},
 	}
 	newStatus := &appsv1alpha1.CloneSetStatus{
@@ -429,13 +430,6 @@ func TestCloneSetAvailable(t *testing.T) {
 			expectedResult: false,
 		},
 		{
-			name: "UpdatedReplicas != Spec.Replicas",
-			modifyStatus: func(status *appsv1alpha1.CloneSetStatus) {
-				status.UpdatedReplicas = 2
-			},
-			expectedResult: false,
-		},
-		{
 			name: "UpdatedAvailableReplicas != Spec.Replicas",
 			modifyStatus: func(status *appsv1alpha1.CloneSetStatus) {
 				status.UpdatedAvailableReplicas = 2
@@ -458,14 +452,15 @@ func TestCloneSetAvailable(t *testing.T) {
 func TestCloneSetPartitionAvailable(t *testing.T) {
 	cs := &appsv1alpha1.CloneSet{
 		Spec: appsv1alpha1.CloneSetSpec{
+			Replicas: pointer.Int32(5),
 			UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
 				Paused: false,
 			},
 		},
 	}
 	newStatus := &appsv1alpha1.CloneSetStatus{
-		ExpectedUpdatedReplicas:  2,
-		UpdatedAvailableReplicas: 2,
+		ExpectedUpdatedReplicas:  5,
+		UpdatedAvailableReplicas: 5,
 	}
 
 	tests := []struct {
@@ -475,23 +470,27 @@ func TestCloneSetPartitionAvailable(t *testing.T) {
 		expectedResult bool
 	}{
 		{
-			name:           "Not paused, expected <= available",
+			name:           "expected <= available, not partition, false",
 			modifySpec:     func(cs *appsv1alpha1.CloneSet) {},
-			modifyStatus:   func(status *appsv1alpha1.CloneSetStatus) {},
-			expectedResult: true,
-		},
-		{
-			name: "Paused",
-			modifySpec: func(cs *appsv1alpha1.CloneSet) {
-				cs.Spec.UpdateStrategy.Paused = true
-			},
 			modifyStatus:   func(status *appsv1alpha1.CloneSetStatus) {},
 			expectedResult: false,
 		},
 		{
-			name:           "Expected > Available",
-			modifySpec:     func(cs *appsv1alpha1.CloneSet) {},
-			modifyStatus:   func(status *appsv1alpha1.CloneSetStatus) { status.ExpectedUpdatedReplicas = 3 },
+			name:       "expected <= available, partition, true",
+			modifySpec: func(cs *appsv1alpha1.CloneSet) {},
+			modifyStatus: func(status *appsv1alpha1.CloneSetStatus) {
+				status.ExpectedUpdatedReplicas = 3
+				status.UpdatedAvailableReplicas = 3
+			},
+			expectedResult: true,
+		},
+		{
+			name:       "expected > available, partition, false",
+			modifySpec: func(cs *appsv1alpha1.CloneSet) {},
+			modifyStatus: func(status *appsv1alpha1.CloneSetStatus) {
+				status.ExpectedUpdatedReplicas = 3
+				status.UpdatedAvailableReplicas = 2
+			},
 			expectedResult: false,
 		},
 	}
@@ -533,26 +532,6 @@ func TestCloneSetPaused(t *testing.T) {
 		expectedResult bool
 	}{
 		{
-			name: "Paused with ProgressPaused reason",
-			modifySpec: func(cs *appsv1alpha1.CloneSet) {
-				cs.Spec.UpdateStrategy.Paused = true
-			},
-			modifyStatus: func(cs *appsv1alpha1.CloneSet) {
-				cs.Status.Conditions[0].Reason = string(appsv1alpha1.CloneSetProgressPaused)
-			},
-			expectedResult: false,
-		},
-		{
-			name: "Paused without ProgressPaused reason",
-			modifySpec: func(cs *appsv1alpha1.CloneSet) {
-				cs.Spec.UpdateStrategy.Paused = true
-			},
-			modifyStatus: func(cs *appsv1alpha1.CloneSet) {
-				cs.Status.Conditions[0].Reason = "OtherReason"
-			},
-			expectedResult: true,
-		},
-		{
 			name: "Not paused",
 			modifySpec: func(cs *appsv1alpha1.CloneSet) {
 				cs.Spec.UpdateStrategy.Paused = false
@@ -579,27 +558,10 @@ func TestCloneSetPaused(t *testing.T) {
 			testCS := cs.DeepCopy()
 			tt.modifySpec(testCS)
 			tt.modifyStatus(testCS)
-			if got := CloneSetPaused(testCS); got != tt.expectedResult {
+			if got := CloneSetBePaused(testCS); got != tt.expectedResult {
 				t.Errorf("CloneSetPaused() = %v, want %v", got, tt.expectedResult)
 			}
 		})
-	}
-}
-
-func TestCloneSetPartitionAvailableWithZeroExpected(t *testing.T) {
-	cs := &appsv1alpha1.CloneSet{
-		Spec: appsv1alpha1.CloneSetSpec{
-			UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-				Paused: false,
-			},
-		},
-	}
-	newStatus := &appsv1alpha1.CloneSetStatus{
-		ExpectedUpdatedReplicas:  0,
-		UpdatedAvailableReplicas: 0,
-	}
-	if got := CloneSetPartitionAvailable(cs, newStatus); !got {
-		t.Errorf("CloneSetPartitionAvailable() = %v, want true when ExpectedUpdatedReplicas is 0", got)
 	}
 }
 

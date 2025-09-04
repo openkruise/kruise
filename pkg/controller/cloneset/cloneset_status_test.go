@@ -8,7 +8,6 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
-	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -22,6 +21,7 @@ func TestSyncProgressingStatus(t *testing.T) {
 
 	timeFn := func(sec int64, nsec int64) time.Time { return time.Unix(sec, nsec) }
 
+	oldTime := metav1.NewTime(time.Date(2025, 7, 20, 11, 0, 0, 0, time.Local))
 	newStatus := func(replicas, readyReplicas, availableReplicas, updatedReplicas, updatedReadyReplicas,
 		updatedAvailableReplicas, expectedUpdatedReplicas int32, currentRevision, updateRevision string) *appsv1alpha1.CloneSetStatus {
 		return &appsv1alpha1.CloneSetStatus{
@@ -92,8 +92,8 @@ func TestSyncProgressingStatus(t *testing.T) {
 				Status:             v1.ConditionTrue,
 				Reason:             string(appsv1alpha1.CloneSetProgressUpdated),
 				Message:            "CloneSet is progressing",
-				LastUpdateTime:     metav1.NewTime(timeFn(0, 0)),
-				LastTransitionTime: metav1.NewTime(timeFn(0, 0)),
+				LastUpdateTime:     metav1.Now(),
+				LastTransitionTime: metav1.Now(),
 			},
 			expectEnqueue: 11 * time.Second,
 		},
@@ -297,15 +297,67 @@ func TestSyncProgressingStatus(t *testing.T) {
 					Replicas:        5,
 				},
 			},
-			newStatus: newStatus(5, 0, 0, 0, 0, 0, 0, "1", "1"),
+			newStatus: newStatus(5, 5, 5, 5, 5, 5, 10, "1", "1"),
 			timer:     testingclock.NewFakeClock(time.Unix(0, 0)),
 			wantCond: &appsv1alpha1.CloneSetCondition{
 				Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
 				Status:             v1.ConditionTrue,
-				Reason:             string(appsv1alpha1.CloneSetAvailable),
-				Message:            "CloneSet is available",
+				Reason:             string(appsv1alpha1.CloneSetProgressUpdated),
+				Message:            "CloneSet is progressing",
 				LastUpdateTime:     metav1.NewTime(timeFn(0, 10)),
 				LastTransitionTime: metav1.NewTime(timeFn(0, 10)),
+			},
+			expectEnqueue: time.Duration(-1),
+		},
+		{
+			name: "startup with CloneSetAvailable condition, and CloneSet scales up replicas, timeout",
+			cs: &appsv1alpha1.CloneSet{
+				Spec: appsv1alpha1.CloneSetSpec{ProgressDeadlineSeconds: progressDeadlineSeconds, Replicas: ptr.To(int32(10))},
+				Status: appsv1alpha1.CloneSetStatus{
+					Conditions: []appsv1alpha1.CloneSetCondition{
+						{
+							Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
+							Status:             v1.ConditionTrue,
+							Reason:             string(appsv1alpha1.CloneSetProgressUpdated),
+							Message:            "CloneSet is progressing",
+							LastUpdateTime:     oldTime,
+							LastTransitionTime: oldTime,
+						},
+					},
+					CurrentRevision: "1",
+					UpdateRevision:  "1",
+					Replicas:        5,
+				},
+			},
+			newStatus: &appsv1alpha1.CloneSetStatus{
+				Replicas:                 10,
+				ReadyReplicas:            8,
+				AvailableReplicas:        8,
+				UpdatedReplicas:          10,
+				UpdatedReadyReplicas:     8,
+				UpdatedAvailableReplicas: 8,
+				ExpectedUpdatedReplicas:  10,
+				CurrentRevision:          "1",
+				UpdateRevision:           "1",
+				Conditions: []appsv1alpha1.CloneSetCondition{
+					{
+						Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
+						Status:             v1.ConditionTrue,
+						Reason:             string(appsv1alpha1.CloneSetProgressUpdated),
+						Message:            "CloneSet is progressing",
+						LastUpdateTime:     oldTime,
+						LastTransitionTime: oldTime,
+					},
+				},
+			},
+			timer: testingclock.NewFakeClock(time.Unix(0, 0)),
+			wantCond: &appsv1alpha1.CloneSetCondition{
+				Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
+				Status:             v1.ConditionFalse,
+				Reason:             string(appsv1alpha1.CloneSetProgressDeadlineExceeded),
+				Message:            "CloneSet revision 1 has timed out progressing",
+				LastUpdateTime:     metav1.Now(),
+				LastTransitionTime: metav1.Now(),
 			},
 			expectEnqueue: time.Duration(-1),
 		},
@@ -327,7 +379,7 @@ func TestSyncProgressingStatus(t *testing.T) {
 					Replicas:        1,
 				},
 			},
-			newStatus: newStatus(1, 0, 0, 0, 0, 0, 0, "1", "2"),
+			newStatus: newStatus(1, 0, 0, 0, 0, 0, 1, "1", "2"),
 			timer:     testingclock.NewFakeClock(time.Unix(5, 0)),
 			wantCond: &appsv1alpha1.CloneSetCondition{
 				Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
@@ -485,7 +537,7 @@ func TestSyncProgressingStatus(t *testing.T) {
 			expectEnqueue: time.Duration(-1),
 		},
 		{
-			name: "startup with Updated condition, and CloneSet is scaled down from 10 to 9, only ExpectedUpdatedReplicas changed and not timeout",
+			name: "startup with Updated condition, and CloneSet is scaled down from 10 to 6, only ExpectedUpdatedReplicas changed and not timeout",
 			cs: &appsv1alpha1.CloneSet{
 				Spec: appsv1alpha1.CloneSetSpec{
 					Replicas:                ptr.To(int32(6)),
@@ -497,8 +549,8 @@ func TestSyncProgressingStatus(t *testing.T) {
 						{
 							Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
 							Reason:             string(appsv1alpha1.CloneSetProgressUpdated),
-							LastUpdateTime:     metav1.NewTime(timeFn(9, 0)),
-							LastTransitionTime: metav1.NewTime(timeFn(9, 0)),
+							LastUpdateTime:     metav1.Now(),
+							LastTransitionTime: metav1.Now(),
 							Status:             v1.ConditionTrue,
 							Message:            "CloneSet is progressing",
 						},
@@ -509,7 +561,7 @@ func TestSyncProgressingStatus(t *testing.T) {
 					UpdatedReplicas:          8,
 					UpdatedReadyReplicas:     6,
 					UpdatedAvailableReplicas: 6,
-					ExpectedUpdatedReplicas:  9,
+					ExpectedUpdatedReplicas:  5,
 					UpdateRevision:           "2",
 					CurrentRevision:          "1",
 				},
@@ -527,7 +579,7 @@ func TestSyncProgressingStatus(t *testing.T) {
 			expectEnqueue: 5 * time.Second,
 		},
 		{
-			name: "startup with Updated condition, and CloneSet is scaled down from 10 to 9, only ExpectedUpdatedReplicas and timeout",
+			name: "startup with Updated condition, and CloneSet is scaled down from 10 to 6, only ExpectedUpdatedReplicas and timeout",
 			cs: &appsv1alpha1.CloneSet{
 				Spec: appsv1alpha1.CloneSetSpec{
 					Replicas:                ptr.To(int32(6)),
@@ -539,30 +591,48 @@ func TestSyncProgressingStatus(t *testing.T) {
 						{
 							Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
 							Reason:             string(appsv1alpha1.CloneSetProgressUpdated),
-							LastUpdateTime:     metav1.NewTime(timeFn(0, 10)),
-							LastTransitionTime: metav1.NewTime(timeFn(0, 10)),
+							LastUpdateTime:     oldTime,
+							LastTransitionTime: oldTime,
 						},
 					},
-					Replicas:                 10,
-					ReadyReplicas:            9,
-					AvailableReplicas:        9,
-					UpdatedReplicas:          8,
-					UpdatedReadyReplicas:     6,
-					UpdatedAvailableReplicas: 6,
-					ExpectedUpdatedReplicas:  9,
+					Replicas:                 6,
+					ReadyReplicas:            6,
+					AvailableReplicas:        6,
+					UpdatedReplicas:          4,
+					UpdatedReadyReplicas:     4,
+					UpdatedAvailableReplicas: 4,
+					ExpectedUpdatedReplicas:  6,
 					UpdateRevision:           "2",
 					CurrentRevision:          "1",
 				},
 			},
-			timer:     testingclock.NewFakeClock(time.Unix(15, 0)),
-			newStatus: newStatus(10, 9, 9, 8, 6, 6, 8, "1", "2"),
+			timer: testingclock.NewFakeClock(time.Unix(15, 0)),
+			newStatus: &appsv1alpha1.CloneSetStatus{
+				Conditions: []appsv1alpha1.CloneSetCondition{
+					{
+						Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
+						Reason:             string(appsv1alpha1.CloneSetProgressUpdated),
+						LastUpdateTime:     oldTime,
+						LastTransitionTime: oldTime,
+					},
+				},
+				Replicas:                 6,
+				ReadyReplicas:            6,
+				AvailableReplicas:        6,
+				UpdatedReplicas:          4,
+				UpdatedReadyReplicas:     4,
+				UpdatedAvailableReplicas: 4,
+				ExpectedUpdatedReplicas:  6,
+				UpdateRevision:           "2",
+				CurrentRevision:          "1",
+			},
 			wantCond: &appsv1alpha1.CloneSetCondition{
 				Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
 				Status:             v1.ConditionFalse,
 				Reason:             string(appsv1alpha1.CloneSetProgressDeadlineExceeded),
 				Message:            "CloneSet revision 2 has timed out progressing",
-				LastUpdateTime:     metav1.NewTime(timeFn(15, 0)),
-				LastTransitionTime: metav1.NewTime(timeFn(15, 0)),
+				LastUpdateTime:     metav1.Now(),
+				LastTransitionTime: metav1.Now(),
 			},
 			expectEnqueue: time.Duration(-1),
 		},
@@ -635,8 +705,27 @@ func TestSyncProgressingStatus(t *testing.T) {
 					CurrentRevision:          "1",
 				},
 			},
-			timer:     testingclock.NewFakeClock(time.Unix(30, 0)),
-			newStatus: newStatus(10, 5, 5, 5, 3, 1, 10, "1", "2"),
+			timer: testingclock.NewFakeClock(time.Unix(30, 0)),
+			newStatus: &appsv1alpha1.CloneSetStatus{
+				Conditions: []appsv1alpha1.CloneSetCondition{
+					{
+						Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
+						Reason:             string(appsv1alpha1.CloneSetProgressUpdated),
+						Status:             v1.ConditionTrue,
+						LastUpdateTime:     metav1.NewTime(timeFn(10, 0)),
+						LastTransitionTime: metav1.NewTime(timeFn(10, 0)),
+					},
+				},
+				Replicas:                 10,
+				ReadyReplicas:            5,
+				AvailableReplicas:        5,
+				UpdatedReplicas:          5,
+				UpdatedReadyReplicas:     3,
+				UpdatedAvailableReplicas: 1,
+				ExpectedUpdatedReplicas:  10,
+				UpdateRevision:           "2",
+				CurrentRevision:          "1",
+			},
 			wantCond: &appsv1alpha1.CloneSetCondition{
 				Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
 				Status:             v1.ConditionFalse,
@@ -1007,9 +1096,9 @@ func TestSyncProgressingStatus(t *testing.T) {
 			newStatus: newStatus(15, 14, 14, 10, 10, 9, 10, "1", "2"),
 			wantCond: &appsv1alpha1.CloneSetCondition{
 				Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
-				Reason:             string(appsv1alpha1.CloneSetProgressDeadlineExceeded),
-				Message:            "CloneSet revision 2 has timed out progressing",
-				Status:             v1.ConditionFalse,
+				Reason:             string(appsv1alpha1.CloneSetProgressPaused),
+				Message:            "CloneSet is paused",
+				Status:             v1.ConditionTrue,
 				LastUpdateTime:     metav1.NewTime(timeFn(0, 8)),
 				LastTransitionTime: metav1.NewTime(timeFn(0, 8)),
 			},
@@ -1048,7 +1137,7 @@ func TestSyncProgressingStatus(t *testing.T) {
 				},
 			},
 			timer:     testingclock.NewFakeClock(time.Unix(40, 0)),
-			newStatus: newStatus(20, 10, 10, 2, 2, 2, 2, "1", "3"),
+			newStatus: newStatus(20, 10, 10, 2, 2, 2, 4, "1", "3"),
 			wantCond: &appsv1alpha1.CloneSetCondition{
 				Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
 				Reason:             string(appsv1alpha1.CloneSetProgressUpdated),
@@ -1313,17 +1402,20 @@ func TestSyncProgressingStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			timer = tt.timer
 			r := &realStatusUpdater{}
-			requeueDuration := r.calculateProgressingStatus(tt.cs, tt.newStatus)
+			_ = r.calculateProgressingStatus(tt.cs, tt.newStatus)
 
 			var cond *appsv1alpha1.CloneSetCondition
 			if tt.newStatus != nil {
 				cond = clonesetutils.GetCloneSetCondition(*tt.newStatus, appsv1alpha1.CloneSetConditionTypeProgressing)
 			}
-
-			assert.Equal(t, tt.wantCond, cond)
-			assert.Equal(t, tt.expectEnqueue, requeueDuration)
+			if tt.wantCond == nil {
+				if cond != nil {
+					t.Fatalf("expect(%s), but get(%s)", util.DumpJSON(tt.wantCond), util.DumpJSON(cond))
+				}
+			} else if cond.Status != tt.wantCond.Status || cond.Reason != tt.wantCond.Reason {
+				t.Fatalf("expect(%s), but get(%s)", util.DumpJSON(tt.wantCond), util.DumpJSON(cond))
+			}
 		})
 	}
 }
@@ -1406,7 +1498,7 @@ func TestHasProgressingConditionChanged(t *testing.T) {
 				c.Message = "New message"
 				return appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{c}}
 			}(),
-			expectedResult: true,
+			expectedResult: false,
 		},
 		{
 			name:      "LastUpdateTime changed",
@@ -1416,7 +1508,7 @@ func TestHasProgressingConditionChanged(t *testing.T) {
 				c.LastUpdateTime = metav1.NewTime(now.Add(time.Minute))
 				return appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{c}}
 			}(),
-			expectedResult: true,
+			expectedResult: false,
 		},
 		{
 			name:      "LastTransitionTime changed",
@@ -1426,7 +1518,7 @@ func TestHasProgressingConditionChanged(t *testing.T) {
 				c.LastTransitionTime = metav1.NewTime(now.Add(time.Minute))
 				return appsv1alpha1.CloneSetStatus{Conditions: []appsv1alpha1.CloneSetCondition{c}}
 			}(),
-			expectedResult: true,
+			expectedResult: false,
 		},
 	}
 

@@ -31,6 +31,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/utils/integer"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -322,13 +323,17 @@ func CloneSetAvailable(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneS
 }
 
 func CloneSetPartitionAvailable(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) bool {
-	return !cs.Spec.UpdateStrategy.Paused &&
-		newStatus.ExpectedUpdatedReplicas <= newStatus.UpdatedAvailableReplicas
+	// newStatus.ExpectedUpdatedReplicas < cs.Spec.Replicas indicates the user has configured the partition field.
+	// and, if newStatus.ExpectedUpdatedReplicas <= newStatus.UpdatedAvailableReplicas, it indicates the PartitionAvailable phase has been reached.
+	replicas := cs.Spec.Replicas
+	if replicas == nil {
+		replicas = pointer.Int32(1)
+	}
+	return newStatus.ExpectedUpdatedReplicas < *replicas && newStatus.ExpectedUpdatedReplicas <= newStatus.UpdatedAvailableReplicas
 }
 
-func CloneSetPaused(cs *appsv1alpha1.CloneSet) bool {
-	cond := GetCloneSetCondition(cs.Status, appsv1alpha1.CloneSetConditionTypeProgressing)
-	return cs.Spec.UpdateStrategy.Paused && (cond == nil || cond.Reason != string(appsv1alpha1.CloneSetProgressPaused))
+func CloneSetBePaused(cs *appsv1alpha1.CloneSet) bool {
+	return cs.Spec.UpdateStrategy.Paused
 }
 
 func CloneSetProgressing(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) bool {
@@ -341,36 +346,22 @@ func CloneSetProgressing(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.Clon
 		return true
 	}
 
-	if IsCloneSetResumed(cs) {
+	if !cs.Spec.UpdateStrategy.Paused && condition.Reason == string(appsv1alpha1.CloneSetProgressPaused) {
 		return true
 	}
-	// a change in ExpectedUpdatedReplicas alone does not trigger a Progress update.
-	return newStatus.UpdatedReplicas != cs.Status.UpdatedReplicas || // scaling or partition changed.
+
+	return newStatus.UpdateRevision != cs.Status.UpdateRevision ||
+		newStatus.UpdatedReplicas != cs.Status.UpdatedReplicas || // scaling or partition changed.
 		newStatus.ReadyReplicas > cs.Status.ReadyReplicas ||
 		newStatus.AvailableReplicas > cs.Status.AvailableReplicas
 }
 
-func IsCloneSetResumed(cs *appsv1alpha1.CloneSet) bool {
-	cond := GetCloneSetCondition(cs.Status, appsv1alpha1.CloneSetConditionTypeProgressing)
-	return !cs.Spec.UpdateStrategy.Paused && (cond != nil && cond.Reason == string(appsv1alpha1.CloneSetProgressPaused))
-}
-
-func CloneSetDeadlineExceeded(cs *appsv1alpha1.CloneSet, now time.Time) bool {
-	condition := GetCloneSetCondition(cs.Status, appsv1alpha1.CloneSetConditionTypeProgressing)
+func CloneSetDeadlineExceeded(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, now time.Time) bool {
+	condition := GetCloneSetCondition(*newStatus, appsv1alpha1.CloneSetConditionTypeProgressing)
 	if condition == nil {
 		return false
-	}
-
-	if condition.Reason == string(appsv1alpha1.CloneSetAvailable) {
-		return false
-	}
-	if condition.Reason == string(appsv1alpha1.CloneSetProgressDeadlineExceeded) {
+	} else if condition.Reason == string(appsv1alpha1.CloneSetProgressDeadlineExceeded) {
 		return true
 	}
-
-	from := condition.LastUpdateTime
-	delta := time.Duration(*cs.Spec.ProgressDeadlineSeconds) * time.Second
-	timedOut := from.Add(delta).Before(now)
-
-	return timedOut
+	return condition.LastUpdateTime.Add(time.Duration(*cs.Spec.ProgressDeadlineSeconds) * time.Second).Before(now)
 }

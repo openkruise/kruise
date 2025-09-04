@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
@@ -225,6 +226,7 @@ func (t *CloneSetTester) GetCloneSetCondition(name string, conditionType appsv1a
 	if err != nil {
 		return nil, err
 	}
+	klog.Infof("cloneset(%s/%s) status(%s)", cs.Namespace, cs.Name, util.DumpJSON(cs.Status))
 	return clonesetutils.GetCloneSetCondition(cs.Status, conditionType), nil
 }
 
