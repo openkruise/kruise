@@ -395,6 +395,13 @@ func TestCloneSetAvailable(t *testing.T) {
 		Spec: appsv1alpha1.CloneSetSpec{
 			Replicas: &replicas,
 		},
+		Status: appsv1alpha1.CloneSetStatus{
+			CurrentRevision:          "1",
+			UpdateRevision:           "1",
+			Replicas:                 replicas,
+			UpdatedReplicas:          replicas,
+			UpdatedAvailableReplicas: replicas,
+		},
 	}
 	newStatus := &appsv1alpha1.CloneSetStatus{
 		CurrentRevision:          "1",
@@ -579,7 +586,7 @@ func TestCloneSetPaused(t *testing.T) {
 			testCS := cs.DeepCopy()
 			tt.modifySpec(testCS)
 			tt.modifyStatus(testCS)
-			if got := CloneSetPaused(testCS); got != tt.expectedResult {
+			if got := CloneSetShouldBePaused(testCS); got != tt.expectedResult {
 				t.Errorf("CloneSetPaused() = %v, want %v", got, tt.expectedResult)
 			}
 		})
@@ -692,6 +699,133 @@ func TestRemoveCloneSetCondition(t *testing.T) {
 							tt.initialStatus.Conditions[i], tt.expectedStatus.Conditions[i])
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestCloneSetAlreadyTimeoutOrAvailable(t *testing.T) {
+	now := time.Now()
+	cs := &appsv1alpha1.CloneSet{
+		Spec: appsv1alpha1.CloneSetSpec{
+			Replicas: ptr.To(int32(3)),
+		},
+		Status: appsv1alpha1.CloneSetStatus{
+			UpdateRevision: "revision-1",
+		},
+	}
+
+	newStatus := &appsv1alpha1.CloneSetStatus{
+		UpdateRevision: "revision-1",
+	}
+
+	tests := []struct {
+		name           string
+		modifyCS       func(*appsv1alpha1.CloneSet)
+		modifyStatus   func(*appsv1alpha1.CloneSetStatus)
+		expectedResult bool
+	}{
+		{
+			name: "Condition is nil",
+			modifyCS: func(cs *appsv1alpha1.CloneSet) {
+				cs.Status.Conditions = nil
+			},
+			modifyStatus:   func(status *appsv1alpha1.CloneSetStatus) {},
+			expectedResult: false,
+		},
+		{
+			name: "Update revision changed",
+			modifyCS: func(cs *appsv1alpha1.CloneSet) {
+				cs.Status.Conditions = []appsv1alpha1.CloneSetCondition{
+					{
+						Type:   appsv1alpha1.CloneSetConditionTypeProgressing,
+						Status: v1.ConditionTrue,
+						Reason: string(appsv1alpha1.CloneSetProgressUpdated),
+					},
+				}
+			},
+			modifyStatus: func(status *appsv1alpha1.CloneSetStatus) {
+				status.UpdateRevision = "revision-2"
+			},
+			expectedResult: false,
+		},
+		{
+			name: "Timeout CloneSet",
+			modifyCS: func(cs *appsv1alpha1.CloneSet) {
+				cs.Status.Conditions = []appsv1alpha1.CloneSetCondition{
+					{
+						Type:           appsv1alpha1.CloneSetConditionTypeProgressing,
+						Status:         v1.ConditionFalse,
+						Reason:         string(appsv1alpha1.CloneSetProgressDeadlineExceeded),
+						LastUpdateTime: metav1.NewTime(now),
+					},
+				}
+			},
+			modifyStatus:   func(status *appsv1alpha1.CloneSetStatus) {},
+			expectedResult: true,
+		},
+		{
+			name: "Available CloneSet",
+			modifyCS: func(cs *appsv1alpha1.CloneSet) {
+				cs.Status.Conditions = []appsv1alpha1.CloneSetCondition{
+					{
+						Type:           appsv1alpha1.CloneSetConditionTypeProgressing,
+						Status:         v1.ConditionTrue,
+						Reason:         string(appsv1alpha1.CloneSetAvailable),
+						LastUpdateTime: metav1.NewTime(now),
+					},
+				}
+			},
+			modifyStatus: func(status *appsv1alpha1.CloneSetStatus) {
+				status.CurrentRevision = "revision-1"
+				status.UpdateRevision = "revision-1"
+			},
+			expectedResult: true,
+		},
+		{
+			name: "Available CloneSet with different current revision",
+			modifyCS: func(cs *appsv1alpha1.CloneSet) {
+				cs.Status.Conditions = []appsv1alpha1.CloneSetCondition{
+					{
+						Type:           appsv1alpha1.CloneSetConditionTypeProgressing,
+						Status:         v1.ConditionTrue,
+						Reason:         string(appsv1alpha1.CloneSetAvailable),
+						LastUpdateTime: metav1.NewTime(now),
+					},
+				}
+			},
+			modifyStatus: func(status *appsv1alpha1.CloneSetStatus) {
+				status.CurrentRevision = "revision-2"
+				status.UpdateRevision = "revision-1"
+			},
+			expectedResult: false,
+		},
+		{
+			name: "Other condition reason",
+			modifyCS: func(cs *appsv1alpha1.CloneSet) {
+				cs.Status.Conditions = []appsv1alpha1.CloneSetCondition{
+					{
+						Type:           appsv1alpha1.CloneSetConditionTypeProgressing,
+						Status:         v1.ConditionTrue,
+						Reason:         string(appsv1alpha1.CloneSetProgressUpdated),
+						LastUpdateTime: metav1.NewTime(now),
+					},
+				}
+			},
+			modifyStatus:   func(status *appsv1alpha1.CloneSetStatus) {},
+			expectedResult: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCS := cs.DeepCopy()
+			tt.modifyCS(testCS)
+			testStatus := newStatus.DeepCopy()
+			tt.modifyStatus(testStatus)
+
+			if got := CloneSetAlreadyTimeoutOrAvailable(testCS, testStatus); got != tt.expectedResult {
+				t.Errorf("CloneSetAlreadyTimeoutOrAvailable() = %v, want %v", got, tt.expectedResult)
 			}
 		})
 	}

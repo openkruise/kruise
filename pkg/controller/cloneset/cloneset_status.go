@@ -134,85 +134,76 @@ func (r *realStatusUpdater) calculateProgressingStatus(cs *appsv1alpha1.CloneSet
 	oldStatus := cs.Status
 	cond := clonesetutils.GetCloneSetCondition(oldStatus, appsv1alpha1.CloneSetConditionTypeProgressing)
 
-	// revision changed, transit to CloneSetUpdated status.
-	if newStatus.UpdateRevision != oldStatus.UpdateRevision {
-		klog.V(5).InfoS("CloneSet is updated due to revision changed",
-			"cloneSet", klog.KObj(cs), "newStatus", newStatus, "oldStatus", oldStatus)
-
-		msg := "CloneSet is progressing"
-		condition := clonesetutils.NewCloneSetCondition(appsv1alpha1.CloneSetConditionTypeProgressing,
-			v1.ConditionTrue, appsv1alpha1.CloneSetProgressUpdated, msg, timer.Now())
-
-		clonesetutils.SetCloneSetCondition(newStatus, *condition)
-		return getRequeueSecondsFromCondition(condition, *cs.Spec.ProgressDeadlineSeconds, timer.Now())
-	}
-
 	klog.V(5).InfoS("Calculate progressing status",
 		"cloneSet", klog.KObj(cs), "newStatus", newStatus, "oldStatus", oldStatus, "cond", cond)
 
-	isTimeoutCloneSet := cond != nil && cond.Reason == string(appsv1alpha1.CloneSetProgressDeadlineExceeded)
-	isAvailableCloneSet := newStatus.CurrentRevision == newStatus.UpdateRevision && cond != nil && cond.Reason == string(appsv1alpha1.CloneSetAvailable)
+	switch {
+	case clonesetutils.CloneSetAlreadyTimeoutOrAvailable(cs, newStatus):
+		klog.V(5).InfoS("CloneSet is already timeout or available",
+			"cloneSet", klog.KObj(cs), "newStatus", newStatus, "oldStatus", oldStatus, "cond", cond)
+		newStatus.Conditions = oldStatus.Conditions
+		return time.Duration(-1)
 
-	if !isTimeoutCloneSet && !isAvailableCloneSet {
-		switch {
-		case clonesetutils.CloneSetPaused(cs):
-			klog.V(5).InfoS("CloneSet is paused",
-				"cloneSet", klog.KObj(cs), "newStatus", newStatus, "csStatus", cs.Status, "cond", cond)
-			condition := clonesetutils.NewCloneSetCondition(appsv1alpha1.CloneSetConditionTypeProgressing,
-				v1.ConditionTrue, appsv1alpha1.CloneSetProgressPaused, "CloneSet is paused", timer.Now())
-			clonesetutils.SetCloneSetCondition(newStatus, *condition)
-			return time.Duration(-1)
+	case clonesetutils.CloneSetAvailable(cs, newStatus):
+		klog.V(5).InfoS("CloneSet is available",
+			"cloneSet", klog.KObj(cs), "newStatus", newStatus, "oldStatus", oldStatus, "cond", cond)
 
-		case clonesetutils.CloneSetPartitionAvailable(cs, newStatus):
-			klog.V(5).InfoS("CloneSet is partition available",
-				"cloneSet", klog.KObj(cs), "newStatus", newStatus, "oldStatus", oldStatus, "cond", cond)
+		condition := clonesetutils.NewCloneSetCondition(appsv1alpha1.CloneSetConditionTypeProgressing,
+			v1.ConditionTrue, appsv1alpha1.CloneSetAvailable, "CloneSet is available", timer.Now())
+		clonesetutils.SetCloneSetCondition(newStatus, *condition)
+		return time.Duration(-1)
 
-			msg := "CloneSet has been paused due to partition ready"
-			reason := appsv1alpha1.CloneSetProgressPartitionAvailable
+	case clonesetutils.CloneSetPartitionAvailable(cs, newStatus):
+		klog.V(5).InfoS("CloneSet is partition available",
+			"cloneSet", klog.KObj(cs), "newStatus", newStatus, "oldStatus", oldStatus, "cond", cond)
 
-			if clonesetutils.CloneSetAvailable(cs, newStatus) {
-				reason, msg = appsv1alpha1.CloneSetAvailable, "CloneSet is available"
+		condition := clonesetutils.NewCloneSetCondition(appsv1alpha1.CloneSetConditionTypeProgressing,
+			v1.ConditionTrue, appsv1alpha1.CloneSetProgressPartitionAvailable, "CloneSet has been paused due to partition ready", timer.Now())
+		clonesetutils.SetCloneSetCondition(newStatus, *condition)
+		return time.Duration(-1)
+
+	case clonesetutils.CloneSetProgressing(cs, newStatus):
+		condition := clonesetutils.NewCloneSetCondition(appsv1alpha1.CloneSetConditionTypeProgressing,
+			v1.ConditionTrue, appsv1alpha1.CloneSetProgressUpdated, "CloneSet is progressing", timer.Now())
+
+		if cond != nil {
+			if cond.Reason == string(appsv1alpha1.CloneSetProgressPaused) {
+				condition.Message = fmt.Sprintf("CloneSet is resumed")
+			} else if cond.Status == v1.ConditionTrue {
+				condition.LastTransitionTime = cond.LastTransitionTime
 			}
 
-			condition := clonesetutils.NewCloneSetCondition(appsv1alpha1.CloneSetConditionTypeProgressing,
-				v1.ConditionTrue, reason, msg, timer.Now())
-			clonesetutils.SetCloneSetCondition(newStatus, *condition)
-			return time.Duration(-1)
-
-		case clonesetutils.CloneSetProgressing(cs, newStatus):
-			condition := clonesetutils.NewCloneSetCondition(appsv1alpha1.CloneSetConditionTypeProgressing,
-				v1.ConditionTrue, appsv1alpha1.CloneSetProgressUpdated, "CloneSet is progressing", timer.Now())
-
-			if cond != nil {
-				if cond.Reason == string(appsv1alpha1.CloneSetProgressPaused) {
-					condition.Message = fmt.Sprintf("CloneSet is resumed")
-				} else if cond.Status == v1.ConditionTrue {
-					condition.LastTransitionTime = cond.LastTransitionTime
-				}
-
-				clonesetutils.RemoveCloneSetCondition(newStatus, appsv1alpha1.CloneSetConditionTypeProgressing)
-			}
-			clonesetutils.SetCloneSetCondition(newStatus, *condition)
-			return getRequeueSecondsFromCondition(condition, *cs.Spec.ProgressDeadlineSeconds, timer.Now())
-
-		case clonesetutils.CloneSetDeadlineExceeded(cs, timer.Now()):
-			msg := fmt.Sprintf("CloneSet revision %s has timed out progressing", newStatus.UpdateRevision)
-			condition := clonesetutils.NewCloneSetCondition(appsv1alpha1.CloneSetConditionTypeProgressing,
-				v1.ConditionFalse, appsv1alpha1.CloneSetProgressDeadlineExceeded, msg, timer.Now())
-			clonesetutils.SetCloneSetCondition(newStatus, *condition)
-			return time.Duration(-1)
+			clonesetutils.RemoveCloneSetCondition(newStatus, appsv1alpha1.CloneSetConditionTypeProgressing)
 		}
+		clonesetutils.SetCloneSetCondition(newStatus, *condition)
+		return getRequeueSecondsFromCondition(condition, *cs.Spec.ProgressDeadlineSeconds, timer.Now())
+
+	case clonesetutils.CloneSetShouldBePaused(cs):
+		klog.V(5).InfoS("CloneSet is paused",
+			"cloneSet", klog.KObj(cs), "newStatus", newStatus, "csStatus", cs.Status, "cond", cond)
+		condition := clonesetutils.NewCloneSetCondition(appsv1alpha1.CloneSetConditionTypeProgressing,
+			v1.ConditionTrue, appsv1alpha1.CloneSetProgressPaused, "CloneSet is paused", timer.Now())
+		clonesetutils.SetCloneSetCondition(newStatus, *condition)
+		return time.Duration(-1)
+
+	case clonesetutils.CloneSetDeadlineExceeded(cs, timer.Now()):
+		msg := fmt.Sprintf("CloneSet revision %s has timed out progressing", newStatus.UpdateRevision)
+		condition := clonesetutils.NewCloneSetCondition(appsv1alpha1.CloneSetConditionTypeProgressing,
+			v1.ConditionFalse, appsv1alpha1.CloneSetProgressDeadlineExceeded, msg, timer.Now())
+		clonesetutils.SetCloneSetCondition(newStatus, *condition)
+		return time.Duration(-1)
+
+	default:
+		klog.V(5).InfoS("CloneSet stays at previous condition",
+			"cloneSet", klog.KObj(cs), "newStatus", newStatus, "oldStatus", oldStatus, "cond", cond)
+		newStatus.Conditions = oldStatus.Conditions
+
+		if cond != nil && cond.Reason == string(appsv1alpha1.CloneSetProgressUpdated) {
+			return getRequeueSecondsFromCondition(cond, *cs.Spec.ProgressDeadlineSeconds, timer.Now())
+		}
+
+		return time.Duration(-1)
 	}
-
-	klog.V(5).InfoS("CloneSet stays at previous condition",
-		"cloneSet", klog.KObj(cs), "newStatus", newStatus, "oldStatus", oldStatus, "cond", cond)
-	newStatus.Conditions = oldStatus.Conditions
-
-	if cond != nil && cond.Reason == string(appsv1alpha1.CloneSetProgressUpdated) {
-		return getRequeueSecondsFromCondition(cond, *cs.Spec.ProgressDeadlineSeconds, timer.Now())
-	}
-
-	return time.Duration(-1)
 }
 
 func hasProgressingConditionChanged(oldStatus appsv1alpha1.CloneSetStatus, newStatus appsv1alpha1.CloneSetStatus) bool {

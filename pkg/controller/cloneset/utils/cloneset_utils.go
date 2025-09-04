@@ -315,7 +315,8 @@ func filterOutCondition(conditions []appsv1alpha1.CloneSetCondition, condType ap
 }
 
 func CloneSetAvailable(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) bool {
-	return newStatus.CurrentRevision == newStatus.UpdateRevision &&
+	return newStatus.UpdateRevision == cs.Status.UpdateRevision &&
+		newStatus.CurrentRevision == newStatus.UpdateRevision &&
 		newStatus.Replicas == *(cs.Spec.Replicas) &&
 		newStatus.UpdatedReplicas == *(cs.Spec.Replicas) &&
 		newStatus.UpdatedAvailableReplicas == *(cs.Spec.Replicas)
@@ -323,10 +324,11 @@ func CloneSetAvailable(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneS
 
 func CloneSetPartitionAvailable(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) bool {
 	return !cs.Spec.UpdateStrategy.Paused &&
+		newStatus.UpdateRevision == cs.Status.UpdateRevision && // UpdateRevision not changed.
 		newStatus.ExpectedUpdatedReplicas <= newStatus.UpdatedAvailableReplicas
 }
 
-func CloneSetPaused(cs *appsv1alpha1.CloneSet) bool {
+func CloneSetShouldBePaused(cs *appsv1alpha1.CloneSet) bool {
 	cond := GetCloneSetCondition(cs.Status, appsv1alpha1.CloneSetConditionTypeProgressing)
 	return cs.Spec.UpdateStrategy.Paused && (cond == nil || cond.Reason != string(appsv1alpha1.CloneSetProgressPaused))
 }
@@ -341,18 +343,14 @@ func CloneSetProgressing(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.Clon
 		return true
 	}
 
-	if IsCloneSetResumed(cs) {
+	if !cs.Spec.UpdateStrategy.Paused && condition.Reason == string(appsv1alpha1.CloneSetProgressPaused) {
 		return true
 	}
-	// a change in ExpectedUpdatedReplicas alone does not trigger a Progress update.
-	return newStatus.UpdatedReplicas != cs.Status.UpdatedReplicas || // scaling or partition changed.
+
+	return newStatus.UpdateRevision != cs.Status.UpdateRevision ||
+		newStatus.UpdatedReplicas != cs.Status.UpdatedReplicas || // scaling or partition changed.
 		newStatus.ReadyReplicas > cs.Status.ReadyReplicas ||
 		newStatus.AvailableReplicas > cs.Status.AvailableReplicas
-}
-
-func IsCloneSetResumed(cs *appsv1alpha1.CloneSet) bool {
-	cond := GetCloneSetCondition(cs.Status, appsv1alpha1.CloneSetConditionTypeProgressing)
-	return !cs.Spec.UpdateStrategy.Paused && (cond != nil && cond.Reason == string(appsv1alpha1.CloneSetProgressPaused))
 }
 
 func CloneSetDeadlineExceeded(cs *appsv1alpha1.CloneSet, now time.Time) bool {
@@ -368,9 +366,18 @@ func CloneSetDeadlineExceeded(cs *appsv1alpha1.CloneSet, now time.Time) bool {
 		return true
 	}
 
-	from := condition.LastUpdateTime
-	delta := time.Duration(*cs.Spec.ProgressDeadlineSeconds) * time.Second
-	timedOut := from.Add(delta).Before(now)
+	return condition.LastUpdateTime.Add(time.Duration(*cs.Spec.ProgressDeadlineSeconds) * time.Second).Before(now)
+}
 
-	return timedOut
+func CloneSetAlreadyTimeoutOrAvailable(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) bool {
+	cond := GetCloneSetCondition(cs.Status, appsv1alpha1.CloneSetConditionTypeProgressing)
+
+	if cond == nil || newStatus.UpdateRevision != cs.Status.UpdateRevision {
+		return false
+	}
+
+	isTimeoutCloneSet := cond.Reason == string(appsv1alpha1.CloneSetProgressDeadlineExceeded)
+	isAvailableCloneSet := newStatus.CurrentRevision == newStatus.UpdateRevision && cond.Reason == string(appsv1alpha1.CloneSetAvailable)
+
+	return isTimeoutCloneSet || isAvailableCloneSet
 }

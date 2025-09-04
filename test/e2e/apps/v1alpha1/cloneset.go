@@ -431,7 +431,7 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 				Type:   appsv1alpha1.RecreateCloneSetUpdateStrategyType,
 				Paused: true,
 			})
-			cs.Spec.ProgressDeadlineSeconds = &tenMinutes
+			cs.Spec.MinReadySeconds, cs.Spec.ProgressDeadlineSeconds = 60, &tenMinutes
 			cs, err = tester.CreateCloneSet(cs)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -442,19 +442,19 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 				return cs.Status.Replicas
 			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(3)))
 
-			ginkgo.By("Wait for all pods ready")
-			gomega.Eventually(func() int32 {
-				cs, err = tester.GetCloneSet(cs.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return cs.Status.ReadyReplicas
-			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
-
 			ginkgo.By("Check cloneSet progressing condition with paused reason")
 			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
 				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return condition
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetPausedCondition()))
+
+			ginkgo.By("Wait for all pods ready")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
 		})
 
 		ginkgo.It("specific delete a Pod, when scalingExcludePreparingDelete is disabled", func() {
