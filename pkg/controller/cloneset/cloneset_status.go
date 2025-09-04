@@ -155,6 +155,15 @@ func (r *realStatusUpdater) calculateProgressingStatus(cs *appsv1alpha1.CloneSet
 
 	if !isTimeoutCloneSet && !isAvailableCloneSet {
 		switch {
+		case clonesetutils.CloneSetAvailable(cs, newStatus):
+			klog.V(5).InfoS("CloneSet is available",
+				"cloneSet", klog.KObj(cs), "newStatus", newStatus, "oldStatus", oldStatus, "cond", cond)
+
+			condition := clonesetutils.NewCloneSetCondition(appsv1alpha1.CloneSetConditionTypeProgressing,
+				v1.ConditionTrue, appsv1alpha1.CloneSetAvailable, "CloneSet is available", timer.Now())
+			clonesetutils.SetCloneSetCondition(newStatus, *condition)
+			return time.Duration(-1)
+
 		case clonesetutils.CloneSetPaused(cs):
 			klog.V(5).InfoS("CloneSet is paused",
 				"cloneSet", klog.KObj(cs), "newStatus", newStatus, "csStatus", cs.Status, "cond", cond)
@@ -167,15 +176,8 @@ func (r *realStatusUpdater) calculateProgressingStatus(cs *appsv1alpha1.CloneSet
 			klog.V(5).InfoS("CloneSet is partition available",
 				"cloneSet", klog.KObj(cs), "newStatus", newStatus, "oldStatus", oldStatus, "cond", cond)
 
-			msg := "CloneSet has been paused due to partition ready"
-			reason := appsv1alpha1.CloneSetProgressPartitionAvailable
-
-			if clonesetutils.CloneSetAvailable(cs, newStatus) {
-				reason, msg = appsv1alpha1.CloneSetAvailable, "CloneSet is available"
-			}
-
 			condition := clonesetutils.NewCloneSetCondition(appsv1alpha1.CloneSetConditionTypeProgressing,
-				v1.ConditionTrue, reason, msg, timer.Now())
+				v1.ConditionTrue, appsv1alpha1.CloneSetProgressPartitionAvailable, "CloneSet has been paused due to partition ready", timer.Now())
 			clonesetutils.SetCloneSetCondition(newStatus, *condition)
 			return time.Duration(-1)
 

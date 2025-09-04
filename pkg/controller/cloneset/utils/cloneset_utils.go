@@ -368,9 +368,5 @@ func CloneSetDeadlineExceeded(cs *appsv1alpha1.CloneSet, now time.Time) bool {
 		return true
 	}
 
-	from := condition.LastUpdateTime
-	delta := time.Duration(*cs.Spec.ProgressDeadlineSeconds) * time.Second
-	timedOut := from.Add(delta).Before(now)
-
-	return timedOut
+	return condition.LastUpdateTime.Add(time.Duration(*cs.Spec.ProgressDeadlineSeconds) * time.Second).Before(now)
 }
