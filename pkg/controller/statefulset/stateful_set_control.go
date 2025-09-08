@@ -854,7 +854,9 @@ func (ssc *defaultStatefulSetControl) inPlaceUpdatePod(
 		}
 	}
 
-	opts := &inplaceupdate.UpdateOptions{}
+	opts := &inplaceupdate.UpdateOptions{
+		RecreatePodWhenChangedVolumeClaimTemplate: utilfeature.DefaultFeatureGate.Enabled(features.RecreatePodWhenChangeVCTInStatefulSetGate),
+	}
 	if set.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy != nil {
 		opts.GracePeriodSeconds = set.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy.GracePeriodSeconds
 	}
@@ -1219,6 +1221,11 @@ func (ssc *defaultStatefulSetControl) processReplica(
 		if err != nil {
 			retentionMatch = true
 		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.RecreatePodWhenChangeVCTInStatefulSetGate) &&
+		!volumeClaimTemplatesMatchPod(set, replicas[i]) {
+		return false, false, nil
 	}
 
 	if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) && retentionMatch {
