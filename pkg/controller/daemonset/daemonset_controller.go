@@ -41,6 +41,7 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	toolscache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
@@ -171,6 +172,10 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	if err != nil {
 		return nil, err
 	}
+	pvcInformer, err := cacher.GetInformerForKind(context.TODO(), corev1.SchemeGroupVersion.WithKind("PersistentVolumeClaim"))
+	if err != nil {
+		return nil, err
+	}
 
 	dsLister := kruiseappslisters.NewDaemonSetLister(dsInformer.(cache.SharedIndexInformer).GetIndexer())
 	historyLister := appslisters.NewControllerRevisionLister(revInformer.(cache.SharedIndexInformer).GetIndexer())
@@ -178,6 +183,7 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 	nodeLister := corelisters.NewNodeLister(nodeInformer.(cache.SharedIndexInformer).GetIndexer())
 	failedPodsBackoff := flowcontrol.NewBackOff(1*time.Second, 15*time.Minute)
 	revisionAdapter := revisionadapter.NewDefaultImpl()
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcInformer.(toolscache.SharedIndexInformer).GetIndexer())
 
 	cli := utilclient.NewClientFromManager(mgr, "daemonset-controller")
 	dsc := &ReconcileDaemonSet{
@@ -185,7 +191,11 @@ func newReconciler(mgr manager.Manager) (reconcile.Reconciler, error) {
 		kubeClient:    genericClient.KubeClient,
 		kruiseClient:  genericClient.KruiseClient,
 		eventRecorder: recorder,
-		podControl:    kubecontroller.RealPodControl{KubeClient: genericClient.KubeClient, Recorder: recorder},
+		podControl: &dsPodControl{
+			recorder:            recorder,
+			objectMgr:           kruiseutil.NewRealObjectManager(genericClient.KubeClient, podLister, pvcLister, nil),
+			PodControlInterface: kubecontroller.RealPodControl{KubeClient: genericClient.KubeClient, Recorder: recorder},
+		},
 		crControl: kubecontroller.RealControllerRevisionControl{
 			KubeClient: genericClient.KubeClient,
 		},
@@ -270,7 +280,7 @@ type ReconcileDaemonSet struct {
 	kubeClient       clientset.Interface
 	kruiseClient     kruiseclientset.Interface
 	eventRecorder    record.EventRecorder
-	podControl       kubecontroller.PodControlInterface
+	podControl       *dsPodControl
 	crControl        kubecontroller.ControllerRevisionControlInterface
 	lifecycleControl lifecycle.Interface
 
@@ -755,7 +765,7 @@ func (dsc *ReconcileDaemonSet) syncNodes(ctx context.Context, ds *appsv1alpha1.D
 					podTemplate.Spec.NodeName = nodesNeedingDaemonPods[ix]
 				}
 
-				err = dsc.podControl.CreatePods(ctx, ds.Namespace, podTemplate, ds, metav1.NewControllerRef(ds, controllerKind))
+				err = dsc.podControl.CreatePod(ctx, ds.Namespace, podTemplate, ds, metav1.NewControllerRef(ds, controllerKind), nodesNeedingDaemonPods[ix])
 
 				if err != nil {
 					if errors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
@@ -790,6 +800,7 @@ func (dsc *ReconcileDaemonSet) syncNodes(ctx context.Context, ds *appsv1alpha1.D
 	for i := 0; i < deleteDiff; i++ {
 		go func(ix int) {
 			defer deleteWait.Done()
+			// TODO: delete pvc when persistentVolumeClaimRetentionPolicy is set to Delete
 			if err := dsc.podControl.DeletePod(ctx, ds.Namespace, podsToDelete[ix], ds); err != nil {
 				dsc.expectations.DeletionObserved(logger, dsKey)
 				if !errors.IsNotFound(err) {
