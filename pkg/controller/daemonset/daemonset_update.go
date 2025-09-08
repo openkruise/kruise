@@ -268,16 +268,14 @@ func (dsc *ReconcileDaemonSet) updatedDesiredNodeCounts(ds *appsv1alpha1.DaemonS
 	return maxSurge, maxUnavailable, nil
 }
 
+// GetTemplateGeneration returns the template generation from the DaemonSet.
+// Since the deprecated template generation annotation support has been removed,
+// this function now returns nil to indicate no legacy template generation tracking.
 func GetTemplateGeneration(ds *appsv1alpha1.DaemonSet) (*int64, error) {
-	annotation, found := ds.Annotations[apps.DeprecatedTemplateGeneration]
-	if !found {
-		return nil, nil
-	}
-	generation, err := strconv.ParseInt(annotation, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-	return &generation, nil
+	// The deprecated template generation annotation support has been removed.
+	// Modern DaemonSets use other mechanisms for template versioning.
+	// Return nil to indicate no template generation tracking via annotations.
+	return nil, nil
 }
 
 func (dsc *ReconcileDaemonSet) filterDaemonPodsToUpdate(ds *appsv1alpha1.DaemonSet, nodeList []*corev1.Node, hash string, nodeToDaemonPods map[string][]*corev1.Pod) (map[string][]*corev1.Pod, error) {
