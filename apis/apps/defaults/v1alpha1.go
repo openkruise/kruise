@@ -44,10 +44,10 @@ func SetDefaultsSidecarSet(obj *v1alpha1.SidecarSet) {
 		setDefaultSidecarContainer(&obj.Spec.Containers[i], v1alpha1.BeforeAppContainerType)
 	}
 
-	//default setting volumes
+	// default setting volumes
 	SetDefaultPodVolumes(obj.Spec.Volumes)
 
-	//default setting history revision limitation
+	// default setting history revision limitation
 	SetDefaultRevisionHistoryLimit(&obj.Spec.RevisionHistoryLimit)
 
 	// default patchPolicy is 'Retain'
@@ -58,7 +58,7 @@ func SetDefaultsSidecarSet(obj *v1alpha1.SidecarSet) {
 		}
 	}
 
-	//default setting injectRevisionStrategy
+	// default setting injectRevisionStrategy
 	SetDefaultInjectRevision(&obj.Spec.InjectionStrategy)
 }
 
@@ -177,31 +177,6 @@ func SetDefaultsAdvancedCronJob(obj *v1alpha1.AdvancedCronJob, injectTemplateDef
 	if obj.Spec.FailedJobsHistoryLimit == nil {
 		obj.Spec.FailedJobsHistoryLimit = new(int32)
 		*obj.Spec.FailedJobsHistoryLimit = 1
-	}
-}
-
-// SetDefaults_BroadcastJob set default values for BroadcastJob.
-func SetDefaultsBroadcastJob(obj *v1alpha1.BroadcastJob, injectTemplateDefaults bool) {
-	if injectTemplateDefaults {
-		SetDefaultPodSpec(&obj.Spec.Template.Spec)
-	}
-	if obj.Spec.CompletionPolicy.Type == "" {
-		obj.Spec.CompletionPolicy.Type = v1alpha1.Always
-	}
-
-	if obj.Spec.Parallelism == nil {
-		parallelism := int32(1<<31 - 1)
-		parallelismIntStr := intstr.FromInt(int(parallelism))
-		obj.Spec.Parallelism = &parallelismIntStr
-	}
-
-	if obj.Spec.FailurePolicy.Type == "" {
-		obj.Spec.FailurePolicy.Type = v1alpha1.FailurePolicyTypeFailFast
-	}
-
-	// Default to 'OnFailure' if no restartPolicy is specified
-	if obj.Spec.Template.Spec.RestartPolicy == "" {
-		obj.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
 	}
 }
 

@@ -17,6 +17,14 @@ limitations under the License.
 
 package v1beta1
 
+// BroadcastJobListerExpansion allows custom methods to be added to
+// BroadcastJobLister.
+type BroadcastJobListerExpansion interface{}
+
+// BroadcastJobNamespaceListerExpansion allows custom methods to be added to
+// BroadcastJobNamespaceLister.
+type BroadcastJobNamespaceListerExpansion interface{}
+
 // StatefulSetListerExpansion allows custom methods to be added to
 // StatefulSetLister.
 type StatefulSetListerExpansion interface{}

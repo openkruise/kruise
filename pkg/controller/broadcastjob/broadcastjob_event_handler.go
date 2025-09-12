@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 )
 
@@ -83,7 +83,7 @@ func (p *enqueueBroadcastJobForNode) Update(ctx context.Context, evt event.Typed
 
 func (p *enqueueBroadcastJobForNode) addNode(q workqueue.TypedRateLimitingInterface[reconcile.Request], obj *v1.Node) {
 	node := obj
-	jobList := &v1alpha1.BroadcastJobList{}
+	jobList := &v1beta1.BroadcastJobList{}
 	err := p.reader.List(context.TODO(), jobList)
 	if err != nil {
 		klog.ErrorS(err, "Failed to enqueue BroadcastJob on addNode")
@@ -110,7 +110,7 @@ func (p *enqueueBroadcastJobForNode) updateNode(q workqueue.TypedRateLimitingInt
 	if shouldIgnoreNodeUpdate(*oldNode, *curNode) {
 		return
 	}
-	jobList := &v1alpha1.BroadcastJobList{}
+	jobList := &v1beta1.BroadcastJobList{}
 	err := p.reader.List(context.TODO(), jobList)
 	if err != nil {
 		klog.ErrorS(err, "Failed to enqueue BroadcastJob on updateNode")

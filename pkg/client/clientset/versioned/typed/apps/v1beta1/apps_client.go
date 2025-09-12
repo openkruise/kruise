@@ -27,12 +27,17 @@ import (
 
 type AppsV1beta1Interface interface {
 	RESTClient() rest.Interface
+	BroadcastJobsGetter
 	StatefulSetsGetter
 }
 
 // AppsV1beta1Client is used to interact with features provided by the apps.kruise.io group.
 type AppsV1beta1Client struct {
 	restClient rest.Interface
+}
+
+func (c *AppsV1beta1Client) BroadcastJobs(namespace string) BroadcastJobInterface {
+	return newBroadcastJobs(c, namespace)
 }
 
 func (c *AppsV1beta1Client) StatefulSets(namespace string) StatefulSetInterface {

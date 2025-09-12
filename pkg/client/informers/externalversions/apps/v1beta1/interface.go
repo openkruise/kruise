@@ -23,6 +23,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// BroadcastJobs returns a BroadcastJobInformer.
+	BroadcastJobs() BroadcastJobInformer
 	// StatefulSets returns a StatefulSetInformer.
 	StatefulSets() StatefulSetInformer
 }
@@ -36,6 +38,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// BroadcastJobs returns a BroadcastJobInformer.
+func (v *version) BroadcastJobs() BroadcastJobInformer {
+	return &broadcastJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // StatefulSets returns a StatefulSetInformer.

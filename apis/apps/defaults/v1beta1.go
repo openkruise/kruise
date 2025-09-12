@@ -93,3 +93,23 @@ func SetDefaultsStatefulSet(obj *v1beta1.StatefulSet, injectTemplateDefaults boo
 		}
 	}
 }
+
+// SetDefaultsBroadcastJob set default values for BroadcastJob.
+func SetDefaultsBroadcastJob(obj *v1beta1.BroadcastJob, injectTemplateDefaults bool) {
+	if injectTemplateDefaults {
+		SetDefaultPodSpec(&obj.Spec.Template.Spec)
+	}
+	if obj.Spec.CompletionPolicy.Type == "" {
+		obj.Spec.CompletionPolicy.Type = v1beta1.Always
+	}
+
+	if obj.Spec.Parallelism == nil {
+		parallelism := int32(1<<31 - 1)
+		parallelismIntStr := intstr.FromInt(int(parallelism))
+		obj.Spec.Parallelism = &parallelismIntStr
+	}
+
+	if obj.Spec.FailurePolicy.Type == "" {
+		obj.Spec.FailurePolicy.Type = v1beta1.FailurePolicyTypeFailFast
+	}
+}
