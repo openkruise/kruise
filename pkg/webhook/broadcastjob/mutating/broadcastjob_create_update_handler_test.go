@@ -10,12 +10,13 @@ import (
 
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/openkruise/kruise/apis"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func TestHandle(t *testing.T) {
@@ -58,6 +59,11 @@ func TestHandle(t *testing.T) {
 
 	req := admission.Request{
 		AdmissionRequest: admissionv1.AdmissionRequest{
+			Resource: metav1.GroupVersionResource{
+				Group:    appsv1beta1.GroupVersion.Group,
+				Version:  appsv1beta1.GroupVersion.Version,
+				Resource: "broadcastjobs",
+			},
 			Object: runtime.RawExtension{
 				Raw: []byte(oldBroadcastJobStr),
 			},
@@ -69,12 +75,12 @@ func TestHandle(t *testing.T) {
 		{
 			Operation: "add",
 			Path:      "/spec/completionPolicy",
-			Value:     map[string]interface{}{"type": string(appsv1alpha1.Always)},
+			Value:     map[string]interface{}{"type": string(appsv1beta1.Always)},
 		},
 		{
 			Operation: "add",
 			Path:      "/spec/failurePolicy",
-			Value:     map[string]interface{}{"type": string(appsv1alpha1.FailurePolicyTypeFailFast)},
+			Value:     map[string]interface{}{"type": string(appsv1beta1.FailurePolicyTypeFailFast)},
 		},
 		{
 			Operation: "remove",

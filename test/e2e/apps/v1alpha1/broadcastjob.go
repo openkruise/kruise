@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1alpha1
 
 import (
 	"context"
@@ -24,13 +24,11 @@ import (
 
 	"k8s.io/client-go/util/retry"
 
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/test/e2e/framework/v1beta1"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -38,12 +36,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-var _ = ginkgo.Describe("BroadcastJob v1beta1", ginkgo.Label("BroadcastJob", "job", "workload", "v1beta1"), func() {
-	f := v1alpha1.NewDefaultFramework("broadcastjobs-v1beta1")
+var _ = ginkgo.Describe("BroadcastJob", ginkgo.Label("BroadcastJob", "job", "workload"), func() {
+	f := v1alpha1.NewDefaultFramework("broadcastjobs")
 	var ns string
 	var c clientset.Interface
 	var kc kruiseclientset.Interface
-	var tester *v1beta1.BroadcastJobTester
+	var tester *v1alpha1.BroadcastJobTester
 	var nodeTester *v1alpha1.NodeTester
 	var randStr string
 
@@ -51,7 +49,7 @@ var _ = ginkgo.Describe("BroadcastJob v1beta1", ginkgo.Label("BroadcastJob", "jo
 		c = f.ClientSet
 		kc = f.KruiseClientSet
 		ns = f.Namespace.Name
-		tester = v1beta1.NewBroadcastJobTester(c, kc, ns)
+		tester = v1alpha1.NewBroadcastJobTester(c, kc, ns)
 		nodeTester = v1alpha1.NewNodeTester(c)
 		randStr = rand.String(10)
 	})
@@ -80,17 +78,16 @@ var _ = ginkgo.Describe("BroadcastJob v1beta1", ginkgo.Label("BroadcastJob", "jo
 			}
 		},
 	}
-
-	ginkgo.Context("BroadcastJob v1beta1 dispatching", func() {
+	ginkgo.Context("BroadcastJob dispatching", func() {
 		ginkgo.It("succeeds for parallelism < number of node", func() {
 			ginkgo.By("Create Fake Node " + randStr)
 			fakeNode, err := nodeTester.CreateFakeNode(randStr)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			ginkgo.By("Create BroadcastJob v1beta1 job-" + randStr)
-			job := &appsv1beta1.BroadcastJob{
+			ginkgo.By("Create BroadcastJob job-" + randStr)
+			job := &appsv1alpha1.BroadcastJob{
 				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-" + randStr},
-				Spec: appsv1beta1.BroadcastJobSpec{
+				Spec: appsv1alpha1.BroadcastJobSpec{
 					Template: v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
 							Tolerations: []v1.Toleration{{Key: v1alpha1.E2eFakeKey, Operator: v1.TolerationOpEqual, Value: randStr, Effect: v1.TaintEffectNoSchedule}},
@@ -102,7 +99,7 @@ var _ = ginkgo.Describe("BroadcastJob v1beta1", ginkgo.Label("BroadcastJob", "jo
 							RestartPolicy: v1.RestartPolicyNever,
 						},
 					},
-					CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
+					CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
 				},
 			}
 
@@ -155,49 +152,5 @@ var _ = ginkgo.Describe("BroadcastJob v1beta1", ginkgo.Label("BroadcastJob", "jo
 				return job.Status.Succeeded
 			}, 60*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
 		})
-
-		ginkgo.It("test v1beta1 specific features", func() {
-			ginkgo.By("Create BroadcastJob v1beta1 with TTL")
-			job := &appsv1beta1.BroadcastJob{
-				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-ttl-" + randStr},
-				Spec: appsv1beta1.BroadcastJobSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{{
-								Name:    "box",
-								Image:   common.BusyboxImage,
-								Command: []string{"/bin/sh", "-c", "echo 'test'"},
-							}},
-							RestartPolicy: v1.RestartPolicyNever,
-						},
-					},
-					CompletionPolicy: appsv1beta1.CompletionPolicy{
-						Type:                    appsv1beta1.Always,
-						TTLSecondsAfterFinished: func() *int32 { ttl := int32(30); return &ttl }(),
-					},
-				},
-			}
-
-			job, err := tester.CreateBroadcastJob(job)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			ginkgo.By("Verify TTL is set correctly")
-			gomega.Expect(job.Spec.CompletionPolicy.TTLSecondsAfterFinished).NotTo(gomega.BeNil())
-			gomega.Expect(*job.Spec.CompletionPolicy.TTLSecondsAfterFinished).To(gomega.Equal(int32(30)))
-		})
 	})
 })
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

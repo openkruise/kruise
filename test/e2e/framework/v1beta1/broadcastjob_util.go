@@ -18,12 +18,11 @@ package v1beta1
 
 import (
 	"context"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
 	"time"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/test/e2e/framework"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -87,7 +86,7 @@ func (t *BroadcastJobTester) WaitForBroadcastJobCreated(job *appsv1beta1.Broadca
 			return true, nil
 		})
 	if pollErr != nil {
-		framework.Failf("Failed waiting for BroadcastJob to enter running: %v", pollErr)
+		common.Failf("Failed waiting for BroadcastJob to enter running: %v", pollErr)
 	}
 }
 
