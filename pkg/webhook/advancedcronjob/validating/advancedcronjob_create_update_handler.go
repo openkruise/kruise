@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 )
 
@@ -57,13 +58,13 @@ type AdvancedCronJobCreateUpdateHandler struct {
 	Decoder admission.Decoder
 }
 
-func (h *AdvancedCronJobCreateUpdateHandler) validateAdvancedCronJob(obj *appsv1alpha1.AdvancedCronJob) field.ErrorList {
+func (h *AdvancedCronJobCreateUpdateHandler) validateAdvancedCronJob(obj *appsv1beta1.AdvancedCronJob) field.ErrorList {
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, true, validateAdvancedCronJobName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateAdvancedCronJobSpec(&obj.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
-func validateAdvancedCronJobSpec(spec *appsv1alpha1.AdvancedCronJobSpec, fldPath *field.Path) field.ErrorList {
+func validateAdvancedCronJobSpec(spec *appsv1beta1.AdvancedCronJobSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateAdvancedCronJobSpecSchedule(spec, fldPath)...)
 	allErrs = append(allErrs, validateAdvancedCronJobSpecTemplate(spec, fldPath)...)
@@ -80,7 +81,7 @@ func validateAdvancedCronJobSpec(spec *appsv1alpha1.AdvancedCronJobSpec, fldPath
 	return allErrs
 }
 
-func validateAdvancedCronJobSpecSchedule(spec *appsv1alpha1.AdvancedCronJobSpec, fldPath *field.Path) field.ErrorList {
+func validateAdvancedCronJobSpecSchedule(spec *appsv1beta1.AdvancedCronJobSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(spec.Schedule) == 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("schedule"),
@@ -121,7 +122,7 @@ func validateTimeZone(timeZone *string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-func validateAdvancedCronJobSpecTemplate(spec *appsv1alpha1.AdvancedCronJobSpec, fldPath *field.Path) field.ErrorList {
+func validateAdvancedCronJobSpecTemplate(spec *appsv1beta1.AdvancedCronJobSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	templateCount := 0
 	if spec.Template.JobTemplate != nil {
@@ -154,7 +155,7 @@ func validateJobTemplateSpec(jobSpec *batchv1.JobTemplateSpec, fldPath *field.Pa
 	return append(allErrs, apivalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions)...)
 }
 
-func validateBroadcastJobTemplateSpec(brJobSpec *appsv1alpha1.BroadcastJobTemplateSpec, fldPath *field.Path) field.ErrorList {
+func validateBroadcastJobTemplateSpec(brJobSpec *appsv1beta1.BroadcastJobTemplateSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	coreTemplate, err := convertPodTemplateSpec(&brJobSpec.Spec.Template)
 	if err != nil {
@@ -182,7 +183,7 @@ func validateAdvancedCronJobName(name string, prefix bool) (allErrs []string) {
 	return allErrs
 }
 
-func (h *AdvancedCronJobCreateUpdateHandler) validateAdvancedCronJobUpdate(obj, oldObj *appsv1alpha1.AdvancedCronJob) field.ErrorList {
+func (h *AdvancedCronJobCreateUpdateHandler) validateAdvancedCronJobUpdate(obj, oldObj *appsv1beta1.AdvancedCronJob) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&obj.ObjectMeta, &oldObj.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateAdvancedCronJobSpec(&obj.Spec, field.NewPath("spec"))...)
 
@@ -200,13 +201,31 @@ func (h *AdvancedCronJobCreateUpdateHandler) validateAdvancedCronJobUpdate(obj, 
 	return allErrs
 }
 
+func (h *AdvancedCronJobCreateUpdateHandler) decodeAdvancedCronJob(req admission.Request, obj *appsv1beta1.AdvancedCronJob) error {
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return err
+		}
+	case appsv1alpha1.GroupVersion.Version:
+		objv1alpha1 := &appsv1alpha1.AdvancedCronJob{}
+		if err := h.Decoder.Decode(req, objv1alpha1); err != nil {
+			return err
+		}
+		if err := objv1alpha1.ConvertTo(obj); err != nil {
+			return fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err)
+		}
+	}
+	return nil
+}
+
 var _ admission.Handler = &AdvancedCronJobCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *AdvancedCronJobCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.AdvancedCronJob{}
+	obj := &appsv1beta1.AdvancedCronJob{}
 
-	err := h.Decoder.Decode(req, obj)
+	err := h.decodeAdvancedCronJob(req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
@@ -216,8 +235,8 @@ func (h *AdvancedCronJobCreateUpdateHandler) Handle(ctx context.Context, req adm
 			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 		}
 	case admissionv1.Update:
-		oldObj := &appsv1alpha1.AdvancedCronJob{}
-		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
+		oldObj := &appsv1beta1.AdvancedCronJob{}
+		if err := h.decodeAdvancedCronJob(admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}}, oldObj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 

@@ -90,6 +90,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().WorkloadSpreads().Informer()}, nil
 
 		// Group=apps.kruise.io, Version=v1beta1
+	case v1beta1.SchemeGroupVersion.WithResource("advancedcronjobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().AdvancedCronJobs().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("broadcastjobs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().BroadcastJobs().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("statefulsets"):

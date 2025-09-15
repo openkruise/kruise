@@ -113,3 +113,30 @@ func SetDefaultsBroadcastJob(obj *v1beta1.BroadcastJob, injectTemplateDefaults b
 		obj.Spec.FailurePolicy.Type = v1beta1.FailurePolicyTypeFailFast
 	}
 }
+
+// SetDefaultsAdvancedCronJob set default values for AdvancedCronJob.
+func SetDefaultsAdvancedCronJob(obj *v1beta1.AdvancedCronJob, injectTemplateDefaults bool) {
+	if obj.Spec.Template.JobTemplate != nil && injectTemplateDefaults {
+		SetDefaultPodSpec(&obj.Spec.Template.JobTemplate.Spec.Template.Spec)
+	}
+
+	if obj.Spec.Template.BroadcastJobTemplate != nil && injectTemplateDefaults {
+		SetDefaultPodSpec(&obj.Spec.Template.BroadcastJobTemplate.Spec.Template.Spec)
+	}
+
+	if obj.Spec.ConcurrencyPolicy == "" {
+		obj.Spec.ConcurrencyPolicy = v1beta1.AllowConcurrent
+	}
+	if obj.Spec.Paused == nil {
+		obj.Spec.Paused = new(bool)
+	}
+
+	if obj.Spec.SuccessfulJobsHistoryLimit == nil {
+		obj.Spec.SuccessfulJobsHistoryLimit = new(int32)
+		*obj.Spec.SuccessfulJobsHistoryLimit = 3
+	}
+	if obj.Spec.FailedJobsHistoryLimit == nil {
+		obj.Spec.FailedJobsHistoryLimit = new(int32)
+		*obj.Spec.FailedJobsHistoryLimit = 1
+	}
+}

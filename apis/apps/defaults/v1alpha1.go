@@ -153,33 +153,6 @@ func setDefaultContainer(sidecarContainer *v1alpha1.SidecarContainer) {
 	}
 }
 
-// SetDefaults_AdvancedCronJob set default values for BroadcastJob.
-func SetDefaultsAdvancedCronJob(obj *v1alpha1.AdvancedCronJob, injectTemplateDefaults bool) {
-	if obj.Spec.Template.JobTemplate != nil && injectTemplateDefaults {
-		SetDefaultPodSpec(&obj.Spec.Template.JobTemplate.Spec.Template.Spec)
-	}
-
-	if obj.Spec.Template.BroadcastJobTemplate != nil && injectTemplateDefaults {
-		SetDefaultPodSpec(&obj.Spec.Template.BroadcastJobTemplate.Spec.Template.Spec)
-	}
-
-	if obj.Spec.ConcurrencyPolicy == "" {
-		obj.Spec.ConcurrencyPolicy = v1alpha1.AllowConcurrent
-	}
-	if obj.Spec.Paused == nil {
-		obj.Spec.Paused = new(bool)
-	}
-
-	if obj.Spec.SuccessfulJobsHistoryLimit == nil {
-		obj.Spec.SuccessfulJobsHistoryLimit = new(int32)
-		*obj.Spec.SuccessfulJobsHistoryLimit = 3
-	}
-	if obj.Spec.FailedJobsHistoryLimit == nil {
-		obj.Spec.FailedJobsHistoryLimit = new(int32)
-		*obj.Spec.FailedJobsHistoryLimit = 1
-	}
-}
-
 // SetDefaults_UnitedDeployment set default values for UnitedDeployment.
 func SetDefaultsUnitedDeployment(obj *v1alpha1.UnitedDeployment, injectTemplateDefaults bool) {
 	if obj.Spec.RevisionHistoryLimit == nil {

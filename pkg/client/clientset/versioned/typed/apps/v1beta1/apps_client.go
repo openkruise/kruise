@@ -27,6 +27,7 @@ import (
 
 type AppsV1beta1Interface interface {
 	RESTClient() rest.Interface
+	AdvancedCronJobsGetter
 	BroadcastJobsGetter
 	StatefulSetsGetter
 }
@@ -34,6 +35,10 @@ type AppsV1beta1Interface interface {
 // AppsV1beta1Client is used to interact with features provided by the apps.kruise.io group.
 type AppsV1beta1Client struct {
 	restClient rest.Interface
+}
+
+func (c *AppsV1beta1Client) AdvancedCronJobs(namespace string) AdvancedCronJobInterface {
+	return newAdvancedCronJobs(c, namespace)
 }
 
 func (c *AppsV1beta1Client) BroadcastJobs(namespace string) BroadcastJobInterface {
