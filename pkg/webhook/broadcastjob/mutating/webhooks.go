@@ -28,7 +28,7 @@ import (
 var (
 	// HandlerGetterMap contains admission webhook handlers
 	HandlerGetterMap = map[string]types.HandlerGetter{
-		"mutate-apps-kruise-io-v1beta1-broadcastjob": func(mgr manager.Manager) admission.Handler {
+		"mutate-apps-kruise-io-broadcastjob": func(mgr manager.Manager) admission.Handler {
 			return &BroadcastJobCreateUpdateHandler{Decoder: admission.NewDecoder(mgr.GetScheme())}
 		},
 	}

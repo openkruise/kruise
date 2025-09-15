@@ -28,7 +28,7 @@ import (
 var (
 	// HandlerGetterMap contains admission webhook handlers
 	HandlerGetterMap = map[string]types.HandlerGetter{
-		"validate-apps-kruise-io-v1alpha1-advancedcronjob": func(mgr manager.Manager) admission.Handler {
+		"validate-apps-kruise-io-advancedcronjob": func(mgr manager.Manager) admission.Handler {
 			return &AdvancedCronJobCreateUpdateHandler{Decoder: admission.NewDecoder(mgr.GetScheme())}
 		},
 	}
