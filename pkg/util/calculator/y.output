@@ -1,0 +1,297 @@
+
+state 0
+	$accept: .input $end 
+
+	NUMBER  shift 5
+	QUANTITY  shift 6
+	IDENT  shift 7
+	'-'  shift 10
+	'('  shift 8
+	.  error
+
+	expr  goto 2
+	term  goto 3
+	factor  goto 4
+	func_call  goto 9
+	input  goto 1
+
+state 1
+	$accept:  input.$end 
+
+	$end  accept
+	.  error
+
+
+state 2
+	input:  expr.    (1)
+	expr:  expr.'+' expr 
+	expr:  expr.'-' expr 
+
+	'+'  shift 11
+	'-'  shift 12
+	.  reduce 1 (src line 270)
+
+
+state 3
+	expr:  term.    (4)
+	term:  term.'*' term 
+	term:  term.'/' term 
+
+	'*'  shift 13
+	'/'  shift 14
+	.  reduce 4 (src line 289)
+
+
+state 4
+	term:  factor.    (7)
+
+	.  reduce 7 (src line 307)
+
+
+state 5
+	factor:  NUMBER.    (8)
+
+	.  reduce 8 (src line 312)
+
+
+state 6
+	factor:  QUANTITY.    (9)
+
+	.  reduce 9 (src line 317)
+
+
+state 7
+	factor:  IDENT.    (10)
+	func_call:  IDENT.'(' expr ')' 
+	func_call:  IDENT.'(' expr ',' expr ')' 
+
+	'('  shift 15
+	.  reduce 10 (src line 326)
+
+
+state 8
+	factor:  '('.expr ')' 
+
+	NUMBER  shift 5
+	QUANTITY  shift 6
+	IDENT  shift 7
+	'-'  shift 10
+	'('  shift 8
+	.  error
+
+	expr  goto 16
+	term  goto 3
+	factor  goto 4
+	func_call  goto 9
+
+state 9
+	factor:  func_call.    (12)
+
+	.  reduce 12 (src line 338)
+
+
+state 10
+	factor:  '-'.factor 
+
+	NUMBER  shift 5
+	QUANTITY  shift 6
+	IDENT  shift 7
+	'-'  shift 10
+	'('  shift 8
+	.  error
+
+	factor  goto 17
+	func_call  goto 9
+
+state 11
+	expr:  expr '+'.expr 
+
+	NUMBER  shift 5
+	QUANTITY  shift 6
+	IDENT  shift 7
+	'-'  shift 10
+	'('  shift 8
+	.  error
+
+	expr  goto 18
+	term  goto 3
+	factor  goto 4
+	func_call  goto 9
+
+state 12
+	expr:  expr '-'.expr 
+
+	NUMBER  shift 5
+	QUANTITY  shift 6
+	IDENT  shift 7
+	'-'  shift 10
+	'('  shift 8
+	.  error
+
+	expr  goto 19
+	term  goto 3
+	factor  goto 4
+	func_call  goto 9
+
+state 13
+	term:  term '*'.term 
+
+	NUMBER  shift 5
+	QUANTITY  shift 6
+	IDENT  shift 7
+	'-'  shift 10
+	'('  shift 8
+	.  error
+
+	term  goto 20
+	factor  goto 4
+	func_call  goto 9
+
+state 14
+	term:  term '/'.term 
+
+	NUMBER  shift 5
+	QUANTITY  shift 6
+	IDENT  shift 7
+	'-'  shift 10
+	'('  shift 8
+	.  error
+
+	term  goto 21
+	factor  goto 4
+	func_call  goto 9
+
+state 15
+	func_call:  IDENT '('.expr ')' 
+	func_call:  IDENT '('.expr ',' expr ')' 
+
+	NUMBER  shift 5
+	QUANTITY  shift 6
+	IDENT  shift 7
+	'-'  shift 10
+	'('  shift 8
+	.  error
+
+	expr  goto 22
+	term  goto 3
+	factor  goto 4
+	func_call  goto 9
+
+state 16
+	expr:  expr.'+' expr 
+	expr:  expr.'-' expr 
+	factor:  '(' expr.')' 
+
+	'+'  shift 11
+	'-'  shift 12
+	')'  shift 23
+	.  error
+
+
+state 17
+	factor:  '-' factor.    (13)
+
+	.  reduce 13 (src line 341)
+
+
+state 18
+	expr:  expr.'+' expr 
+	expr:  expr '+' expr.    (2)
+	expr:  expr.'-' expr 
+
+	.  reduce 2 (src line 276)
+
+
+state 19
+	expr:  expr.'+' expr 
+	expr:  expr.'-' expr 
+	expr:  expr '-' expr.    (3)
+
+	.  reduce 3 (src line 283)
+
+
+state 20
+	term:  term.'*' term 
+	term:  term '*' term.    (5)
+	term:  term.'/' term 
+
+	.  reduce 5 (src line 294)
+
+
+state 21
+	term:  term.'*' term 
+	term:  term.'/' term 
+	term:  term '/' term.    (6)
+
+	.  reduce 6 (src line 301)
+
+
+state 22
+	expr:  expr.'+' expr 
+	expr:  expr.'-' expr 
+	func_call:  IDENT '(' expr.')' 
+	func_call:  IDENT '(' expr.',' expr ')' 
+
+	'+'  shift 11
+	'-'  shift 12
+	')'  shift 24
+	','  shift 25
+	.  error
+
+
+state 23
+	factor:  '(' expr ')'.    (11)
+
+	.  reduce 11 (src line 335)
+
+
+state 24
+	func_call:  IDENT '(' expr ')'.    (14)
+
+	.  reduce 14 (src line 353)
+
+
+state 25
+	func_call:  IDENT '(' expr ','.expr ')' 
+
+	NUMBER  shift 5
+	QUANTITY  shift 6
+	IDENT  shift 7
+	'-'  shift 10
+	'('  shift 8
+	.  error
+
+	expr  goto 26
+	term  goto 3
+	factor  goto 4
+	func_call  goto 9
+
+state 26
+	expr:  expr.'+' expr 
+	expr:  expr.'-' expr 
+	func_call:  IDENT '(' expr ',' expr.')' 
+
+	'+'  shift 11
+	'-'  shift 12
+	')'  shift 27
+	.  error
+
+
+state 27
+	func_call:  IDENT '(' expr ',' expr ')'.    (15)
+
+	.  reduce 15 (src line 360)
+
+
+14 terminals, 6 nonterminals
+16 grammar rules, 28/16000 states
+0 shift/reduce, 0 reduce/reduce conflicts reported
+55 working sets used
+memory: parser 32/240000
+25 extra closures
+60 shift entries, 1 exceptions
+13 goto entries
+20 entries saved by goto default
+Optimizer space used: output 37/240000
+37 table entries, 4 zero
+maximum spread: 14, maximum offset: 25

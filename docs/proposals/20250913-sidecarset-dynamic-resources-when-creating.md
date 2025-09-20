@@ -73,7 +73,7 @@ spec:
         resourceExpr: # <validated by webhook, should not contain scalar resources, only support cpu and memory>, If calculate result is negative, this pod creating request will be rejected by webhook.
           limits: # If matched container resources.limits not configured, sidecar container resources.limits will also won't be configured.
             cpu: max(cpu*50%, 50m)
-            memory: 200Mi
+            memory: max(memory*50%, 100Mi)
           requests: # If matched container resources.requests not configured, corresponding resource value will be treated as 0.
             cpu: max(cpu*50%, 50m)
             memory: 100Mi
@@ -175,10 +175,10 @@ spec:
 In this case, sidecar container resources will be:
 ```
 limits:
-  cpu: max(sum(200m, 400m) * 50%, 50m ) = 300m
+  cpu: max((200m + 400m) * 50%, 50m ) = 300m
   memory: 200Mi
 requests:
-  cpu: max(sum(50m, 100m) * 50%, 50m ) = 75m
+  cpu: max((50m + 100m) * 50%, 50m ) = 75m
   memory: 100Mi
 ```
 
@@ -249,7 +249,7 @@ requests:
 
 ## Design Details
 ### ResourceExpr Calculator
-- Calculator: +, -, *, /, max(), min(), sum()
+- Calculator: +, -, *, /, max(), min()
 - Number: int, float, percent
 - If matched container resources.limits not configured, sidecar container resources.limits will not be configured.
 - If matched container resources.requests not configured, corresponding resource value will be treated as 0.
