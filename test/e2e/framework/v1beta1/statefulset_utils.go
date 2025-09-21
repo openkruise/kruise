@@ -97,30 +97,6 @@ func (s *StatefulSetTester) GetStatefulSet(namespace, name string) *appsv1beta1.
 	return ss
 }
 
-// CreateStatefulSet creates a StatefulSet from the manifest at manifestPath in the Namespace ns using kubectl create.
-func (s *StatefulSetTester) CreateStatefulSet(manifestPath, ns string) *appsv1beta1.StatefulSet {
-	mkpath := func(file string) string {
-		return filepath.Join(manifestPath, file)
-	}
-
-	Logf("Parsing statefulset from %v", mkpath("statefulset.yaml"))
-	ss, err := StatefulSetFromManifest(mkpath("statefulset.yaml"), ns)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	Logf("Parsing service from %v", mkpath("service.yaml"))
-	svc, err := SvcFromManifest(mkpath("service.yaml"))
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-	Logf(fmt.Sprintf("creating " + ss.Name + " service"))
-	_, err = s.c.CoreV1().Services(ns).Create(context.TODO(), svc, metav1.CreateOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-	Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector))
-	_, err = s.kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	s.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
-	return ss
-}
-
 // CheckMount checks that the mount at mountPath is valid for all Pods in ss.
 func (s *StatefulSetTester) CheckMount(ss *appsv1beta1.StatefulSet, mountPath string) error {
 	for _, cmd := range []string{

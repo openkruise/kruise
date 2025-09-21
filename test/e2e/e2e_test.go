@@ -24,7 +24,6 @@ import (
 
 	"github.com/openkruise/kruise/test/e2e/framework/common"
 
-	e2etestingmanifests "github.com/openkruise/kruise/test/e2e/static"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
@@ -39,6 +38,8 @@ import (
 
 	// test sources
 	_ "github.com/openkruise/kruise/test/e2e/apps/v1alpha1"
+	_ "github.com/openkruise/kruise/test/e2e/policy/v1alpha1"
+
 	_ "github.com/openkruise/kruise/test/e2e/apps/v1beta1"
 )
 
@@ -52,9 +53,6 @@ func handleFlags() {
 func TestMain(m *testing.M) {
 	// Register test flags, then parse flags.
 	handleFlags()
-
-	// Enable embedded FS file lookup as fallback
-	e2etestingmanifests.AddFileSource(e2etestingmanifests.GetE2ETestingManifestsFS())
 
 	common.AfterReadingAllFlags(&common.TestContext)
 
