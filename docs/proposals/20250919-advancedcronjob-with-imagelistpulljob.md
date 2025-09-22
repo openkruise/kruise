@@ -141,6 +141,8 @@ In advancedcronjob_create_update_handler.go：
 // Validation rules:
 // - The spec.template field must be a valid ImagePullListJob specification.
 // - spec.completionPolicy.type, if specified, must equal "Always".
+// - TTLSecondsAfterFinished  must be less than 86400.
+// - ActiveDeadlineSeconds must less than 14400.
 func validateImageListPullJobTemplateSpec(ilpJobSpec *appsv1alpha1.ImageListPullJobTemplateSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
