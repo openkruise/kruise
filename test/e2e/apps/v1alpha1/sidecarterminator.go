@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
@@ -19,6 +17,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
 )
 
 var _ = ginkgo.Describe("SidecarTerminator", ginkgo.Label("SidecarTerminator", "operation"), func() {

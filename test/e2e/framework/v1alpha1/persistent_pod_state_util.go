@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/openkruise/kruise/test/e2e/framework/common"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -46,6 +45,7 @@ import (
 	kruiseappsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util/configuration"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
 )
 
 type PersistentPodStateTester struct {

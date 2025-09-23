@@ -17,15 +17,15 @@ limitations under the License.
 package e2e
 
 import (
-	"github.com/openkruise/kruise/test/e2e/framework/common"
 	"testing"
 
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 
-	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
 )
 
 // RunE2ETests checks configuration parameters (specified through flags) and then runs

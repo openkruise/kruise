@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/openkruise/kruise/test/e2e/framework/common"
 	"io"
 	"net"
 	"net/url"
@@ -57,6 +56,8 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	uexec "k8s.io/utils/exec"
+
+	"github.com/openkruise/kruise/test/e2e/framework/common"
 )
 
 const (

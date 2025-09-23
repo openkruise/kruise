@@ -18,16 +18,10 @@ package v1alpha1
 
 import (
 	"fmt"
-	"github.com/openkruise/kruise/test/e2e/framework/common"
-	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/pkg/util"
-	utilpodreadiness "github.com/openkruise/kruise/pkg/util/podreadiness"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +30,13 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/utils/ptr"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/util"
+	utilpodreadiness "github.com/openkruise/kruise/pkg/util/podreadiness"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
+	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
 )
 
 var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecreateRequest", "operation"), func() {

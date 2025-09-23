@@ -22,8 +22,6 @@ import (
 	"testing"
 	"time"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
 	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/assert"
 	batchv1 "k8s.io/api/batch/v1"
@@ -31,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	utilpointer "k8s.io/utils/pointer"

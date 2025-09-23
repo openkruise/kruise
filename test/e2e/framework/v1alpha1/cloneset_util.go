@@ -20,7 +20,6 @@ import (
 	"context"
 	"sort"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,6 +27,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"

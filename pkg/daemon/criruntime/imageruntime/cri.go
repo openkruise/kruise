@@ -20,10 +20,6 @@ import (
 	"reflect"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
-	"github.com/openkruise/kruise/pkg/util/secret"
-
 	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -32,6 +28,10 @@ import (
 	"k8s.io/cri-client/pkg/util"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/util/parsers"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/util/secret"
 )
 
 const (

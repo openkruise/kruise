@@ -20,22 +20,22 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/openkruise/kruise/test/e2e/framework/common"
-	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
 	"strings"
 	"time"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	utils "github.com/openkruise/kruise/pkg/webhook/resourcedistribution/validating"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	utils "github.com/openkruise/kruise/pkg/webhook/resourcedistribution/validating"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
+	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
 )
 
 var _ = ginkgo.Describe("ResourceDistribution", ginkgo.Serial, ginkgo.Label("ResourceDistribution", "operation"), func() {

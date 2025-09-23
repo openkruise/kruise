@@ -244,4 +244,3 @@ type BroadcastJobList struct {
 func init() {
 	SchemeBuilder.Register(&BroadcastJob{}, &BroadcastJobList{})
 }
-

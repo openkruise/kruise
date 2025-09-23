@@ -18,15 +18,16 @@ package v1beta1
 
 import (
 	"context"
-	"github.com/openkruise/kruise/test/e2e/framework/common"
 	"time"
 
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
 )
 
 type BroadcastJobTester struct {

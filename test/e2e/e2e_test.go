@@ -22,9 +22,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/openkruise/kruise/test/e2e/framework/common"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
@@ -32,15 +32,13 @@ import (
 	// See https://github.com/kubernetes/kubernetes/issues/74827
 	// "github.com/onsi/ginkgo/v2"
 
-	kruiseapis "github.com/openkruise/kruise/apis"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
-
 	// test sources
-	_ "github.com/openkruise/kruise/test/e2e/apps/v1alpha1"
-	_ "github.com/openkruise/kruise/test/e2e/policy/v1alpha1"
+	kruiseapis "github.com/openkruise/kruise/apis"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
 
+	_ "github.com/openkruise/kruise/test/e2e/apps/v1alpha1"
 	_ "github.com/openkruise/kruise/test/e2e/apps/v1beta1"
+	_ "github.com/openkruise/kruise/test/e2e/policy/v1alpha1"
 )
 
 // handleFlags sets up all flags and parses the command line.

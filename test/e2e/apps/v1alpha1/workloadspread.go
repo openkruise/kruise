@@ -20,8 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/openkruise/kruise/test/e2e/framework/common"
-	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
 	"sort"
 	"strconv"
 	"time"
@@ -41,6 +39,8 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util/workloadspread"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
+	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
 )
 
 const WorkloadSpreadFakeZoneKey = "e2e.kruise.io/workloadspread-fake-zone"

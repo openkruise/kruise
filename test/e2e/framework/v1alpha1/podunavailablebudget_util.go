@@ -19,12 +19,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	"github.com/openkruise/kruise/test/e2e/framework/common"
 	"time"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 
 	"github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1"
@@ -36,6 +31,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/ptr"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
 )
 
 type PodUnavailableBudgetTester struct {

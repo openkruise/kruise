@@ -20,10 +20,12 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	"github.com/openkruise/kruise/test/e2e/framework/common"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+
+	"github.com/openkruise/kruise/test/e2e/framework/common"
 )
 
 const (

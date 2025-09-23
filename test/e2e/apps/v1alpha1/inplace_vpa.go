@@ -4,9 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	apps2 "github.com/openkruise/kruise/test/e2e/framework/common"
-	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
-	"github.com/openkruise/kruise/test/e2e/framework/v1beta1"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +28,9 @@ import (
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
+	apps2 "github.com/openkruise/kruise/test/e2e/framework/common"
+	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
+	"github.com/openkruise/kruise/test/e2e/framework/v1beta1"
 )
 
 var tester *v1alpha1.CloneSetTester

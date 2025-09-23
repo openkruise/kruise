@@ -26,10 +26,6 @@ import (
 	"strconv"
 	"time"
 
-	apps2 "github.com/openkruise/kruise/test/e2e/framework/common"
-	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
-	"github.com/openkruise/kruise/test/e2e/framework/v1beta1"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -52,6 +48,9 @@ import (
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	apps2 "github.com/openkruise/kruise/test/e2e/framework/common"
+	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
+	"github.com/openkruise/kruise/test/e2e/framework/v1beta1"
 )
 
 // GCE Quota requirements: 3 pds, one per stateful pod manifest declared above.

@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -33,6 +32,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
 )
 
 var _ = ginkgo.Describe("ContainerMeta", ginkgo.Label("ContainerMeta", "operation"), func() {

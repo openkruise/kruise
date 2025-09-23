@@ -19,12 +19,13 @@ package v1alpha1
 import (
 	"context"
 
-	"github.com/openkruise/kruise/pkg/util"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 type DeploymentTester struct {

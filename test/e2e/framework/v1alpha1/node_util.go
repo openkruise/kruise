@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	"github.com/openkruise/kruise/test/e2e/framework/common"
 	"math/rand"
 	"strings"
 	"time"
@@ -34,6 +33,8 @@ import (
 	"k8s.io/client-go/util/retry"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/utils/ptr"
+
+	"github.com/openkruise/kruise/test/e2e/framework/common"
 )
 
 const (

@@ -3,14 +3,9 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	"github.com/openkruise/kruise/test/e2e/framework/common"
 	"reflect"
 	"strings"
 	"time"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/pkg/controller/daemonset"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -25,6 +20,11 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	daemonutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 	utilpointer "k8s.io/utils/pointer"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/controller/daemonset"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
 )
 
 const (

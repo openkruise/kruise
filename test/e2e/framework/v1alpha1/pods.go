@@ -20,7 +20,6 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	"github.com/openkruise/kruise/test/e2e/framework/common"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -28,6 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+
+	"github.com/openkruise/kruise/test/e2e/framework/common"
 )
 
 // PodClient is convenience method for getting a pod client interface in the framework's namespace,

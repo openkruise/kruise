@@ -19,8 +19,9 @@ package v1alpha1
 import (
 	"fmt"
 
-	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
+
+	"github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func (bj *BroadcastJob) ConvertTo(dst conversion.Hub) error {
@@ -34,9 +35,9 @@ func (bj *BroadcastJob) ConvertTo(dst conversion.Hub) error {
 			Parallelism: bj.Spec.Parallelism,
 			Template:    bj.Spec.Template,
 			CompletionPolicy: v1beta1.CompletionPolicy{
-				Type:                     v1beta1.CompletionPolicyType(bj.Spec.CompletionPolicy.Type),
-				ActiveDeadlineSeconds:    bj.Spec.CompletionPolicy.ActiveDeadlineSeconds,
-				TTLSecondsAfterFinished:  bj.Spec.CompletionPolicy.TTLSecondsAfterFinished,
+				Type:                    v1beta1.CompletionPolicyType(bj.Spec.CompletionPolicy.Type),
+				ActiveDeadlineSeconds:   bj.Spec.CompletionPolicy.ActiveDeadlineSeconds,
+				TTLSecondsAfterFinished: bj.Spec.CompletionPolicy.TTLSecondsAfterFinished,
 			},
 			Paused: bj.Spec.Paused,
 			FailurePolicy: v1beta1.FailurePolicy{
@@ -47,14 +48,14 @@ func (bj *BroadcastJob) ConvertTo(dst conversion.Hub) error {
 
 		// status
 		bjv1beta1.Status = v1beta1.BroadcastJobStatus{
-			Conditions:    convertJobConditionsToV1Beta1(bj.Status.Conditions),
-			StartTime:     bj.Status.StartTime,
+			Conditions:     convertJobConditionsToV1Beta1(bj.Status.Conditions),
+			StartTime:      bj.Status.StartTime,
 			CompletionTime: bj.Status.CompletionTime,
-			Active:        bj.Status.Active,
-			Succeeded:     bj.Status.Succeeded,
-			Failed:        bj.Status.Failed,
-			Desired:       bj.Status.Desired,
-			Phase:         v1beta1.BroadcastJobPhase(bj.Status.Phase),
+			Active:         bj.Status.Active,
+			Succeeded:      bj.Status.Succeeded,
+			Failed:         bj.Status.Failed,
+			Desired:        bj.Status.Desired,
+			Phase:          v1beta1.BroadcastJobPhase(bj.Status.Phase),
 		}
 
 		return nil
@@ -75,9 +76,9 @@ func (bj *BroadcastJob) ConvertFrom(src conversion.Hub) error {
 			Parallelism: bjv1beta1.Spec.Parallelism,
 			Template:    bjv1beta1.Spec.Template,
 			CompletionPolicy: CompletionPolicy{
-				Type:                     CompletionPolicyType(bjv1beta1.Spec.CompletionPolicy.Type),
-				ActiveDeadlineSeconds:    bjv1beta1.Spec.CompletionPolicy.ActiveDeadlineSeconds,
-				TTLSecondsAfterFinished:  bjv1beta1.Spec.CompletionPolicy.TTLSecondsAfterFinished,
+				Type:                    CompletionPolicyType(bjv1beta1.Spec.CompletionPolicy.Type),
+				ActiveDeadlineSeconds:   bjv1beta1.Spec.CompletionPolicy.ActiveDeadlineSeconds,
+				TTLSecondsAfterFinished: bjv1beta1.Spec.CompletionPolicy.TTLSecondsAfterFinished,
 			},
 			Paused: bjv1beta1.Spec.Paused,
 			FailurePolicy: FailurePolicy{
@@ -88,14 +89,14 @@ func (bj *BroadcastJob) ConvertFrom(src conversion.Hub) error {
 
 		// status
 		bj.Status = BroadcastJobStatus{
-			Conditions:    convertJobConditionsToV1Alpha1(bjv1beta1.Status.Conditions),
-			StartTime:     bjv1beta1.Status.StartTime,
+			Conditions:     convertJobConditionsToV1Alpha1(bjv1beta1.Status.Conditions),
+			StartTime:      bjv1beta1.Status.StartTime,
 			CompletionTime: bjv1beta1.Status.CompletionTime,
-			Active:        bjv1beta1.Status.Active,
-			Succeeded:     bjv1beta1.Status.Succeeded,
-			Failed:        bjv1beta1.Status.Failed,
-			Desired:       bjv1beta1.Status.Desired,
-			Phase:         BroadcastJobPhase(bjv1beta1.Status.Phase),
+			Active:         bjv1beta1.Status.Active,
+			Succeeded:      bjv1beta1.Status.Succeeded,
+			Failed:         bjv1beta1.Status.Failed,
+			Desired:        bjv1beta1.Status.Desired,
+			Phase:          BroadcastJobPhase(bjv1beta1.Status.Phase),
 		}
 
 		return nil
@@ -139,4 +140,3 @@ func convertJobConditionsToV1Alpha1(conditions []v1beta1.JobCondition) []JobCond
 	}
 	return result
 }
-

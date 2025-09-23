@@ -18,16 +18,7 @@ package v1beta1
 
 import (
 	"context"
-	"github.com/openkruise/kruise/test/e2e/framework/common"
-	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
 	"time"
-
-	"k8s.io/client-go/util/retry"
-
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/test/e2e/framework/v1beta1"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -36,6 +27,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
+	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
+	"github.com/openkruise/kruise/test/e2e/framework/v1beta1"
 )
 
 var _ = ginkgo.Describe("BroadcastJob v1beta1", ginkgo.Label("BroadcastJob", "job", "workload", "v1beta1"), func() {

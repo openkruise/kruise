@@ -2,11 +2,10 @@ package uniteddeployment
 
 import (
 	"encoding/hex"
+	"math/rand"
 	"reflect"
 	"testing"
 	"time"
-
-	"math/rand"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

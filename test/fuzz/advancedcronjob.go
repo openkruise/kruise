@@ -18,10 +18,11 @@ package fuzz
 
 import (
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func GenerateJobTemplateSpec(cf *fuzz.ConsumeFuzzer, jobTemplate *batchv1.JobTemplateSpec) error {

@@ -20,9 +20,10 @@ import (
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	fuzzutils "github.com/openkruise/kruise/test/fuzz"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // FuzzValidateAdvancedCronJob tests AdvancedCronJob validation

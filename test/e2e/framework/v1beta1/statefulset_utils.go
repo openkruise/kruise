@@ -21,7 +21,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -31,7 +30,6 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
-
 	apps "k8s.io/api/apps/v1"
 	appsV1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/api/core/v1"

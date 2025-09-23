@@ -43,6 +43,9 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 fmt: go_check ## Run go fmt against code.
 	go fmt $(shell go list ./... | grep -v /vendor/)
 
+fmt-imports: go_check ## Run goimports to format and organize imports.
+	./hack/fmt-imports.sh
+
 vet: ## Run go vet against code.
 	go vet $(shell go list ./... | grep -v /vendor/)
 
