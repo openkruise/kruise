@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 )
 
@@ -84,6 +85,12 @@ func RegisterFieldIndexes(c cache.Cache) error {
 				return
 			}
 		}
+		// broadcastjob owner for v1beta1
+		if utildiscovery.DiscoverObject(&appsv1beta1.BroadcastJob{}) {
+			if err = indexBroadcastCronJobV1Beta1(c); err != nil {
+				return
+			}
+		}
 		// imagepulljob active
 		if utildiscovery.DiscoverObject(&appsv1alpha1.ImagePullJob{}) {
 			if err = indexImagePullJobActive(c); err != nil {
@@ -122,8 +129,9 @@ func indexJob(c cache.Cache) error {
 			return nil
 		}
 
-		// ...make sure it's a AdvancedCronJob...
-		if owner.APIVersion != apiGVStr || owner.Kind != appsv1alpha1.AdvancedCronJobKind {
+		// ...make sure it's a AdvancedCronJob (v1alpha1 or v1beta1)...
+		if (owner.APIVersion != apiGVStr && owner.APIVersion != appsv1beta1.SchemeGroupVersion.String()) ||
+			(owner.Kind != appsv1alpha1.AdvancedCronJobKind && owner.Kind != appsv1beta1.AdvancedCronJobKind) {
 			return nil
 		}
 
@@ -143,6 +151,25 @@ func indexBroadcastCronJob(c cache.Cache) error {
 
 		// ...make sure it's a AdvancedCronJob...
 		if owner.APIVersion != apiGVStr || owner.Kind != appsv1alpha1.AdvancedCronJobKind {
+			return nil
+		}
+
+		// ...and if so, return it
+		return []string{owner.Name}
+	})
+}
+
+func indexBroadcastCronJobV1Beta1(c cache.Cache) error {
+	return c.IndexField(context.TODO(), &appsv1beta1.BroadcastJob{}, IndexNameForController, func(rawObj client.Object) []string {
+		// grab the job object, extract the owner...
+		job := rawObj.(*appsv1beta1.BroadcastJob)
+		owner := metav1.GetControllerOf(job)
+		if owner == nil {
+			return nil
+		}
+
+		// ...make sure it's a AdvancedCronJob...
+		if owner.APIVersion != appsv1beta1.SchemeGroupVersion.String() || owner.Kind != appsv1beta1.AdvancedCronJobKind {
 			return nil
 		}
 

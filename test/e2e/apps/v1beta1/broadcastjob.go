@@ -33,17 +33,16 @@ import (
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework/common"
-	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
 	"github.com/openkruise/kruise/test/e2e/framework/v1beta1"
 )
 
 var _ = ginkgo.Describe("BroadcastJob v1beta1", ginkgo.Label("BroadcastJob", "job", "workload", "v1beta1"), func() {
-	f := v1alpha1.NewDefaultFramework("broadcastjobs-v1beta1")
+	f := v1beta1.NewDefaultFramework("broadcastjobs-v1beta1")
 	var ns string
 	var c clientset.Interface
 	var kc kruiseclientset.Interface
 	var tester *v1beta1.BroadcastJobTester
-	var nodeTester *v1alpha1.NodeTester
+	var nodeTester *v1beta1.NodeTester
 	var randStr string
 
 	ginkgo.BeforeEach(func() {
@@ -51,7 +50,7 @@ var _ = ginkgo.Describe("BroadcastJob v1beta1", ginkgo.Label("BroadcastJob", "jo
 		kc = f.KruiseClientSet
 		ns = f.Namespace.Name
 		tester = v1beta1.NewBroadcastJobTester(c, kc, ns)
-		nodeTester = v1alpha1.NewNodeTester(c)
+		nodeTester = v1beta1.NewNodeTester(c)
 		randStr = rand.String(10)
 	})
 
@@ -92,7 +91,7 @@ var _ = ginkgo.Describe("BroadcastJob v1beta1", ginkgo.Label("BroadcastJob", "jo
 				Spec: appsv1beta1.BroadcastJobSpec{
 					Template: v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
-							Tolerations: []v1.Toleration{{Key: v1alpha1.E2eFakeKey, Operator: v1.TolerationOpEqual, Value: randStr, Effect: v1.TaintEffectNoSchedule}},
+							Tolerations: []v1.Toleration{{Key: v1beta1.E2eFakeKey, Operator: v1.TolerationOpEqual, Value: randStr, Effect: v1.TaintEffectNoSchedule}},
 							Containers: []v1.Container{{
 								Name:    "box",
 								Image:   common.BusyboxImage,
