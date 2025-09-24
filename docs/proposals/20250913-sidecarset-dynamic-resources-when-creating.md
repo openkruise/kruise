@@ -62,7 +62,7 @@ Overall, we expect the resources of Sidecar containers to be dynamically configu
 
 ### API Definition
 The complete API expression is as follows.
-```
+```yaml
 apiVersion: apps.kruise.io/v1alpha1
 kind: SidecarSet
 spec:
@@ -71,7 +71,7 @@ spec:
       image: centos:6.7
       resourcesPolicy: <optional, default: nil> Validation webhook will reject pod creation request if both resourcesPolicy and resources are configured.
         targetContainerMode: sum|max # <required, enum, validated by CRD>
-        targetContainersNameRegex: ^large.engine.v.*$ # <required, validated by webhook>. If no container names match this regex, the pod creation request will be rejected by the webhook. Target containers include native sidecar containers and plain containers, excluding Kruise sidecar containers.
+        targetContainersNameRegex: ^large.engine.v.*$ # <optional,default=.*, validated by webhook>. If no container names match this regex, the pod creation request will be rejected by the webhook. Target containers include native sidecar containers and plain containers, excluding Kruise sidecar containers.
         resourceExpr: # <Required, validated by webhook, should not contain scalar resources, only support cpu and memory>, If calculate result is negative, this pod creating request will be rejected by webhook.
           limits: # If matched containers don't have resources.limits configured, this field will be treated as unlimited. If the expression result is unlimited, sidecar container resources.limits won't be configured, meaning it's unlimited.
             cpu: max(cpu*50%, 50m) # <optional, default: "", mean unlimited>, support `+,-,*,/,max,min,(,)` and variable `cpu`. Variable `cpu` represents the sum or max of resources.limits.cpu of all matched containers by `targetContainersNameRegex` and `targetContainerMode`.
@@ -82,7 +82,7 @@ spec:
 ```
 ### User Stories
 #### Story 1 - By specific container name 
-```
+```yaml
 apiVersion: apps.kruise.io/v1alpha1
 kind: SidecarSet
 spec:
@@ -124,7 +124,7 @@ spec:
         memory: 100Mi
 ```
 In this case, the sidecar container resources will be:
-```
+```yaml
 limits:
   cpu: max(sum(200m) * 50%, 50m ) = 100m
   memory: 200Mi
@@ -133,7 +133,7 @@ requests:
   memory: 100Mi
 ```
 #### Story 2 - By sum of container resources
-```
+```yaml
 apiVersion: apps.kruise.io/v1alpha1
 kind: SidecarSet
 spec:
@@ -175,7 +175,7 @@ spec:
         memory: 200Mi
 ```
 In this case, the sidecar container resources will be:
-```
+```yaml
 limits:
   cpu: max((200m + 400m) * 50%, 50m ) = 300m
   memory: 200Mi
@@ -185,7 +185,7 @@ requests:
 ```
 
 #### Story 3 - By max of container resources
-```
+```yaml
 apiVersion: apps.kruise.io/v1alpha1
 kind: SidecarSet
 spec:
@@ -227,7 +227,7 @@ spec:
         memory: 200Mi
 ```
 In this case, the sidecar container resources will be:
-```
+```yaml
 limits:
   cpu: max(max(200m, 400m) * 50%, 50m ) = 200m
   memory: 200Mi
@@ -237,7 +237,7 @@ requests:
 ```
 
 #### Story 4 - By unlimited of container resources
-```
+```yaml
 apiVersion: apps.kruise.io/v1alpha1
 kind: SidecarSet
 spec:
@@ -278,7 +278,7 @@ spec:
         memory: 200Mi
 ```
 In this case, the sidecar container resources will be:
-```
+```yaml
 limits:
   cpu: max(max(200m, unlimited) * 50%, 50m ) = unlimited
   memory: 200Mi
@@ -295,56 +295,9 @@ requests:
 ```
 
 #### Story 5 - By linear function that use sum mode and max of container resources
-```
-apiVersion: apps.kruise.io/v1alpha1
-kind: SidecarSet
-spec:
-   containers:
-    - name: sidecar1
-      image: centos:6.7
-      resourcesPolicy:
-        targetContainerMode: sum
-        targetContainersNameRegex: ^large.engine.v.*$
-        resourceExpr:
-          limits:
-            cpu: max(cpu*50%, 1) # cpu limits must be at least 1m
-            memory: 200Mi
-          requests:
-            cpu: max(cpu*50%, 50m) # cpu requests must be at least 50m
-            memory: 100Mi
----
-apiVersion: v1
-kind: Pod
-spec:
-  containers:
-  - name: large.engine.v4
-    image: nginx:1.14.2
-    resources:
-      limits:
-        cpu: 200m
-        memory: 200Mi
-      requests:
-        cpu: 50m
-        memory: 100Mi
-  - name: large.engine.v8
-    image: nginx:1.14.2
-    resources:
-      limits:
-        cpu: 400m
-        memory: 400Mi
-      requests:
-        cpu: 100m
-        memory: 200Mi
-```
-In this case, the sidecar container resources will be:
-```
-limits:
-  cpu: max(sum(200m, 400m) * 50%, 1 ) = 1
-  memory: 200Mi
-requests:
-  cpu: max(sum(50m, 100m) * 50%, 50m ) = 75m
-  memory: 100Mi
-```
+User can define cpu expr as `0.5*cpu - 0.3*max(0, cpu-4) + 0.3*max(0, cpu-8)`, this is a linear function that use sum mode and max of container resources. In this case, the sidecar container cpu resources will be:
+![story5](20250913-story5.png)
+
 
 ### Requirements (Optional)
 
@@ -363,8 +316,8 @@ requests:
 ### ResourceExpr Calculator
 - Calculator: +, -, *, /, max(), min()
 - Number: int, float, percent
-- If matched containers don't have resources.limits configured, sidecar container resources.limits will not be set.
-- If matched containers don't have resources.requests configured, the corresponding resource value will be treated as 0.
+- Unconfigued limits resources will be treated as unlimited.  
+- Unconfigued requests resources will be treated as 0.
 - If the calculation result is negative, the pod creation request will be rejected by the webhook.
 
 ### Test Plan [optional]
