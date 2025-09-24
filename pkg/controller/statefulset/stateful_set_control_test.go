@@ -4090,7 +4090,7 @@ func (om *fakeObjectManager) setPodSpecifiedDelete(set *appsv1beta1.StatefulSet,
 	return om.podsLister.Pods(set.Namespace).List(selector)
 }
 
-var _ StatefulPodControlObjectManager = &fakeObjectManager{}
+var _ util.ObjectManager = &fakeObjectManager{}
 
 type fakeStatefulSetStatusUpdater struct {
 	setsLister          kruiseappslisters.StatefulSetLister
