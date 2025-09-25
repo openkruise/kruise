@@ -89,7 +89,8 @@ func validateAdvancedCronJobSpecSchedule(spec *appsv1beta1.AdvancedCronJobSpec, 
 			"schedule cannot be empty, please provide valid cron schedule."))
 	}
 
-	if _, err := cron.ParseStandard(spec.Schedule); err != nil {
+	// Use a helper function to safely parse cron expressions and handle panics
+	if err := validateCronSchedule(spec.Schedule); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("schedule"),
 			spec.Schedule, err.Error()))
 	}
@@ -98,6 +99,24 @@ func validateAdvancedCronJobSpecSchedule(spec *appsv1beta1.AdvancedCronJobSpec, 
 			spec.Schedule, "cannot use both timeZone field and TZ or CRON_TZ in schedule"))
 	}
 	return allErrs
+}
+
+// validateCronSchedule safely validates a cron schedule expression, handling potential panics
+func validateCronSchedule(schedule string) error {
+	var err error
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// If panic occurs, convert it to an error
+				err = fmt.Errorf("invalid cron schedule: %v", r)
+			}
+		}()
+
+		_, parseErr := cron.ParseStandard(schedule)
+		err = parseErr
+	}()
+
+	return err
 }
 
 func validateTimeZone(timeZone *string, fldPath *field.Path) field.ErrorList {

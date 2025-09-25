@@ -17,6 +17,9 @@ limitations under the License.
 package fuzz
 
 import (
+	"math/rand"
+	"time"
+
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -101,21 +104,12 @@ func GenerateAdvancedCronJobV1Beta1(cf *fuzz.ConsumeFuzzer, acj *appsv1beta1.Adv
 
 	// Generate Spec
 	acj.Spec = appsv1beta1.AdvancedCronJobSpec{
-		Schedule: "0 0 * * *",
+		Schedule: generateCronSchedule(cf),
 		Paused:   &[]bool{r.Intn(2) == 0}[0],
 	}
 
 	// Generate timezone
-	validTimeZones := []string{
-		"UTC",
-		"Asia/Shanghai",
-		"America/New_York",
-		"Europe/London",
-		"Asia/Tokyo",
-		"",
-	}
-	choice := r.Intn(len(validTimeZones))
-	timezone := validTimeZones[choice]
+	timezone := generateTimezone(cf)
 	acj.Spec.TimeZone = &timezone
 
 	// Generate starting deadline
@@ -130,7 +124,7 @@ func GenerateAdvancedCronJobV1Beta1(cf *fuzz.ConsumeFuzzer, acj *appsv1beta1.Adv
 		appsv1beta1.ForbidConcurrent,
 		appsv1beta1.ReplaceConcurrent,
 	}
-	choice = r.Intn(len(validPolicies))
+	choice := r.Intn(len(validPolicies))
 	acj.Spec.ConcurrencyPolicy = validPolicies[choice]
 
 	// Generate history limits
@@ -196,4 +190,66 @@ func GenerateAdvancedCronJobV1Beta1(cf *fuzz.ConsumeFuzzer, acj *appsv1beta1.Adv
 	}
 
 	return nil
+}
+
+// generateTimezone generates a random timezone string for fuzzing
+func generateTimezone(cf *fuzz.ConsumeFuzzer) string {
+	// Use framework to generate boolean value to decide generation strategy
+	useStructured, err := cf.GetBool()
+	if err != nil {
+		useStructured = false
+	}
+
+	if useStructured {
+		// Use framework to generate random string
+		randomTimezone, err := cf.GetString()
+		if err == nil && len(randomTimezone) > 0 {
+			return randomTimezone
+		}
+	}
+
+	timeZones := []string{
+		"UTC", "Asia/Shanghai", "America/New_York", "Europe/London", "Asia/Tokyo", "",
+		"GMT", "GMT+0", "GMT-0",
+	}
+
+	// Randomly select a timezone
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	choice := r.Intn(len(timeZones))
+	return timeZones[choice]
+}
+
+// generateCronSchedule generates various cron schedule expressions for fuzzing
+func generateCronSchedule(cf *fuzz.ConsumeFuzzer) string {
+	// Use framework to generate boolean value to decide generation strategy
+	useStructured, err := cf.GetBool()
+	if err != nil {
+		useStructured = false
+	}
+
+	if useStructured {
+		// Use framework to generate random string
+		randomSchedule, err := cf.GetString()
+		if err == nil && len(randomSchedule) > 0 {
+			return randomSchedule
+		}
+	}
+
+	cronSchedules := []string{
+		"0 0 * * *", "0 12 * * *", "30 9 * * *", "0 */6 * * *",
+		"0 0 */2 * *", "0 0 * * 0", "0 0 1 * *", "0 0 1 1 *",
+
+		"*/1 * * * *", "*/5 * * * *", "*/15 * * * *", "*/30 * * * *",
+		"0,30 * * * *", "15,45 * * * *",
+
+		"0 0 */1 * *", "0 0 */2 * *", "0 0 */3 * *", "0 0 */7 * *",
+		"0 0 */15 * *", "0 0 */30 * *",
+
+		"@yearly", "@annually", "@monthly", "@weekly", "@daily",
+		"@midnight", "@hourly", "@reboot", "@invalid",
+	}
+
+	// Randomly select a cron expression
+	choice := r.Intn(len(cronSchedules))
+	return cronSchedules[choice]
 }
