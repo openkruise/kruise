@@ -1,0 +1,114 @@
+/*
+Copyright 2021 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package v1beta1
+
+import (
+	"context"
+	"time"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
+)
+
+type BroadcastJobTester struct {
+	c  clientset.Interface
+	kc kruiseclientset.Interface
+	ns string
+}
+
+func NewBroadcastJobTester(c clientset.Interface, kc kruiseclientset.Interface, ns string) *BroadcastJobTester {
+	return &BroadcastJobTester{
+		c:  c,
+		kc: kc,
+		ns: ns,
+	}
+}
+
+func (t *BroadcastJobTester) CreateBroadcastJob(job *appsv1beta1.BroadcastJob) (*appsv1beta1.BroadcastJob, error) {
+	job, err := t.kc.AppsV1beta1().BroadcastJobs(t.ns).Create(context.TODO(), job, metav1.CreateOptions{})
+	t.WaitForBroadcastJobCreated(job)
+	return job, err
+}
+
+func (t *BroadcastJobTester) GetBroadcastJob(name string) (*appsv1beta1.BroadcastJob, error) {
+	return t.kc.AppsV1beta1().BroadcastJobs(t.ns).Get(context.TODO(), name, metav1.GetOptions{})
+}
+
+func (t *BroadcastJobTester) UpdateBroadcastJob(job *appsv1beta1.BroadcastJob) (*appsv1beta1.BroadcastJob, error) {
+	return t.kc.AppsV1beta1().BroadcastJobs(t.ns).Update(context.TODO(), job, metav1.UpdateOptions{})
+}
+
+func (t *BroadcastJobTester) DeleteBroadcastJob(name string) error {
+	return t.kc.AppsV1beta1().BroadcastJobs(t.ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
+}
+
+func (t *BroadcastJobTester) GetPodsOfJob(job *appsv1beta1.BroadcastJob) (pods []*v1.Pod, err error) {
+	podList, err := t.c.CoreV1().Pods(t.ns).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		controllerRef := metav1.GetControllerOf(pod)
+		if controllerRef != nil && controllerRef.UID == job.UID {
+			pods = append(pods, pod)
+		}
+	}
+	return pods, nil
+}
+
+func (t *BroadcastJobTester) WaitForBroadcastJobCreated(job *appsv1beta1.BroadcastJob) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, true,
+		func(ctx context.Context) (bool, error) {
+			_, err := t.kc.AppsV1beta1().BroadcastJobs(job.Namespace).Get(context.TODO(), job.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			return true, nil
+		})
+	if pollErr != nil {
+		common.Failf("Failed waiting for BroadcastJob to enter running: %v", pollErr)
+	}
+}
+
+func (t *BroadcastJobTester) WaitForBroadcastJobComplete(job *appsv1beta1.BroadcastJob, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(context.TODO(), time.Second, timeout, true,
+		func(ctx context.Context) (bool, error) {
+			job, err := t.GetBroadcastJob(job.Name)
+			if err != nil {
+				return false, err
+			}
+			return job.Status.Phase == appsv1beta1.PhaseCompleted, nil
+		})
+}
+
+func (t *BroadcastJobTester) WaitForBroadcastJobFailed(job *appsv1beta1.BroadcastJob, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(context.TODO(), time.Second, timeout, true,
+		func(ctx context.Context) (bool, error) {
+			job, err := t.GetBroadcastJob(job.Name)
+			if err != nil {
+				return false, err
+			}
+			return job.Status.Phase == appsv1beta1.PhaseFailed, nil
+		})
+}

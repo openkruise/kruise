@@ -26,7 +26,7 @@ import (
 
 func TestDurationStore_PopFromEmpty(t *testing.T) {
 	store := &DurationStore{}
-	
+
 	duration := store.Pop("non-existent-key")
 	assert.Equal(t, time.Duration(0), duration)
 }
@@ -35,14 +35,14 @@ func TestDurationStore_PushAndPop(t *testing.T) {
 	store := &DurationStore{}
 	key := "test-key"
 	expectedDuration := 5 * time.Second
-	
+
 	// Push duration
 	store.Push(key, expectedDuration)
-	
+
 	// Pop should return the duration and remove the key
 	duration := store.Pop(key)
 	assert.Equal(t, expectedDuration, duration)
-	
+
 	// Second pop should return 0 since key was removed
 	duration = store.Pop(key)
 	assert.Equal(t, time.Duration(0), duration)
@@ -50,17 +50,17 @@ func TestDurationStore_PushAndPop(t *testing.T) {
 
 func TestDurationStore_MultipleKeys(t *testing.T) {
 	store := &DurationStore{}
-	
+
 	// Push different durations for different keys
 	store.Push("key1", 1*time.Second)
 	store.Push("key2", 2*time.Second)
 	store.Push("key3", 3*time.Second)
-	
+
 	// Pop in different order
 	assert.Equal(t, 2*time.Second, store.Pop("key2"))
 	assert.Equal(t, 1*time.Second, store.Pop("key1"))
 	assert.Equal(t, 3*time.Second, store.Pop("key3"))
-	
+
 	// All keys should be removed
 	assert.Equal(t, time.Duration(0), store.Pop("key1"))
 	assert.Equal(t, time.Duration(0), store.Pop("key2"))
@@ -70,12 +70,12 @@ func TestDurationStore_MultipleKeys(t *testing.T) {
 func TestDurationStore_PushMultipleTimes(t *testing.T) {
 	store := &DurationStore{}
 	key := "test-key"
-	
+
 	// Push multiple durations - should keep the shortest
 	store.Push(key, 10*time.Second)
 	store.Push(key, 5*time.Second)
 	store.Push(key, 15*time.Second)
-	
+
 	duration := store.Pop(key)
 	assert.Equal(t, 5*time.Second, duration)
 }
@@ -84,10 +84,10 @@ func TestDurationStore_ConcurrentAccess(t *testing.T) {
 	store := &DurationStore{}
 	key := "concurrent-key"
 	numGoroutines := 100
-	
+
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
-	
+
 	// Concurrent pushes
 	for i := 0; i < numGoroutines; i++ {
 		go func(duration time.Duration) {
@@ -95,9 +95,9 @@ func TestDurationStore_ConcurrentAccess(t *testing.T) {
 			store.Push(key, duration)
 		}(time.Duration(i+1) * time.Millisecond)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Should get the shortest duration (1ms)
 	duration := store.Pop(key)
 	assert.Equal(t, 1*time.Millisecond, duration)
@@ -141,7 +141,7 @@ func TestDuration_Update(t *testing.T) {
 			expectedResult:  5 * time.Second,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			duration := &Duration{duration: tt.initialDuration}
@@ -153,19 +153,19 @@ func TestDuration_Update(t *testing.T) {
 
 func TestDuration_UpdateWithMsg(t *testing.T) {
 	duration := &Duration{}
-	
+
 	// First update with message
 	duration.UpdateWithMsg(5*time.Second, "waiting for %s", "pod")
 	resultDuration, message := duration.GetWithMsg()
 	assert.Equal(t, 5*time.Second, resultDuration)
 	assert.Equal(t, "waiting for pod", message)
-	
+
 	// Update with shorter duration and new message
 	duration.UpdateWithMsg(3*time.Second, "waiting for %s in %s", "container", "namespace")
 	resultDuration, message = duration.GetWithMsg()
 	assert.Equal(t, 3*time.Second, resultDuration)
 	assert.Equal(t, "waiting for container in namespace", message)
-	
+
 	// Update with longer duration - should not change
 	duration.UpdateWithMsg(10*time.Second, "should not update")
 	resultDuration, message = duration.GetWithMsg()
@@ -176,10 +176,10 @@ func TestDuration_UpdateWithMsg(t *testing.T) {
 func TestDuration_Merge(t *testing.T) {
 	duration1 := &Duration{duration: 10 * time.Second, message: "original message"}
 	duration2 := &Duration{duration: 5 * time.Second, message: "shorter message"}
-	
+
 	// Merge duration2 into duration1
 	duration1.Merge(duration2)
-	
+
 	resultDuration, message := duration1.GetWithMsg()
 	assert.Equal(t, 5*time.Second, resultDuration)
 	assert.Equal(t, "shorter message", message)
@@ -188,10 +188,10 @@ func TestDuration_Merge(t *testing.T) {
 func TestDuration_ConcurrentOperations(t *testing.T) {
 	duration := &Duration{}
 	numGoroutines := 100
-	
+
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines * 2)
-	
+
 	// Concurrent updates
 	for i := 0; i < numGoroutines; i++ {
 		go func(d time.Duration) {
@@ -199,7 +199,7 @@ func TestDuration_ConcurrentOperations(t *testing.T) {
 			duration.Update(d)
 		}(time.Duration(i+1) * time.Millisecond)
 	}
-	
+
 	// Concurrent gets
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
@@ -207,9 +207,9 @@ func TestDuration_ConcurrentOperations(t *testing.T) {
 			_ = duration.Get()
 		}()
 	}
-	
+
 	wg.Wait()
-	
+
 	// Should have the shortest duration (1ms)
 	assert.Equal(t, 1*time.Millisecond, duration.Get())
 }
@@ -243,10 +243,10 @@ func TestDuration_ZeroInitialization(t *testing.T) {
 func TestDuration_MessageFormatting(t *testing.T) {
 	// Test various message formatting scenarios
 	tests := []struct {
-		name           string
-		format         string
-		args           []interface{}
-		expectedMsg    string
+		name        string
+		format      string
+		args        []interface{}
+		expectedMsg string
 	}{
 		{
 			name:        "simple string",

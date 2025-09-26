@@ -349,7 +349,7 @@ func TestGetContainerPriority_EdgeCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// For cases that would panic, we need to handle them specially
 			if tt.name == "container with env var but no ValueFrom" ||
-			   tt.name == "container with invalid key format (too short)" {
+				tt.name == "container with invalid key format (too short)" {
 				assert.Panics(t, func() {
 					GetContainerPriority(tt.container)
 				})

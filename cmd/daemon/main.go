@@ -17,19 +17,17 @@ limitations under the License.
 package main
 
 import (
-	"os"
-
-	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
-
 	"flag"
 	"math/rand"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 	"time"
 
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
+	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"

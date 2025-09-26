@@ -22,8 +22,6 @@ import (
 	"testing"
 	"time"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
 	"github.com/robfig/cron/v3"
 	"github.com/stretchr/testify/assert"
 	batchv1 "k8s.io/api/batch/v1"
@@ -31,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	utilpointer "k8s.io/utils/pointer"
@@ -38,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 )
 
@@ -89,7 +88,7 @@ func TestScheduleWithTimeZone(t *testing.T) {
 	}
 
 	for i, tc := range cases {
-		acj := &appsv1alpha1.AdvancedCronJob{Spec: appsv1alpha1.AdvancedCronJobSpec{Schedule: tc.schedule, TimeZone: tc.timeZone}}
+		acj := &appsv1beta1.AdvancedCronJob{Spec: appsv1beta1.AdvancedCronJobSpec{Schedule: tc.schedule, TimeZone: tc.timeZone}}
 		sched, err := cron.ParseStandard(formatSchedule(acj))
 		if err != nil {
 			t.Fatal(err)
@@ -109,7 +108,7 @@ func TestScheduleWithTimeZone(t *testing.T) {
 // Test scenario:
 func TestReconcileAdvancedJobCreateBroadcastJob(t *testing.T) {
 	scheme := runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
 
 	// A job
@@ -133,12 +132,12 @@ func TestReconcileAdvancedJobCreateBroadcastJob(t *testing.T) {
 
 	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
-	retrievedJob := &appsv1alpha1.AdvancedCronJob{}
+	retrievedJob := &appsv1beta1.AdvancedCronJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
 	assert.NoError(t, err)
-	assert.Equal(t, retrievedJob.Status.Type, appsv1alpha1.BroadcastJobTemplate)
+	assert.Equal(t, retrievedJob.Status.Type, appsv1beta1.BroadcastJobTemplate)
 
-	brJobList := &appsv1alpha1.BroadcastJobList{}
+	brJobList := &appsv1beta1.BroadcastJobList{}
 	listOptions := client.InNamespace(request.Namespace)
 	err = reconcileJob.List(context.TODO(), brJobList, listOptions)
 	assert.NoError(t, err)
@@ -146,7 +145,7 @@ func TestReconcileAdvancedJobCreateBroadcastJob(t *testing.T) {
 
 func TestReconcileAdvancedJobCreateJob(t *testing.T) {
 	scheme := runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(batchv1.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
 
@@ -171,10 +170,10 @@ func TestReconcileAdvancedJobCreateJob(t *testing.T) {
 
 	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
-	retrievedJob := &appsv1alpha1.AdvancedCronJob{}
+	retrievedJob := &appsv1beta1.AdvancedCronJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
 	assert.NoError(t, err)
-	assert.Equal(t, retrievedJob.Status.Type, appsv1alpha1.JobTemplate)
+	assert.Equal(t, retrievedJob.Status.Type, appsv1beta1.JobTemplate)
 
 	brJobList := &batchv1.JobList{}
 	listOptions := client.InNamespace(request.Namespace)
@@ -185,14 +184,14 @@ func TestReconcileAdvancedJobCreateJob(t *testing.T) {
 func createReconcileJobWithBroadcastJobIndex(scheme *runtime.Scheme, initObjs ...client.Object) ReconcileAdvancedCronJob {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
 		WithObjects(initObjs...).
-		WithIndex(&appsv1alpha1.BroadcastJob{}, fieldindex.IndexNameForController, func(rawObj client.Object) []string {
-			job := rawObj.(*appsv1alpha1.BroadcastJob)
+		WithIndex(&appsv1beta1.BroadcastJob{}, fieldindex.IndexNameForController, func(rawObj client.Object) []string {
+			job := rawObj.(*appsv1beta1.BroadcastJob)
 			owner := metav1.GetControllerOf(job)
 			if owner == nil {
 				return nil
 			}
 			return []string{owner.Name}
-		}).WithStatusSubresource(&appsv1alpha1.AdvancedCronJob{}).Build()
+		}).WithStatusSubresource(&appsv1beta1.AdvancedCronJob{}).Build()
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "advancedcronjob-controller"})
 	reconcileJob := ReconcileAdvancedCronJob{
@@ -213,7 +212,7 @@ func createReconcileJobWithBatchJobIndex(scheme *runtime.Scheme, initObjs ...cli
 				return nil
 			}
 			return []string{owner.Name}
-		}).WithStatusSubresource(&appsv1alpha1.AdvancedCronJob{}).Build()
+		}).WithStatusSubresource(&appsv1beta1.AdvancedCronJob{}).Build()
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "advancedcronjob-controller"})
 	reconcileJob := ReconcileAdvancedCronJob{
@@ -233,18 +232,18 @@ func createNode(nodeName string) *v1.Node {
 	return node3
 }
 
-func createJob(jobName string, template appsv1alpha1.CronJobTemplate) *appsv1alpha1.AdvancedCronJob {
+func createJob(jobName string, template appsv1beta1.CronJobTemplate) *appsv1beta1.AdvancedCronJob {
 	var historyLimit int32 = 3
 
 	paused := false
-	job1 := &appsv1alpha1.AdvancedCronJob{
+	job1 := &appsv1beta1.AdvancedCronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,
 			Namespace: "default",
 			UID:       "12345",
-			SelfLink:  "/apis/apps.kruise.io/v1alpha1/namespaces/default/advancedcronjobs/" + jobName,
+			SelfLink:  "/apis/apps.kruise.io/v1beta1/namespaces/default/advancedcronjobs/" + jobName,
 		},
-		Spec: appsv1alpha1.AdvancedCronJobSpec{
+		Spec: appsv1beta1.AdvancedCronJobSpec{
 			Schedule:                   "* * * * *",
 			ConcurrencyPolicy:          "Replace",
 			Paused:                     &paused,
@@ -256,23 +255,23 @@ func createJob(jobName string, template appsv1alpha1.CronJobTemplate) *appsv1alp
 	return job1
 }
 
-func broadcastJobTemplate() appsv1alpha1.CronJobTemplate {
-	return appsv1alpha1.CronJobTemplate{
-		BroadcastJobTemplate: &appsv1alpha1.BroadcastJobTemplateSpec{
-			Spec: appsv1alpha1.BroadcastJobSpec{
+func broadcastJobTemplate() appsv1beta1.CronJobTemplate {
+	return appsv1beta1.CronJobTemplate{
+		BroadcastJobTemplate: &appsv1beta1.BroadcastJobTemplateSpec{
+			Spec: appsv1beta1.BroadcastJobSpec{
 				Template: v1.PodTemplateSpec{
 					Spec: v1.PodSpec{},
 				},
-				CompletionPolicy: appsv1alpha1.CompletionPolicy{},
+				CompletionPolicy: appsv1beta1.CompletionPolicy{},
 				Paused:           false,
-				FailurePolicy:    appsv1alpha1.FailurePolicy{},
+				FailurePolicy:    appsv1beta1.FailurePolicy{},
 			},
 		},
 	}
 }
 
-func jobTemplate() appsv1alpha1.CronJobTemplate {
-	return appsv1alpha1.CronJobTemplate{
+func jobTemplate() appsv1beta1.CronJobTemplate {
+	return appsv1beta1.CronJobTemplate{
 		JobTemplate: &batchv1.JobTemplateSpec{
 			Spec: batchv1.JobSpec{
 				Template: v1.PodTemplateSpec{

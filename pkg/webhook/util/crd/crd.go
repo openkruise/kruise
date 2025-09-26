@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-
 	"reflect"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"

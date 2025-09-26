@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kruise Authors.
+Copyright 2025 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -90,6 +90,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().WorkloadSpreads().Informer()}, nil
 
 		// Group=apps.kruise.io, Version=v1beta1
+	case v1beta1.SchemeGroupVersion.WithResource("advancedcronjobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().AdvancedCronJobs().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("broadcastjobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().BroadcastJobs().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("statefulsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().StatefulSets().Informer()}, nil
 

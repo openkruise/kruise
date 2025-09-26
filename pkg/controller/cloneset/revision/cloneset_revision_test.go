@@ -22,15 +22,15 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/openkruise/kruise/apis"
-	clonesettest "github.com/openkruise/kruise/pkg/controller/cloneset/test"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/controller/history"
+
+	"github.com/openkruise/kruise/apis"
+	clonesettest "github.com/openkruise/kruise/pkg/controller/cloneset/test"
 )
 
 func TestMain(m *testing.M) {

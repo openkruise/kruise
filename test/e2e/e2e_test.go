@@ -19,9 +19,12 @@ package e2e
 
 import (
 	"flag"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"os"
 	"testing"
+
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
@@ -29,22 +32,19 @@ import (
 	// See https://github.com/kubernetes/kubernetes/issues/74827
 	// "github.com/onsi/ginkgo/v2"
 
-	kruiseapis "github.com/openkruise/kruise/apis"
-	"github.com/openkruise/kruise/test/e2e/framework"
-	"github.com/openkruise/kruise/test/e2e/framework/testfiles"
-	e2etestingmanifests "github.com/openkruise/kruise/test/e2e/testing-manifests"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
-
 	// test sources
-	_ "github.com/openkruise/kruise/test/e2e/apps"
-	_ "github.com/openkruise/kruise/test/e2e/policy"
+	kruiseapis "github.com/openkruise/kruise/apis"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
+
+	_ "github.com/openkruise/kruise/test/e2e/apps/v1alpha1"
+	_ "github.com/openkruise/kruise/test/e2e/apps/v1beta1"
+	_ "github.com/openkruise/kruise/test/e2e/policy/v1alpha1"
 )
 
 // handleFlags sets up all flags and parses the command line.
 func handleFlags() {
-	framework.RegisterCommonFlags(flag.CommandLine)
-	framework.RegisterClusterFlags(flag.CommandLine)
+	common.RegisterCommonFlags(flag.CommandLine)
+	common.RegisterClusterFlags(flag.CommandLine)
 	flag.Parse()
 }
 
@@ -52,19 +52,7 @@ func TestMain(m *testing.M) {
 	// Register test flags, then parse flags.
 	handleFlags()
 
-	// Enable embedded FS file lookup as fallback
-	testfiles.AddFileSource(e2etestingmanifests.GetE2ETestingManifestsFS())
-
-	framework.AfterReadingAllFlags(&framework.TestContext)
-
-	// TODO: Deprecating repo-root over time... instead just use gobindata_util.go , see #23987.
-	// Right now it is still needed, for example by
-	// test/e2e/framework/ingress/ingress_utils.go
-	// for providing the optional secret.yaml file and by
-	// test/e2e/framework/util.go for cluster/log-dump.
-	if framework.TestContext.RepoRoot != "" {
-		testfiles.AddFileSource(testfiles.RootFileSource{Root: framework.TestContext.RepoRoot})
-	}
+	common.AfterReadingAllFlags(&common.TestContext)
 
 	os.Exit(m.Run())
 }

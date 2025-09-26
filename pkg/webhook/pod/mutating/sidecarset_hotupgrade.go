@@ -20,10 +20,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 func injectHotUpgradeContainers(hotUpgradeWorkInfo map[string]string, sidecarContainer *appsv1alpha1.SidecarContainer) (

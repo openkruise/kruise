@@ -17,14 +17,15 @@ limitations under the License.
 package defaults
 
 import (
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	"github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 const (
@@ -44,10 +45,10 @@ func SetDefaultsSidecarSet(obj *v1alpha1.SidecarSet) {
 		setDefaultSidecarContainer(&obj.Spec.Containers[i], v1alpha1.BeforeAppContainerType)
 	}
 
-	//default setting volumes
+	// default setting volumes
 	SetDefaultPodVolumes(obj.Spec.Volumes)
 
-	//default setting history revision limitation
+	// default setting history revision limitation
 	SetDefaultRevisionHistoryLimit(&obj.Spec.RevisionHistoryLimit)
 
 	// default patchPolicy is 'Retain'
@@ -58,7 +59,7 @@ func SetDefaultsSidecarSet(obj *v1alpha1.SidecarSet) {
 		}
 	}
 
-	//default setting injectRevisionStrategy
+	// default setting injectRevisionStrategy
 	SetDefaultInjectRevision(&obj.Spec.InjectionStrategy)
 }
 
@@ -150,58 +151,6 @@ func setDefaultContainer(sidecarContainer *v1alpha1.SidecarContainer) {
 				v1.SetDefaults_HTTPGetAction(container.Lifecycle.PreStop.HTTPGet)
 			}
 		}
-	}
-}
-
-// SetDefaults_AdvancedCronJob set default values for BroadcastJob.
-func SetDefaultsAdvancedCronJob(obj *v1alpha1.AdvancedCronJob, injectTemplateDefaults bool) {
-	if obj.Spec.Template.JobTemplate != nil && injectTemplateDefaults {
-		SetDefaultPodSpec(&obj.Spec.Template.JobTemplate.Spec.Template.Spec)
-	}
-
-	if obj.Spec.Template.BroadcastJobTemplate != nil && injectTemplateDefaults {
-		SetDefaultPodSpec(&obj.Spec.Template.BroadcastJobTemplate.Spec.Template.Spec)
-	}
-
-	if obj.Spec.ConcurrencyPolicy == "" {
-		obj.Spec.ConcurrencyPolicy = v1alpha1.AllowConcurrent
-	}
-	if obj.Spec.Paused == nil {
-		obj.Spec.Paused = new(bool)
-	}
-
-	if obj.Spec.SuccessfulJobsHistoryLimit == nil {
-		obj.Spec.SuccessfulJobsHistoryLimit = new(int32)
-		*obj.Spec.SuccessfulJobsHistoryLimit = 3
-	}
-	if obj.Spec.FailedJobsHistoryLimit == nil {
-		obj.Spec.FailedJobsHistoryLimit = new(int32)
-		*obj.Spec.FailedJobsHistoryLimit = 1
-	}
-}
-
-// SetDefaults_BroadcastJob set default values for BroadcastJob.
-func SetDefaultsBroadcastJob(obj *v1alpha1.BroadcastJob, injectTemplateDefaults bool) {
-	if injectTemplateDefaults {
-		SetDefaultPodSpec(&obj.Spec.Template.Spec)
-	}
-	if obj.Spec.CompletionPolicy.Type == "" {
-		obj.Spec.CompletionPolicy.Type = v1alpha1.Always
-	}
-
-	if obj.Spec.Parallelism == nil {
-		parallelism := int32(1<<31 - 1)
-		parallelismIntStr := intstr.FromInt(int(parallelism))
-		obj.Spec.Parallelism = &parallelismIntStr
-	}
-
-	if obj.Spec.FailurePolicy.Type == "" {
-		obj.Spec.FailurePolicy.Type = v1alpha1.FailurePolicyTypeFailFast
-	}
-
-	// Default to 'OnFailure' if no restartPolicy is specified
-	if obj.Spec.Template.Spec.RestartPolicy == "" {
-		obj.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyOnFailure
 	}
 }
 

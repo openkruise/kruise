@@ -5,9 +5,10 @@ import (
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	fuzzutils "github.com/openkruise/kruise/test/fuzz"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func FuzzPatchPodMetadata(f *testing.F) {

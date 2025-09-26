@@ -20,13 +20,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 const (

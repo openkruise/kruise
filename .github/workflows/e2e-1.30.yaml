@@ -201,7 +201,7 @@ jobs:
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config
-          tools/hack/run-kruise-e2e-test.sh --focus '(EphemeralJob|BroadcastJob)' --print-info
+          tools/hack/run-kruise-e2e-test.sh --focus '(EphemeralJob|BroadcastJob|AdvancedCronJob)' --print-info
 
   policy:
     runs-on: ubuntu-24.04
