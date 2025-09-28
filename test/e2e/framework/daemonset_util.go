@@ -14,6 +14,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -73,12 +74,35 @@ func (t *DaemonSetTester) NewDaemonSet(name string, label map[string]string, ima
 						{
 							Name:    "busybox",
 							Image:   image,
-							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
+							Command: []string{"/bin/sh", "-c", "echo 'data' > /data/data1 && sleep 10000000"},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name:      "data",
+									MountPath: "/data",
+								},
+							},
 						},
 					},
 					HostNetwork:                   true,
 					Tolerations:                   []v1.Toleration{{Operator: v1.TolerationOpExists}},
 					TerminationGracePeriodSeconds: utilpointer.Int64(3),
+				},
+			},
+			VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "data",
+					},
+					Spec: v1.PersistentVolumeClaimSpec{
+						AccessModes: []v1.PersistentVolumeAccessMode{
+							v1.ReadWriteOnce,
+						},
+						Resources: v1.VolumeResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceStorage: *resource.NewQuantity(1*2^20, resource.BinarySI),
+							},
+						},
+					},
 				},
 			},
 			UpdateStrategy: updateStrategy,
@@ -370,6 +394,18 @@ func (t *DaemonSetTester) ListDaemonPods(label map[string]string) (*v1.PodList, 
 	selector := labels.Set(label).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	return t.c.CoreV1().Pods(t.ns).List(context.TODO(), options)
+}
+
+func (t *DaemonSetTester) ListDaemonPvcs(label map[string]string) (*v1.PersistentVolumeClaimList, error) {
+	selector := labels.Set(label).AsSelector()
+	options := metav1.ListOptions{LabelSelector: selector.String()}
+	return t.c.CoreV1().PersistentVolumeClaims(t.ns).List(context.TODO(), options)
+}
+
+func (t *DaemonSetTester) DeleteDaemonPvcs(label map[string]string) error {
+	selector := labels.Set(label).AsSelector()
+	options := metav1.ListOptions{LabelSelector: selector.String()}
+	return t.c.CoreV1().PersistentVolumeClaims(t.ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, options)
 }
 
 func (t *DaemonSetTester) DaemonPodHasReadinessGate(pods []v1.Pod) bool {

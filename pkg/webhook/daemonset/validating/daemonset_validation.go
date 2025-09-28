@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
+	"k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -35,6 +36,22 @@ func validateDaemonSet(ds *appsv1alpha1.DaemonSet) field.ErrorList {
 	return allErrs
 }
 
+func volumesToAddForTemplates(spec *appsv1alpha1.DaemonSetSpec) map[string]core.Volume {
+	volumes := make(map[string]core.Volume)
+	templates := spec.VolumeClaimTemplates
+	for i := range templates {
+		volumes[templates[i].Name] = core.Volume{
+			Name: templates[i].Name,
+			VolumeSource: core.VolumeSource{
+				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+					ClaimName: templates[i].Name,
+				},
+			},
+		}
+	}
+	return volumes
+}
+
 // ValidateDaemonSetSpec tests if required fields in the DaemonSetSpec are set.
 func validateDaemonSetSpec(spec *appsv1alpha1.DaemonSetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -54,7 +71,24 @@ func validateDaemonSetSpec(spec *appsv1alpha1.DaemonSetSpec, fldPath *field.Path
 		allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.Template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 		return allErrs
 	}
-	allErrs = append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions)...)
+	templateToValidate := coreTemplate
+	if len(spec.VolumeClaimTemplates) > 0 {
+		templateToValidate = templateToValidate.DeepCopy()
+		if len(spec.VolumeClaimTemplates) > 0 {
+			templateVolumes := volumesToAddForTemplates(spec)
+			newVolumes := make([]core.Volume, 0, len(templateVolumes))
+			for _, v := range templateVolumes {
+				newVolumes = append(newVolumes, v)
+			}
+			for _, v := range templateToValidate.Spec.Volumes {
+				if _, ok := templateVolumes[v.Name]; !ok {
+					newVolumes = append(newVolumes, v)
+				}
+			}
+			templateToValidate.Spec.Volumes = newVolumes
+		}
+	}
+	allErrs = append(allErrs, corevalidation.ValidatePodTemplateSpec(templateToValidate, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions)...)
 
 	// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 	if spec.Template.Spec.RestartPolicy != corev1.RestartPolicyAlways {
