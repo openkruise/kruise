@@ -100,6 +100,11 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		klog.ErrorS(err, "Failed to watch BroadcastJob")
 		return err
 	}
+
+	if err = watchImageListPullJob(mgr, c); err != nil {
+		klog.ErrorS(err, "Failed to watch ImageListPullJob")
+		return err
+	}
 	return nil
 }
 
@@ -155,6 +160,8 @@ func (r *ReconcileAdvancedCronJob) Reconcile(_ context.Context, req ctrl.Request
 		return r.reconcileJob(ctx, req, advancedCronJob)
 	case appsv1alpha1.BroadcastJobTemplate:
 		return r.reconcileBroadcastJob(ctx, req, advancedCronJob)
+	case appsv1alpha1.ImageListPullJobTemplate:
+		return r.reconcileImageListPullJob(ctx, req, advancedCronJob)
 	default:
 		klog.InfoS("No template found", "advancedCronJob", req)
 	}

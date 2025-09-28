@@ -24,12 +24,15 @@ import (
 	"strings"
 	"time"
 
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/robfig/cron/v3"
 	admissionv1 "k8s.io/api/admission/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -45,6 +48,8 @@ const (
 	AdvancedCronJobNameMaxLen      = 63
 	validateAdvancedCronJobNameMsg = "AdvancedCronJob name must consist of alphanumeric characters or '-'"
 	validAdvancedCronJobNameFmt    = `^[a-zA-Z0-9\-]+$`
+	MaxActiveDeadLineSeconds       = 14400
+	MaxTTLSecondsAfterFinished     = 86400
 )
 
 var (
@@ -134,6 +139,11 @@ func validateAdvancedCronJobSpecTemplate(spec *appsv1alpha1.AdvancedCronJobSpec,
 		allErrs = append(allErrs, validateBroadcastJobTemplateSpec(spec.Template.BroadcastJobTemplate, fldPath)...)
 	}
 
+	if spec.Template.ImageListPullJobTemplate != nil {
+		templateCount++
+		allErrs = append(allErrs, validateImageListPullJobTemplateSpec(spec.Template.ImageListPullJobTemplate, fldPath)...)
+	}
+
 	if templateCount == 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("template"),
 			"spec must have one template, either JobTemplate or BroadcastJobTemplate should be provided"))
@@ -162,6 +172,72 @@ func validateBroadcastJobTemplateSpec(brJobSpec *appsv1alpha1.BroadcastJobTempla
 		return allErrs
 	}
 	return append(allErrs, apivalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions)...)
+}
+
+func validateImageListPullJobTemplateSpec(ilpJobSpec *appsv1alpha1.ImageListPullJobTemplateSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if ilpJobSpec.Spec.Selector != nil {
+		if ilpJobSpec.Spec.Selector.MatchLabels != nil || ilpJobSpec.Spec.Selector.MatchExpressions != nil {
+			if ilpJobSpec.Spec.Selector.Names != nil {
+				return append(allErrs, field.Invalid(fldPath.Child("spec"), ilpJobSpec.Spec, "can not set both names and labelSelector in this spec.selector"))
+			}
+			if _, err := metav1.LabelSelectorAsSelector(&ilpJobSpec.Spec.Selector.LabelSelector); err != nil {
+				return append(allErrs, field.Invalid(fldPath.Child("spec").Child("selector").Child("labelSelector"), ilpJobSpec.Spec.Selector.LabelSelector, fmt.Sprintf("invalid selector: %v", err)))
+			}
+		}
+		if ilpJobSpec.Spec.Selector.Names != nil {
+			names := sets.NewString(ilpJobSpec.Spec.Selector.Names...)
+			if names.Len() != len(ilpJobSpec.Spec.Selector.Names) {
+				return append(allErrs, field.Invalid(fldPath.Child("spec").Child("selector").Child("names"), ilpJobSpec.Spec.Selector.Names, "duplicated name in selector names"))
+			}
+		}
+	}
+
+	if ilpJobSpec.Spec.PodSelector != nil {
+		if ilpJobSpec.Spec.Selector != nil {
+			return append(allErrs, field.Invalid(fldPath.Child("spec"), ilpJobSpec.Spec, "can not set both selector and podSelector"))
+		}
+		if _, err := metav1.LabelSelectorAsSelector(&ilpJobSpec.Spec.PodSelector.LabelSelector); err != nil {
+			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("podSelector").Child("labelSelector"), ilpJobSpec.Spec.PodSelector.LabelSelector, fmt.Sprintf("invalid selector: %v", err)))
+		}
+	}
+
+	if len(ilpJobSpec.Spec.Images) == 0 {
+		return append(allErrs, field.Invalid(fldPath.Child("spec").Child("images"), ilpJobSpec.Spec.Images, "image can not be empty"))
+	}
+
+	if len(ilpJobSpec.Spec.Images) > 255 {
+		return append(allErrs, field.Invalid(fldPath.Child("spec").Child("images"), ilpJobSpec.Spec.Images, "the maximum number of images cannot > 255"))
+	}
+
+	for i := 0; i < len(ilpJobSpec.Spec.Images); i++ {
+		for j := i + 1; j < len(ilpJobSpec.Spec.Images); j++ {
+			if ilpJobSpec.Spec.Images[i] == ilpJobSpec.Spec.Images[j] {
+				return append(allErrs, field.Invalid(fldPath.Child("spec").Child("images"), ilpJobSpec.Spec.Images, "images cannot have duplicate values"))
+			}
+		}
+	}
+
+	for _, image := range ilpJobSpec.Spec.Images {
+		if _, err := daemonutil.NormalizeImageRef(image); err != nil {
+			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("images"), ilpJobSpec.Spec.Images, fmt.Sprintf("invalid image %s: %v", image, err)))
+		}
+	}
+
+	switch ilpJobSpec.Spec.CompletionPolicy.Type {
+	case appsv1alpha1.Always:
+		// is a no-op here.No need to do parameter dependency verification in this type.
+		if ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil && *ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds > MaxActiveDeadLineSeconds {
+			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("activeDeadlineSeconds"), ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds, fmt.Sprintf("activeDeadlineSeconds must less than 14400,current value is:%d", *ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds)))
+		}
+		if ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished != nil && *ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished > MaxTTLSecondsAfterFinished {
+			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("ttlSecondsAfterFinished"), ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished, fmt.Sprintf("ttlSecondsAfterFinished must less than 86400,current value is:%d", *ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished)))
+		}
+	default:
+		return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("type"), ilpJobSpec.Spec.CompletionPolicy.Type, fmt.Sprintf("completionPolicy should be always,but current value is:%s", ilpJobSpec.Spec.CompletionPolicy.Type)))
+	}
+
+	return allErrs
 }
 
 func convertPodTemplateSpec(template *v1.PodTemplateSpec) (*core.PodTemplateSpec, error) {

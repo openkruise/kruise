@@ -84,6 +84,12 @@ func RegisterFieldIndexes(c cache.Cache) error {
 				return
 			}
 		}
+		// imageListPullJob owner
+		if utildiscovery.DiscoverObject(&appsv1alpha1.ImageListPullJob{}) {
+			if err = indexImageListPullJob(c); err != nil {
+				return
+			}
+		}
 		// imagepulljob active
 		if utildiscovery.DiscoverObject(&appsv1alpha1.ImagePullJob{}) {
 			if err = indexImagePullJobActive(c); err != nil {
@@ -136,6 +142,25 @@ func indexBroadcastCronJob(c cache.Cache) error {
 	return c.IndexField(context.TODO(), &appsv1alpha1.BroadcastJob{}, IndexNameForController, func(rawObj client.Object) []string {
 		// grab the job object, extract the owner...
 		job := rawObj.(*appsv1alpha1.BroadcastJob)
+		owner := metav1.GetControllerOf(job)
+		if owner == nil {
+			return nil
+		}
+
+		// ...make sure it's a AdvancedCronJob...
+		if owner.APIVersion != apiGVStr || owner.Kind != appsv1alpha1.AdvancedCronJobKind {
+			return nil
+		}
+
+		// ...and if so, return it
+		return []string{owner.Name}
+	})
+}
+
+func indexImageListPullJob(c cache.Cache) error {
+	return c.IndexField(context.TODO(), &appsv1alpha1.ImageListPullJob{}, IndexNameForController, func(rawObj client.Object) []string {
+		// grab the job object, extract the owner...
+		job := rawObj.(*appsv1alpha1.ImageListPullJob)
 		owner := metav1.GetControllerOf(job)
 		if owner == nil {
 			return nil
