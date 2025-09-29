@@ -59,7 +59,6 @@ import (
 	_ "github.com/openkruise/kruise/pkg/util/metrics/leadership"
 	"github.com/openkruise/kruise/pkg/webhook"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
-	// +kubebuilder:scaffold:imports
 )
 
 const (

@@ -26,10 +26,9 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
-
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // parameters:

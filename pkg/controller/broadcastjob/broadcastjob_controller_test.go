@@ -23,8 +23,6 @@ import (
 	"reflect"
 	"testing"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -33,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -40,7 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func init() {
@@ -79,7 +78,7 @@ func TestGetNodeToPodMap(t *testing.T) {
 	}
 
 	r := &ReconcileBroadcastJob{recorder: record.NewFakeRecorder(10)}
-	nodeToPodMap := r.getNodeToPodMap(pods, &appsv1alpha1.BroadcastJob{})
+	nodeToPodMap := r.getNodeToPodMap(pods, &appsv1beta1.BroadcastJob{})
 	expectedNodeToPodMap := map[string]*v1.Pod{"n01": pods[0], "n02": pods[1], "n03": pods[2], "n04": pods[3]}
 	if !reflect.DeepEqual(nodeToPodMap, expectedNodeToPodMap) {
 		t.Fatalf("Unexpected nodeToPodMap: %#v", nodeToPodMap)
@@ -93,7 +92,7 @@ func TestGetNodeToPodMap(t *testing.T) {
 // 1 new pod created on 1 node
 func TestReconcileJobCreatePodAbsolute(t *testing.T) {
 	scheme := runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
 
 	p := intstr.FromInt(2)
@@ -121,7 +120,7 @@ func TestReconcileJobCreatePodAbsolute(t *testing.T) {
 
 	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
-	retrievedJob := &appsv1alpha1.BroadcastJob{}
+	retrievedJob := &appsv1beta1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
 	assert.NoError(t, err)
 
@@ -139,7 +138,7 @@ func TestReconcileJobCreatePodAbsolute(t *testing.T) {
 	// 3 desired pods, one for each node
 	assert.Equal(t, int32(3), retrievedJob.Status.Desired)
 	assert.NotNil(t, retrievedJob.Status.StartTime)
-	assert.Equal(t, appsv1alpha1.PhaseRunning, retrievedJob.Status.Phase)
+	assert.Equal(t, appsv1beta1.PhaseRunning, retrievedJob.Status.Phase)
 }
 
 // Test scenario:
@@ -149,7 +148,7 @@ func TestReconcileJobCreatePodAbsolute(t *testing.T) {
 // 1 new pod created on 1 node
 func TestReconcileJobCreatePodPercentage(t *testing.T) {
 	scheme := runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
 
 	p := intstr.FromString("40%")
@@ -181,7 +180,7 @@ func TestReconcileJobCreatePodPercentage(t *testing.T) {
 
 	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
-	retrievedJob := &appsv1alpha1.BroadcastJob{}
+	retrievedJob := &appsv1beta1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
 	assert.NoError(t, err)
 
@@ -199,7 +198,7 @@ func TestReconcileJobCreatePodPercentage(t *testing.T) {
 	// 3 desired pods, one for each node
 	assert.Equal(t, int32(5), retrievedJob.Status.Desired)
 	assert.NotNil(t, retrievedJob.Status.StartTime)
-	assert.Equal(t, appsv1alpha1.PhaseRunning, retrievedJob.Status.Phase)
+	assert.Equal(t, appsv1beta1.PhaseRunning, retrievedJob.Status.Phase)
 }
 
 // Test scenario:
@@ -207,7 +206,7 @@ func TestReconcileJobCreatePodPercentage(t *testing.T) {
 // Check only 1 pod is created because the other node is unschedulable
 func TestPodsOnUnschedulableNodes(t *testing.T) {
 	scheme := runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
 
 	p := intstr.FromInt(2)
@@ -231,7 +230,7 @@ func TestPodsOnUnschedulableNodes(t *testing.T) {
 
 	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
-	retrievedJob := &appsv1alpha1.BroadcastJob{}
+	retrievedJob := &appsv1beta1.BroadcastJob{}
 	// assert Job exists
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
 	assert.NoError(t, err)
@@ -245,7 +244,7 @@ func TestPodsOnUnschedulableNodes(t *testing.T) {
 	assert.Equal(t, int32(1), retrievedJob.Status.Active)
 	assert.Equal(t, int32(1), retrievedJob.Status.Desired)
 	assert.Equal(t, 1, len(podList.Items))
-	assert.Equal(t, appsv1alpha1.PhaseRunning, retrievedJob.Status.Phase)
+	assert.Equal(t, appsv1beta1.PhaseRunning, retrievedJob.Status.Phase)
 }
 
 // Test scenario:
@@ -253,7 +252,7 @@ func TestPodsOnUnschedulableNodes(t *testing.T) {
 // 10 pods created with slow start
 func TestReconcileJobMultipleBatches(t *testing.T) {
 	scheme := runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
 
 	p := intstr.FromInt(20)
@@ -275,7 +274,7 @@ func TestReconcileJobMultipleBatches(t *testing.T) {
 
 	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
-	retrievedJob := &appsv1alpha1.BroadcastJob{}
+	retrievedJob := &appsv1beta1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
 	assert.NoError(t, err)
 
@@ -298,13 +297,13 @@ func TestReconcileJobMultipleBatches(t *testing.T) {
 // Check job state is failed
 func TestJobFailed(t *testing.T) {
 	scheme := runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
 
 	// A job
 	p := intstr.FromInt(10)
 	job := createJob("job5", p)
-	job.Spec.FailurePolicy.Type = appsv1alpha1.FailurePolicyTypeFailFast
+	job.Spec.FailurePolicy.Type = appsv1beta1.FailurePolicyTypeFailFast
 
 	// Create 3 nodes
 	// Node1 has 1 pod running
@@ -330,19 +329,19 @@ func TestJobFailed(t *testing.T) {
 
 	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
-	retrievedJob := &appsv1alpha1.BroadcastJob{}
+	retrievedJob := &appsv1beta1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
 	assert.NoError(t, err)
 
 	// completionTime is set
 	assert.NotNil(t, retrievedJob.Status.CompletionTime)
 	// JobComplete condition is set
-	assert.Equal(t, appsv1alpha1.JobFailed, retrievedJob.Status.Conditions[len(retrievedJob.Status.Conditions)-1].Type)
+	assert.Equal(t, appsv1beta1.JobFailed, retrievedJob.Status.Conditions[len(retrievedJob.Status.Conditions)-1].Type)
 	assert.Equal(t, int32(3), retrievedJob.Status.Desired)
 	assert.Equal(t, int32(2), retrievedJob.Status.Succeeded)
 	assert.Equal(t, int32(1), retrievedJob.Status.Failed)
 	assert.Equal(t, int32(0), retrievedJob.Status.Active)
-	assert.Equal(t, appsv1alpha1.PhaseFailed, retrievedJob.Status.Phase)
+	assert.Equal(t, appsv1beta1.PhaseFailed, retrievedJob.Status.Phase)
 }
 
 // 2 completed pods, 1 succeeded, 1 failed
@@ -350,13 +349,13 @@ func TestJobFailed(t *testing.T) {
 // check job phase is running
 func TestJobFailurePolicyTypeContinue(t *testing.T) {
 	scheme := runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
 
 	// A job
 	p := intstr.FromInt(10)
 	job := createJob("job6", p)
-	job.Spec.FailurePolicy.Type = appsv1alpha1.FailurePolicyTypeContinue
+	job.Spec.FailurePolicy.Type = appsv1beta1.FailurePolicyTypeContinue
 
 	// Create 3 nodes
 	// Node1 has 1 pod running
@@ -381,7 +380,7 @@ func TestJobFailurePolicyTypeContinue(t *testing.T) {
 
 	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
-	retrievedJob := &appsv1alpha1.BroadcastJob{}
+	retrievedJob := &appsv1beta1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
 	assert.NoError(t, err)
 
@@ -389,7 +388,7 @@ func TestJobFailurePolicyTypeContinue(t *testing.T) {
 	assert.Equal(t, int32(1), retrievedJob.Status.Succeeded)
 	assert.Equal(t, int32(1), retrievedJob.Status.Failed)
 	assert.Equal(t, int32(1), retrievedJob.Status.Active)
-	assert.Equal(t, appsv1alpha1.PhaseRunning, retrievedJob.Status.Phase)
+	assert.Equal(t, appsv1beta1.PhaseRunning, retrievedJob.Status.Phase)
 }
 
 // 2 completed pods, 1 succeeded, 1 failed
@@ -397,13 +396,13 @@ func TestJobFailurePolicyTypeContinue(t *testing.T) {
 // check job phase is failed
 func TestJobFailurePolicyTypeFailFast(t *testing.T) {
 	scheme := runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
 
 	// A job
 	p := intstr.FromInt(10)
 	job := createJob("job7", p)
-	job.Spec.FailurePolicy.Type = appsv1alpha1.FailurePolicyTypeFailFast
+	job.Spec.FailurePolicy.Type = appsv1beta1.FailurePolicyTypeFailFast
 
 	// Create 3 nodes
 	// Node1 has 1 pod running
@@ -428,7 +427,7 @@ func TestJobFailurePolicyTypeFailFast(t *testing.T) {
 
 	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
-	retrievedJob := &appsv1alpha1.BroadcastJob{}
+	retrievedJob := &appsv1beta1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
 	assert.NoError(t, err)
 
@@ -436,7 +435,7 @@ func TestJobFailurePolicyTypeFailFast(t *testing.T) {
 	assert.Equal(t, int32(1), retrievedJob.Status.Succeeded)
 	assert.Equal(t, int32(1), retrievedJob.Status.Failed)
 	assert.Equal(t, int32(0), retrievedJob.Status.Active)
-	assert.Equal(t, appsv1alpha1.PhaseFailed, retrievedJob.Status.Phase)
+	assert.Equal(t, appsv1beta1.PhaseFailed, retrievedJob.Status.Phase)
 }
 
 // 2 completed pods, 1 succeeded, 1 failed
@@ -444,13 +443,13 @@ func TestJobFailurePolicyTypeFailFast(t *testing.T) {
 // check job phase is paused
 func TestJobFailurePolicyPause(t *testing.T) {
 	scheme := runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
 
 	// A job
 	p := intstr.FromInt(10)
 	job := createJob("job8", p)
-	job.Spec.FailurePolicy.Type = appsv1alpha1.FailurePolicyTypePause
+	job.Spec.FailurePolicy.Type = appsv1beta1.FailurePolicyTypePause
 
 	// Create 3 nodes
 	// Node1 has 1 pod running
@@ -475,12 +474,12 @@ func TestJobFailurePolicyPause(t *testing.T) {
 
 	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
-	retrievedJob := &appsv1alpha1.BroadcastJob{}
+	retrievedJob := &appsv1beta1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
 	assert.NoError(t, err)
 
 	// JobComplete condition is set
-	assert.Equal(t, appsv1alpha1.PhasePaused, retrievedJob.Status.Phase)
+	assert.Equal(t, appsv1beta1.PhasePaused, retrievedJob.Status.Phase)
 	assert.Equal(t, int32(3), retrievedJob.Status.Desired)
 	assert.Equal(t, int32(1), retrievedJob.Status.Succeeded)
 	assert.Equal(t, int32(1), retrievedJob.Status.Failed)
@@ -492,7 +491,7 @@ func TestJobFailurePolicyPause(t *testing.T) {
 // check job phase is paused, and no new pod is created.
 func TestJobSetPaused(t *testing.T) {
 	scheme := runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
 
 	p := intstr.FromString("50%")
@@ -520,12 +519,12 @@ func TestJobSetPaused(t *testing.T) {
 
 	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
-	retrievedJob := &appsv1alpha1.BroadcastJob{}
+	retrievedJob := &appsv1beta1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
 	assert.NoError(t, err)
 
 	// 3 pods active
-	assert.Equal(t, appsv1alpha1.PhasePaused, retrievedJob.Status.Phase)
+	assert.Equal(t, appsv1beta1.PhasePaused, retrievedJob.Status.Phase)
 	assert.Equal(t, int32(10), retrievedJob.Status.Desired)
 	assert.Equal(t, int32(0), retrievedJob.Status.Succeeded)
 	assert.Equal(t, int32(0), retrievedJob.Status.Failed)
@@ -535,7 +534,7 @@ func TestJobSetPaused(t *testing.T) {
 // The job should fail after activeDeadline, and active pods will be deleted
 func TestJobFailedAfterActiveDeadline(t *testing.T) {
 	scheme := runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
 
 	// A job
@@ -543,7 +542,7 @@ func TestJobFailedAfterActiveDeadline(t *testing.T) {
 	// activeDeadline is set 0, to make job fail
 	activeDeadline := int64(0)
 	now := metav1.Now()
-	job := &appsv1alpha1.BroadcastJob{
+	job := &appsv1beta1.BroadcastJob{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "BroadcastJob",
 			APIVersion: "apps.kruise.io/v1alpha1",
@@ -552,18 +551,18 @@ func TestJobFailedAfterActiveDeadline(t *testing.T) {
 			Name:      "job10",
 			Namespace: "default",
 			UID:       "12345",
-			SelfLink:  "/apis/apps.kruise.io/v1alpha1/namespaces/default/broadcastjobs/test",
+			SelfLink:  "/apis/apps.kruise.io/v1beta1/namespaces/default/broadcastjobs/test",
 		},
-		Spec: appsv1alpha1.BroadcastJobSpec{
+		Spec: appsv1beta1.BroadcastJobSpec{
 			Parallelism: &p,
-			CompletionPolicy: appsv1alpha1.CompletionPolicy{
+			CompletionPolicy: appsv1beta1.CompletionPolicy{
 				ActiveDeadlineSeconds: &activeDeadline,
 			},
-			FailurePolicy: appsv1alpha1.FailurePolicy{
-				Type: appsv1alpha1.FailurePolicyTypeContinue,
+			FailurePolicy: appsv1beta1.FailurePolicy{
+				Type: appsv1beta1.FailurePolicyTypeContinue,
 			},
 		},
-		Status: appsv1alpha1.BroadcastJobStatus{
+		Status: appsv1beta1.BroadcastJobStatus{
 			StartTime: &now,
 		},
 	}
@@ -586,16 +585,16 @@ func TestJobFailedAfterActiveDeadline(t *testing.T) {
 
 	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
-	retrievedJob := &appsv1alpha1.BroadcastJob{}
+	retrievedJob := &appsv1beta1.BroadcastJob{}
 	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
 	assert.NoError(t, err)
 
 	// The job is failed
 	assert.True(t, len(retrievedJob.Status.Conditions) > 0)
-	assert.Equal(t, appsv1alpha1.JobFailed, retrievedJob.Status.Conditions[len(retrievedJob.Status.Conditions)-1].Type)
+	assert.Equal(t, appsv1beta1.JobFailed, retrievedJob.Status.Conditions[len(retrievedJob.Status.Conditions)-1].Type)
 	assert.Equal(t, int32(2), retrievedJob.Status.Failed)
 	assert.Equal(t, int32(0), retrievedJob.Status.Active)
-	assert.Equal(t, appsv1alpha1.PhaseFailed, retrievedJob.Status.Phase)
+	assert.Equal(t, appsv1beta1.PhaseFailed, retrievedJob.Status.Phase)
 
 	// The active pods are deleted
 	podList := &v1.PodList{}
@@ -607,7 +606,7 @@ func TestJobFailedAfterActiveDeadline(t *testing.T) {
 
 func createReconcileJob(scheme *runtime.Scheme, initObjs ...client.Object) ReconcileBroadcastJob {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
-		WithObjects(initObjs...).WithStatusSubresource(&appsv1alpha1.BroadcastJob{}).Build()
+		WithObjects(initObjs...).WithStatusSubresource(&appsv1beta1.BroadcastJob{}).Build()
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "broadcast-controller"})
 	reconcileJob := ReconcileBroadcastJob{
@@ -633,8 +632,8 @@ func createNode(nodeName string) *v1.Node {
 	return node3
 }
 
-func createJob(jobName string, parallelism intstr.IntOrString) *appsv1alpha1.BroadcastJob {
-	job1 := &appsv1alpha1.BroadcastJob{
+func createJob(jobName string, parallelism intstr.IntOrString) *appsv1beta1.BroadcastJob {
+	job1 := &appsv1beta1.BroadcastJob{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "BroadcastJob",
 			APIVersion: "apps.kruise.io/v1alpha1",
@@ -643,24 +642,24 @@ func createJob(jobName string, parallelism intstr.IntOrString) *appsv1alpha1.Bro
 			Name:      jobName,
 			Namespace: "default",
 			UID:       "12345",
-			SelfLink:  "/apis/apps.kruise.io/v1alpha1/namespaces/default/broadcastjobs/" + jobName,
+			SelfLink:  "/apis/apps.kruise.io/v1beta1/namespaces/default/broadcastjobs/" + jobName,
 		},
-		Spec: appsv1alpha1.BroadcastJobSpec{
+		Spec: appsv1beta1.BroadcastJobSpec{
 			Parallelism:      &parallelism,
-			CompletionPolicy: appsv1alpha1.CompletionPolicy{},
+			CompletionPolicy: appsv1beta1.CompletionPolicy{},
 		},
 	}
 	return job1
 }
 
-func createPod(job1 *appsv1alpha1.BroadcastJob, podName, nodeName string, phase v1.PodPhase) *v1.Pod {
+func createPod(job1 *appsv1beta1.BroadcastJob, podName, nodeName string, phase v1.PodPhase) *v1.Pod {
 	job1Pod1onNode1 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
 			Labels:    labelsAsMap(job1),
 			Namespace: "default",
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(job1, appsv1alpha1.SchemeGroupVersion.WithKind("BroadcastJob")),
+				*metav1.NewControllerRef(job1, appsv1beta1.SchemeGroupVersion.WithKind("BroadcastJob")),
 			},
 		},
 		Spec: v1.PodSpec{

@@ -24,9 +24,8 @@ import (
 	"sync"
 	"testing"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
 	"github.com/onsi/gomega"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"

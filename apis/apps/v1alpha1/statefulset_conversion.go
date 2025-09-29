@@ -19,8 +19,9 @@ package v1alpha1
 import (
 	"fmt"
 
-	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
+
+	"github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func (sts *StatefulSet) ConvertTo(dst conversion.Hub) error {

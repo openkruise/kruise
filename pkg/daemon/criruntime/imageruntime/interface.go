@@ -19,9 +19,9 @@ package imageruntime
 import (
 	"context"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-
 	v1 "k8s.io/api/core/v1"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 type ImageInfo struct {

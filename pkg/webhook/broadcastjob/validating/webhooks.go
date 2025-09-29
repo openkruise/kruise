@@ -23,12 +23,12 @@ import (
 	"github.com/openkruise/kruise/pkg/webhook/types"
 )
 
-// +kubebuilder:webhook:path=/validate-apps-kruise-io-v1alpha1-broadcastjob,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=broadcastjobs,verbs=create;update,versions=v1alpha1,name=vbroadcastjob.kb.io
+// +kubebuilder:webhook:path=/validate-apps-kruise-io-v1beta1-broadcastjob,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=broadcastjobs,verbs=create;update,versions=v1beta1,name=vbroadcastjob.kb.io
 
 var (
 	// HandlerGetterMap contains admission webhook handlers
 	HandlerGetterMap = map[string]types.HandlerGetter{
-		"validate-apps-kruise-io-v1alpha1-broadcastjob": func(mgr manager.Manager) admission.Handler {
+		"validate-apps-kruise-io-broadcastjob": func(mgr manager.Manager) admission.Handler {
 			return &BroadcastJobCreateUpdateHandler{Decoder: admission.NewDecoder(mgr.GetScheme())}
 		},
 	}

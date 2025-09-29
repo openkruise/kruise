@@ -31,7 +31,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-advancedcronjob
+      path: /mutate-apps-kruise-io-advancedcronjob
   failurePolicy: Fail
   name: madvancedcronjob.kb.io
   rules:
@@ -39,6 +39,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -52,7 +53,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-broadcastjob
+      path: /mutate-apps-kruise-io-broadcastjob
   failurePolicy: Fail
   name: mbroadcastjob.kb.io
   rules:
@@ -60,6 +61,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
