@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"time"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,4 +37,10 @@ type Options struct {
 	Healthz        *daemonutil.Healthz
 
 	MaxWorkersForPullImages int
+
+	// CRR controller configuration
+	CRRWorkers     int
+	CRRMinBackoff  time.Duration
+	CRRMaxBackoff  time.Duration
+	CRRMaxJitterMs int
 }
