@@ -162,6 +162,14 @@ spec:
                   Defaults to 0 (pod will be considered available as soon as it is ready)
                 format: int32
                 type: integer
+              progressDeadlineSeconds:
+                description: |-
+                  ProgressDeadlineSeconds specifies the maximum time for the CloneSet to reach available
+                  or paused state due to partitioning. The controller will set a ProgressDeadlineExceeded
+                  condition when timeout occurs, while excluding paused state duration from the deadline calculation.
+                  This field is optional. If not set, the controller will not track progress deadlines or add the condition.
+                format: int32
+                type: integer
               replicas:
                 description: |-
                   Replicas is the desired number of replicas of the given Template.
@@ -462,6 +470,10 @@ spec:
                     lastTransitionTime:
                       description: Last time the condition transitioned from one status
                         to another.
+                      format: date-time
+                      type: string
+                    lastUpdateTime:
+                      description: Last time the condition is updated.
                       format: date-time
                       type: string
                     message:
