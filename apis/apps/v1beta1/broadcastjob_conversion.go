@@ -17,4 +17,3 @@ limitations under the License.
 package v1beta1
 
 func (*BroadcastJob) Hub() {}
-

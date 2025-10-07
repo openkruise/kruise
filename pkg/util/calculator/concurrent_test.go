@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
-	
+
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -28,19 +28,19 @@ func TestConcurrentParsing(t *testing.T) {
 		wg.Add(1)
 		go func(index int, expression string) {
 			defer wg.Done()
-			
+
 			calc, err := Parse(expression)
 			if err != nil {
 				errors <- fmt.Errorf("goroutine %d: failed to parse %s: %v", index, expression, err)
 				return
 			}
-			
+
 			result := calc.GetResult()
 			if result == nil {
 				errors <- fmt.Errorf("goroutine %d: no result for %s", index, expression)
 				return
 			}
-			
+
 			t.Logf("Goroutine %d: %s = %s", index, expression, result.String())
 		}(i, expr)
 	}
@@ -79,19 +79,19 @@ func TestConcurrentParsingWithVariables(t *testing.T) {
 		wg.Add(1)
 		go func(index int, expression string) {
 			defer wg.Done()
-			
+
 			calc, err := ParseWithVariables(expression, variables)
 			if err != nil {
 				errors <- fmt.Errorf("goroutine %d: failed to parse %s: %v", index, expression, err)
 				return
 			}
-			
+
 			result := calc.GetResult()
 			if result == nil {
 				errors <- fmt.Errorf("goroutine %d: no result for %s", index, expression)
 				return
 			}
-			
+
 			t.Logf("Goroutine %d: %s = %s", index, expression, result.String())
 		}(i, expr)
 	}

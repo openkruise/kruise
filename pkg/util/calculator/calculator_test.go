@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	
+
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -97,7 +97,7 @@ func TestQuantityOperations(t *testing.T) {
 		{"100m / 2", "50m", false},
 
 		// Mixed operations
-		{"max(40m, 20)", "20", false},  // 40m (0.04) < 20 (base unit)
+		{"max(40m, 20)", "20", false}, // 40m (0.04) < 20 (base unit)
 		{"min(40m, 20m)", "20m", false},
 
 		// Error cases
@@ -172,7 +172,7 @@ func TestToQuantity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			calc := NewCalculator()
-		q := calc.toQuantity(tt.value)
+			q := calc.toQuantity(tt.value)
 			// Verify the returned Quantity is valid
 			if q.IsZero() && tt.value.Number != 0 && !tt.value.IsQuantity {
 				t.Error("toQuantity() returned zero for non-zero input")
@@ -326,8 +326,8 @@ func TestVariables(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name: "undefined variable",
-			expr: "undefined_var",
+			name:      "undefined variable",
+			expr:      "undefined_var",
 			variables: map[string]*Value{},
 			expected:  "",
 			wantErr:   true,
@@ -366,46 +366,46 @@ func TestNegativeValues(t *testing.T) {
 		errMsg   string
 	}{
 		{
-			name:    "negative number",
-			expr:    "-10",
+			name:     "negative number",
+			expr:     "-10",
 			expected: "",
-			wantErr: true,
-			errMsg:  "negative",
+			wantErr:  true,
+			errMsg:   "negative",
 		},
 		{
-			name:    "negative quantity",
-			expr:    "-100m",
+			name:     "negative quantity",
+			expr:     "-100m",
 			expected: "",
-			wantErr: true,
-			errMsg:  "negative",
+			wantErr:  true,
+			errMsg:   "negative",
 		},
 		{
-			name:    "subtraction resulting in negative",
-			expr:    "10 - 20",
+			name:     "subtraction resulting in negative",
+			expr:     "10 - 20",
 			expected: "",
-			wantErr: true,
-			errMsg:  "negative",
+			wantErr:  true,
+			errMsg:   "negative",
 		},
 		{
-			name:    "quantity subtraction resulting in negative",
-			expr:    "50m - 100m",
+			name:     "quantity subtraction resulting in negative",
+			expr:     "50m - 100m",
 			expected: "",
-			wantErr: true,
-			errMsg:  "negative",
+			wantErr:  true,
+			errMsg:   "negative",
 		},
 		{
-			name:    "positive result",
-			expr:    "20 - 10",
+			name:     "positive result",
+			expr:     "20 - 10",
 			expected: "10",
-			wantErr: false,
-			errMsg:  "",
+			wantErr:  false,
+			errMsg:   "",
 		},
 		{
-			name:    "zero result",
-			expr:    "10 - 10",
+			name:     "zero result",
+			expr:     "10 - 10",
 			expected: "0",
-			wantErr: false,
-			errMsg:  "",
+			wantErr:  false,
+			errMsg:   "",
 		},
 	}
 
@@ -490,26 +490,26 @@ func TestProposalScenarios(t *testing.T) {
 
 func TestSetVariables(t *testing.T) {
 	calc := NewCalculator()
-	
+
 	// Test setting variables
 	variables := map[string]*Value{
 		"cpu":    {IsQuantity: true, Quantity: resource.MustParse("100m")},
 		"memory": {IsQuantity: true, Quantity: resource.MustParse("512Mi")},
 	}
-	
+
 	calc.SetVariables(variables)
-	
+
 	// Verify variables are set correctly
 	if len(calc.variables) != 2 {
 		t.Errorf("Expected 2 variables, got %d", len(calc.variables))
 	}
-	
+
 	// Test setting nil variables
 	calc.SetVariables(nil)
 	if len(calc.variables) != 0 {
 		t.Errorf("Expected 0 variables after setting nil, got %d", len(calc.variables))
 	}
-	
+
 	// Test setting empty variables
 	calc.SetVariables(make(map[string]*Value))
 	if len(calc.variables) != 0 {
@@ -523,16 +523,16 @@ func TestCalculatorInstanceMethods(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse: %v", err)
 	}
-	
+
 	if calc.GetExpression() != "2 + 3" {
 		t.Errorf("GetExpression: got %s, want 2 + 3", calc.GetExpression())
 	}
-	
+
 	// Test GetVariables with no variables
 	if len(calc.GetVariables()) != 0 {
 		t.Errorf("GetVariables: expected empty map, got %v", calc.GetVariables())
 	}
-	
+
 	// Test GetVariables with variables
 	variables := map[string]*Value{
 		"cpu": {IsQuantity: true, Quantity: resource.MustParse("100m")},
@@ -541,12 +541,12 @@ func TestCalculatorInstanceMethods(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse with variables: %v", err)
 	}
-	
+
 	vars := calc2.GetVariables()
 	if len(vars) != 1 {
 		t.Errorf("GetVariables: expected 1 variable, got %d", len(vars))
 	}
-	
+
 	if val, exists := vars["cpu"]; !exists || val.Quantity.String() != "100m" {
 		t.Errorf("GetVariables: cpu variable not found or incorrect")
 	}
@@ -554,10 +554,10 @@ func TestCalculatorInstanceMethods(t *testing.T) {
 
 func TestEdgeCases(t *testing.T) {
 	tests := []struct {
-		name     string
-		expr     string
-		wantErr  bool
-		errMsg   string
+		name    string
+		expr    string
+		wantErr bool
+		errMsg  string
 	}{
 		{
 			name:    "empty expression",
