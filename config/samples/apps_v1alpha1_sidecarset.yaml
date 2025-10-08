@@ -24,7 +24,7 @@ spec:
       image: centos:6.7
       resourcesPolicy:
         targetContainerMode: sum
-        targetContainersNameRegex: ^large.engine.v4$ # only apply to container large.engine.v4
+        targetContainersNameRegex: ^large-engine-v4$ # only apply to container large-engine-v4
         resourceExpr:
           limits:
             cpu: max(cpu*50%, 50m)

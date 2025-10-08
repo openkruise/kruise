@@ -73,7 +73,7 @@ spec:
       image: centos:6.7
       resourcesPolicy: <optional, default: nil> Validation webhook will reject pod creation request if both resourcesPolicy and resources are configured.
         targetContainerMode: sum|max # <required, enum, validated by CRD>
-        targetContainersNameRegex: ^large.engine.v.*$ # <optional,default=.*, validated by webhook>. If no container names match this regex, the pod creation request will be rejected by the webhook. Target containers include native sidecar containers and plain containers, excluding Kruise sidecar containers.
+        targetContainersNameRegex: ^large-engine-v.*$ # <optional,default=.*, validated by webhook>. If no container names match this regex, the pod creation request will be rejected by the webhook. Target containers include native sidecar containers and plain containers, excluding Kruise sidecar containers.
         resourceExpr: # <Required, validated by webhook, should not contain scalar resources, only support cpu and memory>, If calculate result is negative, this pod creating request will be rejected by webhook.
           limits: # If one of matched containers don't have resources.limits configured, this field will be treated as unlimited. If the expression result is unlimited, sidecar container resources.limits won't be configured, meaning it's unlimited.
             cpu: max(cpu*50%, 50m) # <optional, default: "", mean unlimited>, support `+,-,*,/,max,min,(,)` and variable `cpu`. Variable `cpu` represents the sum or max of resources.limits.cpu of all matched containers by `targetContainersNameRegex` and `targetContainerMode`.
@@ -93,7 +93,7 @@ spec:
       image: centos:6.7
       resourcesPolicy:
         targetContainerMode: sum
-        targetContainersNameRegex: ^large.engine.v4$ # only apply to container large.engine.v4
+        targetContainersNameRegex: ^large-engine-v4$ # only apply to container large-engine-v4
         resourceExpr:
           limits:
             cpu: max(cpu*50%, 50m)
@@ -106,7 +106,7 @@ apiVersion: v1
 kind: Pod
 spec:
   containers:
-  - name: large.engine.v4
+  - name: large-engine-v4
     image: nginx:1.14.2
     resources:
       limits:
@@ -115,7 +115,7 @@ spec:
       requests:
         cpu: 50m
         memory: 100Mi
-  - name: large.engine.v8
+  - name: large-engine-v8
     image: nginx:1.14.2
     resources:
       limits:
@@ -144,7 +144,7 @@ spec:
       image: centos:6.7
       resourcesPolicy:
         targetContainerMode: sum
-        targetContainersNameRegex: ^large.engine.v.*$
+        targetContainersNameRegex: ^large-engine-v.*$
         resourceExpr:
           limits:
             cpu: max(cpu*50%, 50m)
@@ -157,7 +157,7 @@ apiVersion: v1
 kind: Pod
 spec:
   containers:
-  - name: large.engine.v4
+  - name: large-engine-v4
     image: nginx:1.14.2
     resources:
       limits:
@@ -166,7 +166,7 @@ spec:
       requests:
         cpu: 50m
         memory: 100Mi
-  - name: large.engine.v8
+  - name: large-engine-v8
     image: nginx:1.14.2
     resources:
       limits:
@@ -196,7 +196,7 @@ spec:
       image: centos:6.7
       resourcesPolicy:
         targetContainerMode: max
-        targetContainersNameRegex: ^large.engine.v.*$
+        targetContainersNameRegex: ^large-engine-v.*$
         resourceExpr:
           limits:
             cpu: max(cpu*50%, 50m)
@@ -209,7 +209,7 @@ apiVersion: v1
 kind: Pod
 spec:
   containers:
-  - name: large.engine.v4
+  - name: large-engine-v4
     image: nginx:1.14.2
     resources:
       limits:
@@ -218,7 +218,7 @@ spec:
       requests:
         cpu: 50m
         memory: 100Mi
-  - name: large.engine.v8
+  - name: large-engine-v8
     image: nginx:1.14.2
     resources:
       limits:
@@ -248,7 +248,7 @@ spec:
       image: centos:6.7
       resourcesPolicy:
         targetContainerMode: max
-        targetContainersNameRegex: ^large.engine.v.*$
+        targetContainersNameRegex: ^large-engine-v.*$
         resourceExpr:
           limits:
             cpu: max(cpu*50%, 50m)
@@ -261,7 +261,7 @@ apiVersion: v1
 kind: Pod
 spec:
   containers:
-  - name: large.engine.v4
+  - name: large-engine-v4
     image: nginx:1.14.2
     resources:
       limits:
@@ -270,7 +270,7 @@ spec:
       requests:
         cpu: 50m
         memory: 100Mi
-  - name: large.engine.v8
+  - name: large-engine-v8
     image: nginx:1.14.2
     resources:
       limits:
