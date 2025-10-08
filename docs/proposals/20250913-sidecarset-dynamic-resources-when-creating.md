@@ -60,6 +60,8 @@ SidecarSet provides the capability to inject containers into a specified batch o
 
 Overall, we expect the resources of Sidecar containers to be dynamically configured during creation based on the resource specifications of multiple containers within the Pod. To achieve this, we will introduce a new field `sidecarSet.spec.containers[].resourcesPolicy` to define this configuration.
 
+**Note**: ResourcesPolicy is **only supported for `spec.containers`**, not for `spec.initContainers`. InitContainers are typically short-lived initialization tasks and do not require dynamic resource adjustment based on application containers.
+
 ### API Definition
 The complete API expression is as follows.
 ```yaml
@@ -73,7 +75,7 @@ spec:
         targetContainerMode: sum|max # <required, enum, validated by CRD>
         targetContainersNameRegex: ^large.engine.v.*$ # <optional,default=.*, validated by webhook>. If no container names match this regex, the pod creation request will be rejected by the webhook. Target containers include native sidecar containers and plain containers, excluding Kruise sidecar containers.
         resourceExpr: # <Required, validated by webhook, should not contain scalar resources, only support cpu and memory>, If calculate result is negative, this pod creating request will be rejected by webhook.
-          limits: # If matched containers don't have resources.limits configured, this field will be treated as unlimited. If the expression result is unlimited, sidecar container resources.limits won't be configured, meaning it's unlimited.
+          limits: # If one of matched containers don't have resources.limits configured, this field will be treated as unlimited. If the expression result is unlimited, sidecar container resources.limits won't be configured, meaning it's unlimited.
             cpu: max(cpu*50%, 50m) # <optional, default: "", mean unlimited>, support `+,-,*,/,max,min,(,)` and variable `cpu`. Variable `cpu` represents the sum or max of resources.limits.cpu of all matched containers by `targetContainersNameRegex` and `targetContainerMode`.
             memory: max(memory*50%, 100Mi) # <optional, default: "", mean unlimited>, support `+,-,*,/,max,min,(,)` and variable `memory`. Variable `memory` represents the sum or max of resources.limits.memory of all matched containers by `targetContainersNameRegex` and `targetContainerMode`.
           requests: # If matched containers don't have resources.requests configured, the corresponding resource value will be treated as 0.
@@ -307,10 +309,16 @@ User can define cpu expr as `0.5*cpu - 0.3*max(0, cpu-4) + 0.3*max(0, cpu-8)`, t
 
 - The main modification will be in the `/pkg/webhook/pod/mutating/sidecarset.go::buildSidecars` function.
 - The expression evaluation engine will use `goyacc` to generate the parser and include fuzz testing.
+- ResourcesPolicy is **only applied to `spec.containers`**, not `spec.initContainers`:
+  - InitContainers are short-lived initialization tasks
+  - They typically have fixed resource requirements
+  - Dynamic resource adjustment is not necessary for init containers
+  - Validation webhook will reject SidecarSet with initContainers that have ResourcesPolicy configured
 
 ### Risks and Mitigations
 
 - Any processes unrelated to pod creation must remain consistent with the original behavior.
+- InitContainers with ResourcesPolicy will be rejected by validating webhook to prevent misuse.
 
 ## Design Details
 ### ResourceExpr Calculator

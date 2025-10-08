@@ -761,6 +761,43 @@ func TestValidateSidecarSet(t *testing.T) {
 			},
 			expectErrs: 1,
 		},
+		{
+			caseName: "initContainer-with-resources-policy-forbidden",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					InitContainers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-init",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							},
+							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
+								TargetContainerMode: appsv1alpha1.TargetContainerModeSum,
+								ResourceExpr: appsv1alpha1.ResourceExpr{
+									Limits: &appsv1alpha1.ResourceExprLimits{
+										CPU: "cpu*50%",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErrs: 1,
+		},
 	}
 
 	SidecarSetRevisions := []client.Object{

@@ -261,7 +261,15 @@ func validateContainersForSidecarSet(
 	allErrs := field.ErrorList{}
 	//validating initContainer
 	var coreInitContainers []core.Container
-	for _, container := range initContainers {
+	for i, container := range initContainers {
+		idxPath := fldPath.Index(i)
+
+		// Validate that initContainers do NOT have ResourcesPolicy
+		if container.ResourcesPolicy != nil {
+			allErrs = append(allErrs, field.Forbidden(idxPath.Child("resourcesPolicy"),
+				"resourcesPolicy is not supported for initContainers, only for containers"))
+		}
+
 		coreContainer := core.Container{}
 		if err := corev1.Convert_v1_Container_To_core_Container(&container.Container, &coreContainer, nil); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("initContainer"), container.Container, fmt.Sprintf("Convert_v1_Container_To_core_Container failed: %v", err)))
