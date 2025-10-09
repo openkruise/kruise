@@ -1,7 +1,6 @@
 package calculator
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -65,14 +64,6 @@ func TestBasicArithmetic(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.expr, func(t *testing.T) {
 			result, err := Parse(tt.expr)
-			fmt.Printf("tt.expr: %v\n", tt.expr)
-			fmt.Printf("result: %v\n", result)
-			if err != nil {
-				fmt.Printf("error: %v\n", err)
-			} else if result == nil {
-				fmt.Printf("error: result is nil\n")
-			}
-
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Parse() error = %v, wantErr %v", err, tt.wantErr)
 				return

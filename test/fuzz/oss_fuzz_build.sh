@@ -62,3 +62,8 @@ compile_native_go_fuzzer $SRC/kruise/pkg/webhook/advancedcronjob/validating Fuzz
 compile_native_go_fuzzer $SRC/kruise/pkg/webhook/advancedcronjob/validating FuzzValidateAdvancedCronJobSpec fuzz_validate_advancedcronjob_spec
 compile_native_go_fuzzer $SRC/kruise/pkg/webhook/advancedcronjob/validating FuzzValidateAdvancedCronJobSpecSchedule fuzz_validate_advancedcronjob_spec_schedule
 compile_native_go_fuzzer $SRC/kruise/pkg/webhook/advancedcronjob/validating FuzzValidateAdvancedCronJobSpecTemplate fuzz_validate_advancedcronjob_spec_template
+
+# Compile fuzzers for the Calculator component.
+compile_native_go_fuzzer $SRC/kruise/pkg/util/calculator FuzzParse fuzz_parse
+compile_native_go_fuzzer $SRC/kruise/pkg/util/calculator FuzzParseWithVariables fuzz_parse_with_variables
+compile_native_go_fuzzer $SRC/kruise/pkg/util/calculator FuzzCalculatorParse fuzz_calculator_parse
