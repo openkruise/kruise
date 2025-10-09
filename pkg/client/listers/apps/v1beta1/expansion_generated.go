@@ -33,6 +33,26 @@ type BroadcastJobListerExpansion interface{}
 // BroadcastJobNamespaceLister.
 type BroadcastJobNamespaceListerExpansion interface{}
 
+// ImageListPullJobListerExpansion allows custom methods to be added to
+// ImageListPullJobLister.
+type ImageListPullJobListerExpansion interface{}
+
+// ImageListPullJobNamespaceListerExpansion allows custom methods to be added to
+// ImageListPullJobNamespaceLister.
+type ImageListPullJobNamespaceListerExpansion interface{}
+
+// ImagePullJobListerExpansion allows custom methods to be added to
+// ImagePullJobLister.
+type ImagePullJobListerExpansion interface{}
+
+// ImagePullJobNamespaceListerExpansion allows custom methods to be added to
+// ImagePullJobNamespaceLister.
+type ImagePullJobNamespaceListerExpansion interface{}
+
+// NodeImageListerExpansion allows custom methods to be added to
+// NodeImageLister.
+type NodeImageListerExpansion interface{}
+
 // StatefulSetListerExpansion allows custom methods to be added to
 // StatefulSetLister.
 type StatefulSetListerExpansion interface{}

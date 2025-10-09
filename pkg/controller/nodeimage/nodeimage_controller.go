@@ -44,7 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclient "github.com/openkruise/kruise/pkg/client"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
@@ -62,7 +62,7 @@ func init() {
 
 var (
 	concurrentReconciles = 3
-	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("NodeImage")
+	controllerKind       = appsv1beta1.SchemeGroupVersion.WithKind("NodeImage")
 
 	nodeImageCreationDelayAfterNodeReady = time.Second * 30
 )
@@ -111,7 +111,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to NodeImage
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.NodeImage{}, &handler.TypedEnqueueRequestForObject[*appsv1alpha1.NodeImage]{}))
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.NodeImage{}, &handler.TypedEnqueueRequestForObject[*appsv1beta1.NodeImage]{}))
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for deletion to ImagePullJob
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.ImagePullJob{}, &imagePullJobHandler{Reader: mgr.GetCache()}))
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.ImagePullJob{}, &imagePullJobHandler{Reader: mgr.GetCache()}))
 	if err != nil {
 		return err
 	}
@@ -174,7 +174,7 @@ func (r *ReconcileNodeImage) Reconcile(_ context.Context, request reconcile.Requ
 	}
 
 	// Fetch the NodeImage
-	nodeImage := &appsv1alpha1.NodeImage{}
+	nodeImage := &appsv1beta1.NodeImage{}
 	err = r.Get(context.TODO(), request.NamespacedName, nodeImage)
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -209,11 +209,11 @@ func (r *ReconcileNodeImage) Reconcile(_ context.Context, request reconcile.Requ
 			return reconcile.Result{RequeueAfter: delay}, nil
 		}
 
-		nodeImage = &appsv1alpha1.NodeImage{
+		nodeImage = &appsv1beta1.NodeImage{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: request.Name,
 			},
-			Spec: appsv1alpha1.NodeImageSpec{},
+			Spec: appsv1beta1.NodeImageSpec{},
 		}
 		if err = r.Create(context.TODO(), nodeImage); err != nil {
 			return reconcile.Result{}, fmt.Errorf("failed to create nodeimage %v, err: %v", nodeImage.Name, err)
@@ -250,7 +250,7 @@ func (r *ReconcileNodeImage) updateNodeImage(name string, node *v1.Node, duratio
 	var messages []string
 	tmpDuration := &requeueduration.Duration{}
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		nodeImage := &appsv1alpha1.NodeImage{}
+		nodeImage := &appsv1beta1.NodeImage{}
 		err = r.Get(context.TODO(), types.NamespacedName{Name: name}, nodeImage)
 		if err != nil {
 			return err
@@ -271,7 +271,7 @@ func (r *ReconcileNodeImage) updateNodeImage(name string, node *v1.Node, duratio
 	return modified, err
 }
 
-func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1alpha1.NodeImage, node *v1.Node) (modified bool, messages []string, wait *requeueduration.Duration) {
+func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1beta1.NodeImage, node *v1.Node) (modified bool, messages []string, wait *requeueduration.Duration) {
 	wait = &requeueduration.Duration{}
 	if node != nil {
 		if !reflect.DeepEqual(nodeImage.Labels, node.Labels) {
@@ -281,9 +281,9 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1alpha1.NodeImage
 		}
 	}
 
-	newImageMap := make(map[string]appsv1alpha1.ImageSpec, len(nodeImage.Spec.Images))
+	newImageMap := make(map[string]appsv1beta1.ImageSpec, len(nodeImage.Spec.Images))
 	for name, imageSpec := range nodeImage.Spec.Images {
-		var newTags []appsv1alpha1.ImageTagSpec
+		var newTags []appsv1beta1.ImageTagSpec
 		for i := range imageSpec.Tags {
 			tagSpec := &imageSpec.Tags[i]
 			fullName := fmt.Sprintf("%s:%s", name, tagSpec.Tag)
@@ -303,7 +303,7 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1alpha1.NodeImage
 					activeRefs = append(activeRefs, ref)
 					continue
 				}
-				job := appsv1alpha1.ImagePullJob{}
+				job := appsv1beta1.ImagePullJob{}
 				err := r.Get(context.TODO(), types.NamespacedName{Namespace: ref.Namespace, Name: ref.Name}, &job)
 				if err != nil {
 					if errors.IsNotFound(err) {
@@ -356,7 +356,7 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1alpha1.NodeImage
 		}
 		if len(newTags) > 0 {
 			imageSpec.Tags = newTags
-			utilimagejob.SortSpecImageTags(&imageSpec)
+			utilimagejob.SortSpecImageTagsV1beta1(&imageSpec)
 			newImageMap[name] = imageSpec
 		} else {
 			modified = true
@@ -369,7 +369,7 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1alpha1.NodeImage
 	return
 }
 
-func (r *ReconcileNodeImage) updateNodeImageStatus(nodeImage *appsv1alpha1.NodeImage, duration *requeueduration.Duration) error {
+func (r *ReconcileNodeImage) updateNodeImageStatus(nodeImage *appsv1beta1.NodeImage, duration *requeueduration.Duration) error {
 	now := metav1.NewTime(r.clock.Now())
 
 	specFullImages := sets.NewString()
@@ -386,7 +386,7 @@ func (r *ReconcileNodeImage) updateNodeImageStatus(nodeImage *appsv1alpha1.NodeI
 				continue
 			}
 
-			var tagStatus *appsv1alpha1.ImageTagStatus
+			var tagStatus *appsv1beta1.ImageTagStatus
 			for i := range imageStatus.Tags {
 				if imageStatus.Tags[i].Tag == tagSpec.Tag {
 					tagStatus = &imageStatus.Tags[i]
@@ -403,16 +403,16 @@ func (r *ReconcileNodeImage) updateNodeImageStatus(nodeImage *appsv1alpha1.NodeI
 					continue
 				}
 				if tagStatus == nil {
-					tagStatus = &appsv1alpha1.ImageTagStatus{
+					tagStatus = &appsv1beta1.ImageTagStatus{
 						Tag:            tagSpec.Tag,
-						Phase:          appsv1alpha1.ImagePhaseFailed,
+						Phase:          appsv1beta1.ImagePhaseFailed,
 						CompletionTime: &now,
 						Version:        tagSpec.Version,
 						Message:        "node has not responded for a long time",
 					}
 					imageStatus.Tags = append(imageStatus.Tags, *tagStatus)
 				} else {
-					tagStatus.Phase = appsv1alpha1.ImagePhaseFailed
+					tagStatus.Phase = appsv1beta1.ImagePhaseFailed
 					tagStatus.CompletionTime = &now
 					tagStatus.Version = tagSpec.Version
 					tagStatus.Message = "node has not responded for a long time"
@@ -426,7 +426,7 @@ func (r *ReconcileNodeImage) updateNodeImageStatus(nodeImage *appsv1alpha1.NodeI
 					duration.UpdateWithMsg(leftTime, "[status]image %s wait deadline (%v)s since %v created", fullName, *tagSpec.PullPolicy.ActiveDeadlineSeconds, tagSpec.CreatedAt)
 					continue
 				}
-				tagStatus.Phase = appsv1alpha1.ImagePhaseFailed
+				tagStatus.Phase = appsv1beta1.ImagePhaseFailed
 				tagStatus.CompletionTime = &now
 				tagStatus.Version = tagSpec.Version
 				tagStatus.Message = "pulling exceeds the activeDeadlineSeconds"
@@ -448,9 +448,9 @@ func (r *ReconcileNodeImage) updateNodeImageStatus(nodeImage *appsv1alpha1.NodeI
 
 		if len(imageStatus.Tags) > 0 {
 			if newStatus.ImageStatuses == nil {
-				newStatus.ImageStatuses = make(map[string]appsv1alpha1.ImageStatus)
+				newStatus.ImageStatuses = make(map[string]appsv1beta1.ImageStatus)
 			}
-			utilimagejob.SortStatusImageTags(&imageStatus)
+			utilimagejob.SortStatusImageTagsV1beta1(&imageStatus)
 			newStatus.ImageStatuses[name] = imageStatus
 		}
 	}
@@ -460,12 +460,12 @@ func (r *ReconcileNodeImage) updateNodeImageStatus(nodeImage *appsv1alpha1.NodeI
 	}
 
 	succeeded, failed, pulling := 0, 0, 0
-	newImagesStatus := make(map[string]appsv1alpha1.ImageStatus, len(nodeImage.Spec.Images))
+	newImagesStatus := make(map[string]appsv1beta1.ImageStatus, len(nodeImage.Spec.Images))
 	for name, imageStatus := range newStatus.ImageStatuses {
 		if _, ok := nodeImage.Spec.Images[name]; !ok {
 			continue
 		}
-		newTags := make([]appsv1alpha1.ImageTagStatus, 0, len(imageStatus.Tags))
+		newTags := make([]appsv1beta1.ImageTagStatus, 0, len(imageStatus.Tags))
 		for _, tagStatus := range imageStatus.Tags {
 			fullName := fmt.Sprintf("%s:%s", name, tagStatus.Tag)
 			if !specFullImages.Has(fullName) {
@@ -473,11 +473,11 @@ func (r *ReconcileNodeImage) updateNodeImageStatus(nodeImage *appsv1alpha1.NodeI
 			}
 			newTags = append(newTags, tagStatus)
 			switch tagStatus.Phase {
-			case appsv1alpha1.ImagePhaseSucceeded:
+			case appsv1beta1.ImagePhaseSucceeded:
 				succeeded++
-			case appsv1alpha1.ImagePhasePulling:
+			case appsv1beta1.ImagePhasePulling:
 				pulling++
-			case appsv1alpha1.ImagePhaseFailed:
+			case appsv1beta1.ImagePhaseFailed:
 				failed++
 			}
 		}

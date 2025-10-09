@@ -21,4 +21,10 @@ type AdvancedCronJobExpansion interface{}
 
 type BroadcastJobExpansion interface{}
 
+type ImageListPullJobExpansion interface{}
+
+type ImagePullJobExpansion interface{}
+
+type NodeImageExpansion interface{}
+
 type StatefulSetExpansion interface{}

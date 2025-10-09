@@ -23,7 +23,7 @@ import (
 	"github.com/openkruise/kruise/pkg/webhook/types"
 )
 
-// +kubebuilder:webhook:path=/mutate-apps-kruise-io-v1beta1-broadcastjob,mutating=true,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=broadcastjobs,verbs=create;update,versions=v1beta1,name=mbroadcastjob.kb.io
+// +kubebuilder:webhook:path=/mutate-apps-kruise-io-broadcastjob,mutating=true,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=broadcastjobs,verbs=create;update,versions=v1alpha1;v1beta1,name=mbroadcastjob.kb.io
 
 var (
 	// HandlerGetterMap contains admission webhook handlers

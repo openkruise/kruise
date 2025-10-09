@@ -70,6 +70,12 @@ func RegisterFieldIndexes(c cache.Cache) error {
 		if err = c.IndexField(context.TODO(), &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
 			return
 		}
+		// ImagePullJob ownerReference for v1beta1
+		if utildiscovery.DiscoverObject(&appsv1beta1.ImagePullJob{}) {
+			if err = c.IndexField(context.TODO(), &appsv1beta1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
+				return
+			}
+		}
 
 		// pod name
 		if err = indexPodNodeName(c); err != nil {
@@ -94,6 +100,12 @@ func RegisterFieldIndexes(c cache.Cache) error {
 		// imagepulljob active
 		if utildiscovery.DiscoverObject(&appsv1alpha1.ImagePullJob{}) {
 			if err = indexImagePullJobActive(c); err != nil {
+				return
+			}
+		}
+		// imagepulljob active for v1beta1
+		if utildiscovery.DiscoverObject(&appsv1beta1.ImagePullJob{}) {
+			if err = indexImagePullJobActiveV1Beta1(c); err != nil {
 				return
 			}
 		}
@@ -181,6 +193,17 @@ func indexBroadcastCronJobV1Beta1(c cache.Cache) error {
 func indexImagePullJobActive(c cache.Cache) error {
 	return c.IndexField(context.TODO(), &appsv1alpha1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
 		obj := rawObj.(*appsv1alpha1.ImagePullJob)
+		isActive := "false"
+		if obj.DeletionTimestamp == nil && obj.Status.CompletionTime == nil {
+			isActive = "true"
+		}
+		return []string{isActive}
+	})
+}
+
+func indexImagePullJobActiveV1Beta1(c cache.Cache) error {
+	return c.IndexField(context.TODO(), &appsv1beta1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
+		obj := rawObj.(*appsv1beta1.ImagePullJob)
 		isActive := "false"
 		if obj.DeletionTimestamp == nil && obj.Status.CompletionTime == nil {
 			isActive = "true"

@@ -23,12 +23,13 @@ import (
 	"github.com/openkruise/kruise/pkg/webhook/types"
 )
 
-// +kubebuilder:webhook:path=/validate-apps-kruise-io-v1alpha1-imagelistpulljob,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=imagelistpulljobs,verbs=create;update,versions=v1alpha1,name=vimagelistpulljob.kb.io
+// +kubebuilder:webhook:path=/validate-apps-kruise-io-imagelistpulljob,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=imagelistpulljobs,verbs=create;update,versions=v1alpha1;v1beta1,name=vimagelistpulljob-v1beta1.kb.io
 
 var (
 	// HandlerGetterMap contains admission webhook handlers
 	HandlerGetterMap = map[string]types.HandlerGetter{
-		"validate-apps-kruise-io-v1alpha1-imagelistpulljob": func(mgr manager.Manager) admission.Handler {
+
+		"validate-apps-kruise-io-imagelistpulljob": func(mgr manager.Manager) admission.Handler {
 			return &ImageListPullJobCreateUpdateHandler{Decoder: admission.NewDecoder(mgr.GetScheme())}
 		},
 	}

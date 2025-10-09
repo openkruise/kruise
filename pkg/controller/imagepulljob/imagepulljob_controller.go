@@ -41,7 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/openkruise/kruise/apis/apps/defaults"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
@@ -58,7 +58,7 @@ func init() {
 
 var (
 	concurrentReconciles        = 3
-	controllerKind              = appsv1alpha1.SchemeGroupVersion.WithKind("ImagePullJob")
+	controllerKind              = appsv1beta1.SchemeGroupVersion.WithKind("ImagePullJob")
 	resourceVersionExpectations = expectations.NewResourceVersionExpectation()
 	scaleExpectations           = expectations.NewScaleExpectations()
 )
@@ -107,13 +107,13 @@ func add(mgr manager.Manager, r *ReconcileImagePullJob) error {
 	}
 
 	// Watch for changes to ImagePullJob
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.ImagePullJob{}, &handler.TypedEnqueueRequestForObject[*appsv1alpha1.ImagePullJob]{}))
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.ImagePullJob{}, &handler.TypedEnqueueRequestForObject[*appsv1beta1.ImagePullJob]{}))
 	if err != nil {
 		return err
 	}
 
 	// Watch for nodeimage update to get image pull status
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.NodeImage{}, &nodeImageEventHandler{Reader: mgr.GetCache()}))
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.NodeImage{}, &nodeImageEventHandler{Reader: mgr.GetCache()}))
 	if err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func (r *ReconcileImagePullJob) Reconcile(_ context.Context, request reconcile.R
 	}()
 
 	// Fetch the ImagePullJob instance
-	job := &appsv1alpha1.ImagePullJob{}
+	job := &appsv1beta1.ImagePullJob{}
 	err = r.Get(context.TODO(), request.NamespacedName, job)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -273,7 +273,7 @@ func (r *ReconcileImagePullJob) Reconcile(_ context.Context, request reconcile.R
 		return reconcile.Result{}, nil
 	}
 
-	if job.Spec.CompletionPolicy.Type != appsv1alpha1.Never && job.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil {
+	if job.Spec.CompletionPolicy.Type != appsv1beta1.Never && job.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil {
 		leftTime := time.Duration(*job.Spec.CompletionPolicy.ActiveDeadlineSeconds)*time.Second - time.Since(newStatus.StartTime.Time)
 		if leftTime < minRequeueTime {
 			leftTime = minRequeueTime
@@ -283,7 +283,7 @@ func (r *ReconcileImagePullJob) Reconcile(_ context.Context, request reconcile.R
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileImagePullJob) syncSecrets(job *appsv1alpha1.ImagePullJob) ([]appsv1alpha1.ReferenceObject, error) {
+func (r *ReconcileImagePullJob) syncSecrets(job *appsv1beta1.ImagePullJob) ([]appsv1beta1.ReferenceObject, error) {
 	if job.Namespace == util.GetKruiseDaemonConfigNamespace() {
 		return getSecrets(job), nil // Ignore this special case.
 	}
@@ -304,7 +304,7 @@ func (r *ReconcileImagePullJob) syncSecrets(job *appsv1alpha1.ImagePullJob) ([]a
 	return r.syncTargetSecrets(job, targetMap)
 }
 
-func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, newStatus *appsv1alpha1.ImagePullJobStatus, notSyncedNodeImages []string, secrets []appsv1alpha1.ReferenceObject) error {
+func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1beta1.ImagePullJob, newStatus *appsv1beta1.ImagePullJobStatus, notSyncedNodeImages []string, secrets []appsv1beta1.ReferenceObject) error {
 	if len(notSyncedNodeImages) == 0 {
 		return nil
 	}
@@ -330,12 +330,12 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 	for i := 0; i < parallelism; i++ {
 		var skip bool
 		updateErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			nodeImage := appsv1alpha1.NodeImage{}
+			nodeImage := appsv1beta1.NodeImage{}
 			if err := r.Get(context.TODO(), types.NamespacedName{Name: notSyncedNodeImages[i]}, &nodeImage); err != nil {
 				return err
 			}
 			if nodeImage.Spec.Images == nil {
-				nodeImage.Spec.Images = make(map[string]appsv1alpha1.ImageSpec, 1)
+				nodeImage.Spec.Images = make(map[string]appsv1beta1.ImageSpec, 1)
 			}
 			imageSpec := nodeImage.Spec.Images[imageName]
 			imageSpec.SandboxConfig = job.Spec.SandboxConfig
@@ -376,7 +376,7 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 					}
 				}
 
-				imageSpec.Tags = append(imageSpec.Tags, appsv1alpha1.ImageTagSpec{
+				imageSpec.Tags = append(imageSpec.Tags, appsv1beta1.ImageTagSpec{
 					Tag:             imageTag,
 					Version:         foundVersion + 1,
 					PullPolicy:      pullPolicy,
@@ -385,7 +385,7 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 					ImagePullPolicy: job.Spec.ImagePullPolicy,
 				})
 			}
-			utilimagejob.SortSpecImageTags(&imageSpec)
+			utilimagejob.SortSpecImageTagsV1beta1(&imageSpec)
 			nodeImage.Spec.Images[imageName] = imageSpec
 
 			oldResourceVersion := nodeImage.ResourceVersion
@@ -409,7 +409,7 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1alpha1.ImagePullJob, n
 	return nil
 }
 
-func (r *ReconcileImagePullJob) getTargetSecretMap(job *appsv1alpha1.ImagePullJob) (map[string]*v1.Secret, map[string]*v1.Secret, error) {
+func (r *ReconcileImagePullJob) getTargetSecretMap(job *appsv1beta1.ImagePullJob) (map[string]*v1.Secret, map[string]*v1.Secret, error) {
 	options := client.ListOptions{
 		Namespace: util.GetKruiseDaemonConfigNamespace(),
 	}
@@ -435,7 +435,7 @@ func (r *ReconcileImagePullJob) getTargetSecretMap(job *appsv1alpha1.ImagePullJo
 		if err != nil {
 			klog.ErrorS(err, "Failed to parse source key from annotations in Secret", "secret", klog.KObj(target))
 		}
-		if containsObject(sourceReferences, appsv1alpha1.ReferenceObject{Namespace: sourceNs, Name: sourceName}) {
+		if containsObject(sourceReferences, appsv1beta1.ReferenceObject{Namespace: sourceNs, Name: sourceName}) {
 			targetMap[target.Labels[SourceSecretUIDLabelKey]] = target
 		} else {
 			deleteMap[target.Labels[SourceSecretUIDLabelKey]] = target
@@ -444,7 +444,7 @@ func (r *ReconcileImagePullJob) getTargetSecretMap(job *appsv1alpha1.ImagePullJo
 	return targetMap, deleteMap, nil
 }
 
-func (r *ReconcileImagePullJob) releaseTargetSecrets(targetMap map[string]*v1.Secret, job *appsv1alpha1.ImagePullJob) error {
+func (r *ReconcileImagePullJob) releaseTargetSecrets(targetMap map[string]*v1.Secret, job *appsv1beta1.ImagePullJob) error {
 	if len(targetMap) == 0 {
 		return nil
 	}
@@ -482,9 +482,9 @@ func (r *ReconcileImagePullJob) releaseTargetSecrets(targetMap map[string]*v1.Se
 	return nil
 }
 
-func (r *ReconcileImagePullJob) syncTargetSecrets(job *appsv1alpha1.ImagePullJob, targetMap map[string]*v1.Secret) ([]appsv1alpha1.ReferenceObject, error) {
+func (r *ReconcileImagePullJob) syncTargetSecrets(job *appsv1beta1.ImagePullJob, targetMap map[string]*v1.Secret) ([]appsv1beta1.ReferenceObject, error) {
 	sourceReferences := getSecrets(job)
-	targetReferences := make([]appsv1alpha1.ReferenceObject, 0, len(sourceReferences))
+	targetReferences := make([]appsv1beta1.ReferenceObject, 0, len(sourceReferences))
 	for _, sourceRef := range sourceReferences {
 		source := &v1.Secret{}
 		if err := r.Get(context.TODO(), keyFromRef(sourceRef), source); err != nil {
@@ -513,13 +513,13 @@ func (r *ReconcileImagePullJob) syncTargetSecrets(job *appsv1alpha1.ImagePullJob
 			}
 			resourceVersionExpectations.Expect(target)
 		}
-		targetReferences = append(targetReferences, appsv1alpha1.ReferenceObject{Namespace: target.Namespace, Name: target.Name})
+		targetReferences = append(targetReferences, appsv1beta1.ReferenceObject{Namespace: target.Namespace, Name: target.Name})
 	}
 	return targetReferences, nil
 }
 
-func (r *ReconcileImagePullJob) calculateStatus(job *appsv1alpha1.ImagePullJob, nodeImages []*appsv1alpha1.NodeImage, secrets []appsv1alpha1.ReferenceObject) (*appsv1alpha1.ImagePullJobStatus, []string, error) {
-	newStatus := appsv1alpha1.ImagePullJobStatus{
+func (r *ReconcileImagePullJob) calculateStatus(job *appsv1beta1.ImagePullJob, nodeImages []*appsv1beta1.NodeImage, secrets []appsv1beta1.ReferenceObject) (*appsv1beta1.ImagePullJobStatus, []string, error) {
+	newStatus := appsv1beta1.ImagePullJobStatus{
 		StartTime: job.Status.StartTime,
 		Desired:   int32(len(nodeImages)),
 	}
@@ -587,9 +587,9 @@ func (r *ReconcileImagePullJob) calculateStatus(job *appsv1alpha1.ImagePullJob, 
 				break
 			}
 			switch tagStatus.Phase {
-			case appsv1alpha1.ImagePhaseSucceeded:
+			case appsv1beta1.ImagePhaseSucceeded:
 				succeeded = append(succeeded, nodeImage.Name)
-			case appsv1alpha1.ImagePhaseFailed:
+			case appsv1beta1.ImagePhaseFailed:
 				failed = append(failed, nodeImage.Name)
 			default:
 				pulling = append(pulling, nodeImage.Name)
@@ -598,7 +598,7 @@ func (r *ReconcileImagePullJob) calculateStatus(job *appsv1alpha1.ImagePullJob, 
 		}
 	}
 
-	if job.Spec.CompletionPolicy.Type != appsv1alpha1.Never && job.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil && int(newStatus.Desired) != len(succeeded)+len(failed) {
+	if job.Spec.CompletionPolicy.Type != appsv1beta1.Never && job.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil && int(newStatus.Desired) != len(succeeded)+len(failed) {
 		if time.Duration(*job.Spec.CompletionPolicy.ActiveDeadlineSeconds)*time.Second <= time.Since(newStatus.StartTime.Time) {
 			newStatus.CompletionTime = &now
 			newStatus.Succeeded = int32(len(succeeded))
@@ -615,7 +615,7 @@ func (r *ReconcileImagePullJob) calculateStatus(job *appsv1alpha1.ImagePullJob, 
 	newStatus.Succeeded = int32(len(succeeded))
 	newStatus.Failed = int32(len(failed))
 	newStatus.FailedNodes = failed
-	if job.Spec.CompletionPolicy.Type != appsv1alpha1.Never && (newStatus.Desired-newStatus.Succeeded-newStatus.Failed) == 0 {
+	if job.Spec.CompletionPolicy.Type != appsv1beta1.Never && (newStatus.Desired-newStatus.Succeeded-newStatus.Failed) == 0 {
 		newStatus.CompletionTime = &now
 	}
 
@@ -630,7 +630,7 @@ func (r *ReconcileImagePullJob) checkNamespaceExists(nsName string) error {
 }
 
 // addProtectionFinalizer ensure the GC of secrets in kruise-daemon-config ns
-func (r *ReconcileImagePullJob) addProtectionFinalizer(job *appsv1alpha1.ImagePullJob) error {
+func (r *ReconcileImagePullJob) addProtectionFinalizer(job *appsv1beta1.ImagePullJob) error {
 	if controllerutil.ContainsFinalizer(job, defaults.ProtectionFinalizer) {
 		return nil
 	}
@@ -639,7 +639,7 @@ func (r *ReconcileImagePullJob) addProtectionFinalizer(job *appsv1alpha1.ImagePu
 }
 
 // finalize also ensure the GC of secrets in kruise-daemon-config ns
-func (r *ReconcileImagePullJob) finalize(job *appsv1alpha1.ImagePullJob) error {
+func (r *ReconcileImagePullJob) finalize(job *appsv1beta1.ImagePullJob) error {
 	if !controllerutil.ContainsFinalizer(job, defaults.ProtectionFinalizer) {
 		return nil
 	}

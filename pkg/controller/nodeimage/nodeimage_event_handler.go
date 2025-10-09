@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 )
 
@@ -80,7 +80,7 @@ func (e *nodeHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1
 }
 
 func (e *nodeHandler) nodeCreateOrUpdate(node *v1.Node, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	nodeImage := &appsv1alpha1.NodeImage{}
+	nodeImage := &appsv1beta1.NodeImage{}
 	namespacedName := types.NamespacedName{Name: node.Name}
 	if err := e.Get(context.TODO(), namespacedName, nodeImage); err != nil {
 		if errors.IsNotFound(err) {
@@ -108,7 +108,7 @@ func (e *nodeHandler) nodeCreateOrUpdate(node *v1.Node, q workqueue.TypedRateLim
 }
 
 func (e *nodeHandler) nodeDelete(node *v1.Node, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	nodeImage := &appsv1alpha1.NodeImage{}
+	nodeImage := &appsv1beta1.NodeImage{}
 	namespacedName := types.NamespacedName{Name: node.Name}
 	if err := e.Get(context.TODO(), namespacedName, nodeImage); errors.IsNotFound(err) {
 		return
@@ -117,22 +117,22 @@ func (e *nodeHandler) nodeDelete(node *v1.Node, q workqueue.TypedRateLimitingInt
 	q.Add(reconcile.Request{NamespacedName: namespacedName})
 }
 
-var _ handler.TypedEventHandler[*appsv1alpha1.ImagePullJob, reconcile.Request] = &imagePullJobHandler{}
+var _ handler.TypedEventHandler[*appsv1beta1.ImagePullJob, reconcile.Request] = &imagePullJobHandler{}
 
 type imagePullJobHandler struct {
 	client.Reader
 }
 
-func (e *imagePullJobHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*appsv1alpha1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+func (e *imagePullJobHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*appsv1beta1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (e *imagePullJobHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsv1alpha1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+func (e *imagePullJobHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsv1beta1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (e *imagePullJobHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1alpha1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+func (e *imagePullJobHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1beta1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (e *imagePullJobHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1alpha1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+func (e *imagePullJobHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1beta1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	job := evt.Object
 	nodeImageNames := utilimagejob.PopCachedNodeImagesForJob(job)
 	for _, name := range nodeImageNames {
