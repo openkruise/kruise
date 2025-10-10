@@ -13,7 +13,6 @@ type yyLex struct {
 	line  int
 	col   int
 	token int
-	lval  yySymType
 	err   error
 }
 
