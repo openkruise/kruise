@@ -831,3 +831,261 @@ func TestComplexNestedExpressions(t *testing.T) {
 		})
 	}
 }
+
+// TestLexerBugFixes tests the specific bugs found and fixed in the lexer
+// These tests ensure the fixes for operator parsing and scientific notation remain correct
+func TestLexerBugFixes(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     string
+		expected string
+		desc     string
+	}{
+		// Bug fix: Operator adjacency parsing (operators without spaces)
+		{
+			name:     "plus followed by minus",
+			expr:     "10+-5",
+			expected: "5",
+			desc:     "Fixed: was incorrectly parsed as single token, result was 0",
+		},
+		{
+			name:     "minus followed by minus",
+			expr:     "10--5",
+			expected: "15",
+			desc:     "Fixed: was incorrectly parsed as single token, result was 0",
+		},
+		{
+			name:     "operator adjacency with spaces",
+			expr:     "10 + -5",
+			expected: "5",
+			desc:     "Should work correctly with spaces",
+		},
+		{
+			name:     "operator adjacency subtraction",
+			expr:     "10 - -5",
+			expected: "15",
+			desc:     "Should work correctly with spaces",
+		},
+		{
+			name:     "multiple operator adjacency",
+			expr:     "20+-10+5",
+			expected: "15",
+			desc:     "Multiple adjacent operators should be parsed correctly",
+		},
+		{
+			name:     "quantity with operator adjacency",
+			expr:     "100m+50m",
+			expected: "150m",
+			desc:     "Quantity operations with adjacent operators",
+		},
+
+		// Scientific notation tests
+		{
+			name:     "scientific notation lowercase e",
+			expr:     "1e3",
+			expected: "1000",
+			desc:     "Standard scientific notation",
+		},
+		{
+			name:     "scientific notation uppercase E",
+			expr:     "1E3",
+			expected: "1000",
+			desc:     "Uppercase E scientific notation",
+		},
+		{
+			name:     "scientific notation with plus",
+			expr:     "1e+3",
+			expected: "1000",
+			desc:     "Scientific notation with explicit plus",
+		},
+		{
+			name:     "scientific notation with minus",
+			expr:     "1e-3",
+			expected: "0.001",
+			desc:     "Scientific notation with negative exponent",
+		},
+		{
+			name:     "scientific notation uppercase E with plus",
+			expr:     "1E+3",
+			expected: "1000",
+			desc:     "Uppercase E with explicit plus",
+		},
+		{
+			name:     "scientific notation uppercase E with minus",
+			expr:     "1E-3",
+			expected: "0.001",
+			desc:     "Uppercase E with negative exponent",
+		},
+		{
+			name:     "decimal scientific notation",
+			expr:     "1.5e2",
+			expected: "150",
+			desc:     "Scientific notation with decimal base",
+		},
+		{
+			name:     "decimal scientific notation with sign",
+			expr:     "2.5E+1",
+			expected: "25",
+			desc:     "Decimal base with explicit sign",
+		},
+
+		// Kubernetes quantity unit tests (up to P/Pi)
+		{
+			name:     "milli unit",
+			expr:     "100m",
+			expected: "100m",
+			desc:     "Milli CPU unit",
+		},
+		{
+			name:     "kilo unit",
+			expr:     "1k",
+			expected: "1k",
+			desc:     "Kilo unit",
+		},
+		{
+			name:     "Mega unit",
+			expr:     "100M",
+			expected: "100M",
+			desc:     "Mega unit",
+		},
+		{
+			name:     "Giga unit",
+			expr:     "1G",
+			expected: "1G",
+			desc:     "Giga unit",
+		},
+		{
+			name:     "Tera unit",
+			expr:     "1T",
+			expected: "1T",
+			desc:     "Tera unit",
+		},
+		{
+			name:     "Peta unit",
+			expr:     "1P",
+			expected: "1P",
+			desc:     "Peta unit (maximum supported decimal unit)",
+		},
+		{
+			name:     "Kibi unit",
+			expr:     "1Ki",
+			expected: "1Ki",
+			desc:     "Kibi unit",
+		},
+		{
+			name:     "Mebi unit",
+			expr:     "100Mi",
+			expected: "100Mi",
+			desc:     "Mebi unit",
+		},
+		{
+			name:     "Gibi unit",
+			expr:     "1Gi",
+			expected: "1Gi",
+			desc:     "Gibi unit",
+		},
+		{
+			name:     "Tebi unit",
+			expr:     "1Ti",
+			expected: "1Ti",
+			desc:     "Tebi unit",
+		},
+		{
+			name:     "Pebi unit",
+			expr:     "1Pi",
+			expected: "1Pi",
+			desc:     "Pebi unit (maximum supported binary unit)",
+		},
+
+		// Mixed scenarios combining fixes
+		{
+			name:     "scientific notation in expression",
+			expr:     "1e3 + 2e2",
+			expected: "1200",
+			desc:     "Multiple scientific notations in one expression",
+		},
+		{
+			name:     "scientific notation with operator adjacency",
+			expr:     "1e3+-200",
+			expected: "800",
+			desc:     "Combining scientific notation with adjacent operators",
+		},
+		{
+			name:     "quantity arithmetic",
+			expr:     "100m + 50m",
+			expected: "150m",
+			desc:     "Basic quantity addition",
+		},
+		{
+			name:     "quantity with percentage",
+			expr:     "200m * 50%",
+			expected: "100m",
+			desc:     "Quantity with percentage multiplication",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := Parse(tt.expr)
+			if err != nil {
+				t.Errorf("Parse(%q) unexpected error: %v\nDescription: %s", tt.expr, err, tt.desc)
+				return
+			}
+			actual := result.GetResult().String()
+			if actual != tt.expected {
+				t.Errorf("Parse(%q) = %v, want %v\nDescription: %s", tt.expr, actual, tt.expected, tt.desc)
+			}
+		})
+	}
+}
+
+// TestScientificNotationEdgeCases tests edge cases specific to scientific notation parsing
+func TestScientificNotationEdgeCases(t *testing.T) {
+	tests := []struct {
+		name    string
+		expr    string
+		wantErr bool
+		desc    string
+	}{
+		{
+			name:    "incomplete scientific notation - just e",
+			expr:    "1e",
+			wantErr: false, // Acceptable: parsed as 0 by strconv
+			desc:    "Incomplete exponent - handled by Go's strconv",
+		},
+		{
+			name:    "incomplete scientific notation - e with sign",
+			expr:    "1e+",
+			wantErr: false, // Acceptable: parsed as 0 by strconv
+			desc:    "Incomplete exponent with sign - handled by Go's strconv",
+		},
+		{
+			name:    "double exponent",
+			expr:    "1e3e2",
+			wantErr: true,
+			desc:    "Double exponent should be rejected",
+		},
+		{
+			name:    "scientific notation in max function",
+			expr:    "max(1e3, 2e2)",
+			wantErr: false,
+			desc:    "Scientific notation should work in functions",
+		},
+		{
+			name:    "scientific notation with quantity comparison",
+			expr:    "max(1e3, 100m)",
+			wantErr: false,
+			desc:    "Scientific notation can be compared with quantities",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Parse(tt.expr)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Parse(%q) error = %v, wantErr %v\nDescription: %s",
+					tt.expr, err, tt.wantErr, tt.desc)
+			}
+		})
+	}
+}

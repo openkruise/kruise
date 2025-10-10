@@ -63,17 +63,85 @@ func (x *yyLex) skipWhitespace() {
 // readNumber reads numbers (including floats, percentages and Kubernetes resource units)
 func (x *yyLex) readNumber() string {
 	start := x.pos
+	seenDot := false
+	seenE := false
+	seenPercent := false
+	expectExponentDigit := false
+
 	for {
 		r := x.peek()
 		if r == 0 {
 			break
 		}
-		// Check if it's a number character or Kubernetes resource unit
-		if !isNumberChar(r) && !isQuantityUnitChar(r) {
+
+		// Handle digits
+		if unicode.IsDigit(r) {
+			expectExponentDigit = false
+			x.next()
+			continue
+		}
+
+		// Handle decimal point
+		if r == '.' {
+			if seenDot || seenE || seenPercent {
+				break // Can't have multiple dots, or dot after exponent/percent
+			}
+			seenDot = true
+			x.next()
+			continue
+		}
+
+		// Handle exponent (e or E for scientific notation)
+		// Note: Only lowercase 'e' or uppercase 'E' followed by digit/sign is scientific notation
+		// Kubernetes units only go up to P/Pi (Petabyte), so 'E' alone is not a valid unit
+		if r == 'e' || r == 'E' {
+			if seenE || seenPercent {
+				break // Can't have multiple exponents, or exponent after percent
+			}
+			seenE = true
+			expectExponentDigit = true
+			x.next()
+			continue
+		}
+
+		// Handle sign in exponent (+ or -)
+		if r == '+' || r == '-' {
+			// Sign is only allowed immediately after 'e' or 'E'
+			if !expectExponentDigit {
+				break
+			}
+			expectExponentDigit = false
+			x.next()
+			continue
+		}
+
+		// Handle percent
+		if r == '%' {
+			if seenPercent {
+				break // Can't have multiple percents
+			}
+			seenPercent = true
+			x.next()
+			break // Percent must be the last character of a number
+		}
+
+		// Handle Kubernetes resource units (must come after number part)
+		if isQuantityUnitChar(r) {
+			// If we're in the middle of exponent parsing, stop
+			if expectExponentDigit {
+				break
+			}
+			// Read the unit part
+			for isQuantityUnitChar(x.peek()) {
+				x.next()
+			}
 			break
 		}
-		x.next()
+
+		// Any other character stops number reading
+		break
 	}
+
 	if start >= len(x.input) {
 		return ""
 	}
@@ -96,14 +164,10 @@ func (x *yyLex) readIdentifier() string {
 	return x.input[start:x.pos]
 }
 
-// isNumberChar checks if it's a number character
-func isNumberChar(r rune) bool {
-	return unicode.IsDigit(r) || r == '.' || r == 'e' || r == 'E' || r == '+' || r == '-' || r == '%'
-}
-
 // isQuantityUnitChar checks if it's a Kubernetes resource unit character
 func isQuantityUnitChar(r rune) bool {
-	// Kubernetes resource units: m, k, M, G, T, P, E, Ki, Mi, Gi, Ti, Pi, Ei
+	// Kubernetes resource units: m, k, M, G, T, P, Ki, Mi, Gi, Ti, Pi
+	// Note: E/Ei (Exabyte) are not supported - quantities limited to Petabyte
 	return unicode.IsLetter(r)
 }
 
@@ -132,14 +196,17 @@ func (x *yyLex) isQuantity(s string) bool {
 	}
 
 	unit := s[numEnd:]
-	validUnits := []string{"m", "k", "M", "G", "T", "P", "E", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei"}
+	// Valid Kubernetes resource units (limited to Petabyte for practical use)
+	// Decimal: m (milli), k (kilo), M (Mega), G (Giga), T (Tera), P (Peta)
+	// Binary: Ki (Kibi), Mi (Mebi), Gi (Gibi), Ti (Tebi), Pi (Pebi)
+	validUnits := []string{"m", "k", "M", "G", "T", "P", "Ki", "Mi", "Gi", "Ti", "Pi"}
 
+	// Check if unit is in validUnits
 	for _, validUnit := range validUnits {
 		if unit == validUnit {
 			return true
 		}
 	}
-
 	return false
 }
 
