@@ -627,6 +627,11 @@ func TestParserEdgeCases(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name: "no spaces",
+			expr: "2+3+4/2",
+			want: "7",
+		},
+		{
 			name: "multiple spaces",
 			expr: "2   +   3",
 			want: "5",

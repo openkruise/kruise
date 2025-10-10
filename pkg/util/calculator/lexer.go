@@ -119,7 +119,6 @@ func (x *yyLex) readNumber() string {
 			if seenPercent {
 				break // Can't have multiple percents
 			}
-			seenPercent = true
 			x.next()
 			break // Percent must be the last character of a number
 		}
