@@ -425,6 +425,42 @@ func TestAdvancedCronJobCreateUpdateHandler_Handle(t *testing.T) {
 			expectedResult: false,
 			expectedError:  true,
 		},
+		{
+			name: "update with invalid OldObject JSON should return error",
+			request: admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Update,
+					Resource: metav1.GroupVersionResource{
+						Group:    appsv1beta1.GroupVersion.Group,
+						Version:  appsv1beta1.GroupVersion.Version,
+						Resource: "advancedcronjobs",
+					},
+					Object: runtime.RawExtension{
+						Raw: createAdvancedCronJobV1Beta1JSON(t, &appsv1beta1.AdvancedCronJob{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "test-acj-update",
+								Namespace: "default",
+							},
+							Spec: appsv1beta1.AdvancedCronJobSpec{
+								Schedule: "0 0 * * *",
+								Template: appsv1beta1.CronJobTemplate{
+									JobTemplate: &batchv1.JobTemplateSpec{
+										Spec: batchv1.JobSpec{
+											Template: createValidPodTemplateSpec(),
+										},
+									},
+								},
+							},
+						}),
+					},
+					OldObject: runtime.RawExtension{
+						Raw: []byte("invalid old object json"),
+					},
+				},
+			},
+			expectedResult: false,
+			expectedError:  true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -481,4 +517,122 @@ func createAdvancedCronJobV1Alpha1JSON(t *testing.T, acj *appsv1alpha1.AdvancedC
 		t.Fatalf("failed to marshal AdvancedCronJob v1alpha1: %v", err)
 	}
 	return data
+}
+
+func TestDecodeAdvancedCronJobFromRaw(t *testing.T) {
+	utilruntime.Must(apis.AddToScheme(scheme.Scheme))
+	decoder := admission.NewDecoder(scheme.Scheme)
+	handler := AdvancedCronJobCreateUpdateHandler{
+		Decoder: decoder,
+	}
+
+	tests := []struct {
+		name        string
+		raw         runtime.RawExtension
+		version     string
+		expectError bool
+	}{
+		{
+			name: "decode valid v1beta1 AdvancedCronJob",
+			raw: runtime.RawExtension{
+				Raw: createAdvancedCronJobV1Beta1JSON(t, &appsv1beta1.AdvancedCronJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-acj",
+						Namespace: "default",
+					},
+					Spec: appsv1beta1.AdvancedCronJobSpec{
+						Schedule: "0 0 * * *",
+						Template: appsv1beta1.CronJobTemplate{
+							JobTemplate: &batchv1.JobTemplateSpec{
+								Spec: batchv1.JobSpec{
+									Template: createValidPodTemplateSpec(),
+								},
+							},
+						},
+					},
+				}),
+			},
+			version:     appsv1beta1.GroupVersion.Version,
+			expectError: false,
+		},
+		{
+			name: "decode valid v1alpha1 AdvancedCronJob with conversion",
+			raw: runtime.RawExtension{
+				Raw: createAdvancedCronJobV1Alpha1JSON(t, &appsv1alpha1.AdvancedCronJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-acj-v1alpha1",
+						Namespace: "default",
+					},
+					Spec: appsv1alpha1.AdvancedCronJobSpec{
+						Schedule: "0 0 * * *",
+						Template: appsv1alpha1.CronJobTemplate{
+							BroadcastJobTemplate: &appsv1alpha1.BroadcastJobTemplateSpec{
+								Spec: appsv1alpha1.BroadcastJobSpec{
+									Template: createValidPodTemplateSpec(),
+								},
+							},
+						},
+					},
+				}),
+			},
+			version:     appsv1alpha1.GroupVersion.Version,
+			expectError: false,
+		},
+		{
+			name: "decode invalid JSON",
+			raw: runtime.RawExtension{
+				Raw: []byte("invalid json"),
+			},
+			version:     appsv1beta1.GroupVersion.Version,
+			expectError: true,
+		},
+		{
+			name: "decode unsupported version",
+			raw: runtime.RawExtension{
+				Raw: createAdvancedCronJobV1Beta1JSON(t, &appsv1beta1.AdvancedCronJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-acj",
+						Namespace: "default",
+					},
+					Spec: appsv1beta1.AdvancedCronJobSpec{
+						Schedule: "0 0 * * *",
+						Template: appsv1beta1.CronJobTemplate{
+							JobTemplate: &batchv1.JobTemplateSpec{
+								Spec: batchv1.JobSpec{
+									Template: createValidPodTemplateSpec(),
+								},
+							},
+						},
+					},
+				}),
+			},
+			version:     "v1",
+			expectError: true,
+		},
+		{
+			name: "decode v1alpha1 with invalid JSON in v1alpha1 format",
+			raw: runtime.RawExtension{
+				Raw: []byte(`{"invalid json for v1alpha1`),
+			},
+			version:     appsv1alpha1.GroupVersion.Version,
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj := &appsv1beta1.AdvancedCronJob{}
+			err := handler.decodeAdvancedCronJobFromRaw(tt.raw, tt.version, obj)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got nil")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
 }

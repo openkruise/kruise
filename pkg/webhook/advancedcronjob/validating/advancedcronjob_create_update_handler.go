@@ -30,6 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
+	"k8s.io/apimachinery/pkg/runtime"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -238,6 +239,26 @@ func (h *AdvancedCronJobCreateUpdateHandler) decodeAdvancedCronJob(req admission
 	return nil
 }
 
+func (h *AdvancedCronJobCreateUpdateHandler) decodeAdvancedCronJobFromRaw(raw runtime.RawExtension, version string, obj *appsv1beta1.AdvancedCronJob) error {
+	switch version {
+	case appsv1beta1.GroupVersion.Version:
+		if err := h.Decoder.DecodeRaw(raw, obj); err != nil {
+			return err
+		}
+	case appsv1alpha1.GroupVersion.Version:
+		objv1alpha1 := &appsv1alpha1.AdvancedCronJob{}
+		if err := h.Decoder.DecodeRaw(raw, objv1alpha1); err != nil {
+			return err
+		}
+		if err := objv1alpha1.ConvertTo(obj); err != nil {
+			return fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err)
+		}
+	default:
+		return fmt.Errorf("unsupported version: %s", version)
+	}
+	return nil
+}
+
 var _ admission.Handler = &AdvancedCronJobCreateUpdateHandler{}
 
 // Handle handles admission requests.
@@ -255,7 +276,7 @@ func (h *AdvancedCronJobCreateUpdateHandler) Handle(ctx context.Context, req adm
 		}
 	case admissionv1.Update:
 		oldObj := &appsv1beta1.AdvancedCronJob{}
-		if err := h.decodeAdvancedCronJob(admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}}, oldObj); err != nil {
+		if err := h.decodeAdvancedCronJobFromRaw(req.AdmissionRequest.OldObject, req.AdmissionRequest.Resource.Version, oldObj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
