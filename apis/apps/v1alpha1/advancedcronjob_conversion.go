@@ -65,6 +65,10 @@ func (acj *AdvancedCronJob) ConvertFrom(src conversion.Hub) error {
 		acjv1beta1 := src.(*v1beta1.AdvancedCronJob)
 		acj.ObjectMeta = acjv1beta1.ObjectMeta
 
+		if acjv1beta1.Spec.Template.ImageListPullJobTemplate != nil {
+			return fmt.Errorf("imageListPullJobTemplate is not supported in v1alpha1")
+		}
+
 		// spec
 		acj.Spec = AdvancedCronJobSpec{
 			Schedule:                   acjv1beta1.Spec.Schedule,
