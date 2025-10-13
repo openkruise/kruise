@@ -125,6 +125,10 @@ func SetDefaultsAdvancedCronJob(obj *v1beta1.AdvancedCronJob, injectTemplateDefa
 		SetDefaultPodSpec(&obj.Spec.Template.BroadcastJobTemplate.Spec.Template.Spec)
 	}
 
+	if obj.Spec.Template.ImageListPullJobTemplate != nil && obj.Spec.Template.ImageListPullJobTemplate.Spec.CompletionPolicy.Type == "" {
+		obj.Spec.Template.ImageListPullJobTemplate.Spec.CompletionPolicy.Type = v1beta1.Always
+	}
+
 	if obj.Spec.ConcurrencyPolicy == "" {
 		obj.Spec.ConcurrencyPolicy = v1beta1.AllowConcurrent
 	}

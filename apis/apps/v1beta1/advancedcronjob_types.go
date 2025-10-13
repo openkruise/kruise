@@ -77,6 +77,10 @@ type CronJobTemplate struct {
 	// Specifies the broadcastjob that will be created when executing a BroadcastCronJob.
 	// +optional
 	BroadcastJobTemplate *BroadcastJobTemplateSpec `json:"broadcastJobTemplate,omitempty" protobuf:"bytes,2,opt,name=broadcastJobTemplate"`
+
+	// Specifies the imagelistpulljob that will be created when executing a CronImageListPullJob.
+	// +optional
+	ImageListPullJobTemplate *ImageListPullJobTemplateSpec `json:"imageListPullJobTemplate,omitempty" protobuf:"bytes,3,opt,name=imageListPullJobTemplate"`
 }
 
 type TemplateKind string
@@ -85,6 +89,8 @@ const (
 	JobTemplate TemplateKind = "Job"
 
 	BroadcastJobTemplate TemplateKind = "BroadcastJob"
+
+	ImageListPullJobTemplate TemplateKind = "ImageListPullJob"
 )
 
 // JobTemplateSpec describes the data a Job should have when created from a template
@@ -96,6 +102,17 @@ type BroadcastJobTemplateSpec struct {
 	// Specification of the desired behavior of the broadcastjob.
 	// +optional
 	Spec BroadcastJobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+}
+
+// ImageListPullJobTemplateSpec describes the data an ImageListPullJob should have when created from a template
+type ImageListPullJobTemplateSpec struct {
+	// Standard object's metadata of the jobs created from this template.
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Specification of the desired behavior of the imagelistpulljob.
+	// +optional
+	Spec ImageListPullJobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 // ConcurrencyPolicy describes how the job will be handled.
