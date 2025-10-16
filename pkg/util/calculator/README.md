@@ -10,7 +10,7 @@ This calculator is specifically designed to solve the dynamic resource calculati
 
 ### Core Capabilities
 - **Thread-safe**: No global state, each calculator instance is independent
-- **Resource isolation**: Expression + variables uniquely map to calculator instances  
+- **Resource isolation**: Expression + variables uniquely map to calculator instances
 - **High performance**: Lock-free design for concurrent operations
 - **Kubernetes native**: Full support for Kubernetes resource quantities (cpu, memory)
 - **Expression validation**: Comprehensive error handling and validation
@@ -35,7 +35,7 @@ This calculator is specifically designed to solve the dynamic resource calculati
 The calculator follows a **resource isolation** pattern where each expression and its variables create a unique calculator instance. This design ensures:
 
 1. **No Lock Contention**: Each instance operates independently
-2. **Memory Isolation**: No shared state between different calculations  
+2. **Memory Isolation**: No shared state between different calculations
 3. **Predictable Performance**: O(1) parsing time, no synchronization overhead
 4. **Concurrent Safety**: Multiple goroutines can parse different expressions simultaneously
 

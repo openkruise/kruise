@@ -96,29 +96,29 @@ The following benchmark results were obtained on:
 - **Architecture**: arm64
 
 ```
-BenchmarkParseSimpleArithmetic-10                2219050        627.0 ns/op     1152 B/op      7 allocs/op
-BenchmarkParseComplexArithmetic-10               1252183       1753 ns/op       1472 B/op     11 allocs/op
-BenchmarkParsePercentage-10                      1834174        697.7 ns/op     1152 B/op      7 allocs/op
-BenchmarkParseQuantity-10                        1385220        780.4 ns/op     1280 B/op      9 allocs/op
-BenchmarkParseQuantityComplex-10                 1000000       1594 ns/op       1440 B/op     11 allocs/op
-BenchmarkParseMaxFunction-10                     1218528        956.3 ns/op     1152 B/op      7 allocs/op
-BenchmarkParseMinFunction-10                     1655571        850.6 ns/op     1152 B/op      7 allocs/op
-BenchmarkParseNestedFunctions-10                 1000000       1110 ns/op       1312 B/op      9 allocs/op
-BenchmarkParseWithVariablesSimple-10             2165596        562.3 ns/op     1072 B/op      6 allocs/op
-BenchmarkParseWithVariablesComplex-10            1366978       1102 ns/op       1232 B/op      8 allocs/op
-BenchmarkParseProposalScenario-10                1000000       1873 ns/op       1232 B/op      8 allocs/op
-BenchmarkParseLargeQuantity-10                    873884       1196 ns/op       1280 B/op      9 allocs/op
-BenchmarkParseScientificNotation-10              1778199        718.7 ns/op     1152 B/op      7 allocs/op
-BenchmarkCalculatorReuse-10                      1869799        536.8 ns/op     1056 B/op      5 allocs/op
-BenchmarkCalculatorWithVariablesReuse-10         2612859        560.3 ns/op      976 B/op      4 allocs/op
-BenchmarkArithmeticOperations/Add-10            10246407        144.1 ns/op      208 B/op      3 allocs/op
-BenchmarkArithmeticOperations/Sub-10            10507390        152.1 ns/op      208 B/op      3 allocs/op
-BenchmarkArithmeticOperations/Mul-10            24176366         46.42 ns/op      80 B/op      1 allocs/op
-BenchmarkArithmeticOperations/Div-10            30410781         41.39 ns/op      80 B/op      1 allocs/op
-BenchmarkFunctionCalls/Max-10                   32819502         48.07 ns/op      80 B/op      1 allocs/op
-BenchmarkFunctionCalls/Min-10                   27980316         43.60 ns/op      80 B/op      1 allocs/op
-BenchmarkParseMemoryAllocation-10                1000000       1402 ns/op       1340 B/op      9 allocs/op
-BenchmarkConcurrentParsing-10                    1000000       1699 ns/op       1312 B/op      9 allocs/op
+BenchmarkParseSimpleArithmetic-10                8082366        438.4 ns/op     1120 B/op      7 allocs/op
+BenchmarkParseComplexArithmetic-10               4382671        830.1 ns/op     1440 B/op     11 allocs/op
+BenchmarkParsePercentage-10                      7622686        481.6 ns/op     1120 B/op      7 allocs/op
+BenchmarkParseQuantity-10                        6125442        608.2 ns/op     1248 B/op      9 allocs/op
+BenchmarkParseQuantityComplex-10                 4242794        856.1 ns/op     1408 B/op     11 allocs/op
+BenchmarkParseMaxFunction-10                     6317332        581.3 ns/op     1120 B/op      7 allocs/op
+BenchmarkParseMinFunction-10                     6209354        661.1 ns/op     1120 B/op      7 allocs/op
+BenchmarkParseNestedFunctions-10                 4048755        844.1 ns/op     1280 B/op      9 allocs/op
+BenchmarkParseWithVariablesSimple-10             7972747        429.2 ns/op     1040 B/op      6 allocs/op
+BenchmarkParseWithVariablesComplex-10            4969149        837.7 ns/op     1200 B/op      8 allocs/op
+BenchmarkParseProposalScenario-10                4755639        858.4 ns/op     1200 B/op      8 allocs/op
+BenchmarkParseLargeQuantity-10                   5339418        690.9 ns/op     1248 B/op      9 allocs/op
+BenchmarkParseScientificNotation-10              8134534        478.5 ns/op     1120 B/op      7 allocs/op
+BenchmarkCalculatorReuse-10                      9603499        392.1 ns/op     1024 B/op      5 allocs/op
+BenchmarkCalculatorWithVariablesReuse-10        10385060        373.2 ns/op      944 B/op      4 allocs/op
+BenchmarkArithmeticOperations/Add-10            36233281         96.75 ns/op      208 B/op      3 allocs/op
+BenchmarkArithmeticOperations/Sub-10            40982226        109.3 ns/op      208 B/op      3 allocs/op
+BenchmarkArithmeticOperations/Mul-10           100000000         36.16 ns/op      80 B/op      1 allocs/op
+BenchmarkArithmeticOperations/Div-10           100000000         32.88 ns/op      80 B/op      1 allocs/op
+BenchmarkFunctionCalls/Max-10                   94502450         33.36 ns/op      80 B/op      1 allocs/op
+BenchmarkFunctionCalls/Min-10                  100000000         33.29 ns/op      80 B/op      1 allocs/op
+BenchmarkParseMemoryAllocation-10                4568913        931.2 ns/op     1308 B/op      9 allocs/op
+BenchmarkConcurrentParsing-10                    6013420        686.2 ns/op     1280 B/op      9 allocs/op
 ```
 
 ### Metrics Explanation
@@ -131,12 +131,12 @@ BenchmarkConcurrentParsing-10                    1000000       1699 ns/op       
 
 | Category | Average Time | Memory Usage | Allocations |
 |----------|-------------|--------------|-------------|
-| Simple expressions | ~600-800 ns | ~1.1 KB | 5-7 |
-| Complex expressions | ~1500-1800 ns | ~1.4 KB | 9-11 |
-| Variable substitution | ~600-1100 ns | ~1.0-1.2 KB | 4-8 |
-| Instance reuse | ~540-560 ns | ~1.0 KB | 4-5 |
-| Low-level operations | ~40-150 ns | 80-208 B | 1-3 |
-| Concurrent parsing | ~1700 ns | ~1.3 KB | 9 |
+| Simple expressions | ~430-610 ns | ~1.1 KB | 7-9 |
+| Complex expressions | ~830-930 ns | ~1.3-1.4 KB | 9-11 |
+| Variable substitution | ~370-840 ns | ~0.9-1.2 KB | 4-8 |
+| Instance reuse | ~370-390 ns | ~0.9-1.0 KB | 4-5 |
+| Low-level operations | ~33-110 ns | 80-208 B | 1-3 |
+| Concurrent parsing | ~690 ns | ~1.3 KB | 9 |
 
 ## Use Cases
 

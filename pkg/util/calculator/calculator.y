@@ -269,21 +269,23 @@ func (c *Calculator) getVariable(name string) (*Value, bool) {
 
 input:
 	expr {
-		currentCalc.result = $1
+		yylex.(*yyLex).calc.result = $1
 	}
 	;
 
 expr:
 	expr '+' expr {
-		$$ = currentCalc.add($1, $3)
-		if $$ == nil && currentCalc.lastError == nil {
-			currentCalc.lastError = fmt.Errorf("invalid addition operation")
+		calc := yylex.(*yyLex).calc
+		$$ = calc.add($1, $3)
+		if $$ == nil && calc.lastError == nil {
+			calc.lastError = fmt.Errorf("invalid addition operation")
 		}
 	}
 	| expr '-' expr {
-		$$ = currentCalc.sub($1, $3)
-		if $$ == nil && currentCalc.lastError == nil {
-			currentCalc.lastError = fmt.Errorf("invalid subtraction operation")
+		calc := yylex.(*yyLex).calc
+		$$ = calc.sub($1, $3)
+		if $$ == nil && calc.lastError == nil {
+			calc.lastError = fmt.Errorf("invalid subtraction operation")
 		}
 	}
 	| term {
@@ -293,15 +295,17 @@ expr:
 
 term:
 	term '*' term {
-		$$ = currentCalc.mul($1, $3)
-		if $$ == nil && currentCalc.lastError == nil {
-			currentCalc.lastError = fmt.Errorf("invalid multiplication operation")
+		calc := yylex.(*yyLex).calc
+		$$ = calc.mul($1, $3)
+		if $$ == nil && calc.lastError == nil {
+			calc.lastError = fmt.Errorf("invalid multiplication operation")
 		}
 	}
 	| term '/' term {
-		$$ = currentCalc.div($1, $3)
-		if $$ == nil && currentCalc.lastError == nil {
-			currentCalc.lastError = fmt.Errorf("invalid division operation")
+		calc := yylex.(*yyLex).calc
+		$$ = calc.div($1, $3)
+		if $$ == nil && calc.lastError == nil {
+			calc.lastError = fmt.Errorf("invalid division operation")
 		}
 	}
 	| factor {
@@ -311,13 +315,15 @@ term:
 
 factor:
 	NUMBER {
-		num, _ := currentCalc.parseNumber($1)
+		calc := yylex.(*yyLex).calc
+		num, _ := calc.parseNumber($1)
 		$$ = &Value{IsQuantity: false, Number: num}
 	}
 	| QUANTITY {
-		q, err := currentCalc.parseQuantity($1)
+		calc := yylex.(*yyLex).calc
+		q, err := calc.parseQuantity($1)
 		if err != nil {
-			currentCalc.lastError = err
+			calc.lastError = err
 			$$ = nil
 		} else {
 			$$ = &Value{IsQuantity: true, Quantity: q}
@@ -325,8 +331,9 @@ factor:
 	}
 	| IDENT {
 		// Handle variable reference
+		calc := yylex.(*yyLex).calc
 		varName := strings.ToLower($1)
-		if val, exists := currentCalc.getVariable(varName); exists {
+		if val, exists := calc.getVariable(varName); exists {
 			$$ = val
 		} else {
 			$$ = nil
@@ -352,15 +359,17 @@ factor:
 
 func_call:
 	IDENT '(' expr ')' {
-		$$ = currentCalc.callFunc($1, []*Value{$3})
-		if $$ == nil && currentCalc.lastError == nil {
-			currentCalc.lastError = fmt.Errorf("function call failed")
+		calc := yylex.(*yyLex).calc
+		$$ = calc.callFunc($1, []*Value{$3})
+		if $$ == nil && calc.lastError == nil {
+			calc.lastError = fmt.Errorf("function call failed")
 		}
 	}
 	| IDENT '(' expr ',' expr ')' {
-		$$ = currentCalc.callFunc($1, []*Value{$3, $5})
-		if $$ == nil && currentCalc.lastError == nil {
-			currentCalc.lastError = fmt.Errorf("function call failed")
+		calc := yylex.(*yyLex).calc
+		$$ = calc.callFunc($1, []*Value{$3, $5})
+		if $$ == nil && calc.lastError == nil {
+			calc.lastError = fmt.Errorf("function call failed")
 		}
 	}
 	;

@@ -2,15 +2,8 @@ package calculator
 
 import (
 	"fmt"
-	"sync"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-)
-
-// Global variable for yacc parser - use mutex for thread safety
-var (
-	currentCalc   *Calculator
-	currentCalcMu sync.Mutex
 )
 
 // Value represents the calculator's value type, can be number or Quantity
@@ -86,16 +79,10 @@ func (c *Calculator) Parse(input string) (*Value, error) {
 	c.expr = input
 	c.lastError = nil
 
-	// Use mutex for thread safety
-	currentCalcMu.Lock()
-	defer currentCalcMu.Unlock()
-
 	// Use yacc-generated parser with lexer
 	lexer := &yyLex{}
 	lexer.init(input)
-
-	// Set current calculator for yacc parser
-	currentCalc = c
+	lexer.calc = c // Set calculator instance in lexer
 
 	// Parse using yacc
 	parseResult := yyParse(lexer)

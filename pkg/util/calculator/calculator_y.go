@@ -293,7 +293,7 @@ const yyEofCode = 1
 const yyErrCode = 2
 const yyInitialStackSize = 16
 
-//line calculator.y:368
+//line calculator.y:377
 
 //line yacctab:1
 var yyExca = [...]int8{
@@ -702,70 +702,76 @@ yydefault:
 		yyDollar = yyS[yypt-1 : yypt+1]
 //line calculator.y:271
 		{
-			currentCalc.result = yyDollar[1].val
+			yylex.(*yyLex).calc.result = yyDollar[1].val
 		}
 	case 2:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line calculator.y:277
 		{
-			yyVAL.val = currentCalc.add(yyDollar[1].val, yyDollar[3].val)
-			if yyVAL.val == nil && currentCalc.lastError == nil {
-				currentCalc.lastError = fmt.Errorf("invalid addition operation")
+			calc := yylex.(*yyLex).calc
+			yyVAL.val = calc.add(yyDollar[1].val, yyDollar[3].val)
+			if yyVAL.val == nil && calc.lastError == nil {
+				calc.lastError = fmt.Errorf("invalid addition operation")
 			}
 		}
 	case 3:
 		yyDollar = yyS[yypt-3 : yypt+1]
-//line calculator.y:283
+//line calculator.y:284
 		{
-			yyVAL.val = currentCalc.sub(yyDollar[1].val, yyDollar[3].val)
-			if yyVAL.val == nil && currentCalc.lastError == nil {
-				currentCalc.lastError = fmt.Errorf("invalid subtraction operation")
+			calc := yylex.(*yyLex).calc
+			yyVAL.val = calc.sub(yyDollar[1].val, yyDollar[3].val)
+			if yyVAL.val == nil && calc.lastError == nil {
+				calc.lastError = fmt.Errorf("invalid subtraction operation")
 			}
 		}
 	case 4:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line calculator.y:289
+//line calculator.y:291
 		{
 			yyVAL.val = yyDollar[1].val
 		}
 	case 5:
 		yyDollar = yyS[yypt-3 : yypt+1]
-//line calculator.y:295
+//line calculator.y:297
 		{
-			yyVAL.val = currentCalc.mul(yyDollar[1].val, yyDollar[3].val)
-			if yyVAL.val == nil && currentCalc.lastError == nil {
-				currentCalc.lastError = fmt.Errorf("invalid multiplication operation")
+			calc := yylex.(*yyLex).calc
+			yyVAL.val = calc.mul(yyDollar[1].val, yyDollar[3].val)
+			if yyVAL.val == nil && calc.lastError == nil {
+				calc.lastError = fmt.Errorf("invalid multiplication operation")
 			}
 		}
 	case 6:
 		yyDollar = yyS[yypt-3 : yypt+1]
-//line calculator.y:301
+//line calculator.y:304
 		{
-			yyVAL.val = currentCalc.div(yyDollar[1].val, yyDollar[3].val)
-			if yyVAL.val == nil && currentCalc.lastError == nil {
-				currentCalc.lastError = fmt.Errorf("invalid division operation")
+			calc := yylex.(*yyLex).calc
+			yyVAL.val = calc.div(yyDollar[1].val, yyDollar[3].val)
+			if yyVAL.val == nil && calc.lastError == nil {
+				calc.lastError = fmt.Errorf("invalid division operation")
 			}
 		}
 	case 7:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line calculator.y:307
+//line calculator.y:311
 		{
 			yyVAL.val = yyDollar[1].val
 		}
 	case 8:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line calculator.y:313
+//line calculator.y:317
 		{
-			num, _ := currentCalc.parseNumber(yyDollar[1].str)
+			calc := yylex.(*yyLex).calc
+			num, _ := calc.parseNumber(yyDollar[1].str)
 			yyVAL.val = &Value{IsQuantity: false, Number: num}
 		}
 	case 9:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line calculator.y:317
+//line calculator.y:322
 		{
-			q, err := currentCalc.parseQuantity(yyDollar[1].str)
+			calc := yylex.(*yyLex).calc
+			q, err := calc.parseQuantity(yyDollar[1].str)
 			if err != nil {
-				currentCalc.lastError = err
+				calc.lastError = err
 				yyVAL.val = nil
 			} else {
 				yyVAL.val = &Value{IsQuantity: true, Quantity: q}
@@ -773,11 +779,12 @@ yydefault:
 		}
 	case 10:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line calculator.y:326
+//line calculator.y:332
 		{
 			// Handle variable reference
+			calc := yylex.(*yyLex).calc
 			varName := strings.ToLower(yyDollar[1].str)
-			if val, exists := currentCalc.getVariable(varName); exists {
+			if val, exists := calc.getVariable(varName); exists {
 				yyVAL.val = val
 			} else {
 				yyVAL.val = nil
@@ -785,19 +792,19 @@ yydefault:
 		}
 	case 11:
 		yyDollar = yyS[yypt-3 : yypt+1]
-//line calculator.y:335
+//line calculator.y:342
 		{
 			yyVAL.val = yyDollar[2].val
 		}
 	case 12:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line calculator.y:338
+//line calculator.y:345
 		{
 			yyVAL.val = yyDollar[1].val
 		}
 	case 13:
 		yyDollar = yyS[yypt-2 : yypt+1]
-//line calculator.y:341
+//line calculator.y:348
 		{
 			if yyDollar[2].val == nil {
 				yyVAL.val = nil
@@ -810,20 +817,22 @@ yydefault:
 		}
 	case 14:
 		yyDollar = yyS[yypt-4 : yypt+1]
-//line calculator.y:354
+//line calculator.y:361
 		{
-			yyVAL.val = currentCalc.callFunc(yyDollar[1].str, []*Value{yyDollar[3].val})
-			if yyVAL.val == nil && currentCalc.lastError == nil {
-				currentCalc.lastError = fmt.Errorf("function call failed")
+			calc := yylex.(*yyLex).calc
+			yyVAL.val = calc.callFunc(yyDollar[1].str, []*Value{yyDollar[3].val})
+			if yyVAL.val == nil && calc.lastError == nil {
+				calc.lastError = fmt.Errorf("function call failed")
 			}
 		}
 	case 15:
 		yyDollar = yyS[yypt-6 : yypt+1]
-//line calculator.y:360
+//line calculator.y:368
 		{
-			yyVAL.val = currentCalc.callFunc(yyDollar[1].str, []*Value{yyDollar[3].val, yyDollar[5].val})
-			if yyVAL.val == nil && currentCalc.lastError == nil {
-				currentCalc.lastError = fmt.Errorf("function call failed")
+			calc := yylex.(*yyLex).calc
+			yyVAL.val = calc.callFunc(yyDollar[1].str, []*Value{yyDollar[3].val, yyDollar[5].val})
+			if yyVAL.val == nil && calc.lastError == nil {
+				calc.lastError = fmt.Errorf("function call failed")
 			}
 		}
 	}

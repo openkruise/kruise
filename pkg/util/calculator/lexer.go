@@ -14,6 +14,7 @@ type yyLex struct {
 	col   int
 	token int
 	err   error
+	calc  *Calculator // Calculator instance for context
 }
 
 // init initializes the lexical analyzer
