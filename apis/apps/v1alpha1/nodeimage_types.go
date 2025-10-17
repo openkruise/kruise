@@ -17,8 +17,13 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/conversion"
+
+	v1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 // NodeImageSpec defines the desired state of NodeImage
@@ -249,4 +254,244 @@ type NodeImageList struct {
 
 func init() {
 	SchemeBuilder.Register(&NodeImage{}, &NodeImageList{})
+}
+
+// ConvertTo converts this NodeImage to the Hub version (v1beta1).
+func (src *NodeImage) ConvertTo(dstRaw conversion.Hub) error {
+	switch t := dstRaw.(type) {
+	case *v1beta1.NodeImage:
+		dst := dstRaw.(*v1beta1.NodeImage)
+		// Copy metadata
+		dst.ObjectMeta = src.ObjectMeta
+
+		// Convert spec
+		dst.Spec = v1beta1.NodeImageSpec{
+			Images: make(map[string]v1beta1.ImageSpec),
+		}
+		for name, imageSpec := range src.Spec.Images {
+			dst.Spec.Images[name] = convertImageSpecToV1Beta1(imageSpec)
+		}
+
+		// Convert status
+		dst.Status = v1beta1.NodeImageStatus{
+			Desired:         src.Status.Desired,
+			Succeeded:       src.Status.Succeeded,
+			Failed:          src.Status.Failed,
+			Pulling:         src.Status.Pulling,
+			Waiting:         src.Status.Waiting,
+			ImageStatuses:   make(map[string]v1beta1.ImageStatus),
+			FirstSyncStatus: convertSyncStatusToV1Beta1(src.Status.FirstSyncStatus),
+		}
+		for name, imageStatus := range src.Status.ImageStatuses {
+			dst.Status.ImageStatuses[name] = convertImageStatusToV1Beta1(imageStatus)
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported type %T", t)
+	}
+}
+
+// ConvertFrom converts from the Hub version (v1beta1) to this version.
+func (dst *NodeImage) ConvertFrom(srcRaw conversion.Hub) error {
+	switch t := srcRaw.(type) {
+	case *v1beta1.NodeImage:
+		src := srcRaw.(*v1beta1.NodeImage)
+		// Copy metadata
+		dst.ObjectMeta = src.ObjectMeta
+
+		// Convert spec
+		dst.Spec = NodeImageSpec{
+			Images: make(map[string]ImageSpec),
+		}
+		for name, imageSpec := range src.Spec.Images {
+			dst.Spec.Images[name] = convertImageSpecFromV1Beta1(imageSpec)
+		}
+
+		// Convert status
+		dst.Status = NodeImageStatus{
+			Desired:         src.Status.Desired,
+			Succeeded:       src.Status.Succeeded,
+			Failed:          src.Status.Failed,
+			Pulling:         src.Status.Pulling,
+			Waiting:         src.Status.Waiting,
+			ImageStatuses:   make(map[string]ImageStatus),
+			FirstSyncStatus: convertSyncStatusFromV1Beta1(src.Status.FirstSyncStatus),
+		}
+		for name, imageStatus := range src.Status.ImageStatuses {
+			dst.Status.ImageStatuses[name] = convertImageStatusFromV1Beta1(imageStatus)
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported type %T", t)
+	}
+}
+
+func convertImageSpecToV1Beta1(src ImageSpec) v1beta1.ImageSpec {
+	dst := v1beta1.ImageSpec{
+		PullSecrets:   make([]v1beta1.ReferenceObject, len(src.PullSecrets)),
+		Tags:          make([]v1beta1.ImageTagSpec, len(src.Tags)),
+		SandboxConfig: convertSandboxConfigToV1Beta1(src.SandboxConfig),
+	}
+	for i, secret := range src.PullSecrets {
+		dst.PullSecrets[i] = v1beta1.ReferenceObject{
+			Namespace: secret.Namespace,
+			Name:      secret.Name,
+		}
+	}
+	for i, tag := range src.Tags {
+		dst.Tags[i] = convertImageTagSpecToV1Beta1(tag)
+	}
+	return dst
+}
+
+func convertImageSpecFromV1Beta1(src v1beta1.ImageSpec) ImageSpec {
+	dst := ImageSpec{
+		PullSecrets:   make([]ReferenceObject, len(src.PullSecrets)),
+		Tags:          make([]ImageTagSpec, len(src.Tags)),
+		SandboxConfig: convertSandboxConfigFromV1Beta1(src.SandboxConfig),
+	}
+	for i, secret := range src.PullSecrets {
+		dst.PullSecrets[i] = ReferenceObject{
+			Namespace: secret.Namespace,
+			Name:      secret.Name,
+		}
+	}
+	for i, tag := range src.Tags {
+		dst.Tags[i] = convertImageTagSpecFromV1Beta1(tag)
+	}
+	return dst
+}
+
+func convertImageTagSpecToV1Beta1(src ImageTagSpec) v1beta1.ImageTagSpec {
+	return v1beta1.ImageTagSpec{
+		Tag:             src.Tag,
+		CreatedAt:       src.CreatedAt,
+		PullPolicy:      convertImageTagPullPolicyToV1Beta1(src.PullPolicy),
+		OwnerReferences: src.OwnerReferences,
+		Version:         src.Version,
+		ImagePullPolicy: v1beta1.ImagePullPolicy(src.ImagePullPolicy),
+	}
+}
+
+func convertImageTagSpecFromV1Beta1(src v1beta1.ImageTagSpec) ImageTagSpec {
+	return ImageTagSpec{
+		Tag:             src.Tag,
+		CreatedAt:       src.CreatedAt,
+		PullPolicy:      convertImageTagPullPolicyFromV1Beta1(src.PullPolicy),
+		OwnerReferences: src.OwnerReferences,
+		Version:         src.Version,
+		ImagePullPolicy: ImagePullPolicy(src.ImagePullPolicy),
+	}
+}
+
+func convertImageTagPullPolicyToV1Beta1(src *ImageTagPullPolicy) *v1beta1.ImageTagPullPolicy {
+	if src == nil {
+		return nil
+	}
+	return &v1beta1.ImageTagPullPolicy{
+		TimeoutSeconds:          src.TimeoutSeconds,
+		BackoffLimit:            src.BackoffLimit,
+		TTLSecondsAfterFinished: src.TTLSecondsAfterFinished,
+		ActiveDeadlineSeconds:   src.ActiveDeadlineSeconds,
+	}
+}
+
+func convertImageTagPullPolicyFromV1Beta1(src *v1beta1.ImageTagPullPolicy) *ImageTagPullPolicy {
+	if src == nil {
+		return nil
+	}
+	return &ImageTagPullPolicy{
+		TimeoutSeconds:          src.TimeoutSeconds,
+		BackoffLimit:            src.BackoffLimit,
+		TTLSecondsAfterFinished: src.TTLSecondsAfterFinished,
+		ActiveDeadlineSeconds:   src.ActiveDeadlineSeconds,
+	}
+}
+
+func convertImageStatusToV1Beta1(src ImageStatus) v1beta1.ImageStatus {
+	dst := v1beta1.ImageStatus{
+		Tags: make([]v1beta1.ImageTagStatus, len(src.Tags)),
+	}
+	for i, tag := range src.Tags {
+		dst.Tags[i] = convertImageTagStatusToV1Beta1(tag)
+	}
+	return dst
+}
+
+func convertImageStatusFromV1Beta1(src v1beta1.ImageStatus) ImageStatus {
+	dst := ImageStatus{
+		Tags: make([]ImageTagStatus, len(src.Tags)),
+	}
+	for i, tag := range src.Tags {
+		dst.Tags[i] = convertImageTagStatusFromV1Beta1(tag)
+	}
+	return dst
+}
+
+func convertImageTagStatusToV1Beta1(src ImageTagStatus) v1beta1.ImageTagStatus {
+	return v1beta1.ImageTagStatus{
+		Tag:            src.Tag,
+		Phase:          v1beta1.ImagePullPhase(src.Phase),
+		Progress:       src.Progress,
+		StartTime:      src.StartTime,
+		CompletionTime: src.CompletionTime,
+		Version:        src.Version,
+		ImageID:        src.ImageID,
+		Message:        src.Message,
+	}
+}
+
+func convertImageTagStatusFromV1Beta1(src v1beta1.ImageTagStatus) ImageTagStatus {
+	return ImageTagStatus{
+		Tag:            src.Tag,
+		Phase:          ImagePullPhase(src.Phase),
+		Progress:       src.Progress,
+		StartTime:      src.StartTime,
+		CompletionTime: src.CompletionTime,
+		Version:        src.Version,
+		ImageID:        src.ImageID,
+		Message:        src.Message,
+	}
+}
+
+func convertSyncStatusToV1Beta1(src *SyncStatus) *v1beta1.SyncStatus {
+	if src == nil {
+		return nil
+	}
+	return &v1beta1.SyncStatus{
+		SyncAt:  src.SyncAt,
+		Status:  v1beta1.SyncStatusPhase(src.Status),
+		Message: src.Message,
+	}
+}
+
+func convertSyncStatusFromV1Beta1(src *v1beta1.SyncStatus) *SyncStatus {
+	if src == nil {
+		return nil
+	}
+	return &SyncStatus{
+		SyncAt:  src.SyncAt,
+		Status:  SyncStatusPhase(src.Status),
+		Message: src.Message,
+	}
+}
+
+func convertSandboxConfigFromV1Beta1(in *v1beta1.SandboxConfig) *SandboxConfig {
+	if in == nil {
+		return nil
+	}
+	out := &SandboxConfig{}
+	if in.Labels != nil {
+		out.Labels = make(map[string]string, len(in.Labels))
+		for k, v := range in.Labels {
+			out.Labels[k] = v
+		}
+	}
+	if in.Annotations != nil {
+		out.Annotations = make(map[string]string, len(in.Annotations))
+		for k, v := range in.Annotations {
+			out.Annotations[k] = v
+		}
+	}
+	return out
 }

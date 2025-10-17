@@ -140,7 +140,7 @@ var _ = ginkgo.Describe("AdvancedCronJob v1beta1", ginkgo.Label("AdvancedCronJob
 			gomega.Expect(updatedAcj.Spec.Paused).To(gomega.Equal(boolPtr(true)))
 
 			// Record the job count AFTER pausing (this is our baseline)
-			pausedJobs, err := tester.GetJobsCreatedByAdvancedCronJob(acj)
+			pausedJobs, err := tester.GetJobsCreatedByAdvancedCronJob(updatedAcj)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			pausedJobCount := len(pausedJobs)
 			common.Logf("Job count after pausing: %d", pausedJobCount)
@@ -150,7 +150,7 @@ var _ = ginkgo.Describe("AdvancedCronJob v1beta1", ginkgo.Label("AdvancedCronJob
 			time.Sleep(120 * time.Second)
 
 			// Check that no new jobs were created during the pause period
-			stillPausedJobs, err := tester.GetJobsCreatedByAdvancedCronJob(acj)
+			stillPausedJobs, err := tester.GetJobsCreatedByAdvancedCronJob(updatedAcj)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			stillPausedJobCount := len(stillPausedJobs)
 			common.Logf("Job count after pause period: %d", stillPausedJobCount)
@@ -167,13 +167,13 @@ var _ = ginkgo.Describe("AdvancedCronJob v1beta1", ginkgo.Label("AdvancedCronJob
 			ginkgo.By("Waiting for new jobs to be created after resume")
 			// Wait for new jobs to be created after resume
 			gomega.Eventually(func() int {
-				jobs, err := tester.GetJobsCreatedByAdvancedCronJob(acj)
+				jobs, err := tester.GetJobsCreatedByAdvancedCronJob(updatedAcj)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return len(jobs)
 			}, 3*time.Minute, 10*time.Second).Should(gomega.BeNumerically(">", stillPausedJobCount))
 
 			// Verify that jobs are being created again after resume
-			finalJobs, err := tester.GetJobsCreatedByAdvancedCronJob(acj)
+			finalJobs, err := tester.GetJobsCreatedByAdvancedCronJob(updatedAcj)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			finalJobCount := len(finalJobs)
 			common.Logf("Final job count: %d", finalJobCount)

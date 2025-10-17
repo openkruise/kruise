@@ -28,14 +28,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 )
 
-var _ handler.TypedEventHandler[*appsv1alpha1.ImagePullJob, reconcile.Request] = &imagePullJobEventHandler{}
+var _ handler.TypedEventHandler[*appsv1beta1.ImagePullJob, reconcile.Request] = &imagePullJobEventHandler{}
 
 type imagePullJobEventHandler struct {
-	enqueueHandler handler.TypedEventHandler[*appsv1alpha1.ImagePullJob, reconcile.Request]
+	enqueueHandler handler.TypedEventHandler[*appsv1beta1.ImagePullJob, reconcile.Request]
 }
 
 func isImageListPullJobController(controllerRef *metav1.OwnerReference) bool {
@@ -47,10 +47,10 @@ func isImageListPullJobController(controllerRef *metav1.OwnerReference) bool {
 	return controllerRef.Kind == controllerKind.Kind && refGV.Group == controllerKind.Group
 }
 
-func (p *imagePullJobEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*appsv1alpha1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+func (p *imagePullJobEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*appsv1beta1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	job := evt.Object
 	if job.DeletionTimestamp != nil {
-		p.Delete(ctx, event.TypedDeleteEvent[*appsv1alpha1.ImagePullJob]{Object: evt.Object}, q)
+		p.Delete(ctx, event.TypedDeleteEvent[*appsv1beta1.ImagePullJob]{Object: evt.Object}, q)
 		return
 	}
 	if controllerRef := metav1.GetControllerOf(job); controllerRef != nil && isImageListPullJobController(controllerRef) {
@@ -60,7 +60,7 @@ func (p *imagePullJobEventHandler) Create(ctx context.Context, evt event.TypedCr
 	}
 }
 
-func (p *imagePullJobEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1alpha1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+func (p *imagePullJobEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1beta1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	job := evt.Object
 	if controllerRef := metav1.GetControllerOf(job); controllerRef != nil && isImageListPullJobController(controllerRef) {
 		key := types.NamespacedName{Namespace: job.Namespace, Name: controllerRef.Name}.String()
@@ -69,11 +69,11 @@ func (p *imagePullJobEventHandler) Delete(ctx context.Context, evt event.TypedDe
 	p.enqueueHandler.Delete(ctx, evt, q)
 }
 
-func (p *imagePullJobEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1alpha1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+func (p *imagePullJobEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1beta1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	newJob := evt.ObjectNew
 	resourceVersionExpectations.Expect(newJob)
 	p.enqueueHandler.Update(ctx, evt, q)
 }
 
-func (p *imagePullJobEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsv1alpha1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+func (p *imagePullJobEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsv1beta1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }

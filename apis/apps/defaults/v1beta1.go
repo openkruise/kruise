@@ -18,6 +18,7 @@ package defaults
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/utils/ptr"
@@ -138,5 +139,67 @@ func SetDefaultsAdvancedCronJob(obj *v1beta1.AdvancedCronJob, injectTemplateDefa
 	if obj.Spec.FailedJobsHistoryLimit == nil {
 		obj.Spec.FailedJobsHistoryLimit = new(int32)
 		*obj.Spec.FailedJobsHistoryLimit = 1
+	}
+}
+
+// SetDefaultsImagePullJobV1beta1 sets default values for v1beta1 ImagePullJob.
+func SetDefaultsImagePullJobV1beta1(obj *v1beta1.ImagePullJob, addProtection bool) {
+	if obj.Spec.CompletionPolicy.Type == "" {
+		obj.Spec.CompletionPolicy.Type = v1beta1.Always
+	}
+	if obj.Spec.PullPolicy == nil {
+		obj.Spec.PullPolicy = &v1beta1.PullPolicy{}
+	}
+	if obj.Spec.PullPolicy.TimeoutSeconds == nil {
+		obj.Spec.PullPolicy.TimeoutSeconds = ptr.To(int32(600))
+	}
+	if obj.Spec.PullPolicy.BackoffLimit == nil {
+		obj.Spec.PullPolicy.BackoffLimit = ptr.To(int32(3))
+	}
+	if obj.Spec.ImagePullPolicy == "" {
+		obj.Spec.ImagePullPolicy = v1beta1.PullIfNotPresent
+	}
+}
+
+// SetDefaultsImageListPullJobV1beta1 sets default values for v1beta1 ImageListPullJob.
+func SetDefaultsImageListPullJobV1beta1(obj *v1beta1.ImageListPullJob) {
+	if obj.Spec.CompletionPolicy.Type == "" {
+		obj.Spec.CompletionPolicy.Type = v1beta1.Always
+	}
+	if obj.Spec.PullPolicy == nil {
+		obj.Spec.PullPolicy = &v1beta1.PullPolicy{}
+	}
+	if obj.Spec.PullPolicy.TimeoutSeconds == nil {
+		obj.Spec.PullPolicy.TimeoutSeconds = ptr.To(int32(600))
+	}
+	if obj.Spec.PullPolicy.BackoffLimit == nil {
+		obj.Spec.PullPolicy.BackoffLimit = ptr.To(int32(3))
+	}
+}
+
+// SetDefaultsNodeImageV1beta1 sets default values for v1beta1 NodeImage.
+func SetDefaultsNodeImageV1beta1(obj *v1beta1.NodeImage) {
+	now := metav1.Now()
+	for name, imageSpec := range obj.Spec.Images {
+		for i := range imageSpec.Tags {
+			tagSpec := &imageSpec.Tags[i]
+			if tagSpec.CreatedAt == nil {
+				tagSpec.CreatedAt = &now
+			}
+			if tagSpec.PullPolicy == nil {
+				tagSpec.PullPolicy = &v1beta1.ImageTagPullPolicy{}
+			}
+			SetDefaultsImageTagPullPolicyV1beta1(tagSpec.PullPolicy)
+		}
+		obj.Spec.Images[name] = imageSpec
+	}
+}
+
+func SetDefaultsImageTagPullPolicyV1beta1(obj *v1beta1.ImageTagPullPolicy) {
+	if obj.TimeoutSeconds == nil {
+		obj.TimeoutSeconds = ptr.To(int32(600))
+	}
+	if obj.BackoffLimit == nil {
+		obj.BackoffLimit = ptr.To(int32(3))
 	}
 }

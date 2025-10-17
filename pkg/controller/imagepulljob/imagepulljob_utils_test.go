@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 )
 
@@ -130,23 +130,23 @@ func TestTargetFromSource(t *testing.T) {
 func TestGetActiveDeadlineSecondsForNever(t *testing.T) {
 	cases := []struct {
 		name        string
-		getImageJob func() *appsv1alpha1.ImagePullJob
+		getImageJob func() *appsv1beta1.ImagePullJob
 		expected    int64
 	}{
 		{
 			name: "not set timeout",
-			getImageJob: func() *appsv1alpha1.ImagePullJob {
-				return &appsv1alpha1.ImagePullJob{}
+			getImageJob: func() *appsv1beta1.ImagePullJob {
+				return &appsv1beta1.ImagePullJob{}
 			},
 			expected: 1800,
 		},
 		{
 			name: "timeout < 1800",
-			getImageJob: func() *appsv1alpha1.ImagePullJob {
-				return &appsv1alpha1.ImagePullJob{
-					Spec: appsv1alpha1.ImagePullJobSpec{
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							PullPolicy: &appsv1alpha1.PullPolicy{
+			getImageJob: func() *appsv1beta1.ImagePullJob {
+				return &appsv1beta1.ImagePullJob{
+					Spec: appsv1beta1.ImagePullJobSpec{
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							PullPolicy: &appsv1beta1.PullPolicy{
 								TimeoutSeconds: ptr.To(int32(1799)),
 							},
 						},
@@ -157,11 +157,11 @@ func TestGetActiveDeadlineSecondsForNever(t *testing.T) {
 		},
 		{
 			name: "timeout > 1800",
-			getImageJob: func() *appsv1alpha1.ImagePullJob {
-				return &appsv1alpha1.ImagePullJob{
-					Spec: appsv1alpha1.ImagePullJobSpec{
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							PullPolicy: &appsv1alpha1.PullPolicy{
+			getImageJob: func() *appsv1beta1.ImagePullJob {
+				return &appsv1beta1.ImagePullJob{
+					Spec: appsv1beta1.ImagePullJobSpec{
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							PullPolicy: &appsv1beta1.PullPolicy{
 								TimeoutSeconds: ptr.To(int32(7200)),
 							},
 						},

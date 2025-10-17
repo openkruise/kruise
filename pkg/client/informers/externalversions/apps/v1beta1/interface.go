@@ -27,6 +27,12 @@ type Interface interface {
 	AdvancedCronJobs() AdvancedCronJobInformer
 	// BroadcastJobs returns a BroadcastJobInformer.
 	BroadcastJobs() BroadcastJobInformer
+	// ImageListPullJobs returns a ImageListPullJobInformer.
+	ImageListPullJobs() ImageListPullJobInformer
+	// ImagePullJobs returns a ImagePullJobInformer.
+	ImagePullJobs() ImagePullJobInformer
+	// NodeImages returns a NodeImageInformer.
+	NodeImages() NodeImageInformer
 	// StatefulSets returns a StatefulSetInformer.
 	StatefulSets() StatefulSetInformer
 }
@@ -50,6 +56,21 @@ func (v *version) AdvancedCronJobs() AdvancedCronJobInformer {
 // BroadcastJobs returns a BroadcastJobInformer.
 func (v *version) BroadcastJobs() BroadcastJobInformer {
 	return &broadcastJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ImageListPullJobs returns a ImageListPullJobInformer.
+func (v *version) ImageListPullJobs() ImageListPullJobInformer {
+	return &imageListPullJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ImagePullJobs returns a ImagePullJobInformer.
+func (v *version) ImagePullJobs() ImagePullJobInformer {
+	return &imagePullJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// NodeImages returns a NodeImageInformer.
+func (v *version) NodeImages() NodeImageInformer {
+	return &nodeImageInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // StatefulSets returns a StatefulSetInformer.
