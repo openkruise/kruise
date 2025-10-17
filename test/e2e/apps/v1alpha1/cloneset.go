@@ -647,10 +647,29 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 			gomega.Expect(redisContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 
 			ginkgo.By("Verify nginx should be stopped after new redis has started 10s")
-			gomega.Expect(nginxContainerStatus.LastTerminationState.Terminated.FinishedAt.After(redisContainerStatus.State.Running.StartedAt.Time.Add(time.Second*10))).
-				Should(gomega.Equal(true), fmt.Sprintf("nginx finish at %v is not after redis start %v + 10s",
-					nginxContainerStatus.LastTerminationState.Terminated.FinishedAt,
-					redisContainerStatus.State.Running.StartedAt))
+			gomega.Eventually(func() bool {
+				pods, err := tester.ListPodsForCloneSet(cs.Name)
+				if err != nil || len(pods) != 1 {
+					return false
+				}
+				pod := pods[0]
+				nginxStatus := util.GetContainerStatus("nginx", pod)
+				redisStatus := util.GetContainerStatus("redis", pod)
+
+				// Ensure all required fields are not nil
+				if nginxStatus == nil || redisStatus == nil {
+					return false
+				}
+				if nginxStatus.LastTerminationState.Terminated == nil {
+					return false
+				}
+				if redisStatus.State.Running == nil {
+					return false
+				}
+
+				return nginxStatus.LastTerminationState.Terminated.FinishedAt.After(
+					redisStatus.State.Running.StartedAt.Time.Add(time.Second * 10))
+			}, 30*time.Second, time.Second).Should(gomega.BeTrue(), "nginx should be stopped after new redis has started 10s")
 
 			ginkgo.By("Verify in-place update state in two batches")
 			inPlaceUpdateState := appspub.InPlaceUpdateState{}
