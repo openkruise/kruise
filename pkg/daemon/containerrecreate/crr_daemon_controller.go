@@ -52,9 +52,6 @@ import (
 )
 
 const (
-	// TODO: make it a configurable flag
-	workers = 32
-
 	maxExpectationWaitDuration = 10 * time.Second
 )
 
@@ -69,10 +66,36 @@ type Controller struct {
 	crrLister      listersalpha1.ContainerRecreateRequestLister
 	eventRecorder  record.EventRecorder
 	runtimeFactory daemonruntime.Factory
+	
+	// Configurable parameters
+	workers     int
+	minBackoff  time.Duration
+	maxBackoff  time.Duration
+	maxJitterMs int
 }
 
 // NewController returns the controller for CRR
 func NewController(opts daemonoptions.Options) (*Controller, error) {
+	// Set default values if not provided
+	workers := opts.CRRWorkers
+	if workers <= 0 {
+		workers = 32 // fallback to default
+	}
+	
+	minBackoff := opts.CRRMinBackoff
+	if minBackoff <= 0 {
+		minBackoff = 500 * time.Millisecond // fallback to default
+	}
+	
+	maxBackoff := opts.CRRMaxBackoff
+	if maxBackoff <= 0 {
+		maxBackoff = 50 * time.Second // fallback to default
+	}
+	
+	maxJitterMs := opts.CRRMaxJitterMs
+	if maxJitterMs <= 0 {
+		maxJitterMs = 5000 // fallback to default
+	}
 	genericClient := client.GetGenericClientWithName("kruise-daemon-crr")
 	informer := newCRRInformer(genericClient.KruiseClient, opts.NodeName)
 
@@ -81,8 +104,8 @@ func NewController(opts daemonoptions.Options) (*Controller, error) {
 	recorder := eventBroadcaster.NewRecorder(opts.Scheme, v1.EventSource{Component: "kruise-daemon-crr", Host: opts.NodeName})
 
 	queue := workqueue.NewNamedRateLimitingQueue(
-		// Backoff duration from 500ms to 50~55s
-		workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 50*time.Second+time.Millisecond*time.Duration(rand.Intn(5000))),
+		// Backoff duration from minBackoff to maxBackoff+jitter
+		workqueue.NewItemExponentialFailureRateLimiter(minBackoff, maxBackoff+time.Millisecond*time.Duration(rand.Intn(maxJitterMs))),
 		"crr",
 	)
 
@@ -121,6 +144,10 @@ func NewController(opts daemonoptions.Options) (*Controller, error) {
 		crrLister:      listersalpha1.NewContainerRecreateRequestLister(informer.GetIndexer()),
 		eventRecorder:  recorder,
 		runtimeFactory: opts.RuntimeFactory,
+		workers:        workers,
+		minBackoff:     minBackoff,
+		maxBackoff:     maxBackoff,
+		maxJitterMs:    maxJitterMs,
 	}, nil
 }
 
@@ -171,8 +198,8 @@ func (c *Controller) Run(stop <-chan struct{}) {
 		return
 	}
 
-	klog.Info("Starting crr daemon controller")
-	for i := 0; i < workers; i++ {
+	klog.InfoS("Starting crr daemon controller", "workers", c.workers, "minBackoff", c.minBackoff, "maxBackoff", c.maxBackoff, "maxJitterMs", c.maxJitterMs)
+	for i := 0; i < c.workers; i++ {
 		go wait.Until(func() {
 			for c.processNextWorkItem() {
 			}
