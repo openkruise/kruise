@@ -35,7 +35,7 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
 )
 
-var _ = ginkgo.FDescribe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), func() {
+var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), func() {
 	f := v1alpha1.NewDefaultFramework("sidecarset")
 	var ns string
 	var c clientset.Interface
