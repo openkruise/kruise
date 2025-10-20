@@ -264,10 +264,14 @@ func validateContainersForSidecarSet(
 	for i, container := range initContainers {
 		idxPath := fldPath.Index(i)
 
-		// Validate that initContainers do NOT have ResourcesPolicy
+		// Validate that initContainers ResourcesPolicy
 		if container.ResourcesPolicy != nil {
-			allErrs = append(allErrs, field.Forbidden(idxPath.Child("resourcesPolicy"),
-				"resourcesPolicy is not supported for initContainers, only for containers"))
+			// resourcesPolicy is only supported for containers with RestartPolicy Always (Native sidecar containers)
+			if container.RestartPolicy == nil || *container.RestartPolicy != v1.ContainerRestartPolicyAlways {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("resourcesPolicy"), container.ResourcesPolicy, "resourcesPolicy is only supported for containers with RestartPolicy Always"))
+			}
+			allErrs = append(allErrs, validateResourcesPolicy(container, idxPath.Child("resourcesPolicy"))...)
+
 		}
 
 		coreContainer := core.Container{}

@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
@@ -461,6 +462,90 @@ func TestApplyResourcesPolicy(t *testing.T) {
 			expectedCPURequest:    "30m",  // sum(100m, 0) * 30% = 30m
 			expectedMemoryRequest: "20Mi", // sum(100Mi, 0) * 20% = 20Mi
 		},
+		{
+			name: "init-container with resource policy (native sidecar)",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					InitContainers: []corev1.Container{
+						{
+							Name:  "app1",
+							Image: "nginx:1.14.2",
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("400m"),
+									corev1.ResourceMemory: resource.MustParse("800Mi"),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("200m"),
+									corev1.ResourceMemory: resource.MustParse("400Mi"),
+								},
+							},
+							RestartPolicy: ptr.To(corev1.ContainerRestartPolicyAlways),
+						},
+						{
+							Name:  "app2",
+							Image: "nginx:1.14.2",
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("400m"),
+									corev1.ResourceMemory: resource.MustParse("800Mi"),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("200m"),
+									corev1.ResourceMemory: resource.MustParse("400Mi"),
+								},
+							},
+						},
+					},
+					Containers: []corev1.Container{
+						{
+							Name:  "app2",
+							Image: "nginx:1.14.2",
+							Resources: corev1.ResourceRequirements{
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("600m"),
+									corev1.ResourceMemory: resource.MustParse("1200Mi"),
+								},
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("300m"),
+									corev1.ResourceMemory: resource.MustParse("600Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			sidecarContainer: &appsv1alpha1.SidecarContainer{
+				Container: corev1.Container{
+					Name:  "init-sidecar",
+					Image: "sidecar:latest",
+				},
+				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
+					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+					TargetContainersNameRegex: "^app.*$",
+					ResourceExpr: appsv1alpha1.ResourceExpr{
+						Limits: &appsv1alpha1.ResourceExprLimits{
+							CPU:    "max(cpu*30%, 50m)",
+							Memory: "max(memory*25%, 100Mi)",
+						},
+						Requests: &appsv1alpha1.ResourceExprRequests{
+							CPU:    "cpu*20%",
+							Memory: "memory*15%",
+						},
+					},
+				},
+			},
+			matchedSidecarSets: []sidecarcontrol.SidecarControl{},
+			expectError:        false,
+			// CPU limit: max((400m + 600m) * 30%, 50m) = max(300m, 50m) = 300m
+			expectedCPULimit: "300m",
+			// Memory limit: max((800Mi + 1200Mi) * 25%, 100Mi) = max(500Mi, 100Mi) = 500Mi
+			expectedMemoryLimit: "500Mi",
+			// CPU request: (200m + 300m) * 20% = 100m
+			expectedCPURequest: "100m",
+			// Memory request: (400Mi + 600Mi) * 15% = 150Mi
+			expectedMemoryRequest: "150Mi",
+		},
 	}
 
 	for _, tt := range tests {
@@ -783,6 +868,61 @@ func TestAggregateResourcesByMax(t *testing.T) {
 		}
 	})
 
+	t.Run("one container without Cpu limit - should be unlimited", func(t *testing.T) {
+		containers := []corev1.Container{
+			{
+				Name: "app1",
+				Resources: corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("200m"),
+						corev1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("50m"),
+						corev1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+				},
+			},
+			{
+				Name: "app2",
+				Resources: corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						// No CPU limit - unlimited
+						corev1.ResourceMemory: resource.MustParse("400Mi"),
+					},
+					Requests: corev1.ResourceList{
+						// No CPU request
+						corev1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				},
+			},
+		}
+
+		limits, requests := aggregateResourcesByMax(containers)
+
+		// Memory limit should be set: max(200Mi, 400Mi) = 400Mi
+		if memLimit, ok := limits[corev1.ResourceMemory]; !ok {
+			t.Errorf("Expected Memory limit to be set, but it was not")
+		} else if memLimit.String() != "400Mi" {
+			t.Errorf("Expected Memory limit 400Mi, got %s", memLimit.String())
+		}
+
+		// Cpu limit should NOT be set (unlimited)
+		if _, ok := limits[corev1.ResourceCPU]; ok {
+			t.Errorf("Expected CPU limit NOT to be set (unlimited), but it was set to %v", limits[corev1.ResourceCPU])
+		}
+
+		// Requests: max(50m, 0) = 50m
+		if cpuRequest := requests[corev1.ResourceCPU]; cpuRequest.String() != "50m" {
+			t.Errorf("Expected CPU request 50m, got %s", cpuRequest.String())
+		}
+
+		// Memory request: max(100Mi, 200Mi) = 200Mi (missing treated as 0)
+		if memRequest := requests[corev1.ResourceMemory]; memRequest.String() != "200Mi" {
+			t.Errorf("Expected Memory request 200Mi (max(100Mi, 200Mi)), got %s", memRequest.String())
+		}
+	})
+
 	t.Run("container without requests - treated as 0", func(t *testing.T) {
 		containers := []corev1.Container{
 			{
@@ -839,6 +979,13 @@ func TestGetTargetContainers(t *testing.T) {
 			Name: "test-sidecarset",
 		},
 		Spec: appsv1alpha1.SidecarSetSpec{
+			InitContainers: []appsv1alpha1.SidecarContainer{
+				{
+					Container: corev1.Container{
+						Name: "init-sidecar1",
+					},
+				},
+			},
 			Containers: []appsv1alpha1.SidecarContainer{
 				{
 					Container: corev1.Container{
@@ -849,8 +996,16 @@ func TestGetTargetContainers(t *testing.T) {
 		},
 	}
 
+	restartAlways := corev1.ContainerRestartPolicyAlways
 	pod := &corev1.Pod{
 		Spec: corev1.PodSpec{
+			InitContainers: []corev1.Container{
+				{Name: "init-sidecar1"},        // This is a Kruise sidecar, should be excluded
+				{Name: "plain-init-container"}, // This is a plain init-container, should be excluded
+				{ // This is a native sidecar container, should be included
+					Name:          "sidecar-container",
+					RestartPolicy: &restartAlways},
+			},
 			Containers: []corev1.Container{
 				{Name: "app1"},
 				{Name: "app2"},
@@ -868,8 +1023,8 @@ func TestGetTargetContainers(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	if len(containers) != 2 {
-		t.Errorf("Expected 2 containers, got %d", len(containers))
+	if len(containers) != 3 {
+		t.Errorf("Expected 3 containers, got %d", len(containers))
 	}
 
 	// Verify that sidecar1 is excluded
@@ -877,6 +1032,13 @@ func TestGetTargetContainers(t *testing.T) {
 		if c.Name == "sidecar1" {
 			t.Errorf("Kruise sidecar container should be excluded")
 		}
+		if c.Name == "init-sidecar1" {
+			t.Errorf("Kruise init-container should be excluded")
+		}
+		if c.Name == "plain-init-container" {
+			t.Errorf("Plain init-container should be excluded")
+		}
+
 	}
 }
 
@@ -1004,6 +1166,24 @@ func TestEvaluateResourceExpression(t *testing.T) {
 			expectNil:       false,
 			expectError:     false,
 			expectedValue:   "100Mi",
+		},
+		{
+			name:            "number cpu",
+			expr:            "1",
+			aggregatedValue: resource.MustParse("2"),
+			isLimit:         false,
+			expectNil:       false,
+			expectError:     false,
+			expectedValue:   "1",
+		},
+		{
+			name:            "number memory",
+			expr:            "1",
+			aggregatedValue: resource.MustParse("2Mi"),
+			isLimit:         false,
+			expectNil:       false,
+			expectError:     false,
+			expectedValue:   "1",
 		},
 	}
 

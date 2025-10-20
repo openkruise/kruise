@@ -28,6 +28,7 @@ status: implementable
       - [Story 3 - By max of container resources](#story-3---by-max-of-container-resources)
       - [Story 4 - By unlimited of container resources](#story-4---by-unlimited-of-container-resources)
       - [Story 5 - By linear function that use sum mode and max of container resources](#story-5---by-linear-function-that-use-sum-mode-and-max-of-container-resources)
+      - [Story 6 - Init-container (Native Sidecar) dynamic resource policy injection](#story-6---init-container-native-sidecar-dynamic-resource-policy-injection)
     - [Requirements (Optional)](#requirements-optional)
     - [Implementation Details/Notes/Constraints](#implementation-detailsnotesconstraints)
     - [Risks and Mitigations](#risks-and-mitigations)
@@ -299,6 +300,60 @@ requests:
 #### Story 5 - By linear function that use sum mode and max of container resources
 User can define cpu expr as `0.5*cpu - 0.3*max(0, cpu-4) + 0.3*max(0, cpu-8)`, this is a linear function that use sum mode and max of container resources. In this case, the sidecar container cpu resources will be:
 ![story5](20250913-story5.png)
+
+#### Story 6 - Init-container (Native Sidecar) dynamic resource policy injection
+```yaml
+apiVersion: apps.kruise.io/v1alpha1
+kind: SidecarSet
+spec:
+   initContainers:
+    - name: init-sidecar
+      image: busybox:latest
+      restartPolicy: Always  # Native sidecar container
+      resourcesPolicy:
+        targetContainerMode: sum
+        targetContainersNameRegex: ^app.*$
+        resourceExpr:
+          limits:
+            cpu: max(cpu*30%, 50m)
+            memory: max(memory*25%, 100Mi)
+          requests:
+            cpu: cpu*20%
+            memory: memory*15%
+---
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: app1
+    image: nginx:1.14.2
+    resources:
+      limits:
+        cpu: 400m
+        memory: 800Mi
+      requests:
+        cpu: 200m
+        memory: 400Mi
+  - name: app2
+    image: nginx:1.14.2
+    resources:
+      limits:
+        cpu: 600m
+        memory: 1200Mi
+      requests:
+        cpu: 300m
+        memory: 600Mi
+```
+In this case, the init-sidecar container resources will be:
+```yaml
+limits:
+  cpu: max((400m + 600m) * 30%, 50m) = 300m
+  memory: max((800Mi + 1200Mi) * 25%, 100Mi) = 500Mi
+requests:
+  cpu: (200m + 300m) * 20% = 100m
+  memory: (400Mi + 600Mi) * 15% = 150Mi
+```
+**Note**: ResourcesPolicy is only supported for init-containers with `restartPolicy: Always` (native sidecar containers). Regular init-containers that run once during pod initialization do not support dynamic resource policy.
 
 
 ### Requirements (Optional)
