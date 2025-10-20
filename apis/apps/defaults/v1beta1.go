@@ -203,3 +203,36 @@ func SetDefaultsImageTagPullPolicyV1beta1(obj *v1beta1.ImageTagPullPolicy) {
 		obj.BackoffLimit = ptr.To(int32(3))
 	}
 }
+
+// SetDefaultsDaemonSetV1beta1 sets default values for v1beta1 DaemonSet.
+func SetDefaultsDaemonSetV1beta1(obj *v1beta1.DaemonSet) {
+	if obj.Spec.BurstReplicas == nil {
+		BurstReplicas := intstr.FromInt(250)
+		obj.Spec.BurstReplicas = &BurstReplicas
+	}
+
+	if obj.Spec.UpdateStrategy.Type == "" {
+		obj.Spec.UpdateStrategy.Type = v1beta1.RollingUpdateDaemonSetStrategyType
+	}
+	if obj.Spec.UpdateStrategy.Type == v1beta1.RollingUpdateDaemonSetStrategyType {
+		if obj.Spec.UpdateStrategy.RollingUpdate == nil {
+			obj.Spec.UpdateStrategy.RollingUpdate = &v1beta1.RollingUpdateDaemonSet{}
+		}
+
+		// Default to Standard
+		if obj.Spec.UpdateStrategy.RollingUpdate.Type == "" {
+			obj.Spec.UpdateStrategy.RollingUpdate.Type = v1beta1.StandardRollingUpdateType
+		}
+
+		if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil && obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge == nil {
+			maxUnavailable := intstr.FromInt(1)
+			obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+			MaxSurge := intstr.FromInt(0)
+			obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge = &MaxSurge
+		}
+	}
+
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = ptr.To(int32(10))
+	}
+}

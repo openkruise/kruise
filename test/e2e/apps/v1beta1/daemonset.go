@@ -1,4 +1,4 @@
-package v1alpha1
+package v1beta1
 
 import (
 	"context"
@@ -20,25 +20,25 @@ import (
 	daemonutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/test/e2e/framework/common"
-	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
+	"github.com/openkruise/kruise/test/e2e/framework/v1beta1"
 )
 
 var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func() {
-	f := v1alpha1.NewDefaultFramework("daemonset")
+	f := v1beta1.NewDefaultFramework("daemonset")
 	var ns string
 	var c clientset.Interface
 	var kc kruiseclientset.Interface
-	var tester *v1alpha1.DaemonSetTester
+	var tester *v1beta1.DaemonSetTester
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		kc = f.KruiseClientSet
 		ns = f.Namespace.Name
-		tester = v1alpha1.NewDaemonSetTester(c, kc, ns)
+		tester = v1beta1.NewDaemonSetTester(c, kc, ns)
 	})
 
 	ginkgo.Context("Basic DaemonSet functionality [DaemonSetBasic]", func() {
@@ -58,13 +58,13 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 		  Pod is deleted, the DaemonSet controller MUST create a replacement Pod.
 		*/
 		ginkgo.It("should run and stop simple daemon", func() {
-			label := map[string]string{v1alpha1.DaemonSetNameLabel: dsName}
+			label := map[string]string{v1beta1.DaemonSetNameLabel: dsName}
 			ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
-			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, common.WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{}))
+			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, common.WebserverImage, appsv1beta1.DaemonSetUpdateStrategy{}))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check that daemon pods launch on every node of the cluster.")
-			err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 				return tester.CheckRunningOnAllNodes(ds)()
 			})
 
@@ -81,7 +81,7 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 			err = c.CoreV1().Pods(ns).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 				return tester.CheckRunningOnAllNodes(ds)()
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to revive")
@@ -93,16 +93,16 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 		  selectors.
 		*/
 		ginkgo.It("should run and stop complex daemon", func() {
-			complexLabel := map[string]string{v1alpha1.DaemonSetNameLabel: dsName}
-			nodeSelector := map[string]string{v1alpha1.DaemonSetColorLabel: "blue"}
+			complexLabel := map[string]string{v1beta1.DaemonSetNameLabel: dsName}
+			nodeSelector := map[string]string{v1beta1.DaemonSetColorLabel: "blue"}
 			common.Logf("Creating daemon %q with a node selector", dsName)
-			ds := tester.NewDaemonSet(dsName, complexLabel, common.WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{})
+			ds := tester.NewDaemonSet(dsName, complexLabel, common.WebserverImage, appsv1beta1.DaemonSetUpdateStrategy{})
 			ds.Spec.Template.Spec.NodeSelector = nodeSelector
 			ds, err := tester.CreateDaemonSet(ds)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Initially, daemon pods should not be running on any nodes.")
-			err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 				return tester.CheckRunningOnNoNodes(ds)()
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pods to be running on no nodes")
@@ -114,7 +114,7 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error setting labels on node")
 			daemonSetLabels, _ := tester.SeparateDaemonSetNodeLabels(newNode.Labels)
 			gomega.Expect(len(daemonSetLabels)).To(gomega.Equal(1))
-			err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 				return tester.CheckDaemonPodOnNodes(ds, []string{newNode.Name})()
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pods to be running on new nodes")
@@ -122,22 +122,22 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Update the node label to green, and wait for daemons to be unscheduled")
-			nodeSelector[v1alpha1.DaemonSetColorLabel] = "green"
+			nodeSelector[v1beta1.DaemonSetColorLabel] = "green"
 			greenNode, err := tester.SetDaemonSetNodeLabels(nodeList.Items[0].Name, nodeSelector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error removing labels on node")
-			gomega.Expect(wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+			gomega.Expect(wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 				return tester.CheckRunningOnNoNodes(ds)()
 			})).
 				NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to not be running on nodes")
 
 			ginkgo.By("Update DaemonSet node selector to green, and change its update strategy to RollingUpdate")
 			patch := fmt.Sprintf(`{"spec":{"template":{"spec":{"nodeSelector":{"%s":"%s"}}},"updateStrategy":{"type":"RollingUpdate"}}}`,
-				v1alpha1.DaemonSetColorLabel, greenNode.Labels[v1alpha1.DaemonSetColorLabel])
+				v1beta1.DaemonSetColorLabel, greenNode.Labels[v1beta1.DaemonSetColorLabel])
 			ds, err = tester.PatchDaemonSet(dsName, types.MergePatchType, []byte(patch))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error patching daemon set")
 			daemonSetLabels, _ = tester.SeparateDaemonSetNodeLabels(greenNode.Labels)
 			gomega.Expect(len(daemonSetLabels)).To(gomega.Equal(1))
-			err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 				return tester.CheckDaemonPodOnNodes(ds, []string{greenNode.Name})()
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pods to be running on new nodes")
@@ -150,14 +150,14 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 		  Description: A conformant Kubernetes distribution MUST create new DaemonSet Pods when they fail.
 		*/
 		ginkgo.It("should retry creating failed daemon pods", func() {
-			label := map[string]string{v1alpha1.DaemonSetNameLabel: dsName}
+			label := map[string]string{v1beta1.DaemonSetNameLabel: dsName}
 
 			ginkgo.By(fmt.Sprintf("Creating a simple DaemonSet %q", dsName))
-			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, common.WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{}))
+			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, common.WebserverImage, appsv1beta1.DaemonSetUpdateStrategy{}))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check that daemon pods launch on every node of the cluster.")
-			err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 				return tester.CheckRunningOnAllNodes(ds)()
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to start")
@@ -172,34 +172,34 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 			pod.Status.Phase = v1.PodFailed
 			_, err = c.CoreV1().Pods(ns).UpdateStatus(context.TODO(), &pod, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error failing a daemon pod")
-			err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 				return tester.CheckRunningOnAllNodes(ds)()
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to revive")
 
 			ginkgo.By("Wait for the failed daemon pod to be completely deleted.")
-			err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 				return tester.WaitFailedDaemonPodDeleted(&pod)()
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for the failed daemon pod to be completely deleted")
 		})
 
 		ginkgo.It("should only inplace image if update daemonset image with inplace update strategy", func() {
-			label := map[string]string{v1alpha1.DaemonSetNameLabel: dsName}
+			label := map[string]string{v1beta1.DaemonSetNameLabel: dsName}
 
 			ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
 			maxUnavailable := intstr.IntOrString{IntVal: int32(5)}
-			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, common.WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{
-				Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
-				RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
-					Type:           appsv1alpha1.InplaceRollingUpdateType,
+			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, common.WebserverImage, appsv1beta1.DaemonSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+					Type:           appsv1beta1.InplaceRollingUpdateType,
 					MaxUnavailable: &maxUnavailable,
 				},
 			}))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check that daemon pods launch on every node of the cluster.")
-			err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 				return tester.CheckRunningOnAllNodes(ds)()
 			})
 
@@ -216,14 +216,14 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(len(oldPodList.Items)).To(gomega.BeNumerically(">", 0))
 
-			//change pods container image
-			err = tester.UpdateDaemonSet(ds.Name, func(ds *appsv1alpha1.DaemonSet) {
+			// change pods container image
+			err = tester.UpdateDaemonSet(ds.Name, func(ds *appsv1beta1.DaemonSet) {
 				ds.Spec.Template.Spec.Containers[0].Image = common.NewWebserverImage
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error to update daemon")
 
 			ginkgo.By("Compare container info")
-			err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 				return tester.GetNewPodsToCheckImage(label, common.NewWebserverImage)()
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error for pod image")
@@ -233,7 +233,7 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 			gomega.Expect(len(newNodeList.Items)).To(gomega.BeNumerically(">", 0))
 
 			ginkgo.By("Compare Node info")
-			err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 				return tester.CheckPodStayInNode(oldNodeList, newNodeList)()
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error for node info")
@@ -251,20 +251,20 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 		})
 
 		ginkgo.It("Should upgrade inplace if update image and recreate if update others", func() {
-			label := map[string]string{v1alpha1.DaemonSetNameLabel: dsName}
+			label := map[string]string{v1beta1.DaemonSetNameLabel: dsName}
 
 			cases := []struct {
-				updateFn       func(ds *appsv1alpha1.DaemonSet)
+				updateFn       func(ds *appsv1beta1.DaemonSet)
 				expectRecreate bool
 			}{
 				{
-					updateFn: func(ds *appsv1alpha1.DaemonSet) {
+					updateFn: func(ds *appsv1beta1.DaemonSet) {
 						ds.Spec.Template.Spec.Containers[0].Image = common.NewWebserverImage
 					},
 					expectRecreate: true,
 				},
 				{
-					updateFn: func(ds *appsv1alpha1.DaemonSet) {
+					updateFn: func(ds *appsv1beta1.DaemonSet) {
 						ds.Spec.Template.Spec.Containers[0].Env = []v1.EnvVar{
 							{Name: "foo", Value: "bar"},
 						}
@@ -275,17 +275,17 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 
 			ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
 			maxUnavailable := intstr.IntOrString{IntVal: int32(20)}
-			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, common.WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{
-				Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
-				RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
-					Type:           appsv1alpha1.InplaceRollingUpdateType,
+			ds, err := tester.CreateDaemonSet(tester.NewDaemonSet(dsName, label, common.WebserverImage, appsv1beta1.DaemonSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+					Type:           appsv1beta1.InplaceRollingUpdateType,
 					MaxUnavailable: &maxUnavailable,
 				},
 			}))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check that daemon pods launch on every node of the cluster")
-			err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 				return tester.CheckRunningOnAllNodes(ds)()
 			})
 
@@ -312,7 +312,7 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 				time.Sleep(5 * time.Second)
 
 				ginkgo.By("Compare container info")
-				err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+				err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 					return tester.GetNewPodsToCheckImage(label, common.NewWebserverImage)()
 				})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error for pod image")
@@ -322,13 +322,13 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 				gomega.Expect(len(newNodeList.Items)).To(gomega.BeNumerically(">", 0))
 
 				ginkgo.By("Compare Node info")
-				err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+				err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 					return tester.CheckPodStayInNode(oldNodeList, newNodeList)()
 				})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error for node info")
 
 				ginkgo.By("Wait for daemonset ready")
-				err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+				err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 					return tester.CheckDaemonReady(dsName)()
 				})
 
@@ -346,20 +346,20 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 		})
 
 		ginkgo.It("should upgrade one by one on steps if there is pre-delete hook", func() {
-			label := map[string]string{v1alpha1.DaemonSetNameLabel: dsName}
+			label := map[string]string{v1beta1.DaemonSetNameLabel: dsName}
 			hookKey := "my-pre-delete"
 
 			ginkgo.By(fmt.Sprintf("Creating DaemonSet %q with pre-delete hook", dsName))
 			maxUnavailable := intstr.IntOrString{IntVal: int32(1)}
-			ads := tester.NewDaemonSet(dsName, label, common.WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{
-				Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
-				RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
-					Type:           appsv1alpha1.InplaceRollingUpdateType,
+			ads := tester.NewDaemonSet(dsName, label, common.WebserverImage, appsv1beta1.DaemonSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+					Type:           appsv1beta1.InplaceRollingUpdateType,
 					MaxUnavailable: &maxUnavailable,
 				},
 			})
 			ads.Spec.Lifecycle = &appspub.Lifecycle{PreDelete: &appspub.LifecycleHook{LabelsHandler: map[string]string{hookKey: "true"}}}
-			ads.Spec.Template.Labels = map[string]string{v1alpha1.DaemonSetNameLabel: dsName, hookKey: "true"}
+			ads.Spec.Template.Labels = map[string]string{v1beta1.DaemonSetNameLabel: dsName, hookKey: "true"}
 			ads.Spec.Template.Spec.Containers[0].Resources = v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceCPU: resource.MustParse("100m"),
@@ -369,7 +369,7 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check that daemon pods launch on every node of the cluster")
-			err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 				return tester.CheckRunningOnAllNodes(ds)()
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to start")
@@ -381,7 +381,7 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Update daemonset resources")
-			err = tester.UpdateDaemonSet(ds.Name, func(ads *appsv1alpha1.DaemonSet) {
+			err = tester.UpdateDaemonSet(ds.Name, func(ads *appsv1beta1.DaemonSet) {
 				ads.Spec.Template.Spec.Containers[0].Resources = v1.ResourceRequirements{
 					Requests: v1.ResourceList{
 						v1.ResourceCPU: resource.MustParse("120m"),
@@ -396,10 +396,9 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 			gomega.Eventually(func() int64 {
 				ads, err = tester.GetDaemonSet(dsName)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				newHash = ads.Status.DaemonSetHash
+				newHash = ads.Status.UpdateRevision
 				return ads.Status.ObservedGeneration
 			}, time.Second*30, time.Second*3).Should(gomega.Equal(int64(2)))
-			common.Logf("DaemonSet new hash: %s", newHash)
 
 			ginkgo.By("There should be one pod with PreparingDelete and no pods been deleted")
 			var preDeletingPod *v1.Pod
@@ -449,14 +448,14 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 		})
 
 		ginkgo.It("should successfully surging update daemonset with minReadySeconds", func() {
-			label := map[string]string{v1alpha1.DaemonSetNameLabel: dsName}
+			label := map[string]string{v1beta1.DaemonSetNameLabel: dsName}
 
 			ginkgo.By(fmt.Sprintf("Creating DaemonSet %q", dsName))
 			maxSurge := intstr.FromString("100%")
 			maxUnavailable := intstr.FromInt32(0)
-			ds := tester.NewDaemonSet(dsName, label, common.WebserverImage, appsv1alpha1.DaemonSetUpdateStrategy{
-				Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
-				RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+			ds := tester.NewDaemonSet(dsName, label, common.WebserverImage, appsv1beta1.DaemonSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
 					MaxSurge:       &maxSurge,
 					MaxUnavailable: &maxUnavailable,
 				},
@@ -466,7 +465,7 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check that daemon pods launch on every node of the cluster.")
-			err = wait.PollUntilContextTimeout(context.TODO(), v1alpha1.DaemonSetRetryPeriod, v1alpha1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
+			err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 				return tester.CheckRunningOnAllNodes(ds)()
 			})
 
@@ -489,8 +488,8 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 				gomega.Expect(podutil.IsPodReady(pods[0])).To(gomega.BeTrue())
 			}
 
-			//change pods container image
-			err = tester.UpdateDaemonSet(ds.Name, func(ds *appsv1alpha1.DaemonSet) {
+			// change pods container image
+			err = tester.UpdateDaemonSet(ds.Name, func(ds *appsv1beta1.DaemonSet) {
 				ds.Spec.Template.Spec.Containers[0].Image = common.NewWebserverImage
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error to update daemon")

@@ -29,6 +29,7 @@ type AppsV1beta1Interface interface {
 	RESTClient() rest.Interface
 	AdvancedCronJobsGetter
 	BroadcastJobsGetter
+	DaemonSetsGetter
 	ImageListPullJobsGetter
 	ImagePullJobsGetter
 	NodeImagesGetter
@@ -46,6 +47,10 @@ func (c *AppsV1beta1Client) AdvancedCronJobs(namespace string) AdvancedCronJobIn
 
 func (c *AppsV1beta1Client) BroadcastJobs(namespace string) BroadcastJobInterface {
 	return newBroadcastJobs(c, namespace)
+}
+
+func (c *AppsV1beta1Client) DaemonSets(namespace string) DaemonSetInterface {
+	return newDaemonSets(c, namespace)
 }
 
 func (c *AppsV1beta1Client) ImageListPullJobs(namespace string) ImageListPullJobInterface {

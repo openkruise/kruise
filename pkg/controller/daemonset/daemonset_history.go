@@ -33,11 +33,11 @@ import (
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 )
 
-func (dsc *ReconcileDaemonSet) constructHistory(ctx context.Context, ds *appsv1alpha1.DaemonSet) (cur *apps.ControllerRevision, old []*apps.ControllerRevision, err error) {
+func (dsc *ReconcileDaemonSet) constructHistory(ctx context.Context, ds *appsv1beta1.DaemonSet) (cur *apps.ControllerRevision, old []*apps.ControllerRevision, err error) {
 	var histories []*apps.ControllerRevision
 	var currentHistories []*apps.ControllerRevision
 	histories, err = dsc.controlledHistories(ctx, ds)
@@ -94,11 +94,44 @@ func (dsc *ReconcileDaemonSet) constructHistory(ctx context.Context, ds *appsv1a
 	return cur, old, err
 }
 
+// getCurrentRevision determines the current revision for the DaemonSet.
+// The logic is:
+// 1. If rolling update is complete (all pods updated), CurrentRevision = UpdateRevision
+// 2. Otherwise, keep the previous CurrentRevision if it exists
+// 3. For first deployment, CurrentRevision = UpdateRevision
+func (dsc *ReconcileDaemonSet) getCurrentRevision(ds *appsv1beta1.DaemonSet, updateRevision *apps.ControllerRevision, oldRevisions []*apps.ControllerRevision) (*apps.ControllerRevision, error) {
+	// Check if rolling update is complete
+	// When all pods are updated and ready, switch CurrentRevision to UpdateRevision
+	if ds.Status.UpdatedNumberScheduled == ds.Status.DesiredNumberScheduled &&
+		ds.Status.NumberReady == ds.Status.DesiredNumberScheduled {
+		// All pods have been updated and are ready, use update revision as current
+		return updateRevision, nil
+	}
+
+	// During rolling update, keep the previous CurrentRevision
+	// If Status.CurrentRevision is set, try to find it in old revisions
+	if ds.Status.CurrentRevision != "" {
+		for _, revision := range oldRevisions {
+			if revision.Name == ds.Status.CurrentRevision {
+				return revision, nil
+			}
+		}
+		// Also check if current revision matches update revision
+		if updateRevision.Name == ds.Status.CurrentRevision {
+			return updateRevision, nil
+		}
+	}
+
+	// If current revision is not found or not set, initialize it with update revision
+	// This happens on first deployment or when all old revisions have been cleaned up
+	return updateRevision, nil
+}
+
 // controlledHistories returns all ControllerRevisions controlled by the given DaemonSet.
 // This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned histories are pointers to objects in the cache.
 // If you want to modify one, you need to deep-copy it first.
-func (dsc *ReconcileDaemonSet) controlledHistories(ctx context.Context, ds *appsv1alpha1.DaemonSet) ([]*apps.ControllerRevision, error) {
+func (dsc *ReconcileDaemonSet) controlledHistories(ctx context.Context, ds *appsv1beta1.DaemonSet) ([]*apps.ControllerRevision, error) {
 	selector, err := util.ValidatedLabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -128,7 +161,7 @@ func (dsc *ReconcileDaemonSet) controlledHistories(ctx context.Context, ds *apps
 }
 
 // Match check if the given DaemonSet's template matches the template stored in the given history.
-func Match(ds *appsv1alpha1.DaemonSet, history *apps.ControllerRevision) (bool, error) {
+func Match(ds *appsv1beta1.DaemonSet, history *apps.ControllerRevision) (bool, error) {
 	patch, err := getPatch(ds)
 	if err != nil {
 		return false, err
@@ -140,7 +173,7 @@ func Match(ds *appsv1alpha1.DaemonSet, history *apps.ControllerRevision) (bool, 
 // previous version. If the returned error is nil the patch is valid. The current state that we save is just the
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
-func getPatch(ds *appsv1alpha1.DaemonSet) ([]byte, error) {
+func getPatch(ds *appsv1beta1.DaemonSet) ([]byte, error) {
 	dsBytes, err := json.Marshal(ds)
 	if err != nil {
 		return nil, err
@@ -174,7 +207,7 @@ func maxRevision(histories []*apps.ControllerRevision) int64 {
 	return max
 }
 
-func (dsc *ReconcileDaemonSet) snapshot(ctx context.Context, ds *appsv1alpha1.DaemonSet, revision int64) (*apps.ControllerRevision, error) {
+func (dsc *ReconcileDaemonSet) snapshot(ctx context.Context, ds *appsv1beta1.DaemonSet, revision int64) (*apps.ControllerRevision, error) {
 	patch, err := getPatch(ds)
 	if err != nil {
 		return nil, err
@@ -233,7 +266,7 @@ func (dsc *ReconcileDaemonSet) snapshot(ctx context.Context, ds *appsv1alpha1.Da
 	return history, err
 }
 
-func (dsc *ReconcileDaemonSet) dedupCurHistories(ctx context.Context, ds *appsv1alpha1.DaemonSet, curHistories []*apps.ControllerRevision) (*apps.ControllerRevision, error) {
+func (dsc *ReconcileDaemonSet) dedupCurHistories(ctx context.Context, ds *appsv1beta1.DaemonSet, curHistories []*apps.ControllerRevision) (*apps.ControllerRevision, error) {
 	if len(curHistories) == 1 {
 		return curHistories[0], nil
 	}
