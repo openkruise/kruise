@@ -309,6 +309,7 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1beta1.ImagePullJob, ne
 		return nil
 	}
 
+	klog.V(3).InfoS("Start to sync NodeImages", "imagePullJob", klog.KObj(job), "activePullingCount", newStatus.Active)
 	parallelismLimit := defaultParallelism
 	if job.Spec.Parallelism != nil {
 		parallelismLimit = job.Spec.Parallelism.IntValue()
@@ -573,17 +574,13 @@ func (r *ReconcileImagePullJob) calculateStatus(job *appsv1beta1.ImagePullJob, n
 			continue
 		}
 
-		imageStatus, ok := nodeImage.Status.ImageStatuses[imageName]
-		if !ok {
-			pulling = append(pulling, nodeImage.Name)
-		}
-
+		imageStatus, _ := nodeImage.Status.ImageStatuses[imageName]
+		foundTag := false
 		for _, tagStatus := range imageStatus.Tags {
 			if tagStatus.Tag != imageTag {
 				continue
 			}
 			if tagStatus.Version != tagVersion {
-				pulling = append(pulling, nodeImage.Name)
 				break
 			}
 			switch tagStatus.Phase {
@@ -594,7 +591,11 @@ func (r *ReconcileImagePullJob) calculateStatus(job *appsv1beta1.ImagePullJob, n
 			default:
 				pulling = append(pulling, nodeImage.Name)
 			}
+			foundTag = true
 			break
+		}
+		if !foundTag {
+			pulling = append(pulling, nodeImage.Name)
 		}
 	}
 
