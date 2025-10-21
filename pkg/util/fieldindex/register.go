@@ -203,13 +203,17 @@ func indexImagePullJobActive(c cache.Cache) error {
 
 func indexImagePullJobActiveV1Beta1(c cache.Cache) error {
 	return c.IndexField(context.TODO(), &appsv1beta1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
-		obj := rawObj.(*appsv1beta1.ImagePullJob)
-		isActive := "false"
-		if obj.DeletionTimestamp == nil && obj.Status.CompletionTime == nil {
-			isActive = "true"
-		}
-		return []string{isActive}
+		return IndexImagePullJob(rawObj)
 	})
+}
+
+func IndexImagePullJob(rawObj client.Object) []string {
+	obj := rawObj.(*appsv1beta1.ImagePullJob)
+	isActive := "false"
+	if obj.DeletionTimestamp == nil && obj.Status.CompletionTime == nil {
+		isActive = "true"
+	}
+	return []string{isActive}
 }
 
 func IndexSidecarSet(rawObj client.Object) []string {
