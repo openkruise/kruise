@@ -247,15 +247,15 @@ func validateImageListPullJobTemplateSpec(ilpJobSpec *appsv1beta1.ImageListPullJ
 
 	switch ilpJobSpec.Spec.CompletionPolicy.Type {
 	case appsv1beta1.Always:
-		// is a no-op here.No need to do parameter dependency verification in this type.
+		// is a no-op here. No need to do parameter dependency verification in this type.
 		if ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil && *ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds > MaxActiveDeadLineSeconds {
-			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("activeDeadlineSeconds"), ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds, fmt.Sprintf("activeDeadlineSeconds must less than 14400,current value is:%d", *ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds)))
+			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("activeDeadlineSeconds"), ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds, fmt.Sprintf("activeDeadlineSeconds must be less than 14400, current value is: %d", *ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds)))
 		}
 		if ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished != nil && *ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished > MaxTTLSecondsAfterFinished {
-			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("ttlSecondsAfterFinished"), ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished, fmt.Sprintf("ttlSecondsAfterFinished must less than 86400,current value is:%d", *ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished)))
+			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("ttlSecondsAfterFinished"), ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished, fmt.Sprintf("ttlSecondsAfterFinished must be less than 86400, current value is: %d", *ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished)))
 		}
 	default:
-		return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("type"), ilpJobSpec.Spec.CompletionPolicy.Type, fmt.Sprintf("completionPolicy should be always,but current value is:%s", ilpJobSpec.Spec.CompletionPolicy.Type)))
+		return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("type"), ilpJobSpec.Spec.CompletionPolicy.Type, fmt.Sprintf("completionPolicy should be always, but current value is: %s", ilpJobSpec.Spec.CompletionPolicy.Type)))
 	}
 
 	return allErrs
