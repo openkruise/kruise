@@ -33,7 +33,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	testingclock "k8s.io/utils/clock/testing"
-	"k8s.io/utils/ptr"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
@@ -731,7 +730,7 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 			name: "Standard,partition=0",
 			rolling: &appsv1beta1.RollingUpdateDaemonSet{
 				Type:      appsv1beta1.StandardRollingUpdateType,
-				Partition: ptr.To[int32](0),
+				Partition: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
 			},
 			hash: "v2",
 			nodeToDaemonPods: map[string][]*corev1.Pod{
@@ -751,7 +750,7 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 			name: "Standard,partition=1",
 			rolling: &appsv1beta1.RollingUpdateDaemonSet{
 				Type:      appsv1beta1.StandardRollingUpdateType,
-				Partition: ptr.To[int32](1),
+				Partition: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
 			},
 			hash: "v2",
 			nodeToDaemonPods: map[string][]*corev1.Pod{
@@ -771,7 +770,7 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 			name: "Standard,partition=1,selector=1",
 			rolling: &appsv1beta1.RollingUpdateDaemonSet{
 				Type:      appsv1beta1.StandardRollingUpdateType,
-				Partition: ptr.To[int32](1),
+				Partition: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
 				Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"node-type": "canary"}},
 			},
 			hash: "v2",
@@ -801,7 +800,7 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 			name: "Standard,partition=2,selector=3",
 			rolling: &appsv1beta1.RollingUpdateDaemonSet{
 				Type:      appsv1beta1.StandardRollingUpdateType,
-				Partition: ptr.To[int32](2),
+				Partition: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
 				Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"node-type": "canary"}},
 			},
 			hash: "v2",
@@ -831,7 +830,7 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 			name: "Standard,partition=0,selector=3,terminating",
 			rolling: &appsv1beta1.RollingUpdateDaemonSet{
 				Type:      appsv1beta1.StandardRollingUpdateType,
-				Partition: ptr.To[int32](0),
+				Partition: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
 				Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"node-type": "canary"}},
 			},
 			hash: "v2",

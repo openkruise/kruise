@@ -781,3 +781,1015 @@ func boolPtr(b bool) *bool {
 func intstrPtr(s string) *intstr.IntOrString {
 	return &intstr.IntOrString{Type: intstr.String, StrVal: s}
 }
+
+func intstrIntPtr(i int32) *intstr.IntOrString {
+	return &intstr.IntOrString{Type: intstr.Int, IntVal: i}
+}
+
+func TestDaemonSet_ConvertTo(t *testing.T) {
+	tests := []struct {
+		name     string
+		ds       *DaemonSet
+		expected *v1beta1.DaemonSet
+	}{
+		{
+			name: "convert with all fields populated including Standard rolling update",
+			ds: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds",
+					Namespace: "default",
+					Labels:    map[string]string{"app": "test"},
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"app": "test"},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:1.14.2",
+								},
+							},
+						},
+					},
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							Type:           StandardRollingUpdateType,
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+							MaxSurge:       &intstr.IntOrString{Type: intstr.String, StrVal: "10%"},
+							Selector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{"region": "us-west"},
+							},
+							Partition: intstrIntPtr(5),
+							Paused:    boolPtr(false),
+						},
+					},
+					MinReadySeconds:      30,
+					BurstReplicas:        intstrPtr("50%"),
+					RevisionHistoryLimit: int32Ptr(10),
+				},
+				Status: DaemonSetStatus{
+					CurrentNumberScheduled: 5,
+					NumberMisscheduled:     0,
+					DesiredNumberScheduled: 5,
+					NumberReady:            5,
+					ObservedGeneration:     1,
+					UpdatedNumberScheduled: 5,
+					NumberAvailable:        5,
+					NumberUnavailable:      0,
+					CollisionCount:         int32Ptr(0),
+					DaemonSetHash:          "abc123",
+				},
+			},
+			expected: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds",
+					Namespace: "default",
+					Labels:    map[string]string{"app": "test"},
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"app": "test"},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:1.14.2",
+								},
+							},
+						},
+					},
+					UpdateStrategy: v1beta1.DaemonSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateDaemonSet{
+							Type:           v1beta1.StandardRollingUpdateType,
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+							MaxSurge:       &intstr.IntOrString{Type: intstr.String, StrVal: "10%"},
+							Selector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{"region": "us-west"},
+							},
+							Partition: intstrIntPtr(5),
+							Paused:    boolPtr(false),
+						},
+					},
+					MinReadySeconds:      30,
+					BurstReplicas:        intstrPtr("50%"),
+					RevisionHistoryLimit: int32Ptr(10),
+				},
+				Status: v1beta1.DaemonSetStatus{
+					CurrentNumberScheduled: 5,
+					NumberMisscheduled:     0,
+					DesiredNumberScheduled: 5,
+					NumberReady:            5,
+					ObservedGeneration:     1,
+					UpdatedNumberScheduled: 5,
+					NumberAvailable:        5,
+					NumberUnavailable:      0,
+					CollisionCount:         int32Ptr(0),
+					UpdateRevision:         "abc123",
+				},
+			},
+		},
+		{
+			name: "convert with deprecated Surging rolling update type",
+			ds: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-surging",
+					Namespace: "default",
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							Type:           DeprecatedSurgingRollingUpdateType, // Should be mapped to Standard
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+						},
+					},
+				},
+				Status: DaemonSetStatus{},
+			},
+			expected: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-surging",
+					Namespace: "default",
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: v1beta1.DaemonSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateDaemonSet{
+							Type:           v1beta1.StandardRollingUpdateType, // Mapped from Surging
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+						},
+					},
+				},
+				Status: v1beta1.DaemonSetStatus{},
+			},
+		},
+		{
+			name: "convert with InPlaceIfPossible rolling update type",
+			ds: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-inplace",
+					Namespace: "default",
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							Type:           InplaceRollingUpdateType,
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+						},
+					},
+				},
+				Status: DaemonSetStatus{},
+			},
+			expected: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-inplace",
+					Namespace: "default",
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: v1beta1.DaemonSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateDaemonSet{
+							Type:           v1beta1.InplaceRollingUpdateType,
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+						},
+					},
+				},
+				Status: v1beta1.DaemonSetStatus{},
+			},
+		},
+		{
+			name: "convert with progressive-create-pod annotation",
+			ds: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-progressive",
+					Namespace: "default",
+					Annotations: map[string]string{
+						ProgressiveCreatePodAnnotation: "true",
+						"other-annotation":             "keep-this",
+					},
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+				Status: DaemonSetStatus{},
+			},
+			expected: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-progressive",
+					Namespace: "default",
+					Annotations: map[string]string{
+						"other-annotation": "keep-this",
+					},
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: &v1beta1.DaemonSetScaleStrategy{
+						Progressive: true,
+					},
+				},
+				Status: v1beta1.DaemonSetStatus{},
+			},
+		},
+		{
+			name: "convert without progressive-create-pod annotation",
+			ds: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-no-progressive",
+					Namespace: "default",
+					Annotations: map[string]string{
+						"other-annotation": "keep-this",
+					},
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+				Status: DaemonSetStatus{},
+			},
+			expected: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-no-progressive",
+					Namespace: "default",
+					Annotations: map[string]string{
+						"other-annotation": "keep-this",
+					},
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+				Status: v1beta1.DaemonSetStatus{},
+			},
+		},
+		{
+			name: "convert with OnDelete update strategy",
+			ds: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-ondelete",
+					Namespace: "default",
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: OnDeleteDaemonSetStrategyType,
+					},
+				},
+				Status: DaemonSetStatus{},
+			},
+			expected: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-ondelete",
+					Namespace: "default",
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: v1beta1.DaemonSetUpdateStrategy{
+						Type: v1beta1.OnDeleteDaemonSetStrategyType,
+					},
+				},
+				Status: v1beta1.DaemonSetStatus{},
+			},
+		},
+		{
+			name: "convert minimal fields",
+			ds: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "minimal-ds",
+					Namespace: "default",
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+				Status: DaemonSetStatus{},
+			},
+			expected: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "minimal-ds",
+					Namespace: "default",
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+				Status: v1beta1.DaemonSetStatus{},
+			},
+		},
+		{
+			name: "convert with nil annotations and progressive annotation true",
+			ds: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-nil-annotations",
+					Namespace: "default",
+					Annotations: map[string]string{
+						ProgressiveCreatePodAnnotation: "true",
+					},
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+				Status: DaemonSetStatus{},
+			},
+			expected: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-ds-nil-annotations",
+					Namespace:   "default",
+					Annotations: map[string]string{},
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: &v1beta1.DaemonSetScaleStrategy{
+						Progressive: true,
+					},
+				},
+				Status: v1beta1.DaemonSetStatus{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dst := &v1beta1.DaemonSet{}
+			err := tt.ds.ConvertTo(dst)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, dst)
+		})
+	}
+}
+
+func TestDaemonSet_ConvertFrom(t *testing.T) {
+	tests := []struct {
+		name     string
+		src      *v1beta1.DaemonSet
+		expected *DaemonSet
+	}{
+		{
+			name: "convert from v1beta1 with all fields populated",
+			src: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds",
+					Namespace: "default",
+					Labels:    map[string]string{"app": "test"},
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"app": "test"},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:1.14.2",
+								},
+							},
+						},
+					},
+					UpdateStrategy: v1beta1.DaemonSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateDaemonSet{
+							Type:           v1beta1.StandardRollingUpdateType,
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+							MaxSurge:       &intstr.IntOrString{Type: intstr.String, StrVal: "10%"},
+							Selector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{"region": "us-west"},
+							},
+							Partition: intstrIntPtr(5),
+							Paused:    boolPtr(false),
+						},
+					},
+					MinReadySeconds:      30,
+					BurstReplicas:        intstrPtr("50%"),
+					RevisionHistoryLimit: int32Ptr(10),
+				},
+				Status: v1beta1.DaemonSetStatus{
+					CurrentNumberScheduled: 5,
+					NumberMisscheduled:     0,
+					DesiredNumberScheduled: 5,
+					NumberReady:            5,
+					ObservedGeneration:     1,
+					UpdatedNumberScheduled: 5,
+					NumberAvailable:        5,
+					NumberUnavailable:      0,
+					CollisionCount:         int32Ptr(0),
+					UpdateRevision:         "abc123",
+				},
+			},
+			expected: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds",
+					Namespace: "default",
+					Labels:    map[string]string{"app": "test"},
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"app": "test"},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:1.14.2",
+								},
+							},
+						},
+					},
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							Type:           StandardRollingUpdateType,
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+							MaxSurge:       &intstr.IntOrString{Type: intstr.String, StrVal: "10%"},
+							Selector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{"region": "us-west"},
+							},
+							Partition: intstrIntPtr(5),
+							Paused:    boolPtr(false),
+						},
+					},
+					MinReadySeconds:      30,
+					BurstReplicas:        intstrPtr("50%"),
+					RevisionHistoryLimit: int32Ptr(10),
+				},
+				Status: DaemonSetStatus{
+					CurrentNumberScheduled: 5,
+					NumberMisscheduled:     0,
+					DesiredNumberScheduled: 5,
+					NumberReady:            5,
+					ObservedGeneration:     1,
+					UpdatedNumberScheduled: 5,
+					NumberAvailable:        5,
+					NumberUnavailable:      0,
+					CollisionCount:         int32Ptr(0),
+					DaemonSetHash:          "abc123",
+				},
+			},
+		},
+		{
+			name: "convert from v1beta1 with ScaleStrategy progressive true",
+			src: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-progressive",
+					Namespace: "default",
+					Annotations: map[string]string{
+						"other-annotation": "keep-this",
+					},
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: &v1beta1.DaemonSetScaleStrategy{
+						Progressive: true,
+					},
+				},
+				Status: v1beta1.DaemonSetStatus{},
+			},
+			expected: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-progressive",
+					Namespace: "default",
+					Annotations: map[string]string{
+						ProgressiveCreatePodAnnotation: "true",
+						"other-annotation":             "keep-this",
+					},
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+				Status: DaemonSetStatus{},
+			},
+		},
+		{
+			name: "convert from v1beta1 with ScaleStrategy progressive false",
+			src: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-no-progressive",
+					Namespace: "default",
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: &v1beta1.DaemonSetScaleStrategy{
+						Progressive: false,
+					},
+				},
+				Status: v1beta1.DaemonSetStatus{},
+			},
+			expected: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-no-progressive",
+					Namespace: "default",
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+				Status: DaemonSetStatus{},
+			},
+		},
+		{
+			name: "convert from v1beta1 without ScaleStrategy",
+			src: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-nil-scale-strategy",
+					Namespace: "default",
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+				Status: v1beta1.DaemonSetStatus{},
+			},
+			expected: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-nil-scale-strategy",
+					Namespace: "default",
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+				Status: DaemonSetStatus{},
+			},
+		},
+		{
+			name: "convert from v1beta1 with InPlaceIfPossible rolling update",
+			src: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-inplace",
+					Namespace: "default",
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: v1beta1.DaemonSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateDaemonSet{
+							Type:           v1beta1.InplaceRollingUpdateType,
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+						},
+					},
+				},
+				Status: v1beta1.DaemonSetStatus{},
+			},
+			expected: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-inplace",
+					Namespace: "default",
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							Type:           InplaceRollingUpdateType,
+							MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+						},
+					},
+				},
+				Status: DaemonSetStatus{},
+			},
+		},
+		{
+			name: "convert from v1beta1 with OnDelete update strategy",
+			src: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-ondelete",
+					Namespace: "default",
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: v1beta1.DaemonSetUpdateStrategy{
+						Type: v1beta1.OnDeleteDaemonSetStrategyType,
+					},
+				},
+				Status: v1beta1.DaemonSetStatus{},
+			},
+			expected: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-ondelete",
+					Namespace: "default",
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: OnDeleteDaemonSetStrategyType,
+					},
+				},
+				Status: DaemonSetStatus{},
+			},
+		},
+		{
+			name: "convert from v1beta1 minimal fields",
+			src: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "minimal-ds",
+					Namespace: "default",
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+				Status: v1beta1.DaemonSetStatus{},
+			},
+			expected: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "minimal-ds",
+					Namespace: "default",
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+				Status: DaemonSetStatus{},
+			},
+		},
+		{
+			name: "convert from v1beta1 with nil annotations and progressive true",
+			src: &v1beta1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-nil-annotations",
+					Namespace: "default",
+				},
+				Spec: v1beta1.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: &v1beta1.DaemonSetScaleStrategy{
+						Progressive: true,
+					},
+				},
+				Status: v1beta1.DaemonSetStatus{},
+			},
+			expected: &DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ds-nil-annotations",
+					Namespace: "default",
+					Annotations: map[string]string{
+						ProgressiveCreatePodAnnotation: "true",
+					},
+				},
+				Spec: DaemonSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+				Status: DaemonSetStatus{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ds := &DaemonSet{}
+			err := ds.ConvertFrom(tt.src)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, ds)
+		})
+	}
+}

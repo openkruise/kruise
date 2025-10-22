@@ -399,7 +399,6 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 				newHash = ads.Status.DaemonSetHash
 				return ads.Status.ObservedGeneration
 			}, time.Second*30, time.Second*3).Should(gomega.Equal(int64(2)))
-			common.Logf("DaemonSet new hash: %s", newHash)
 
 			ginkgo.By("There should be one pod with PreparingDelete and no pods been deleted")
 			var preDeletingPod *v1.Pod

@@ -135,7 +135,8 @@ func validateRollingUpdateDaemonSet(rollingUpdate *appsv1alpha1.RollingUpdateDae
 	}
 
 	if rollingUpdate.Partition != nil {
-		allErrs = append(allErrs, corevalidation.ValidateNonnegativeField(int64(*rollingUpdate.Partition), fldPath.Child("rollingUpdate").Child("partition"))...)
+		allErrs = append(allErrs, validateNonnegativeIntOrPercent(*rollingUpdate.Partition, fldPath.Child("rollingUpdate").Child("partition"))...)
+		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*rollingUpdate.Partition, fldPath.Child("rollingUpdate").Child("partition"))...)
 	}
 
 	return allErrs
@@ -147,6 +148,18 @@ func getIntOrPercentValue(intOrStringValue intstr.IntOrString) int {
 		return value
 	}
 	return intOrStringValue.IntValue()
+}
+
+// validateNonnegativeIntOrPercent tests if a given value is a valid non-negative int or percentage.
+func validateNonnegativeIntOrPercent(intOrPercent intstr.IntOrString, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	switch intOrPercent.Type {
+	case intstr.String:
+		allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(intOrPercent, fldPath)...)
+	case intstr.Int:
+		allErrs = append(allErrs, corevalidation.ValidateNonnegativeField(int64(intOrPercent.IntValue()), fldPath)...)
+	}
+	return allErrs
 }
 
 func getPercentValue(intOrStringValue intstr.IntOrString) (int, bool) {
@@ -270,7 +283,8 @@ func validateRollingUpdateDaemonSetV1beta1(rollingUpdate *appsv1beta1.RollingUpd
 	}
 
 	if rollingUpdate.Partition != nil {
-		allErrs = append(allErrs, corevalidation.ValidateNonnegativeField(int64(*rollingUpdate.Partition), fldPath.Child("rollingUpdate").Child("partition"))...)
+		allErrs = append(allErrs, validateNonnegativeIntOrPercent(*rollingUpdate.Partition, fldPath.Child("rollingUpdate").Child("partition"))...)
+		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*rollingUpdate.Partition, fldPath.Child("rollingUpdate").Child("partition"))...)
 	}
 
 	return allErrs

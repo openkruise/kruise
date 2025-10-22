@@ -110,7 +110,7 @@ type RollingUpdateDaemonSet struct {
 	// Default value is 0.
 	// Maximum value is status.DesiredNumberScheduled, which means no pod will be updated.
 	// +optional
-	Partition *int32 `json:"partition,omitempty"`
+	Partition *intstr.IntOrString `json:"partition,omitempty"`
 
 	// Indicates that the daemon set is paused and will not be processed by the
 	// daemon set controller.

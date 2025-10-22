@@ -673,13 +673,16 @@ func (dsc *ReconcileDaemonSet) manage(ctx context.Context, ds *appsv1beta1.Daemo
 
 	// This is the first deploy process.
 	if ds.Spec.UpdateStrategy.Type == appsv1beta1.RollingUpdateDaemonSetStrategyType && ds.Spec.UpdateStrategy.RollingUpdate != nil {
-		if ds.Spec.UpdateStrategy.RollingUpdate.Partition != nil && *ds.Spec.UpdateStrategy.RollingUpdate.Partition != 0 {
-			partition := *ds.Spec.UpdateStrategy.RollingUpdate.Partition
-
-			// Creates pods on nodes that needing daemon pod. If progressive annotation is true, the creation will controlled
-			// by partition and only some of daemon pods will be created. Otherwise daemon pods will be created on every
-			// node that need to start a daemon pod.
-			nodesNeedingDaemonPods = GetNodesNeedingPods(newPodCount, nodesDesireScheduled, int(partition), isDaemonSetCreationProgressively(ds), nodesNeedingDaemonPods)
+		if ds.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
+			partition, err := intstrutil.GetScaledValueFromIntOrPercent(ds.Spec.UpdateStrategy.RollingUpdate.Partition, int(ds.Status.DesiredNumberScheduled), false)
+			if err != nil {
+				klog.ErrorS(err, "Failed to get partition value for DaemonSet", "daemonSet", klog.KObj(ds))
+			} else if partition != 0 {
+				// Creates pods on nodes that needing daemon pod. If progressive annotation is true, the creation will controlled
+				// by partition and only some of daemon pods will be created. Otherwise daemon pods will be created on every
+				// node that need to start a daemon pod.
+				nodesNeedingDaemonPods = GetNodesNeedingPods(newPodCount, nodesDesireScheduled, partition, isDaemonSetCreationProgressively(ds), nodesNeedingDaemonPods)
+			}
 		}
 	}
 

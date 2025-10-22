@@ -48,10 +48,14 @@ func (dsc *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1bet
 	var partition, maxUnavailable int
 	var dsPodsNumber = int(ds.Status.DesiredNumberScheduled)
 	if ds.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
-		partition = int(*ds.Spec.UpdateStrategy.RollingUpdate.Partition)
+		var err error
+		partition, err = intstrutil.GetScaledValueFromIntOrPercent(ds.Spec.UpdateStrategy.RollingUpdate.Partition, dsPodsNumber, false)
+		if err != nil {
+			return fmt.Errorf("failed to get partition value: %v", err)
+		}
 	}
-	maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
-		intstrutil.ValueOrDefault(ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), dsPodsNumber, false)
+	maxUnavailable, _ = intstrutil.GetScaledValueFromIntOrPercent(
+		intstrutil.ValueOrDefault(ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), dsPodsNumber, true)
 	if partition == 0 && maxUnavailable >= dsPodsNumber {
 		klog.V(4).InfoS("DaemonSet skipped to create ImagePullJob for all Pods update in one batch",
 			"daemonSet", klog.KObj(ds), "replicas", dsPodsNumber, "partition", partition, "maxUnavailable", maxUnavailable)
