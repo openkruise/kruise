@@ -71,11 +71,6 @@ func (ds *DaemonSet) ConvertTo(dst conversion.Hub) error {
 			dsv1beta1.Spec.ScaleStrategy = &v1beta1.DaemonSetScaleStrategy{
 				Progressive: true,
 			}
-			// Remove the annotation from the converted object
-			if dsv1beta1.Annotations == nil {
-				dsv1beta1.Annotations = make(map[string]string)
-			}
-			delete(dsv1beta1.Annotations, ProgressiveCreatePodAnnotation)
 		}
 
 		// status

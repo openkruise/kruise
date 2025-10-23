@@ -1056,7 +1056,8 @@ func TestDaemonSet_ConvertTo(t *testing.T) {
 					Name:      "test-ds-progressive",
 					Namespace: "default",
 					Annotations: map[string]string{
-						"other-annotation": "keep-this",
+						ProgressiveCreatePodAnnotation: "true",
+						"other-annotation":             "keep-this",
 					},
 				},
 				Spec: v1beta1.DaemonSetSpec{
@@ -1262,9 +1263,11 @@ func TestDaemonSet_ConvertTo(t *testing.T) {
 			},
 			expected: &v1beta1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        "test-ds-nil-annotations",
-					Namespace:   "default",
-					Annotations: map[string]string{},
+					Name:      "test-ds-nil-annotations",
+					Namespace: "default",
+					Annotations: map[string]string{
+						ProgressiveCreatePodAnnotation: "true",
+					},
 				},
 				Spec: v1beta1.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{
