@@ -231,12 +231,7 @@ type DaemonSetStatus struct {
 	// +patchStrategy=merge
 	Conditions []appsv1.DaemonSetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 
-	// CurrentRevision, if not empty, indicates the version of the DaemonSet used to generate Pods
-	// in the sequence [0,currentReplicas).
-	CurrentRevision string `json:"currentRevision,omitempty"`
-
-	// UpdateRevision, if not empty, indicates the version of the DaemonSet used to generate Pods
-	// in the sequence [replicas-updatedReplicas,replicas)
+	// UpdateRevision is the controller-revision-hash, which represents the latest version of the DaemonSet.
 	UpdateRevision string `json:"updateRevision,omitempty"`
 }
 

@@ -403,14 +403,8 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(ctx context.Context, request reconc
 	}
 	hash := cur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 
-	// Determine the current revision
-	currentRevision, err := dsc.getCurrentRevision(ds, cur, old)
-	if err != nil {
-		return fmt.Errorf("failed to determine current revision of DaemonSet: %v", err)
-	}
-
 	if !dsc.expectations.SatisfiedExpectations(logger, dsKey) || !dsc.hasPodExpectationsSatisfied(ctx, ds) {
-		return dsc.updateDaemonSetStatus(ctx, ds, nodeList, hash, currentRevision.Name, false)
+		return dsc.updateDaemonSetStatus(ctx, ds, nodeList, hash, false)
 	}
 
 	if !isPreDownloadDisabled && dsc.Client != nil {
@@ -446,7 +440,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(ctx context.Context, request reconc
 
 	// return and wait next reconcile if expectation changed to unsatisfied
 	if !dsc.expectations.SatisfiedExpectations(logger, dsKey) || !dsc.hasPodExpectationsSatisfied(ctx, ds) {
-		return dsc.updateDaemonSetStatus(ctx, ds, nodeList, hash, currentRevision.Name, false)
+		return dsc.updateDaemonSetStatus(ctx, ds, nodeList, hash, false)
 	}
 
 	if err := dsc.refreshUpdateStates(ctx, ds); err != nil {
@@ -471,7 +465,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(ctx context.Context, request reconc
 		return fmt.Errorf("failed to clean up revisions of DaemonSet: %v", err)
 	}
 
-	return dsc.updateDaemonSetStatus(ctx, ds, nodeList, hash, currentRevision.Name, true)
+	return dsc.updateDaemonSetStatus(ctx, ds, nodeList, hash, true)
 }
 
 // Predicates checks if a DaemonSet's pod can run on a node.
@@ -522,7 +516,7 @@ func NewPod(ds *appsv1beta1.DaemonSet, nodeName string) *corev1.Pod {
 	return newPod
 }
 
-func (dsc *ReconcileDaemonSet) updateDaemonSetStatus(ctx context.Context, ds *appsv1beta1.DaemonSet, nodeList []*corev1.Node, hash string, currentRevisionName string, updateObservedGen bool) error {
+func (dsc *ReconcileDaemonSet) updateDaemonSetStatus(ctx context.Context, ds *appsv1beta1.DaemonSet, nodeList []*corev1.Node, hash string, updateObservedGen bool) error {
 	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for DaemonSet %q: %v", ds.Name, err)
@@ -566,7 +560,7 @@ func (dsc *ReconcileDaemonSet) updateDaemonSetStatus(ctx context.Context, ds *ap
 	}
 	numberUnavailable := desiredNumberScheduled - numberAvailable
 
-	err = dsc.storeDaemonSetStatus(ctx, ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable, updateObservedGen, hash, currentRevisionName)
+	err = dsc.storeDaemonSetStatus(ctx, ds, desiredNumberScheduled, currentNumberScheduled, numberMisscheduled, numberReady, updatedNumberScheduled, numberAvailable, numberUnavailable, updateObservedGen, hash)
 	if err != nil {
 		return fmt.Errorf("error storing status for DaemonSet %v: %v", ds.Name, err)
 	}
@@ -589,8 +583,7 @@ func (dsc *ReconcileDaemonSet) storeDaemonSetStatus(
 	numberAvailable,
 	numberUnavailable int,
 	updateObservedGen bool,
-	hash string,
-	currentRevisionName string) error {
+	hash string) error {
 	if int(ds.Status.DesiredNumberScheduled) == desiredNumberScheduled &&
 		int(ds.Status.CurrentNumberScheduled) == currentNumberScheduled &&
 		int(ds.Status.NumberMisscheduled) == numberMisscheduled &&
@@ -599,8 +592,7 @@ func (dsc *ReconcileDaemonSet) storeDaemonSetStatus(
 		int(ds.Status.NumberAvailable) == numberAvailable &&
 		int(ds.Status.NumberUnavailable) == numberUnavailable &&
 		ds.Status.ObservedGeneration >= ds.Generation &&
-		ds.Status.UpdateRevision == hash &&
-		ds.Status.CurrentRevision == currentRevisionName {
+		ds.Status.UpdateRevision == hash {
 		return nil
 	}
 
@@ -619,7 +611,6 @@ func (dsc *ReconcileDaemonSet) storeDaemonSetStatus(
 		toUpdate.Status.NumberAvailable = int32(numberAvailable)
 		toUpdate.Status.NumberUnavailable = int32(numberUnavailable)
 		toUpdate.Status.UpdateRevision = hash
-		toUpdate.Status.CurrentRevision = currentRevisionName
 
 		if _, updateErr = dsClient.UpdateStatus(ctx, toUpdate, metav1.UpdateOptions{}); updateErr == nil {
 			klog.InfoS("Updated DaemonSet status", "daemonSet", klog.KObj(ds), "status", kruiseutil.DumpJSON(toUpdate.Status))

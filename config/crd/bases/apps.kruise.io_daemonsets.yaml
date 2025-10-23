@@ -283,12 +283,14 @@ spec:
                           the update.
                         x-kubernetes-int-or-string: true
                       partition:
+                        anyOf:
+                        - type: integer
+                        - type: string
                         description: |-
                           The number of DaemonSet pods remained to be old version.
                           Default value is 0.
                           Maximum value is status.DesiredNumberScheduled, which means no pod will be updated.
-                        format: int32
-                        type: integer
+                        x-kubernetes-int-or-string: true
                       paused:
                         description: |-
                           Indicates that the daemon set is paused and will not be processed by the
@@ -742,12 +744,14 @@ spec:
                           the update.
                         x-kubernetes-int-or-string: true
                       partition:
+                        anyOf:
+                        - type: integer
+                        - type: string
                         description: |-
                           The number of DaemonSet pods remained to be old version.
                           Default value is 0.
                           Maximum value is status.DesiredNumberScheduled, which means no pod will be updated.
-                        format: int32
-                        type: integer
+                        x-kubernetes-int-or-string: true
                       paused:
                         description: |-
                           Indicates that the daemon set is paused and will not be processed by the
@@ -862,11 +866,6 @@ spec:
                   More info: https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/
                 format: int32
                 type: integer
-              currentRevision:
-                description: |-
-                  CurrentRevision, if not empty, indicates the version of the DaemonSet used to generate Pods
-                  in the sequence [0,currentReplicas).
-                type: string
               desiredNumberScheduled:
                 description: |-
                   The total number of nodes that should be running the daemon
@@ -907,9 +906,8 @@ spec:
                 format: int64
                 type: integer
               updateRevision:
-                description: |-
-                  UpdateRevision, if not empty, indicates the version of the DaemonSet used to generate Pods
-                  in the sequence [replicas-updatedReplicas,replicas)
+                description: UpdateRevision is the controller-revision-hash, which
+                  represents the latest version of the DaemonSet.
                 type: string
               updatedNumberScheduled:
                 description: The total number of nodes that are running updated daemon

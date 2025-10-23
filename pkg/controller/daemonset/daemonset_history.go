@@ -94,39 +94,6 @@ func (dsc *ReconcileDaemonSet) constructHistory(ctx context.Context, ds *appsv1b
 	return cur, old, err
 }
 
-// getCurrentRevision determines the current revision for the DaemonSet.
-// The logic is:
-// 1. If rolling update is complete (all pods updated), CurrentRevision = UpdateRevision
-// 2. Otherwise, keep the previous CurrentRevision if it exists
-// 3. For first deployment, CurrentRevision = UpdateRevision
-func (dsc *ReconcileDaemonSet) getCurrentRevision(ds *appsv1beta1.DaemonSet, updateRevision *apps.ControllerRevision, oldRevisions []*apps.ControllerRevision) (*apps.ControllerRevision, error) {
-	// Check if rolling update is complete
-	// When all pods are updated and ready, switch CurrentRevision to UpdateRevision
-	if ds.Status.UpdatedNumberScheduled == ds.Status.DesiredNumberScheduled &&
-		ds.Status.NumberReady == ds.Status.DesiredNumberScheduled {
-		// All pods have been updated and are ready, use update revision as current
-		return updateRevision, nil
-	}
-
-	// During rolling update, keep the previous CurrentRevision
-	// If Status.CurrentRevision is set, try to find it in old revisions
-	if ds.Status.CurrentRevision != "" {
-		for _, revision := range oldRevisions {
-			if revision.Name == ds.Status.CurrentRevision {
-				return revision, nil
-			}
-		}
-		// Also check if current revision matches update revision
-		if updateRevision.Name == ds.Status.CurrentRevision {
-			return updateRevision, nil
-		}
-	}
-
-	// If current revision is not found or not set, initialize it with update revision
-	// This happens on first deployment or when all old revisions have been cleaned up
-	return updateRevision, nil
-}
-
 // controlledHistories returns all ControllerRevisions controlled by the given DaemonSet.
 // This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned histories are pointers to objects in the cache.
