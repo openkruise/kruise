@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/klog/v2"
@@ -161,7 +162,7 @@ func (r *ReconcileAdvancedCronJob) reconcileImageListPullJob(ctx context.Context
 				break
 			}
 
-			if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+			if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil && !errors.IsNotFound(err) {
 				klog.ErrorS(err, "Unable to delete old failed ImageListPullJob", "job", klog.KObj(job), "advancedCronJob", req)
 			} else {
 				klog.InfoS("Deleted old failed ImageListPullJob", "job", klog.KObj(job), "advancedCronJob", req)
@@ -181,7 +182,7 @@ func (r *ReconcileAdvancedCronJob) reconcileImageListPullJob(ctx context.Context
 				break
 			}
 
-			if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+			if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil && !errors.IsNotFound(err) {
 				klog.ErrorS(err, "Unable to delete old successful ImageListPullJob", "job", klog.KObj(job), "advancedCronJob", req)
 			} else {
 				klog.InfoS("Deleted old successful ImageListPullJob", "job", klog.KObj(job), "advancedCronJob", req)

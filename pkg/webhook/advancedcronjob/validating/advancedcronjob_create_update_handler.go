@@ -50,8 +50,8 @@ const (
 	AdvancedCronJobNameMaxLen      = 63
 	validateAdvancedCronJobNameMsg = "AdvancedCronJob name must consist of alphanumeric characters or '-'"
 	validAdvancedCronJobNameFmt    = `^[a-zA-Z0-9\-]+$`
-	MaxActiveDeadLineSeconds       = 14400
-	MaxTTLSecondsAfterFinished     = 86400
+	MaxActiveDeadLineSeconds       = 3600 * 24
+	MaxTTLSecondsAfterFinished     = 3600 * 24 * 3
 )
 
 var (
@@ -162,7 +162,12 @@ func validateAdvancedCronJobSpecTemplate(spec *appsv1beta1.AdvancedCronJobSpec, 
 
 	if spec.Template.ImageListPullJobTemplate != nil {
 		templateCount++
-		allErrs = append(allErrs, validateImageListPullJobTemplateSpec(spec.Template.ImageListPullJobTemplate, fldPath)...)
+		switch spec.ConcurrencyPolicy {
+		case appsv1beta1.ReplaceConcurrent, appsv1beta1.ForbidConcurrent:
+		default:
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("spec").Child("concurrencyPolicy"), spec.ConcurrencyPolicy, fmt.Sprintf("concurrencyPolicy should be Replace or Forbid, but current value is: %s", spec.ConcurrencyPolicy)))
+		}
+		allErrs = append(allErrs, validateImageListPullJobTemplateSpec(spec.Template.ImageListPullJobTemplate, fldPath.Child("template").Child("imageListPullJobTemplate"))...)
 	}
 
 	if templateCount == 0 {
@@ -200,7 +205,7 @@ func validateImageListPullJobTemplateSpec(ilpJobSpec *appsv1beta1.ImageListPullJ
 	if ilpJobSpec.Spec.Selector != nil {
 		if ilpJobSpec.Spec.Selector.MatchLabels != nil || ilpJobSpec.Spec.Selector.MatchExpressions != nil {
 			if ilpJobSpec.Spec.Selector.Names != nil {
-				return append(allErrs, field.Invalid(fldPath.Child("spec"), ilpJobSpec.Spec, "can not set both names and labelSelector in this spec.selector"))
+				return append(allErrs, field.Invalid(fldPath.Child("spec").Child("selector"), ilpJobSpec.Spec.Selector, "can not set both names and labelSelector in this spec.selector"))
 			}
 			if _, err := metav1.LabelSelectorAsSelector(&ilpJobSpec.Spec.Selector.LabelSelector); err != nil {
 				return append(allErrs, field.Invalid(fldPath.Child("spec").Child("selector").Child("labelSelector"), ilpJobSpec.Spec.Selector.LabelSelector, fmt.Sprintf("invalid selector: %v", err)))
@@ -249,13 +254,16 @@ func validateImageListPullJobTemplateSpec(ilpJobSpec *appsv1beta1.ImageListPullJ
 	case appsv1beta1.Always:
 		// is a no-op here. No need to do parameter dependency verification in this type.
 		if ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil && *ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds > MaxActiveDeadLineSeconds {
-			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("activeDeadlineSeconds"), ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds, fmt.Sprintf("activeDeadlineSeconds must be less than 14400, current value is: %d", *ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds)))
+			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("activeDeadlineSeconds"), ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds, fmt.Sprintf("activeDeadlineSeconds must be less than %d, current value is: %d", MaxActiveDeadLineSeconds, *ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds)))
+		}
+		if ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil && ilpJobSpec.Spec.PullPolicy != nil && ilpJobSpec.Spec.PullPolicy.TimeoutSeconds != nil && int64(*ilpJobSpec.Spec.PullPolicy.TimeoutSeconds) > *ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds {
+			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("activeDeadlineSeconds"), ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds, fmt.Sprintf("completionPolicy.activeDeadlineSeconds must be greater than pullPolicy.timeoutSeconds(%d)", *ilpJobSpec.Spec.PullPolicy.TimeoutSeconds)))
 		}
 		if ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished != nil && *ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished > MaxTTLSecondsAfterFinished {
-			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("ttlSecondsAfterFinished"), ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished, fmt.Sprintf("ttlSecondsAfterFinished must be less than 86400, current value is: %d", *ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished)))
+			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("ttlSecondsAfterFinished"), ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished, fmt.Sprintf("ttlSecondsAfterFinished must be less than %d, current value is: %d", MaxTTLSecondsAfterFinished, *ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished)))
 		}
 	default:
-		return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("type"), ilpJobSpec.Spec.CompletionPolicy.Type, fmt.Sprintf("completionPolicy should be always, but current value is: %s", ilpJobSpec.Spec.CompletionPolicy.Type)))
+		return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("type"), ilpJobSpec.Spec.CompletionPolicy.Type, fmt.Sprintf("completionPolicy should be Always, but current value is: %s", ilpJobSpec.Spec.CompletionPolicy.Type)))
 	}
 
 	return allErrs

@@ -238,7 +238,8 @@ func createNode(nodeName string) *v1.Node {
 }
 
 func createJob(jobName string, template appsv1beta1.CronJobTemplate) *appsv1beta1.AdvancedCronJob {
-	var historyLimit int32 = 1
+	var successfulHistoryLimit int32 = 2
+	var failedHistoryLimit int32 = 1
 
 	paused := false
 	job1 := &appsv1beta1.AdvancedCronJob{
@@ -253,8 +254,8 @@ func createJob(jobName string, template appsv1beta1.CronJobTemplate) *appsv1beta
 			Schedule:                   "*/5 * * * *",
 			ConcurrencyPolicy:          "Replace",
 			Paused:                     &paused,
-			SuccessfulJobsHistoryLimit: &historyLimit,
-			FailedJobsHistoryLimit:     &historyLimit,
+			SuccessfulJobsHistoryLimit: &successfulHistoryLimit,
+			FailedJobsHistoryLimit:     &failedHistoryLimit,
 			Template:                   template,
 		},
 	}
@@ -325,6 +326,7 @@ func TestReconcileAdvancedJobCreateImageListPullJob(t *testing.T) {
 	listOptions := client.InNamespace(request.Namespace)
 	err = reconcileJob.List(context.TODO(), jobList, listOptions)
 	assert.NoError(t, err)
+	assert.Equal(t, 1, len(jobList.Items))
 }
 
 // Test scenario:
@@ -351,6 +353,7 @@ func TestReconcileAdvancedJobCreateImageListPullJobAgain(t *testing.T) {
 
 	var initObjs []client.Object
 	initObjs = append(initObjs, job1, node1, node2, node3)
+	initObjs = append(initObjs, createImageListPullJob(-25, 3, 3, 3, job1))
 	initObjs = append(initObjs, createImageListPullJob(-20, 2, 1, 2, job1))
 	initObjs = append(initObjs, createImageListPullJob(-15, 2, 1, 2, job1))
 	initObjs = append(initObjs, createImageListPullJob(-10, 2, 2, 2, job1))
@@ -377,6 +380,7 @@ func TestReconcileAdvancedJobCreateImageListPullJobAgain(t *testing.T) {
 	listOptions := client.InNamespace(request.Namespace)
 	err = reconcileJob.List(context.TODO(), jobList, listOptions)
 	assert.NoError(t, err)
+	assert.Equal(t, 4, len(jobList.Items)) // 1 failed + 2 successful + 1 running
 }
 
 func createImageListPullJob(timeDiff int, desired, succeeded, completed int32, parentJob *appsv1beta1.AdvancedCronJob) *appsv1beta1.ImageListPullJob {
