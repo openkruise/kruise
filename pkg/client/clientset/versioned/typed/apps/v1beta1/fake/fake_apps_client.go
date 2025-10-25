@@ -35,6 +35,10 @@ func (c *FakeAppsV1beta1) BroadcastJobs(namespace string) v1beta1.BroadcastJobIn
 	return newFakeBroadcastJobs(c, namespace)
 }
 
+func (c *FakeAppsV1beta1) DaemonSets(namespace string) v1beta1.DaemonSetInterface {
+	return newFakeDaemonSets(c, namespace)
+}
+
 func (c *FakeAppsV1beta1) ImageListPullJobs(namespace string) v1beta1.ImageListPullJobInterface {
 	return newFakeImageListPullJobs(c, namespace)
 }

@@ -117,7 +117,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-daemonset
+      path: /mutate-apps-kruise-io-daemonset
   failurePolicy: Fail
   name: mdaemonset.kb.io
   rules:
@@ -125,6 +125,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -463,7 +464,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-apps-kruise-io-v1alpha1-daemonset
+      path: /validate-apps-kruise-io-daemonset
   failurePolicy: Fail
   name: vdaemonset.kb.io
   rules:
@@ -471,6 +472,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE

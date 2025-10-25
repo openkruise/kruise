@@ -30,7 +30,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_sidecarsets.yaml
 - patches/webhook_in_statefulsets.yaml
 #- patches/webhook_in_uniteddeployments.yaml
-#- patches/webhook_in_daemonsets.yaml
+- patches/webhook_in_daemonsets.yaml
 #- patches/webhook_in_nodeimages.yaml
 #- patches/webhook_in_imagepulljobs.yaml
 #- patches/webhook_in_advancedcronjobs.yaml
