@@ -73,6 +73,74 @@ spec:
                         otherwise it will be injected into the back.
                         default BeforeAppContainerType
                       type: string
+                    resourcesPolicy:
+                      description: |-
+                        ResourcesPolicy defines the policy for dynamically configuring container resources based on Pod specification during pod creation.
+                        Validation webhook will reject pod creation request if both resourcesPolicy and resources are configured.
+                      properties:
+                        resourceExpr:
+                          description: ResourceExpr defines the expressions for calculating
+                            resource values
+                          properties:
+                            limits:
+                              description: Limits defines expressions for calculating
+                                resource limits
+                              properties:
+                                cpu:
+                                  description: |-
+                                    CPU expression for calculating CPU limits
+                                    Support +, -, *, /, max(), min() and variable 'cpu'
+                                    Variable 'cpu' represents the sum or max of resources.limits.cpu of all matched containers
+                                    If matched containers don't have resources.limits configured, this field will be treated as unlimited
+                                    If the expression result is unlimited, sidecar container resources.limits won't be configured
+                                  type: string
+                                memory:
+                                  description: |-
+                                    Memory expression for calculating memory limits
+                                    Support +, -, *, /, max(), min() and variable 'memory'
+                                    Variable 'memory' represents the sum or max of resources.limits.memory of all matched containers
+                                    If matched containers don't have resources.limits configured, this field will be treated as unlimited
+                                    If the expression result is unlimited, sidecar container resources.limits won't be configured
+                                  type: string
+                              type: object
+                            requests:
+                              description: Requests defines expressions for calculating
+                                resource requests
+                              properties:
+                                cpu:
+                                  description: |-
+                                    CPU expression for calculating CPU requests
+                                    Support +, -, *, /, max(), min() and variable 'cpu'
+                                    Variable 'cpu' represents the sum or max of resources.limits.cpu of all matched containers
+                                    If matched containers don't have resources.requests configured, the corresponding resource value will be treated as 0
+                                  type: string
+                                memory:
+                                  description: |-
+                                    Memory expression for calculating memory requests
+                                    Support +, -, *, /, max(), min() and variable 'memory'
+                                    Variable 'memory' represents the sum or max of resources.limits.memory of all matched containers
+                                    If matched containers don't have resources.requests configured, the corresponding resource value will be treated as 0
+                                  type: string
+                              type: object
+                          type: object
+                        targetContainerMode:
+                          description: TargetContainerMode defines how to aggregate
+                            resources from target containers
+                          enum:
+                          - sum
+                          - max
+                          type: string
+                        targetContainersNameRegex:
+                          default: .*
+                          description: |-
+                            TargetContainersNameRegex is the regex pattern to match target container names
+                            If no container names match this regex, the pod creation request will be rejected by the webhook
+                            Target containers include native sidecar containers and plain containers, excluding Kruise sidecar containers
+                          type: string
+                      required:
+                      - resourceExpr
+                      - targetContainerMode
+                      type: object
                     shareVolumeDevicePolicy:
                       description: |-
                         If ShareVolumeDevicePolicy is enabled, the sidecar container will share the other container's VolumeDevices
@@ -182,6 +250,74 @@ spec:
                         otherwise it will be injected into the back.
                         default BeforeAppContainerType
                       type: string
+                    resourcesPolicy:
+                      description: |-
+                        ResourcesPolicy defines the policy for dynamically configuring container resources based on Pod specification during pod creation.
+                        Validation webhook will reject pod creation request if both resourcesPolicy and resources are configured.
+                      properties:
+                        resourceExpr:
+                          description: ResourceExpr defines the expressions for calculating
+                            resource values
+                          properties:
+                            limits:
+                              description: Limits defines expressions for calculating
+                                resource limits
+                              properties:
+                                cpu:
+                                  description: |-
+                                    CPU expression for calculating CPU limits
+                                    Support +, -, *, /, max(), min() and variable 'cpu'
+                                    Variable 'cpu' represents the sum or max of resources.limits.cpu of all matched containers
+                                    If matched containers don't have resources.limits configured, this field will be treated as unlimited
+                                    If the expression result is unlimited, sidecar container resources.limits won't be configured
+                                  type: string
+                                memory:
+                                  description: |-
+                                    Memory expression for calculating memory limits
+                                    Support +, -, *, /, max(), min() and variable 'memory'
+                                    Variable 'memory' represents the sum or max of resources.limits.memory of all matched containers
+                                    If matched containers don't have resources.limits configured, this field will be treated as unlimited
+                                    If the expression result is unlimited, sidecar container resources.limits won't be configured
+                                  type: string
+                              type: object
+                            requests:
+                              description: Requests defines expressions for calculating
+                                resource requests
+                              properties:
+                                cpu:
+                                  description: |-
+                                    CPU expression for calculating CPU requests
+                                    Support +, -, *, /, max(), min() and variable 'cpu'
+                                    Variable 'cpu' represents the sum or max of resources.limits.cpu of all matched containers
+                                    If matched containers don't have resources.requests configured, the corresponding resource value will be treated as 0
+                                  type: string
+                                memory:
+                                  description: |-
+                                    Memory expression for calculating memory requests
+                                    Support +, -, *, /, max(), min() and variable 'memory'
+                                    Variable 'memory' represents the sum or max of resources.limits.memory of all matched containers
+                                    If matched containers don't have resources.requests configured, the corresponding resource value will be treated as 0
+                                  type: string
+                              type: object
+                          type: object
+                        targetContainerMode:
+                          description: TargetContainerMode defines how to aggregate
+                            resources from target containers
+                          enum:
+                          - sum
+                          - max
+                          type: string
+                        targetContainersNameRegex:
+                          default: .*
+                          description: |-
+                            TargetContainersNameRegex is the regex pattern to match target container names
+                            If no container names match this regex, the pod creation request will be rejected by the webhook
+                            Target containers include native sidecar containers and plain containers, excluding Kruise sidecar containers
+                          type: string
+                      required:
+                      - resourceExpr
+                      - targetContainerMode
+                      type: object
                     shareVolumeDevicePolicy:
                       description: |-
                         If ShareVolumeDevicePolicy is enabled, the sidecar container will share the other container's VolumeDevices

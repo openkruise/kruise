@@ -427,6 +427,17 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 				if sidecarcontrol.IsSidecarContainer(initContainer.Container) {
 					sidecarList.Insert(initContainer.Name)
 				}
+
+				// Apply resources policy if configured (only during pod creation)
+				if initContainer.ResourcesPolicy != nil {
+					if err := applyResourcesPolicy(pod, initContainer, matchedSidecarSets); err != nil {
+						klog.ErrorS(err, "failed to apply resources policy",
+							"namespace", pod.Namespace, "podName", pod.Name,
+							"initContainer", initContainer.Name, "sidecarSet", sidecarSet.Name)
+						return nil, nil, nil, nil, nil, err
+					}
+				}
+
 				// volumeMounts that injected into sidecar container
 				// when volumeMounts SubPathExpr contains expansions, then need copy container EnvVars(injectEnvs)
 				injectedMounts, injectedEnvs := sidecarcontrol.GetInjectedVolumeMountsAndEnvs(control, initContainer, pod)
@@ -481,6 +492,17 @@ func buildSidecars(isUpdated bool, pod *corev1.Pod, oldPod *corev1.Pod, matchedS
 		for i := range sidecarSet.Spec.Containers {
 			sidecarContainer := &sidecarSet.Spec.Containers[i]
 			sidecarList.Insert(sidecarContainer.Name)
+
+			// Apply resources policy if configured (only during pod creation)
+			if !isUpdated && sidecarContainer.ResourcesPolicy != nil {
+				if err := applyResourcesPolicy(pod, sidecarContainer, matchedSidecarSets); err != nil {
+					klog.ErrorS(err, "failed to apply resources policy",
+						"namespace", pod.Namespace, "podName", pod.Name,
+						"container", sidecarContainer.Name, "sidecarSet", sidecarSet.Name)
+					return nil, nil, nil, nil, nil, err
+				}
+			}
+
 			// volumeMounts that injected into sidecar container
 			// when volumeMounts SubPathExpr contains expansions, then need copy container EnvVars(injectEnvs)
 			injectedMounts, injectedEnvs := sidecarcontrol.GetInjectedVolumeMountsAndEnvs(control, sidecarContainer, pod)
