@@ -15,6 +15,10 @@ func FindTemplateKind(spec appsv1beta1.AdvancedCronJobSpec) appsv1beta1.Template
 		return appsv1beta1.JobTemplate
 	}
 
+	if spec.Template.ImageListPullJobTemplate != nil {
+		return appsv1beta1.ImageListPullJobTemplate
+	}
+
 	return appsv1beta1.BroadcastJobTemplate
 }
 

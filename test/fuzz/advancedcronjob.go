@@ -140,17 +140,24 @@ func GenerateAdvancedCronJobV1Beta1(cf *fuzz.ConsumeFuzzer, acj *appsv1beta1.Adv
 	// Generate template
 	template := appsv1beta1.CronJobTemplate{}
 
-	if r.Intn(2) == 0 {
+	switch r.Intn(3) {
+	case 0:
 		// Generate JobTemplate
 		jobTemplate := &batchv1.JobTemplateSpec{}
 		if err := GenerateJobTemplateSpec(cf, jobTemplate); err == nil {
 			template.JobTemplate = jobTemplate
 		}
-	} else {
+	case 1:
 		// Generate BroadcastJobTemplate
 		broadcastJobTemplate := &appsv1beta1.BroadcastJobTemplateSpec{}
 		if err := GenerateBroadcastJobTemplateSpecV1Beta1(cf, broadcastJobTemplate); err == nil {
 			template.BroadcastJobTemplate = broadcastJobTemplate
+		}
+	case 2:
+		// Generate ImageListPullJobTemplate
+		imageListPullJobTemplate := &appsv1beta1.ImageListPullJobTemplateSpec{}
+		if err := GenerateImageListPullJobTemplateSpecV1Beta1(cf, imageListPullJobTemplate); err == nil {
+			template.ImageListPullJobTemplate = imageListPullJobTemplate
 		}
 	}
 
@@ -160,6 +167,7 @@ func GenerateAdvancedCronJobV1Beta1(cf *fuzz.ConsumeFuzzer, acj *appsv1beta1.Adv
 	validTypes := []appsv1beta1.TemplateKind{
 		appsv1beta1.JobTemplate,
 		appsv1beta1.BroadcastJobTemplate,
+		appsv1beta1.ImageListPullJobTemplate,
 	}
 	choice = r.Intn(len(validTypes))
 	templateType := validTypes[choice]

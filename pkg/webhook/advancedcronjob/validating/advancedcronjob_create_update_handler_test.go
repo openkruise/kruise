@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -408,6 +409,539 @@ func TestAdvancedCronJobCreateUpdateHandler_Handle(t *testing.T) {
 			expectedError:  true,
 		},
 		{
+			name: "create v1beta1 AdvancedCronJob ImageListPullJobTemplate",
+			request: admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource: metav1.GroupVersionResource{
+						Group:    appsv1beta1.GroupVersion.Group,
+						Version:  appsv1beta1.GroupVersion.Version,
+						Resource: "advancedcronjobs",
+					},
+					Object: runtime.RawExtension{
+						Raw: createAdvancedCronJobV1Beta1JSON(t, &appsv1beta1.AdvancedCronJob{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "test-acj-v1beta1",
+								Namespace: "default",
+							},
+							Spec: appsv1beta1.AdvancedCronJobSpec{
+								Schedule:          "0 0 * * *",
+								ConcurrencyPolicy: appsv1beta1.ReplaceConcurrent,
+								Template: appsv1beta1.CronJobTemplate{
+									ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+										Spec: appsv1beta1.ImageListPullJobSpec{
+											Images: []string{
+												"busybox:latest",
+												"alpine:latest",
+											},
+											ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+												PullSecrets: nil,
+												Selector: &appsv1beta1.ImagePullJobNodeSelector{
+													Names: []string{
+														"node1",
+													},
+												},
+												PodSelector: nil,
+												Parallelism: nil,
+												PullPolicy:  nil,
+												CompletionPolicy: appsv1beta1.CompletionPolicy{
+													Type:                    appsv1beta1.Always,
+													ActiveDeadlineSeconds:   int64Ptr(100),
+													TTLSecondsAfterFinished: int32Ptr(100),
+												},
+												SandboxConfig:   nil,
+												ImagePullPolicy: "",
+											},
+										},
+									},
+								},
+							},
+						}),
+					},
+				},
+			},
+			expectedResult: true,
+			expectedError:  false,
+		},
+		{
+			name: "update v1beta1 AdvancedCronJob ImageListPullJobTemplate",
+			request: admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Update,
+					Resource: metav1.GroupVersionResource{
+						Group:    appsv1beta1.GroupVersion.Group,
+						Version:  appsv1beta1.GroupVersion.Version,
+						Resource: "advancedcronjobs",
+					},
+					Object: runtime.RawExtension{
+						Raw: createAdvancedCronJobV1Beta1JSON(t, &appsv1beta1.AdvancedCronJob{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:            "test-acj-update",
+								Namespace:       "default",
+								ResourceVersion: "xxxx",
+							},
+							Spec: appsv1beta1.AdvancedCronJobSpec{
+								Schedule:                   "1 0 * * *",
+								TimeZone:                   strPtr("Asia/Shanghai"),
+								StartingDeadlineSeconds:    int64Ptr(100),
+								ConcurrencyPolicy:          appsv1beta1.ForbidConcurrent,
+								Paused:                     boolPtr(true),
+								SuccessfulJobsHistoryLimit: int32Ptr(5),
+								FailedJobsHistoryLimit:     int32Ptr(4),
+								Template: appsv1beta1.CronJobTemplate{
+									ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+										Spec: appsv1beta1.ImageListPullJobSpec{
+											Images: []string{
+												"busybox:latest",
+												"alpine:latest",
+												"nginx:latest",
+											},
+											ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+												PullSecrets: []string{"secret1"},
+												Selector: &appsv1beta1.ImagePullJobNodeSelector{
+													Names: []string{
+														"node1",
+														"node2",
+													},
+												},
+												PodSelector: nil,
+												Parallelism: &intstr.IntOrString{
+													Type:   intstr.Int,
+													IntVal: 2,
+												},
+												PullPolicy: &appsv1beta1.PullPolicy{
+													TimeoutSeconds: int32Ptr(30),
+													BackoffLimit:   int32Ptr(1),
+												},
+												CompletionPolicy: appsv1beta1.CompletionPolicy{
+													Type:                    appsv1beta1.Always,
+													ActiveDeadlineSeconds:   int64Ptr(200),
+													TTLSecondsAfterFinished: int32Ptr(200),
+												},
+												SandboxConfig:   nil,
+												ImagePullPolicy: appsv1beta1.PullAlways,
+											},
+										},
+									},
+								},
+							},
+						}),
+					},
+					OldObject: runtime.RawExtension{
+						Raw: createAdvancedCronJobV1Beta1JSON(t, &appsv1beta1.AdvancedCronJob{
+							ObjectMeta: metav1.ObjectMeta{
+								ResourceVersion: "xxxx",
+								Name:            "test-acj-update",
+								Namespace:       "default",
+							},
+							Spec: appsv1beta1.AdvancedCronJobSpec{
+								Schedule:          "0 0 * * *",
+								ConcurrencyPolicy: appsv1beta1.ReplaceConcurrent,
+								Template: appsv1beta1.CronJobTemplate{
+									ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+										Spec: appsv1beta1.ImageListPullJobSpec{
+											Images: []string{
+												"busybox:latest",
+												"alpine:latest",
+											},
+											ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+												PullSecrets: nil,
+												Selector: &appsv1beta1.ImagePullJobNodeSelector{
+													Names: []string{
+														"node1",
+													},
+												},
+												PodSelector: nil,
+												Parallelism: &intstr.IntOrString{
+													Type:   intstr.Int,
+													IntVal: 1,
+												},
+												PullPolicy: nil,
+												CompletionPolicy: appsv1beta1.CompletionPolicy{
+													Type:                    appsv1beta1.Always,
+													ActiveDeadlineSeconds:   int64Ptr(100),
+													TTLSecondsAfterFinished: int32Ptr(100),
+												},
+												SandboxConfig:   nil,
+												ImagePullPolicy: appsv1beta1.PullIfNotPresent,
+											},
+										},
+									},
+								},
+							},
+						}),
+					},
+				},
+			},
+			expectedResult: true,
+			expectedError:  false,
+		},
+		{
+			name: "update v1beta1 AdvancedCronJob ImageListPullJobTemplate with forbidden field",
+			request: admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Update,
+					Resource: metav1.GroupVersionResource{
+						Group:    appsv1beta1.GroupVersion.Group,
+						Version:  appsv1beta1.GroupVersion.Version,
+						Resource: "advancedcronjobs",
+					},
+					Object: runtime.RawExtension{
+						Raw: createAdvancedCronJobV1Beta1JSON(t, &appsv1beta1.AdvancedCronJob{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:            "test-acj-update",
+								Namespace:       "default",
+								ResourceVersion: "xxxx",
+							},
+							Spec: appsv1beta1.AdvancedCronJobSpec{
+								Schedule:          "0 0 * * *",
+								ConcurrencyPolicy: appsv1beta1.AllowConcurrent,
+								Template: appsv1beta1.CronJobTemplate{
+									ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+										Spec: appsv1beta1.ImageListPullJobSpec{
+											Images: []string{
+												"busybox:latest",
+												"alpine:latest",
+											},
+											ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+												CompletionPolicy: appsv1beta1.CompletionPolicy{
+													Type: appsv1beta1.Never,
+												},
+											},
+										},
+									},
+								},
+							},
+						}),
+					},
+					OldObject: runtime.RawExtension{
+						Raw: createAdvancedCronJobV1Beta1JSON(t, &appsv1beta1.AdvancedCronJob{
+							ObjectMeta: metav1.ObjectMeta{
+								ResourceVersion: "xxxx",
+								Name:            "test-acj-update",
+								Namespace:       "default",
+							},
+							Spec: appsv1beta1.AdvancedCronJobSpec{
+								Schedule:          "0 0 * * *",
+								ConcurrencyPolicy: appsv1beta1.ReplaceConcurrent,
+								Template: appsv1beta1.CronJobTemplate{
+									ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+										Spec: appsv1beta1.ImageListPullJobSpec{
+											Images: []string{
+												"busybox:latest",
+												"alpine:latest",
+											},
+											ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+												CompletionPolicy: appsv1beta1.CompletionPolicy{
+													Type: appsv1beta1.Always,
+												},
+											},
+										},
+									},
+								},
+							},
+						}),
+					},
+				},
+			},
+			expectedResult: true,
+			expectedError:  true,
+		},
+		{
+			name: "create v1beta1 AdvancedCronJob ImageListPullJobTemplate conflict Selector",
+			request: admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource: metav1.GroupVersionResource{
+						Group:    appsv1beta1.GroupVersion.Group,
+						Version:  appsv1beta1.GroupVersion.Version,
+						Resource: "advancedcronjobs",
+					},
+					Object: runtime.RawExtension{
+						Raw: createAdvancedCronJobV1Beta1JSON(t, &appsv1beta1.AdvancedCronJob{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "test-acj-v1beta1",
+								Namespace: "default",
+							},
+							Spec: appsv1beta1.AdvancedCronJobSpec{
+								Schedule:          "0 0 * * *",
+								ConcurrencyPolicy: appsv1beta1.ReplaceConcurrent,
+								Template: appsv1beta1.CronJobTemplate{
+									ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+										Spec: appsv1beta1.ImageListPullJobSpec{
+											Images: []string{
+												"busybox:latest",
+												"alpine:latest",
+											},
+											ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+												PullSecrets: nil,
+												Selector: &appsv1beta1.ImagePullJobNodeSelector{
+													Names: []string{
+														"node1",
+													},
+													LabelSelector: metav1.LabelSelector{
+														MatchLabels: map[string]string{
+															"key": "value",
+														},
+													},
+												},
+												PodSelector: nil,
+												Parallelism: nil,
+												PullPolicy:  nil,
+												CompletionPolicy: appsv1beta1.CompletionPolicy{
+													Type:                    appsv1beta1.Always,
+													ActiveDeadlineSeconds:   int64Ptr(100),
+													TTLSecondsAfterFinished: int32Ptr(100),
+												},
+												SandboxConfig:   nil,
+												ImagePullPolicy: "",
+											},
+										},
+									},
+								},
+							},
+						}),
+					},
+				},
+			},
+			expectedResult: true,
+			expectedError:  true,
+		},
+		{
+			name: "create v1beta1 AdvancedCronJob ImageListPullJobTemplate conflict Selector 2",
+			request: admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource: metav1.GroupVersionResource{
+						Group:    appsv1beta1.GroupVersion.Group,
+						Version:  appsv1beta1.GroupVersion.Version,
+						Resource: "advancedcronjobs",
+					},
+					Object: runtime.RawExtension{
+						Raw: createAdvancedCronJobV1Beta1JSON(t, &appsv1beta1.AdvancedCronJob{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "test-acj-v1beta1",
+								Namespace: "default",
+							},
+							Spec: appsv1beta1.AdvancedCronJobSpec{
+								Schedule:          "0 0 * * *",
+								ConcurrencyPolicy: appsv1beta1.ReplaceConcurrent,
+								Template: appsv1beta1.CronJobTemplate{
+									ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+										Spec: appsv1beta1.ImageListPullJobSpec{
+											Images: []string{
+												"busybox:latest",
+												"alpine:latest",
+											},
+											ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+												PullSecrets: nil,
+												Selector: &appsv1beta1.ImagePullJobNodeSelector{
+													LabelSelector: metav1.LabelSelector{
+														MatchLabels: map[string]string{
+															"key": "value",
+														},
+														MatchExpressions: []metav1.LabelSelectorRequirement{
+															{Key: "xxx"},
+														},
+													},
+												},
+												PodSelector: nil,
+												Parallelism: nil,
+												PullPolicy:  nil,
+												CompletionPolicy: appsv1beta1.CompletionPolicy{
+													Type:                    appsv1beta1.Always,
+													ActiveDeadlineSeconds:   int64Ptr(100),
+													TTLSecondsAfterFinished: int32Ptr(100),
+												},
+												SandboxConfig:   nil,
+												ImagePullPolicy: "",
+											},
+										},
+									},
+								},
+							},
+						}),
+					},
+				},
+			},
+			expectedResult: true,
+			expectedError:  true,
+		},
+		{
+			name: "create v1beta1 AdvancedCronJob ImageListPullJobTemplate conflict PodSelector",
+			request: admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource: metav1.GroupVersionResource{
+						Group:    appsv1beta1.GroupVersion.Group,
+						Version:  appsv1beta1.GroupVersion.Version,
+						Resource: "advancedcronjobs",
+					},
+					Object: runtime.RawExtension{
+						Raw: createAdvancedCronJobV1Beta1JSON(t, &appsv1beta1.AdvancedCronJob{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "test-acj-v1beta1",
+								Namespace: "default",
+							},
+							Spec: appsv1beta1.AdvancedCronJobSpec{
+								Schedule:          "0 0 * * *",
+								ConcurrencyPolicy: appsv1beta1.ReplaceConcurrent,
+								Template: appsv1beta1.CronJobTemplate{
+									ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+										Spec: appsv1beta1.ImageListPullJobSpec{
+											Images: []string{
+												"busybox:latest",
+												"alpine:latest",
+											},
+											ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+												PullSecrets: nil,
+												Selector: &appsv1beta1.ImagePullJobNodeSelector{
+													Names: []string{
+														"node1",
+													},
+												},
+												PodSelector: &appsv1beta1.ImagePullJobPodSelector{
+													LabelSelector: metav1.LabelSelector{
+														MatchLabels: map[string]string{
+															"key": "value",
+														},
+													},
+												},
+												Parallelism: nil,
+												PullPolicy:  nil,
+												CompletionPolicy: appsv1beta1.CompletionPolicy{
+													Type:                    appsv1beta1.Always,
+													ActiveDeadlineSeconds:   int64Ptr(100),
+													TTLSecondsAfterFinished: int32Ptr(100),
+												},
+												SandboxConfig:   nil,
+												ImagePullPolicy: "",
+											},
+										},
+									},
+								},
+							},
+						}),
+					},
+				},
+			},
+			expectedResult: true,
+			expectedError:  true,
+		},
+		{
+			name: "create v1beta1 AdvancedCronJob ImageListPullJobTemplate conflict PodSelector 2",
+			request: admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource: metav1.GroupVersionResource{
+						Group:    appsv1beta1.GroupVersion.Group,
+						Version:  appsv1beta1.GroupVersion.Version,
+						Resource: "advancedcronjobs",
+					},
+					Object: runtime.RawExtension{
+						Raw: createAdvancedCronJobV1Beta1JSON(t, &appsv1beta1.AdvancedCronJob{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "test-acj-v1beta1",
+								Namespace: "default",
+							},
+							Spec: appsv1beta1.AdvancedCronJobSpec{
+								Schedule:          "0 0 * * *",
+								ConcurrencyPolicy: appsv1beta1.ReplaceConcurrent,
+								Template: appsv1beta1.CronJobTemplate{
+									ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+										Spec: appsv1beta1.ImageListPullJobSpec{
+											Images: []string{
+												"busybox:latest",
+												"alpine:latest",
+											},
+											ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+												PullSecrets: nil,
+												PodSelector: &appsv1beta1.ImagePullJobPodSelector{
+													LabelSelector: metav1.LabelSelector{
+														MatchLabels: map[string]string{
+															"key": "value",
+														},
+														MatchExpressions: []metav1.LabelSelectorRequirement{
+															{Key: "xxx"},
+														},
+													},
+												},
+												Parallelism: nil,
+												PullPolicy:  nil,
+												CompletionPolicy: appsv1beta1.CompletionPolicy{
+													Type:                    appsv1beta1.Always,
+													ActiveDeadlineSeconds:   int64Ptr(100),
+													TTLSecondsAfterFinished: int32Ptr(100),
+												},
+												SandboxConfig:   nil,
+												ImagePullPolicy: "",
+											},
+										},
+									},
+								},
+							},
+						}),
+					},
+				},
+			},
+			expectedResult: true,
+			expectedError:  true,
+		},
+		{
+			name: "create v1beta1 AdvancedCronJob ImageListPullJobTemplate bad completionPolicy",
+			request: admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource: metav1.GroupVersionResource{
+						Group:    appsv1beta1.GroupVersion.Group,
+						Version:  appsv1beta1.GroupVersion.Version,
+						Resource: "advancedcronjobs",
+					},
+					Object: runtime.RawExtension{
+						Raw: createAdvancedCronJobV1Beta1JSON(t, &appsv1beta1.AdvancedCronJob{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "test-acj-v1beta1",
+								Namespace: "default",
+							},
+							Spec: appsv1beta1.AdvancedCronJobSpec{
+								Schedule:          "0 0 * * *",
+								ConcurrencyPolicy: appsv1beta1.ReplaceConcurrent,
+								Template: appsv1beta1.CronJobTemplate{
+									ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+										Spec: appsv1beta1.ImageListPullJobSpec{
+											Images: []string{
+												"busybox:latest",
+												"alpine:latest",
+											},
+											ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+												PullSecrets: nil,
+												Selector: &appsv1beta1.ImagePullJobNodeSelector{
+													Names: []string{
+														"node1",
+													},
+												},
+												Parallelism: nil,
+												PullPolicy:  nil,
+												CompletionPolicy: appsv1beta1.CompletionPolicy{
+													Type:                    appsv1beta1.Always,
+													ActiveDeadlineSeconds:   int64Ptr(MaxActiveDeadLineSeconds + 1),
+													TTLSecondsAfterFinished: int32Ptr(MaxTTLSecondsAfterFinished + 1),
+												},
+												SandboxConfig:   nil,
+												ImagePullPolicy: "",
+											},
+										},
+									},
+								},
+							},
+						}),
+					},
+				},
+			},
+			expectedResult: true,
+			expectedError:  true,
+		},
+		{
 			name: "invalid JSON should return error",
 			request: admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -636,3 +1170,9 @@ func TestDecodeAdvancedCronJobFromRaw(t *testing.T) {
 		})
 	}
 }
+
+// Helper functions
+func int32Ptr(i int32) *int32 { return &i }
+func int64Ptr(i int64) *int64 { return &i }
+func boolPtr(b bool) *bool    { return &b }
+func strPtr(s string) *string { return &s }

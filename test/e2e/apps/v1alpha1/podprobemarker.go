@@ -690,12 +690,13 @@ var _ = ginkgo.Describe("PodProbeMarker", ginkgo.Label("PodProbeMarker", "operat
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			gomega.Expect(controllerutil.ContainsFinalizer(ppm1, podprobemarker.PodProbeMarkerFinalizer)).To(gomega.BeTrue())
-			pods, err := tester.ListActivePods(ns)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
 
 			ginkgo.By("wait for pods labeled with healthy")
 			tester.WaitForPodLabeled(ns, "nginx", "healthy")
+
+			pods, err := tester.ListActivePods(ns)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
 
 			validPods := sets.NewString()
 			for _, pod := range pods {

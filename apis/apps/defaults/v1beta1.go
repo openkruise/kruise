@@ -125,8 +125,29 @@ func SetDefaultsAdvancedCronJob(obj *v1beta1.AdvancedCronJob, injectTemplateDefa
 		SetDefaultPodSpec(&obj.Spec.Template.BroadcastJobTemplate.Spec.Template.Spec)
 	}
 
+	if obj.Spec.Template.ImageListPullJobTemplate != nil && obj.Spec.Template.ImageListPullJobTemplate.Spec.CompletionPolicy.Type == "" {
+		obj.Spec.Template.ImageListPullJobTemplate.Spec.CompletionPolicy.Type = v1beta1.Always
+		if obj.Spec.Template.ImageListPullJobTemplate.Spec.PullPolicy == nil {
+			obj.Spec.Template.ImageListPullJobTemplate.Spec.PullPolicy = &v1beta1.PullPolicy{}
+		}
+		if obj.Spec.Template.ImageListPullJobTemplate.Spec.PullPolicy.TimeoutSeconds == nil {
+			obj.Spec.Template.ImageListPullJobTemplate.Spec.PullPolicy.TimeoutSeconds = ptr.To(int32(600))
+		}
+		if obj.Spec.Template.ImageListPullJobTemplate.Spec.PullPolicy.BackoffLimit == nil {
+			obj.Spec.Template.ImageListPullJobTemplate.Spec.PullPolicy.BackoffLimit = ptr.To(int32(3))
+		}
+		if obj.Spec.Template.ImageListPullJobTemplate.Spec.ImagePullPolicy == "" {
+			obj.Spec.Template.ImageListPullJobTemplate.Spec.ImagePullPolicy = v1beta1.PullIfNotPresent
+		}
+	}
+
 	if obj.Spec.ConcurrencyPolicy == "" {
-		obj.Spec.ConcurrencyPolicy = v1beta1.AllowConcurrent
+		if obj.Spec.Template.ImageListPullJobTemplate != nil {
+			// concurrent run imagepulljob is useless
+			obj.Spec.ConcurrencyPolicy = v1beta1.ReplaceConcurrent
+		} else {
+			obj.Spec.ConcurrencyPolicy = v1beta1.AllowConcurrent
+		}
 	}
 	if obj.Spec.Paused == nil {
 		obj.Spec.Paused = new(bool)
