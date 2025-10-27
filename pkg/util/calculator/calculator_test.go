@@ -332,6 +332,15 @@ func TestVariables(t *testing.T) {
 			expected: "300Mi",
 			wantErr:  false,
 		},
+		{
+			name: "memory variable with max",
+			expr: "0.5 * memory + max(0, memory-2Gi)",
+			variables: map[string]*Value{
+				"memory": &Value{IsQuantity: true, Quantity: func() resource.Quantity { calc := NewCalculator(); q, _ := calc.parseQuantity("8Gi"); return q }()},
+			},
+			expected: "10Gi",
+			wantErr:  false,
+		},
 	}
 
 	for _, tt := range tests {
