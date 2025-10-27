@@ -29,8 +29,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
@@ -38,7 +40,16 @@ import (
 
 func watchJob(mgr manager.Manager, c controller.Controller) error {
 	if err := c.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}, handler.TypedEnqueueRequestForOwner[*batchv1.Job](
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1beta1.BroadcastJob{}, handler.OnlyControllerOwner()))); err != nil {
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1beta1.BroadcastJob{}, handler.OnlyControllerOwner()),
+		predicate.TypedFuncs[*batchv1.Job]{
+			// only watch create / update event
+			DeleteFunc: func(e event.TypedDeleteEvent[*batchv1.Job]) bool {
+				return false
+			},
+			GenericFunc: func(e event.TypedGenericEvent[*batchv1.Job]) bool {
+				return false
+			},
+		})); err != nil {
 		return err
 	}
 

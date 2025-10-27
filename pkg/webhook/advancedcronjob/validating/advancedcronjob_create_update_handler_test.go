@@ -445,9 +445,8 @@ func TestAdvancedCronJobCreateUpdateHandler_Handle(t *testing.T) {
 												Parallelism: nil,
 												PullPolicy:  nil,
 												CompletionPolicy: appsv1beta1.CompletionPolicy{
-													Type:                    appsv1beta1.Always,
-													ActiveDeadlineSeconds:   int64Ptr(100),
-													TTLSecondsAfterFinished: int32Ptr(100),
+													Type:                  appsv1beta1.Always,
+													ActiveDeadlineSeconds: int64Ptr(100),
 												},
 												SandboxConfig:   nil,
 												ImagePullPolicy: "",
@@ -462,6 +461,54 @@ func TestAdvancedCronJobCreateUpdateHandler_Handle(t *testing.T) {
 			},
 			expectedResult: true,
 			expectedError:  false,
+		},
+		{
+			name: "create v1beta1 AdvancedCronJob ImageListPullJobTemplate forbidden field",
+			request: admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource: metav1.GroupVersionResource{
+						Group:    appsv1beta1.GroupVersion.Group,
+						Version:  appsv1beta1.GroupVersion.Version,
+						Resource: "advancedcronjobs",
+					},
+					Object: runtime.RawExtension{
+						Raw: createAdvancedCronJobV1Beta1JSON(t, &appsv1beta1.AdvancedCronJob{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "test-acj-v1beta1",
+								Namespace: "default",
+							},
+							Spec: appsv1beta1.AdvancedCronJobSpec{
+								Schedule:          "0 0 * * *",
+								ConcurrencyPolicy: appsv1beta1.AllowConcurrent,
+								Template: appsv1beta1.CronJobTemplate{
+									ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+										Spec: appsv1beta1.ImageListPullJobSpec{
+											Images: []string{
+												"busybox:latest",
+												"alpine:latest",
+											},
+											ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+												Selector: &appsv1beta1.ImagePullJobNodeSelector{
+													Names: []string{
+														"node1",
+													},
+												},
+												CompletionPolicy: appsv1beta1.CompletionPolicy{
+													Type:                    appsv1beta1.Always,
+													TTLSecondsAfterFinished: int32Ptr(100),
+												},
+											},
+										},
+									},
+								},
+							},
+						}),
+					},
+				},
+			},
+			expectedResult: true,
+			expectedError:  true,
 		},
 		{
 			name: "update v1beta1 AdvancedCronJob ImageListPullJobTemplate",
@@ -514,9 +561,8 @@ func TestAdvancedCronJobCreateUpdateHandler_Handle(t *testing.T) {
 													BackoffLimit:   int32Ptr(1),
 												},
 												CompletionPolicy: appsv1beta1.CompletionPolicy{
-													Type:                    appsv1beta1.Always,
-													ActiveDeadlineSeconds:   int64Ptr(200),
-													TTLSecondsAfterFinished: int32Ptr(200),
+													Type:                  appsv1beta1.Always,
+													ActiveDeadlineSeconds: int64Ptr(200),
 												},
 												SandboxConfig:   nil,
 												ImagePullPolicy: appsv1beta1.PullAlways,
@@ -558,9 +604,8 @@ func TestAdvancedCronJobCreateUpdateHandler_Handle(t *testing.T) {
 												},
 												PullPolicy: nil,
 												CompletionPolicy: appsv1beta1.CompletionPolicy{
-													Type:                    appsv1beta1.Always,
-													ActiveDeadlineSeconds:   int64Ptr(100),
-													TTLSecondsAfterFinished: int32Ptr(100),
+													Type:                  appsv1beta1.Always,
+													ActiveDeadlineSeconds: int64Ptr(100),
 												},
 												SandboxConfig:   nil,
 												ImagePullPolicy: appsv1beta1.PullIfNotPresent,
@@ -633,7 +678,8 @@ func TestAdvancedCronJobCreateUpdateHandler_Handle(t *testing.T) {
 											},
 											ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
 												CompletionPolicy: appsv1beta1.CompletionPolicy{
-													Type: appsv1beta1.Always,
+													Type:                    appsv1beta1.Always,
+													TTLSecondsAfterFinished: int32Ptr(100),
 												},
 											},
 										},
@@ -689,9 +735,8 @@ func TestAdvancedCronJobCreateUpdateHandler_Handle(t *testing.T) {
 												Parallelism: nil,
 												PullPolicy:  nil,
 												CompletionPolicy: appsv1beta1.CompletionPolicy{
-													Type:                    appsv1beta1.Always,
-													ActiveDeadlineSeconds:   int64Ptr(100),
-													TTLSecondsAfterFinished: int32Ptr(100),
+													Type:                  appsv1beta1.Always,
+													ActiveDeadlineSeconds: int64Ptr(100),
 												},
 												SandboxConfig:   nil,
 												ImagePullPolicy: "",
@@ -749,9 +794,8 @@ func TestAdvancedCronJobCreateUpdateHandler_Handle(t *testing.T) {
 												Parallelism: nil,
 												PullPolicy:  nil,
 												CompletionPolicy: appsv1beta1.CompletionPolicy{
-													Type:                    appsv1beta1.Always,
-													ActiveDeadlineSeconds:   int64Ptr(100),
-													TTLSecondsAfterFinished: int32Ptr(100),
+													Type:                  appsv1beta1.Always,
+													ActiveDeadlineSeconds: int64Ptr(100),
 												},
 												SandboxConfig:   nil,
 												ImagePullPolicy: "",
@@ -810,9 +854,8 @@ func TestAdvancedCronJobCreateUpdateHandler_Handle(t *testing.T) {
 												Parallelism: nil,
 												PullPolicy:  nil,
 												CompletionPolicy: appsv1beta1.CompletionPolicy{
-													Type:                    appsv1beta1.Always,
-													ActiveDeadlineSeconds:   int64Ptr(100),
-													TTLSecondsAfterFinished: int32Ptr(100),
+													Type:                  appsv1beta1.Always,
+													ActiveDeadlineSeconds: int64Ptr(100),
 												},
 												SandboxConfig:   nil,
 												ImagePullPolicy: "",
@@ -869,9 +912,8 @@ func TestAdvancedCronJobCreateUpdateHandler_Handle(t *testing.T) {
 												Parallelism: nil,
 												PullPolicy:  nil,
 												CompletionPolicy: appsv1beta1.CompletionPolicy{
-													Type:                    appsv1beta1.Always,
-													ActiveDeadlineSeconds:   int64Ptr(100),
-													TTLSecondsAfterFinished: int32Ptr(100),
+													Type:                  appsv1beta1.Always,
+													ActiveDeadlineSeconds: int64Ptr(100),
 												},
 												SandboxConfig:   nil,
 												ImagePullPolicy: "",
@@ -925,7 +967,7 @@ func TestAdvancedCronJobCreateUpdateHandler_Handle(t *testing.T) {
 												CompletionPolicy: appsv1beta1.CompletionPolicy{
 													Type:                    appsv1beta1.Always,
 													ActiveDeadlineSeconds:   int64Ptr(MaxActiveDeadLineSeconds + 1),
-													TTLSecondsAfterFinished: int32Ptr(MaxTTLSecondsAfterFinished + 1),
+													TTLSecondsAfterFinished: int32Ptr(100),
 												},
 												SandboxConfig:   nil,
 												ImagePullPolicy: "",
