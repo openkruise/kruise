@@ -30,8 +30,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
@@ -40,7 +42,16 @@ import (
 func watchImageListPullJob(mgr manager.Manager, c controller.Controller) error {
 	if err := c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.ImageListPullJob{},
 		handler.TypedEnqueueRequestForOwner[*appsv1beta1.ImageListPullJob](
-			mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1beta1.AdvancedCronJob{}, handler.OnlyControllerOwner()))); err != nil {
+			mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1beta1.AdvancedCronJob{}, handler.OnlyControllerOwner()),
+		predicate.TypedFuncs[*appsv1beta1.ImageListPullJob]{
+			// only watch create / update event
+			DeleteFunc: func(e event.TypedDeleteEvent[*appsv1beta1.ImageListPullJob]) bool {
+				return false
+			},
+			GenericFunc: func(e event.TypedGenericEvent[*appsv1beta1.ImageListPullJob]) bool {
+				return false
+			},
+		})); err != nil {
 		return err
 	}
 

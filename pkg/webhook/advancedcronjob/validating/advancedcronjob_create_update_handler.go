@@ -51,7 +51,6 @@ const (
 	validateAdvancedCronJobNameMsg = "AdvancedCronJob name must consist of alphanumeric characters or '-'"
 	validAdvancedCronJobNameFmt    = `^[a-zA-Z0-9\-]+$`
 	MaxActiveDeadLineSeconds       = 3600 * 24
-	MaxTTLSecondsAfterFinished     = 3600 * 24 * 3
 )
 
 var (
@@ -259,8 +258,8 @@ func validateImageListPullJobTemplateSpec(ilpJobSpec *appsv1beta1.ImageListPullJ
 		if ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds != nil && ilpJobSpec.Spec.PullPolicy != nil && ilpJobSpec.Spec.PullPolicy.TimeoutSeconds != nil && int64(*ilpJobSpec.Spec.PullPolicy.TimeoutSeconds) > *ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds {
 			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("activeDeadlineSeconds"), ilpJobSpec.Spec.CompletionPolicy.ActiveDeadlineSeconds, fmt.Sprintf("completionPolicy.activeDeadlineSeconds must be greater than pullPolicy.timeoutSeconds(%d)", *ilpJobSpec.Spec.PullPolicy.TimeoutSeconds)))
 		}
-		if ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished != nil && *ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished > MaxTTLSecondsAfterFinished {
-			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("ttlSecondsAfterFinished"), ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished, fmt.Sprintf("ttlSecondsAfterFinished must be less than %d, current value is: %d", MaxTTLSecondsAfterFinished, *ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished)))
+		if ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished != nil {
+			return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("ttlSecondsAfterFinished"), ilpJobSpec.Spec.CompletionPolicy.TTLSecondsAfterFinished, fmt.Sprintf("ttlSecondsAfterFinished is not supported in advancedCronJob")))
 		}
 	default:
 		return append(allErrs, field.Invalid(fldPath.Child("spec").Child("completionPolicy").Child("type"), ilpJobSpec.Spec.CompletionPolicy.Type, fmt.Sprintf("completionPolicy should be Always, but current value is: %s", ilpJobSpec.Spec.CompletionPolicy.Type)))
