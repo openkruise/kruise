@@ -63,10 +63,11 @@ import (
 )
 
 const (
-	defaultLeaseDuration              = 15 * time.Second
-	defaultRenewDeadline              = 10 * time.Second
-	defaultRetryPeriod                = 2 * time.Second
-	defaultControllerCacheSyncTimeout = 2 * time.Minute
+	defaultLeaseDuration                     = 15 * time.Second
+	defaultRenewDeadline                     = 10 * time.Second
+	defaultRetryPeriod                       = 2 * time.Second
+	defaultControllerCacheSyncTimeout        = 2 * time.Minute
+	defaultTtlsecondsForAlwaysNodeimageConst = 300
 )
 
 var (
@@ -102,6 +103,7 @@ func main() {
 	var leaderElectionId string
 	var retryPeriod time.Duration
 	var controllerCacheSyncTimeout time.Duration
+	var defaultTtlsecondsForAlwaysNodeimage int
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&healthProbeAddr, "health-probe-addr", ":8000", "The address the healthz/readyz endpoint binds to.")
@@ -126,6 +128,7 @@ func main() {
 	flag.DurationVar(&retryPeriod, "leader-election-retry-period", defaultRetryPeriod,
 		"leader-election-retry-period is the duration the LeaderElector clients should wait between tries of actions. Default is 2 seconds.")
 	flag.DurationVar(&controllerCacheSyncTimeout, "controller-cache-sync-timeout", defaultControllerCacheSyncTimeout, "CacheSyncTimeout refers to the time limit set to wait for syncing caches. Defaults to 2 minutes if not set.")
+	flag.IntVar(&defaultTtlsecondsForAlwaysNodeimage, "default-ttlseconds-for-always-nodeimage", defaultTtlsecondsForAlwaysNodeimageConst, "DefaultTtlsecondsForAlwaysNodeimage refers to the calculation of the time limit the lifetime of a pulling task that has finished execution. Defaults to 300 seconds if not set.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
 	logOptions := logs.NewOptions()
@@ -141,6 +144,10 @@ func main() {
 	}
 	features.SetDefaultFeatureGates()
 	util.SetControllerCacheSyncTimeout(controllerCacheSyncTimeout)
+	if err := util.SetDefaultTtlForAlwaysNodeimage(defaultTtlsecondsForAlwaysNodeimage); err != nil {
+		setupLog.Error(err, "default-ttlseconds-for-always-nodeimage validate failed")
+		os.Exit(1)
+	}
 
 	if enablePprof {
 		go func() {
