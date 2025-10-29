@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	fuzzutils "github.com/openkruise/kruise/test/fuzz"
 )
@@ -56,15 +56,15 @@ var (
 
 func init() {
 	_ = clientgoscheme.AddToScheme(fakeScheme)
-	_ = appsv1alpha1.AddToScheme(fakeScheme)
-	_ = appsv1alpha1.AddToScheme(clientgoscheme.Scheme)
+	_ = appsv1beta1.AddToScheme(fakeScheme)
+	_ = appsv1beta1.AddToScheme(clientgoscheme.Scheme)
 }
 
 func FuzzSidecarSetMutatingPod(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cf := fuzz.NewConsumer(data)
 
-		sidecarSet := &appsv1alpha1.SidecarSet{}
+		sidecarSet := &appsv1beta1.SidecarSet{}
 		if err := cf.GenerateStruct(sidecarSet); err != nil {
 			return
 		}
@@ -85,7 +85,7 @@ func FuzzSidecarSetMutatingPod(f *testing.F) {
 			// Make sure can select to defaultPod
 			sidecarSet.Spec.Selector.MatchLabels = defaultPod.GetLabels()
 			sidecarSet.Spec.Selector.MatchExpressions = nil
-			sidecarSet.Spec.Namespace = defaultPod.GetNamespace()
+			// Set NamespaceSelector to nil to match all namespaces
 			sidecarSet.Spec.NamespaceSelector = nil
 			sidecarSet.Spec.InjectionStrategy.Revision = nil
 		}
@@ -95,7 +95,7 @@ func FuzzSidecarSetMutatingPod(f *testing.F) {
 		}
 
 		c := fake.NewClientBuilder().WithObjects(sidecarSet).WithIndex(
-			&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+			&appsv1beta1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSetV1Beta1,
 		).WithScheme(fakeScheme).Build()
 
 		handler := &PodCreateHandler{

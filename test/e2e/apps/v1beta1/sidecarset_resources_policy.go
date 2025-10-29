@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	"fmt"
@@ -30,24 +30,24 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	apps2 "github.com/openkruise/kruise/test/e2e/framework/common"
-	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
+	"github.com/openkruise/kruise/test/e2e/framework/v1beta1"
 )
 
 var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResourcesPolicy", "workload"), func() {
-	f := v1alpha1.NewDefaultFramework("sidecarresourcespolicy")
+	f := v1beta1.NewDefaultFramework("sidecarresourcespolicy")
 	var ns string
 	var c clientset.Interface
 	var kc kruiseclientset.Interface
-	var tester *v1alpha1.SidecarSetTester
+	var tester *v1beta1.SidecarSetTester
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		kc = f.KruiseClientSet
 		ns = f.Namespace.Name
-		tester = v1alpha1.NewSidecarSetTester(c, kc)
+		tester = v1beta1.NewSidecarSetTester(c, kc)
 	})
 
 	ginkgo.Context("Sidecar ResourcesPolicy functionality [SidecarResourcesPolicy]", func() {
@@ -66,31 +66,35 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 
 			// Create SidecarSet with ResourcesPolicy targeting specific container
 			randStr := rand.String(5)
-			sidecarSet := &appsv1alpha1.SidecarSet{
+			sidecarSet := &appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("test-sidecarset-story1-%s", randStr),
 				},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"app": "story1"},
 					},
-					Namespace: ns,
-					Containers: []appsv1alpha1.SidecarContainer{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"kubernetes.io/metadata.name": ns,
+						},
+					},
+					Containers: []appsv1beta1.SidecarContainer{
 						{
 							Container: corev1.Container{
 								Name:    "sidecar1",
 								Image:   "busybox:latest",
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
-							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+								TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 								TargetContainersNameRegex: "^large-engine-v4$", // Only match large-engine-v4
-								ResourceExpr: appsv1alpha1.ResourceExpr{
-									Limits: &appsv1alpha1.ResourceExprLimits{
+								ResourceExpr: appsv1beta1.ResourceExpr{
+									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
 									},
-									Requests: &appsv1alpha1.ResourceExprRequests{
+									Requests: &appsv1beta1.ResourceExprRequests{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "100Mi",
 									},
@@ -218,31 +222,35 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 
 			// Create SidecarSet with sum mode
 			randStr := rand.String(5)
-			sidecarSet := &appsv1alpha1.SidecarSet{
+			sidecarSet := &appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("test-sidecarset-story2-%s", randStr),
 				},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"app": "story2"},
 					},
-					Namespace: ns,
-					Containers: []appsv1alpha1.SidecarContainer{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"kubernetes.io/metadata.name": ns,
+						},
+					},
+					Containers: []appsv1beta1.SidecarContainer{
 						{
 							Container: corev1.Container{
 								Name:    "sidecar1",
 								Image:   "busybox:latest",
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
-							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+								TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 								TargetContainersNameRegex: "^large-engine-v.*$",
-								ResourceExpr: appsv1alpha1.ResourceExpr{
-									Limits: &appsv1alpha1.ResourceExprLimits{
+								ResourceExpr: appsv1beta1.ResourceExpr{
+									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
 									},
-									Requests: &appsv1alpha1.ResourceExprRequests{
+									Requests: &appsv1beta1.ResourceExprRequests{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "100Mi",
 									},
@@ -365,31 +373,35 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 
 			// Create SidecarSet with max mode
 			randStr := rand.String(5)
-			sidecarSet := &appsv1alpha1.SidecarSet{
+			sidecarSet := &appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("test-sidecarset-story3-%s", randStr),
 				},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"app": "story3"},
 					},
-					Namespace: ns,
-					Containers: []appsv1alpha1.SidecarContainer{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"kubernetes.io/metadata.name": ns,
+						},
+					},
+					Containers: []appsv1beta1.SidecarContainer{
 						{
 							Container: corev1.Container{
 								Name:    "sidecar1",
 								Image:   "busybox:latest",
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
-							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeMax,
+							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+								TargetContainerMode:       appsv1beta1.TargetContainerModeMax,
 								TargetContainersNameRegex: "^large-engine-v.*$",
-								ResourceExpr: appsv1alpha1.ResourceExpr{
-									Limits: &appsv1alpha1.ResourceExprLimits{
+								ResourceExpr: appsv1beta1.ResourceExpr{
+									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
 									},
-									Requests: &appsv1alpha1.ResourceExprRequests{
+									Requests: &appsv1beta1.ResourceExprRequests{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "100Mi",
 									},
@@ -512,31 +524,35 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 
 			// Create SidecarSet
 			randStr := rand.String(5)
-			sidecarSet := &appsv1alpha1.SidecarSet{
+			sidecarSet := &appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("test-sidecarset-story4-%s", randStr),
 				},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"app": "story4"},
 					},
-					Namespace: ns,
-					Containers: []appsv1alpha1.SidecarContainer{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"kubernetes.io/metadata.name": ns,
+						},
+					},
+					Containers: []appsv1beta1.SidecarContainer{
 						{
 							Container: corev1.Container{
 								Name:    "sidecar1",
 								Image:   "busybox:latest",
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
-							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeMax,
+							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+								TargetContainerMode:       appsv1beta1.TargetContainerModeMax,
 								TargetContainersNameRegex: "^large-engine-v.*$",
-								ResourceExpr: appsv1alpha1.ResourceExpr{
-									Limits: &appsv1alpha1.ResourceExprLimits{
+								ResourceExpr: appsv1beta1.ResourceExpr{
+									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
 									},
-									Requests: &appsv1alpha1.ResourceExprRequests{
+									Requests: &appsv1beta1.ResourceExprRequests{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "100Mi",
 									},
@@ -663,32 +679,36 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 			// Expression: 0.5*cpu - 0.3*max(0, cpu-4) + 0.3*max(0, cpu-8)
 			// Simplified for testing: Use cpu*40% for simplicity
 			randStr := rand.String(5)
-			sidecarSet := &appsv1alpha1.SidecarSet{
+			sidecarSet := &appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("test-sidecarset-story5-%s", randStr),
 				},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"app": "story5"},
 					},
-					Namespace: ns,
-					Containers: []appsv1alpha1.SidecarContainer{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"kubernetes.io/metadata.name": ns,
+						},
+					},
+					Containers: []appsv1beta1.SidecarContainer{
 						{
 							Container: corev1.Container{
 								Name:    "sidecar1",
 								Image:   "busybox:latest",
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
-							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+								TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: appsv1alpha1.ResourceExpr{
-									Limits: &appsv1alpha1.ResourceExprLimits{
+								ResourceExpr: appsv1beta1.ResourceExpr{
+									Limits: &appsv1beta1.ResourceExprLimits{
 										// Complex expression with arithmetic operations
 										CPU:    "cpu*50% + 100m",
 										Memory: "max(memory*20% + 100Mi, 200Mi)",
 									},
-									Requests: &appsv1alpha1.ResourceExprRequests{
+									Requests: &appsv1beta1.ResourceExprRequests{
 										CPU:    "cpu*30% + 50m",
 										Memory: "memory*15% + 50Mi",
 									},
@@ -819,19 +839,23 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 
 			// Create SidecarSet with init-container resource policy
 			randStr := rand.String(5)
-			sidecarSet := &appsv1alpha1.SidecarSet{
+			sidecarSet := &appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("test-sidecarset-story6-%s", randStr),
 				},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"app": "story6"},
 					},
-					Namespace: ns,
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"kubernetes.io/metadata.name": ns,
+						},
 					},
-					InitContainers: []appsv1alpha1.SidecarContainer{
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
+					},
+					InitContainers: []appsv1beta1.SidecarContainer{
 						{
 							Container: corev1.Container{
 								Name:          "init-sidecar",
@@ -839,15 +863,15 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								Command:       []string{"/bin/sh", "-c", "sleep 10000000"},
 								RestartPolicy: &restartAlways, // Native sidecar container
 							},
-							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+								TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 								TargetContainersNameRegex: "^app.*$",
-								ResourceExpr: appsv1alpha1.ResourceExpr{
-									Limits: &appsv1alpha1.ResourceExprLimits{
+								ResourceExpr: appsv1beta1.ResourceExpr{
+									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU:    "max(cpu*30%, 50m)",
 										Memory: "max(memory*25%, 100Mi)",
 									},
-									Requests: &appsv1alpha1.ResourceExprRequests{
+									Requests: &appsv1beta1.ResourceExprRequests{
 										CPU:    "cpu*20%",
 										Memory: "memory*15%",
 									},
@@ -980,31 +1004,35 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 
 			// Create SidecarSet
 			randStr := rand.String(5)
-			sidecarSet := &appsv1alpha1.SidecarSet{
+			sidecarSet := &appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("test-sidecarset-filter-plain-init-%s", randStr),
 				},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"app": "filter-plain-init"},
 					},
-					Namespace: ns,
-					Containers: []appsv1alpha1.SidecarContainer{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"kubernetes.io/metadata.name": ns,
+						},
+					},
+					Containers: []appsv1beta1.SidecarContainer{
 						{
 							Container: corev1.Container{
 								Name:    "sidecar1",
 								Image:   "busybox:latest",
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
-							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+								TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 								TargetContainersNameRegex: ".*", // Match all containers
-								ResourceExpr: appsv1alpha1.ResourceExpr{
-									Limits: &appsv1alpha1.ResourceExprLimits{
+								ResourceExpr: appsv1beta1.ResourceExpr{
+									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU:    "cpu*50%",
 										Memory: "memory*50%",
 									},
-									Requests: &appsv1alpha1.ResourceExprRequests{
+									Requests: &appsv1beta1.ResourceExprRequests{
 										CPU:    "cpu*40%",
 										Memory: "memory*40%",
 									},
@@ -1138,19 +1166,23 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 
 			// Create first SidecarSet that will inject containers to be filtered
 			randStr := rand.String(5)
-			sidecarSet1 := &appsv1alpha1.SidecarSet{
+			sidecarSet1 := &appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("test-sidecarset-filter-kruise-1-%s", randStr),
 				},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"app": "filter-kruise"},
 					},
-					Namespace: ns,
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"kubernetes.io/metadata.name": ns,
+						},
 					},
-					InitContainers: []appsv1alpha1.SidecarContainer{
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
+					},
+					InitContainers: []appsv1beta1.SidecarContainer{
 						{
 							Container: corev1.Container{
 								Name:          "kruise-init-sidecar",
@@ -1170,7 +1202,7 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 							},
 						},
 					},
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
 							Container: corev1.Container{
 								Name:    "kruise-sidecar",
@@ -1193,31 +1225,35 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 			}
 
 			// Create second SidecarSet with ResourcesPolicy that should exclude kruise sidecars
-			sidecarSet2 := &appsv1alpha1.SidecarSet{
+			sidecarSet2 := &appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("test-sidecarset-filter-kruise-2-%s", randStr),
 				},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"app": "filter-kruise"},
 					},
-					Namespace: ns,
-					Containers: []appsv1alpha1.SidecarContainer{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"kubernetes.io/metadata.name": ns,
+						},
+					},
+					Containers: []appsv1beta1.SidecarContainer{
 						{
 							Container: corev1.Container{
 								Name:    "policy-sidecar",
 								Image:   "busybox:latest",
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
-							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+								TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: appsv1alpha1.ResourceExpr{
-									Limits: &appsv1alpha1.ResourceExprLimits{
+								ResourceExpr: appsv1beta1.ResourceExpr{
+									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU:    "cpu*50%",
 										Memory: "memory*50%",
 									},
-									Requests: &appsv1alpha1.ResourceExprRequests{
+									Requests: &appsv1beta1.ResourceExprRequests{
 										CPU:    "cpu*40%",
 										Memory: "memory*40%",
 									},
