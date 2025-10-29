@@ -62,7 +62,7 @@ func getTTLSecondsForAlways(job *appsv1beta1.ImagePullJob) *int32 {
 		}
 		ret = timeoutSeconds * backoffLimit
 	}
-	ret += 300 + rand.Int31n(300)
+	ret += util.GetDefaultTtlsecondsForAlwaysNodeimage() + rand.Int31n(300)
 	return &ret
 }
 

@@ -62,11 +62,12 @@ import (
 )
 
 const (
-	defaultLeaseDuration              = 15 * time.Second
-	defaultRenewDeadline              = 10 * time.Second
-	defaultRetryPeriod                = 2 * time.Second
-	defaultControllerCacheSyncTimeout = 2 * time.Minute
-	defaultWebhookInitializeTimeout   = 60 * time.Second
+	defaultLeaseDuration                     = 15 * time.Second
+	defaultRenewDeadline                     = 10 * time.Second
+	defaultRetryPeriod                       = 2 * time.Second
+	defaultControllerCacheSyncTimeout        = 2 * time.Minute
+	defaultWebhookInitializeTimeout          = 60 * time.Second
+	defaultTtlsecondsForAlwaysNodeimageConst = 300
 )
 
 var (
@@ -103,6 +104,7 @@ func main() {
 	var retryPeriod time.Duration
 	var controllerCacheSyncTimeout time.Duration
 	var webhookInitializeTimeout time.Duration
+	var defaultTtlsecondsForAlwaysNodeimage int
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&healthProbeAddr, "health-probe-addr", ":8000", "The address the healthz/readyz endpoint binds to.")
@@ -128,6 +130,7 @@ func main() {
 		"leader-election-retry-period is the duration the LeaderElector clients should wait between tries of actions. Default is 2 seconds.")
 	flag.DurationVar(&controllerCacheSyncTimeout, "controller-cache-sync-timeout", defaultControllerCacheSyncTimeout, "CacheSyncTimeout refers to the time limit set to wait for syncing caches. Defaults to 2 minutes if not set.")
 	flag.DurationVar(&webhookInitializeTimeout, "webhook-initialize-timeout", defaultWebhookInitializeTimeout, "WebhookInitializeTimeout refers to the time limit set to wait for webhook initialization. Defaults to 60 seconds if not set.")
+	flag.IntVar(&defaultTtlsecondsForAlwaysNodeimage, "default-ttlseconds-for-always-nodeimage", defaultTtlsecondsForAlwaysNodeimageConst, "DefaultTtlsecondsForAlwaysNodeimage refers to the calculation of the time limit the lifetime of a pulling task that has finished execution. Defaults to 300 seconds if not set.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(pflag.CommandLine)
 	logOptions := logs.NewOptions()
@@ -143,6 +146,10 @@ func main() {
 	}
 	features.SetDefaultFeatureGates()
 	util.SetControllerCacheSyncTimeout(controllerCacheSyncTimeout)
+	if err := util.SetDefaultTtlForAlwaysNodeimage(defaultTtlsecondsForAlwaysNodeimage); err != nil {
+		setupLog.Error(err, "default-ttlseconds-for-always-nodeimage validate failed")
+		os.Exit(1)
+	}
 
 	if enablePprof {
 		go func() {
