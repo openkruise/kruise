@@ -365,28 +365,28 @@ func TestCreatePodProgressively(t *testing.T) {
 			expect: false,
 		},
 		{
-			name: "ds with ScaleStrategy, Progressive is false",
+			name: "ds with ScaleStrategy, PartitionedScaling is false",
 			ds: &appsv1beta1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "ds-with-scale-strategy-false",
 				},
 				Spec: appsv1beta1.DaemonSetSpec{
 					ScaleStrategy: &appsv1beta1.DaemonSetScaleStrategy{
-						Progressive: false,
+						PartitionedScaling: false,
 					},
 				},
 			},
 			expect: false,
 		},
 		{
-			name: "ds with ScaleStrategy, Progressive is true",
+			name: "ds with ScaleStrategy, PartitionedScaling is true",
 			ds: &appsv1beta1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "ds-with-scale-strategy-true",
 				},
 				Spec: appsv1beta1.DaemonSetSpec{
 					ScaleStrategy: &appsv1beta1.DaemonSetScaleStrategy{
-						Progressive: true,
+						PartitionedScaling: true,
 					},
 				},
 			},

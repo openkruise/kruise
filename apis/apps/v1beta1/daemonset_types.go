@@ -168,12 +168,12 @@ type DaemonSetSpec struct {
 
 // DaemonSetScaleStrategy defines strategies for DaemonSet scaling.
 type DaemonSetScaleStrategy struct {
-	// Progressive indicates daemon pods created in manage phase will be controlled by partition.
+	// PartitionedScaling indicates daemon pods created in manage phase will be controlled by partition.
 	// If set to true, the creation will be controlled by partition and only some of daemon pods
 	// will be created. Otherwise daemon pods will be created on every node that need to start a daemon pod.
 	// Default is false.
 	// +optional
-	Progressive bool `json:"progressive,omitempty"`
+	PartitionedScaling bool `json:"partitionedScaling,omitempty"`
 }
 
 // DaemonSetStatus defines the observed state of DaemonSet

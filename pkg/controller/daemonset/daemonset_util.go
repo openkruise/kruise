@@ -208,12 +208,12 @@ func ContainsReadinessGate(pod *corev1.Pod) bool {
 	return false
 }
 
-// isDaemonSetCreationProgressively returns true if and only if the progressive field is set to true.
+// isDaemonSetCreationProgressively returns true if and only if the partitionedScaling field is set to true.
 func isDaemonSetCreationProgressively(ds *appsv1beta1.DaemonSet) bool {
-	return ds.Spec.ScaleStrategy != nil && ds.Spec.ScaleStrategy.Progressive
+	return ds.Spec.ScaleStrategy != nil && ds.Spec.ScaleStrategy.PartitionedScaling
 }
 
-// GetNodesNeedingPods finds which nodes should run daemon pod according to progressive flag and parititon.
+// GetNodesNeedingPods finds which nodes should run daemon pod according to partitionedScaling flag and partition.
 func GetNodesNeedingPods(newPodsNum, desire, partition int, progressive bool, nodesNeedingPods []string) []string {
 	if !progressive {
 		sort.Strings(nodesNeedingPods)

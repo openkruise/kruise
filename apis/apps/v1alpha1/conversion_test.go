@@ -1075,7 +1075,7 @@ func TestDaemonSet_ConvertTo(t *testing.T) {
 						},
 					},
 					ScaleStrategy: &v1beta1.DaemonSetScaleStrategy{
-						Progressive: true,
+						PartitionedScaling: true,
 					},
 				},
 				Status: v1beta1.DaemonSetStatus{},
@@ -1284,7 +1284,7 @@ func TestDaemonSet_ConvertTo(t *testing.T) {
 						},
 					},
 					ScaleStrategy: &v1beta1.DaemonSetScaleStrategy{
-						Progressive: true,
+						PartitionedScaling: true,
 					},
 				},
 				Status: v1beta1.DaemonSetStatus{},
@@ -1442,7 +1442,7 @@ func TestDaemonSet_ConvertFrom(t *testing.T) {
 						},
 					},
 					ScaleStrategy: &v1beta1.DaemonSetScaleStrategy{
-						Progressive: true,
+						PartitionedScaling: true,
 					},
 				},
 				Status: v1beta1.DaemonSetStatus{},
@@ -1496,7 +1496,7 @@ func TestDaemonSet_ConvertFrom(t *testing.T) {
 						},
 					},
 					ScaleStrategy: &v1beta1.DaemonSetScaleStrategy{
-						Progressive: false,
+						PartitionedScaling: false,
 					},
 				},
 				Status: v1beta1.DaemonSetStatus{},
@@ -1754,7 +1754,7 @@ func TestDaemonSet_ConvertFrom(t *testing.T) {
 						},
 					},
 					ScaleStrategy: &v1beta1.DaemonSetScaleStrategy{
-						Progressive: true,
+						PartitionedScaling: true,
 					},
 				},
 				Status: v1beta1.DaemonSetStatus{},

@@ -106,6 +106,7 @@ const (
 	BurstReplicas = 250
 
 	// ProgressiveCreatePod indicates daemon pods created in manage phase will be controlled by partition.
+	// This annotation is for v1alpha1 backward compatibility. For v1beta1+, use ScaleStrategy.PartitionedScaling field.
 	// This annotation will be added to DaemonSet when it is created, and removed if partition is set to 0.
 	ProgressiveCreatePod = "daemonset.kruise.io/progressive-create-pod"
 
@@ -669,7 +670,7 @@ func (dsc *ReconcileDaemonSet) manage(ctx context.Context, ds *appsv1beta1.Daemo
 			if err != nil {
 				klog.ErrorS(err, "Failed to get partition value for DaemonSet", "daemonSet", klog.KObj(ds))
 			} else if partition != 0 {
-				// Creates pods on nodes that needing daemon pod. If progressive annotation is true, the creation will controlled
+				// Creates pods on nodes that needing daemon pod. If partitionedScaling is enabled, the creation will be controlled
 				// by partition and only some of daemon pods will be created. Otherwise daemon pods will be created on every
 				// node that need to start a daemon pod.
 				nodesNeedingDaemonPods = GetNodesNeedingPods(newPodCount, nodesDesireScheduled, partition, isDaemonSetCreationProgressively(ds), nodesNeedingDaemonPods)
