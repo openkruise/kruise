@@ -73,7 +73,7 @@ func SortPods(reader client.Reader, ns string, owner metav1.OwnerReference, pods
 		indexes = sortPodsForStatefulSet(set, pods)
 
 	case "SidecarSet":
-		set := &appsv1alpha1.SidecarSet{}
+		set := &appsv1beta1.SidecarSet{}
 		if err := reader.Get(context.TODO(), namespacedName, set); err != nil {
 			if errors.IsNotFound(err) {
 				return pods, nil
@@ -119,7 +119,7 @@ func sortPodsForStatefulSet(set *appsv1beta1.StatefulSet, pods []*v1.Pod) []int 
 	return indexes
 }
 
-func sortPodsForSidecarSet(set *appsv1alpha1.SidecarSet, pods []*v1.Pod) []int {
+func sortPodsForSidecarSet(set *appsv1beta1.SidecarSet, pods []*v1.Pod) []int {
 	indexes := make([]int, 0, len(pods))
 	for i := 0; i < len(pods); i++ {
 		indexes = append(indexes, i)

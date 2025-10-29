@@ -1796,3 +1796,742 @@ func TestDaemonSet_ConvertFrom(t *testing.T) {
 		})
 	}
 }
+
+func TestSidecarSet_ConvertTo(t *testing.T) {
+	tests := []struct {
+		name     string
+		scs      *SidecarSet
+		expected *v1beta1.SidecarSet
+	}{
+		{
+			name: "convert with all fields populated",
+			scs: &SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-sidecarset",
+					Labels: map[string]string{
+						"app":                        "test",
+						SidecarSetCustomVersionLabel: "v1.0",
+					},
+				},
+				Spec: SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "nginx"},
+					},
+					Namespace: "test-namespace",
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"env": "prod"},
+					},
+					InitContainers: []SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "init-sidecar",
+								Image: "init:latest",
+							},
+							PodInjectPolicy: BeforeAppContainerType,
+							UpgradeStrategy: SidecarContainerUpgradeStrategy{
+								UpgradeType:          SidecarContainerColdUpgrade,
+								HotUpgradeEmptyImage: "",
+							},
+							ShareVolumePolicy: ShareVolumePolicy{
+								Type: ShareVolumePolicyEnabled,
+							},
+							TransferEnv: []TransferEnvVar{
+								{
+									SourceContainerName: "app",
+									EnvName:             "APP_ENV",
+								},
+							},
+						},
+					},
+					Containers: []SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+							PodInjectPolicy: AfterAppContainerType,
+							UpgradeStrategy: SidecarContainerUpgradeStrategy{
+								UpgradeType:          SidecarContainerHotUpgrade,
+								HotUpgradeEmptyImage: "empty:latest",
+							},
+							ShareVolumePolicy: ShareVolumePolicy{
+								Type: ShareVolumePolicyDisabled,
+							},
+							ShareVolumeDevicePolicy: &ShareVolumePolicy{
+								Type: ShareVolumePolicyEnabled,
+							},
+							TransferEnv: []TransferEnvVar{
+								{
+									SourceContainerName: "main",
+									EnvNames:            []string{"ENV1", "ENV2"},
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "config-volume",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+					UpdateStrategy: SidecarSetUpdateStrategy{
+						Type:   RollingUpdateSidecarSetStrategyType,
+						Paused: false,
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"update": "true"},
+						},
+						Partition:      intstrPtr("30%"),
+						MaxUnavailable: intstrPtr("20%"),
+						ScatterStrategy: UpdateScatterStrategy{
+							{Key: "zone", Value: "us-west"},
+						},
+					},
+					InjectionStrategy: SidecarSetInjectionStrategy{
+						Paused: false,
+						Revision: &SidecarSetInjectRevision{
+							CustomVersion: stringPtr("v1.0"),
+							RevisionName:  stringPtr("test-revision"),
+							Policy:        AlwaysSidecarSetInjectRevisionPolicy,
+						},
+					},
+					ImagePullSecrets: []corev1.LocalObjectReference{
+						{Name: "my-secret"},
+					},
+					RevisionHistoryLimit: int32Ptr(5),
+					PatchPodMetadata: []SidecarSetPatchPodMetadata{
+						{
+							Annotations: map[string]string{"key": "value"},
+							PatchPolicy: SidecarSetOverwritePatchPolicy,
+						},
+					},
+				},
+				Status: SidecarSetStatus{
+					ObservedGeneration: 1,
+					MatchedPods:        10,
+					UpdatedPods:        8,
+					ReadyPods:          9,
+					UpdatedReadyPods:   7,
+					LatestRevision:     "test-revision-1",
+					CollisionCount:     int32Ptr(0),
+				},
+			},
+			expected: &v1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-sidecarset",
+					Labels: map[string]string{
+						"app": "test",
+						// SidecarSetCustomVersionLabel should be removed
+					},
+				},
+				Spec: v1beta1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "nginx"},
+					},
+					SpecificNamespace: &v1beta1.SpecificNamespace{
+						Namespace: "test-namespace",
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"env": "prod"},
+						},
+					},
+					InitContainers: []v1beta1.SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "init-sidecar",
+								Image: "init:latest",
+							},
+							PodInjectPolicy: v1beta1.BeforeAppContainerType,
+							UpgradeStrategy: v1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType:          v1beta1.SidecarContainerColdUpgrade,
+								HotUpgradeEmptyImage: "",
+							},
+							ShareVolumePolicy: v1beta1.ShareVolumePolicy{
+								Type: v1beta1.ShareVolumePolicyEnabled,
+							},
+							TransferEnv: []v1beta1.TransferEnvVar{
+								{
+									SourceContainerName: "app",
+									EnvName:             "APP_ENV",
+								},
+							},
+						},
+					},
+					Containers: []v1beta1.SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+							PodInjectPolicy: v1beta1.AfterAppContainerType,
+							UpgradeStrategy: v1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType:          v1beta1.SidecarContainerHotUpgrade,
+								HotUpgradeEmptyImage: "empty:latest",
+							},
+							ShareVolumePolicy: v1beta1.ShareVolumePolicy{
+								Type: v1beta1.ShareVolumePolicyDisabled,
+							},
+							ShareVolumeDevicePolicy: &v1beta1.ShareVolumePolicy{
+								Type: v1beta1.ShareVolumePolicyEnabled,
+							},
+							TransferEnv: []v1beta1.TransferEnvVar{
+								{
+									SourceContainerName: "main",
+									EnvNames:            []string{"ENV1", "ENV2"},
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "config-volume",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+					UpdateStrategy: v1beta1.SidecarSetUpdateStrategy{
+						Type:   v1beta1.RollingUpdateSidecarSetStrategyType,
+						Paused: false,
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"update": "true"},
+						},
+						Partition:      intstrPtr("30%"),
+						MaxUnavailable: intstrPtr("20%"),
+						ScatterStrategy: v1beta1.UpdateScatterStrategy{
+							{Key: "zone", Value: "us-west"},
+						},
+					},
+					InjectionStrategy: v1beta1.SidecarSetInjectionStrategy{
+						Paused: false,
+						Revision: &v1beta1.SidecarSetInjectRevision{
+							CustomVersion: stringPtr("v1.0"),
+							RevisionName:  stringPtr("test-revision"),
+							Policy:        v1beta1.AlwaysSidecarSetInjectRevisionPolicy,
+						},
+					},
+					ImagePullSecrets: []corev1.LocalObjectReference{
+						{Name: "my-secret"},
+					},
+					RevisionHistoryLimit: int32Ptr(5),
+					PatchPodMetadata: []v1beta1.SidecarSetPatchPodMetadata{
+						{
+							Annotations: map[string]string{"key": "value"},
+							PatchPolicy: v1beta1.SidecarSetOverwritePatchPolicy,
+						},
+					},
+					CustomVersion: "v1.0",
+				},
+				Status: v1beta1.SidecarSetStatus{
+					ObservedGeneration: 1,
+					MatchedPods:        10,
+					UpdatedPods:        8,
+					ReadyPods:          9,
+					UpdatedReadyPods:   7,
+					LatestRevision:     "test-revision-1",
+					CollisionCount:     int32Ptr(0),
+				},
+			},
+		},
+		{
+			name: "convert with minimal fields",
+			scs: &SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "minimal-sidecarset",
+				},
+				Spec: SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Containers: []SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+						},
+					},
+				},
+				Status: SidecarSetStatus{
+					MatchedPods: 5,
+				},
+			},
+			expected: &v1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "minimal-sidecarset",
+				},
+				Spec: v1beta1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Containers: []v1beta1.SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+						},
+					},
+				},
+				Status: v1beta1.SidecarSetStatus{
+					MatchedPods: 5,
+				},
+			},
+		},
+		{
+			name: "convert with namespace only",
+			scs: &SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "namespace-only",
+				},
+				Spec: SidecarSetSpec{
+					Namespace: "test-ns",
+					Containers: []SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+						},
+					},
+				},
+			},
+			expected: &v1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "namespace-only",
+				},
+				Spec: v1beta1.SidecarSetSpec{
+					SpecificNamespace: &v1beta1.SpecificNamespace{
+						Namespace: "test-ns",
+					},
+					Containers: []v1beta1.SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "convert with namespaceSelector only",
+			scs: &SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "namespace-selector-only",
+				},
+				Spec: SidecarSetSpec{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"env": "dev"},
+					},
+					Containers: []SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+						},
+					},
+				},
+			},
+			expected: &v1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "namespace-selector-only",
+				},
+				Spec: v1beta1.SidecarSetSpec{
+					SpecificNamespace: &v1beta1.SpecificNamespace{
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"env": "dev"},
+						},
+					},
+					Containers: []v1beta1.SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dst := &v1beta1.SidecarSet{}
+			err := tt.scs.ConvertTo(dst)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, dst)
+		})
+	}
+}
+
+func TestSidecarSet_ConvertFrom(t *testing.T) {
+	tests := []struct {
+		name     string
+		src      *v1beta1.SidecarSet
+		expected *SidecarSet
+	}{
+		{
+			name: "convert from v1beta1 with all fields populated",
+			src: &v1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-sidecarset",
+					Labels: map[string]string{
+						"app": "test",
+					},
+				},
+				Spec: v1beta1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "nginx"},
+					},
+					SpecificNamespace: &v1beta1.SpecificNamespace{
+						Namespace: "test-namespace",
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"env": "prod"},
+						},
+					},
+					InitContainers: []v1beta1.SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "init-sidecar",
+								Image: "init:latest",
+							},
+							PodInjectPolicy: v1beta1.BeforeAppContainerType,
+							UpgradeStrategy: v1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType:          v1beta1.SidecarContainerColdUpgrade,
+								HotUpgradeEmptyImage: "",
+							},
+							ShareVolumePolicy: v1beta1.ShareVolumePolicy{
+								Type: v1beta1.ShareVolumePolicyEnabled,
+							},
+							TransferEnv: []v1beta1.TransferEnvVar{
+								{
+									SourceContainerName: "app",
+									EnvName:             "APP_ENV",
+								},
+							},
+						},
+					},
+					Containers: []v1beta1.SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+							PodInjectPolicy: v1beta1.AfterAppContainerType,
+							UpgradeStrategy: v1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType:          v1beta1.SidecarContainerHotUpgrade,
+								HotUpgradeEmptyImage: "empty:latest",
+							},
+							ShareVolumePolicy: v1beta1.ShareVolumePolicy{
+								Type: v1beta1.ShareVolumePolicyDisabled,
+							},
+							ShareVolumeDevicePolicy: &v1beta1.ShareVolumePolicy{
+								Type: v1beta1.ShareVolumePolicyEnabled,
+							},
+							TransferEnv: []v1beta1.TransferEnvVar{
+								{
+									SourceContainerName: "main",
+									EnvNames:            []string{"ENV1", "ENV2"},
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "config-volume",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+					UpdateStrategy: v1beta1.SidecarSetUpdateStrategy{
+						Type:   v1beta1.RollingUpdateSidecarSetStrategyType,
+						Paused: false,
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"update": "true"},
+						},
+						Partition:      intstrPtr("30%"),
+						MaxUnavailable: intstrPtr("20%"),
+						ScatterStrategy: v1beta1.UpdateScatterStrategy{
+							{Key: "zone", Value: "us-west"},
+						},
+					},
+					InjectionStrategy: v1beta1.SidecarSetInjectionStrategy{
+						Paused: false,
+						Revision: &v1beta1.SidecarSetInjectRevision{
+							CustomVersion: stringPtr("v1.0"),
+							RevisionName:  stringPtr("test-revision"),
+							Policy:        v1beta1.AlwaysSidecarSetInjectRevisionPolicy,
+						},
+					},
+					ImagePullSecrets: []corev1.LocalObjectReference{
+						{Name: "my-secret"},
+					},
+					RevisionHistoryLimit: int32Ptr(5),
+					PatchPodMetadata: []v1beta1.SidecarSetPatchPodMetadata{
+						{
+							Annotations: map[string]string{"key": "value"},
+							PatchPolicy: v1beta1.SidecarSetOverwritePatchPolicy,
+						},
+					},
+					CustomVersion: "v1.0",
+				},
+				Status: v1beta1.SidecarSetStatus{
+					ObservedGeneration: 1,
+					MatchedPods:        10,
+					UpdatedPods:        8,
+					ReadyPods:          9,
+					UpdatedReadyPods:   7,
+					LatestRevision:     "test-revision-1",
+					CollisionCount:     int32Ptr(0),
+				},
+			},
+			expected: &SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-sidecarset",
+					Labels: map[string]string{
+						"app":                        "test",
+						SidecarSetCustomVersionLabel: "v1.0",
+					},
+				},
+				Spec: SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "nginx"},
+					},
+					Namespace: "test-namespace",
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"env": "prod"},
+					},
+					InitContainers: []SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "init-sidecar",
+								Image: "init:latest",
+							},
+							PodInjectPolicy: BeforeAppContainerType,
+							UpgradeStrategy: SidecarContainerUpgradeStrategy{
+								UpgradeType:          SidecarContainerColdUpgrade,
+								HotUpgradeEmptyImage: "",
+							},
+							ShareVolumePolicy: ShareVolumePolicy{
+								Type: ShareVolumePolicyEnabled,
+							},
+							TransferEnv: []TransferEnvVar{
+								{
+									SourceContainerName: "app",
+									EnvName:             "APP_ENV",
+								},
+							},
+						},
+					},
+					Containers: []SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+							PodInjectPolicy: AfterAppContainerType,
+							UpgradeStrategy: SidecarContainerUpgradeStrategy{
+								UpgradeType:          SidecarContainerHotUpgrade,
+								HotUpgradeEmptyImage: "empty:latest",
+							},
+							ShareVolumePolicy: ShareVolumePolicy{
+								Type: ShareVolumePolicyDisabled,
+							},
+							ShareVolumeDevicePolicy: &ShareVolumePolicy{
+								Type: ShareVolumePolicyEnabled,
+							},
+							TransferEnv: []TransferEnvVar{
+								{
+									SourceContainerName: "main",
+									EnvNames:            []string{"ENV1", "ENV2"},
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "config-volume",
+							VolumeSource: corev1.VolumeSource{
+								EmptyDir: &corev1.EmptyDirVolumeSource{},
+							},
+						},
+					},
+					UpdateStrategy: SidecarSetUpdateStrategy{
+						Type:   RollingUpdateSidecarSetStrategyType,
+						Paused: false,
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"update": "true"},
+						},
+						Partition:      intstrPtr("30%"),
+						MaxUnavailable: intstrPtr("20%"),
+						ScatterStrategy: UpdateScatterStrategy{
+							{Key: "zone", Value: "us-west"},
+						},
+					},
+					InjectionStrategy: SidecarSetInjectionStrategy{
+						Paused: false,
+						Revision: &SidecarSetInjectRevision{
+							CustomVersion: stringPtr("v1.0"),
+							RevisionName:  stringPtr("test-revision"),
+							Policy:        AlwaysSidecarSetInjectRevisionPolicy,
+						},
+					},
+					ImagePullSecrets: []corev1.LocalObjectReference{
+						{Name: "my-secret"},
+					},
+					RevisionHistoryLimit: int32Ptr(5),
+					PatchPodMetadata: []SidecarSetPatchPodMetadata{
+						{
+							Annotations: map[string]string{"key": "value"},
+							PatchPolicy: SidecarSetOverwritePatchPolicy,
+						},
+					},
+				},
+				Status: SidecarSetStatus{
+					ObservedGeneration: 1,
+					MatchedPods:        10,
+					UpdatedPods:        8,
+					ReadyPods:          9,
+					UpdatedReadyPods:   7,
+					LatestRevision:     "test-revision-1",
+					CollisionCount:     int32Ptr(0),
+				},
+			},
+		},
+		{
+			name: "convert from v1beta1 with minimal fields",
+			src: &v1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "minimal-sidecarset",
+				},
+				Spec: v1beta1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Containers: []v1beta1.SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+						},
+					},
+				},
+				Status: v1beta1.SidecarSetStatus{
+					MatchedPods: 5,
+				},
+			},
+			expected: &SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "minimal-sidecarset",
+				},
+				Spec: SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Containers: []SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+						},
+					},
+				},
+				Status: SidecarSetStatus{
+					MatchedPods: 5,
+				},
+			},
+		},
+		{
+			name: "convert from v1beta1 with SpecificNamespace",
+			src: &v1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "specific-namespace",
+				},
+				Spec: v1beta1.SidecarSetSpec{
+					SpecificNamespace: &v1beta1.SpecificNamespace{
+						Namespace: "test-ns",
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"env": "staging"},
+						},
+					},
+					Containers: []v1beta1.SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+						},
+					},
+				},
+			},
+			expected: &SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "specific-namespace",
+				},
+				Spec: SidecarSetSpec{
+					Namespace: "test-ns",
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"env": "staging"},
+					},
+					Containers: []SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "convert from v1beta1 with nil SpecificNamespace",
+			src: &v1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "nil-specific-namespace",
+				},
+				Spec: v1beta1.SidecarSetSpec{
+					Containers: []v1beta1.SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+						},
+					},
+				},
+			},
+			expected: &SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "nil-specific-namespace",
+				},
+				Spec: SidecarSetSpec{
+					Containers: []SidecarContainer{
+						{
+							Container: corev1.Container{
+								Name:  "sidecar",
+								Image: "sidecar:latest",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scs := &SidecarSet{}
+			err := scs.ConvertFrom(tt.src)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, scs)
+		})
+	}
+}

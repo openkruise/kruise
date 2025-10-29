@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 )
@@ -34,16 +34,16 @@ import (
 func TestInjectHotUpgradeSidecar(t *testing.T) {
 	sidecarSetIn := sidecarSet1.DeepCopy()
 	sidecarSetIn.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = "without-c4k2dbb95d"
-	sidecarSetIn.Spec.Containers[0].UpgradeStrategy.UpgradeType = appsv1alpha1.SidecarContainerHotUpgrade
+	sidecarSetIn.Spec.Containers[0].UpgradeStrategy.UpgradeType = appsv1beta1.SidecarContainerHotUpgrade
 	sidecarSetIn.Spec.Containers[0].UpgradeStrategy.HotUpgradeEmptyImage = "busy:hotupgrade-empty"
 	testInjectHotUpgradeSidecar(t, sidecarSetIn)
 }
 
-func testInjectHotUpgradeSidecar(t *testing.T, sidecarSetIn *appsv1alpha1.SidecarSet) {
+func testInjectHotUpgradeSidecar(t *testing.T, sidecarSetIn *appsv1beta1.SidecarSet) {
 	podIn := pod1.DeepCopy()
 	decoder := admission.NewDecoder(scheme.Scheme)
 	client := fake.NewClientBuilder().WithObjects(sidecarSetIn).WithIndex(
-		&appsv1alpha1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSet,
+		&appsv1beta1.SidecarSet{}, fieldindex.IndexNameForSidecarSetNamespace, fieldindex.IndexSidecarSetV1Beta1,
 	).Build()
 	podOut := podIn.DeepCopy()
 	podHandler := &PodCreateHandler{Decoder: decoder, Client: client}

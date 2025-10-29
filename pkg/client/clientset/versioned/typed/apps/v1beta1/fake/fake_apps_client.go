@@ -51,6 +51,10 @@ func (c *FakeAppsV1beta1) NodeImages() v1beta1.NodeImageInterface {
 	return newFakeNodeImages(c)
 }
 
+func (c *FakeAppsV1beta1) SidecarSets() v1beta1.SidecarSetInterface {
+	return newFakeSidecarSets(c)
+}
+
 func (c *FakeAppsV1beta1) StatefulSets(namespace string) v1beta1.StatefulSetInterface {
 	return newFakeStatefulSets(c, namespace)
 }
