@@ -2601,7 +2601,7 @@ func (in *RollingUpdateDaemonSet) DeepCopyInto(out *RollingUpdateDaemonSet) {
 	}
 	if in.Partition != nil {
 		in, out := &in.Partition, &out.Partition
-		*out = new(int32)
+		*out = new(intstr.IntOrString)
 		**out = **in
 	}
 	if in.Paused != nil {

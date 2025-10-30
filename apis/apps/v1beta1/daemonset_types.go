@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kruise Authors.
+Copyright 2025 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
@@ -51,10 +51,6 @@ const (
 
 	// InplaceRollingUpdateType update container image without killing the pod if possible.
 	InplaceRollingUpdateType RollingUpdateType = "InPlaceIfPossible"
-
-	// DeprecatedSurgingRollingUpdateType is a depreciated alias for Standard.
-	// Deprecated: Just use Standard instead.
-	DeprecatedSurgingRollingUpdateType RollingUpdateType = "Surging"
 )
 
 // Spec to control the desired behavior of daemon set rolling update.
@@ -163,6 +159,21 @@ type DaemonSetSpec struct {
 	// Currently, we only support pre-delete hook for Advanced DaemonSet.
 	// +optional
 	Lifecycle *appspub.Lifecycle `json:"lifecycle,omitempty"`
+
+	// ScaleStrategy indicates the DaemonSetScaleStrategy that will be
+	// employed to create Pods in the DaemonSet.
+	// +optional
+	ScaleStrategy *DaemonSetScaleStrategy `json:"scaleStrategy,omitempty"`
+}
+
+// DaemonSetScaleStrategy defines strategies for DaemonSet scaling.
+type DaemonSetScaleStrategy struct {
+	// PartitionedScaling indicates daemon pods created in manage phase will be controlled by partition.
+	// If set to true, the creation will be controlled by partition and only some of daemon pods
+	// will be created. Otherwise daemon pods will be created on every node that need to start a daemon pod.
+	// Default is false.
+	// +optional
+	PartitionedScaling bool `json:"partitionedScaling,omitempty"`
 }
 
 // DaemonSetStatus defines the observed state of DaemonSet
@@ -220,8 +231,8 @@ type DaemonSetStatus struct {
 	// +patchStrategy=merge
 	Conditions []appsv1.DaemonSetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 
-	// DaemonSetHash is the controller-revision-hash, which represents the latest version of the DaemonSet.
-	DaemonSetHash string `json:"daemonSetHash,omitempty"`
+	// UpdateRevision is the controller-revision-hash, which represents the latest version of the DaemonSet.
+	UpdateRevision string `json:"updateRevision,omitempty"`
 }
 
 // +genclient
@@ -229,6 +240,7 @@ type DaemonSetStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=daemon;ads
+// +kubebuilder:storageversion
 // +kubebuilder:printcolumn:name="DESIRED",type="integer",JSONPath=".status.desiredNumberScheduled",description="The desired number of pods."
 // +kubebuilder:printcolumn:name="CURRENT",type="integer",JSONPath=".status.currentNumberScheduled",description="The current number of pods."
 // +kubebuilder:printcolumn:name="READY",type="integer",JSONPath=".status.numberReady",description="The ready number of pods."

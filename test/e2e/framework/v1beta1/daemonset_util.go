@@ -1,4 +1,4 @@
-package v1alpha1
+package v1beta1
 
 import (
 	"context"
@@ -21,7 +21,6 @@ import (
 	daemonutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 	utilpointer "k8s.io/utils/pointer"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/controller/daemonset"
@@ -53,14 +52,14 @@ func NewDaemonSetTester(c clientset.Interface, kc kruiseclientset.Interface, ns 
 	}
 }
 
-func (t *DaemonSetTester) NewDaemonSet(name string, label map[string]string, image string, updateStrategy appsv1alpha1.DaemonSetUpdateStrategy) *appsv1alpha1.DaemonSet {
+func (t *DaemonSetTester) NewDaemonSet(name string, label map[string]string, image string, updateStrategy appsv1beta1.DaemonSetUpdateStrategy) *appsv1beta1.DaemonSet {
 	burstReplicas := intstr.IntOrString{IntVal: int32(50)}
-	return &appsv1alpha1.DaemonSet{
+	return &appsv1beta1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: t.ns,
 			Name:      name,
 		},
-		Spec: appsv1alpha1.DaemonSetSpec{
+		Spec: appsv1beta1.DaemonSetSpec{
 			BurstReplicas: &burstReplicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: label,
@@ -87,15 +86,15 @@ func (t *DaemonSetTester) NewDaemonSet(name string, label map[string]string, ima
 	}
 }
 
-func (t *DaemonSetTester) CreateDaemonSet(ds *appsv1alpha1.DaemonSet) (*appsv1alpha1.DaemonSet, error) {
-	return t.kc.AppsV1alpha1().DaemonSets(t.ns).Create(context.TODO(), ds, metav1.CreateOptions{})
+func (t *DaemonSetTester) CreateDaemonSet(ds *appsv1beta1.DaemonSet) (*appsv1beta1.DaemonSet, error) {
+	return t.kc.AppsV1beta1().DaemonSets(t.ns).Create(context.TODO(), ds, metav1.CreateOptions{})
 }
 
-func (t *DaemonSetTester) GetDaemonSet(name string) (*appsv1alpha1.DaemonSet, error) {
-	return t.kc.AppsV1alpha1().DaemonSets(t.ns).Get(context.TODO(), name, metav1.GetOptions{})
+func (t *DaemonSetTester) GetDaemonSet(name string) (*appsv1beta1.DaemonSet, error) {
+	return t.kc.AppsV1beta1().DaemonSets(t.ns).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
-func (t *DaemonSetTester) UpdateDaemonSet(name string, fn func(ds *appsv1alpha1.DaemonSet)) error {
+func (t *DaemonSetTester) UpdateDaemonSet(name string, fn func(ds *appsv1beta1.DaemonSet)) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		ds, err := t.GetDaemonSet(name)
 		if err != nil {
@@ -103,27 +102,27 @@ func (t *DaemonSetTester) UpdateDaemonSet(name string, fn func(ds *appsv1alpha1.
 		}
 
 		fn(ds)
-		_, err = t.kc.AppsV1alpha1().DaemonSets(t.ns).Update(context.TODO(), ds, metav1.UpdateOptions{})
+		_, err = t.kc.AppsV1beta1().DaemonSets(t.ns).Update(context.TODO(), ds, metav1.UpdateOptions{})
 		return err
 	})
 }
 
 func (t *DaemonSetTester) DeleteDaemonSet(namespace, name string) {
-	err := t.kc.AppsV1alpha1().DaemonSets(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	err := t.kc.AppsV1beta1().DaemonSets(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		common.Logf("delete daemonset(%s/%s) failed: %s", t.ns, name, err.Error())
 		return
 	}
 }
 
-func (t *DaemonSetTester) PatchDaemonSet(name string, patchType types.PatchType, patch []byte) (*appsv1alpha1.DaemonSet, error) {
-	return t.kc.AppsV1alpha1().DaemonSets(t.ns).Patch(context.TODO(), name, patchType, patch, metav1.PatchOptions{})
+func (t *DaemonSetTester) PatchDaemonSet(name string, patchType types.PatchType, patch []byte) (*appsv1beta1.DaemonSet, error) {
+	return t.kc.AppsV1beta1().DaemonSets(t.ns).Patch(context.TODO(), name, patchType, patch, metav1.PatchOptions{})
 }
 
 func (t *DaemonSetTester) WaitForDaemonSetDeleted(namespace, name string) {
 	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, true,
 		func(ctx context.Context) (bool, error) {
-			_, err := t.kc.AppsV1alpha1().DaemonSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+			_, err := t.kc.AppsV1beta1().DaemonSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					return true, nil
@@ -280,18 +279,18 @@ func (t *DaemonSetTester) CheckPodStayInNode(oldNodeList *v1.NodeList, newNodeLi
 	}
 }
 
-func (t *DaemonSetTester) CheckRunningOnAllNodes(ds *appsv1alpha1.DaemonSet) func() (bool, error) {
+func (t *DaemonSetTester) CheckRunningOnAllNodes(ds *appsv1beta1.DaemonSet) func() (bool, error) {
 	return func() (bool, error) {
 		nodeNames := t.SchedulableNodes(ds)
 		return t.CheckDaemonPodOnNodes(ds, nodeNames)()
 	}
 }
 
-func (t *DaemonSetTester) CheckRunningOnNoNodes(ds *appsv1alpha1.DaemonSet) func() (bool, error) {
+func (t *DaemonSetTester) CheckRunningOnNoNodes(ds *appsv1beta1.DaemonSet) func() (bool, error) {
 	return t.CheckDaemonPodOnNodes(ds, make([]string, 0))
 }
 
-func (t *DaemonSetTester) SchedulableNodes(ds *appsv1alpha1.DaemonSet) []string {
+func (t *DaemonSetTester) SchedulableNodes(ds *appsv1beta1.DaemonSet) []string {
 	nodeList, err := t.c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	common.ExpectNoError(err)
 	nodeNames := make([]string, 0)
@@ -305,7 +304,7 @@ func (t *DaemonSetTester) SchedulableNodes(ds *appsv1alpha1.DaemonSet) []string 
 	return nodeNames
 }
 
-func (t *DaemonSetTester) CheckDaemonPodOnNodes(ds *appsv1alpha1.DaemonSet, nodeNames []string) func() (bool, error) {
+func (t *DaemonSetTester) CheckDaemonPodOnNodes(ds *appsv1beta1.DaemonSet, nodeNames []string) func() (bool, error) {
 	return func() (bool, error) {
 		podList, err := t.c.CoreV1().Pods(t.ns).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
@@ -356,14 +355,8 @@ func (t *DaemonSetTester) WaitFailedDaemonPodDeleted(pod *v1.Pod) func() (bool, 
 	}
 }
 
-func (t *DaemonSetTester) CanScheduleOnNode(node v1.Node, ds *appsv1alpha1.DaemonSet) bool {
-	// Convert v1alpha1 to v1beta1 for NewPod function
-	v1beta1DS := &appsv1beta1.DaemonSet{}
-	if err := ds.ConvertTo(v1beta1DS); err != nil {
-		common.Logf("Failed to convert v1alpha1 DaemonSet to v1beta1: %v", err)
-		return false
-	}
-	newPod := daemonset.NewPod(v1beta1DS, node.Name)
+func (t *DaemonSetTester) CanScheduleOnNode(node v1.Node, ds *appsv1beta1.DaemonSet) bool {
+	newPod := daemonset.NewPod(ds, node.Name)
 	taints := node.Spec.Taints
 	fitsNodeName, fitsNodeAffinity, fitsTaints := daemonset.Predicates(newPod, &node, taints)
 	if !fitsNodeName || !fitsNodeAffinity || !fitsTaints {
