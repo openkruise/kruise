@@ -6,6 +6,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -678,6 +679,168 @@ func TestValidateSidecarSet(t *testing.T) {
 				},
 			},
 			expectErrs: 1,
+		},
+		// ResourcesPolicy validation test cases
+		{
+			caseName: "resources-policy-and-resources-conflict",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Containers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+								Resources: corev1.ResourceRequirements{
+									Limits: corev1.ResourceList{
+										corev1.ResourceCPU:    resource.MustParse("100m"),
+										corev1.ResourceMemory: resource.MustParse("100Mi"),
+									},
+								},
+							},
+							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
+								TargetContainerMode: appsv1alpha1.TargetContainerModeSum,
+								ResourceExpr: appsv1alpha1.ResourceExpr{
+									Limits: &appsv1alpha1.ResourceExprLimits{
+										CPU: "cpu*50%",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErrs: 1,
+		},
+		{
+			caseName: "invalid-target-container-mode",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Containers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-sidecar",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							},
+							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
+								TargetContainerMode: "invalid",
+								ResourceExpr: appsv1alpha1.ResourceExpr{
+									Limits: &appsv1alpha1.ResourceExprLimits{
+										CPU: "cpu*50%",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErrs: 1,
+		},
+		{
+			caseName: "initContainer-with-resources-policy-forbidden",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					InitContainers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-init",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+								// Plain init-container without RestartPolicy: Always
+							},
+							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
+								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+								TargetContainersNameRegex: ".*",
+								ResourceExpr: appsv1alpha1.ResourceExpr{
+									Limits: &appsv1alpha1.ResourceExprLimits{
+										CPU: "cpu*50%",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErrs: 1, // Should fail because ResourcesPolicy is only allowed for native sidecars (RestartPolicy: Always)
+		},
+		{
+			caseName: "native-sidecar-initContainer-with-resources-policy-allowed",
+			sidecarSet: appsv1alpha1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+				Spec: appsv1alpha1.SidecarSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
+						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					},
+					InitContainers: []appsv1alpha1.SidecarContainer{
+						{
+							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
+								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							},
+							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							},
+							Container: corev1.Container{
+								Name:                     "test-init",
+								Image:                    "test-image",
+								ImagePullPolicy:          corev1.PullIfNotPresent,
+								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+								RestartPolicy:            &always, // Native sidecar container
+							},
+							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
+								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+								TargetContainersNameRegex: ".*",
+								ResourceExpr: appsv1alpha1.ResourceExpr{
+									Limits: &appsv1alpha1.ResourceExprLimits{
+										CPU: "cpu*50%",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErrs: 0, // Should pass because native sidecar (RestartPolicy: Always) can have ResourcesPolicy
 		},
 	}
 

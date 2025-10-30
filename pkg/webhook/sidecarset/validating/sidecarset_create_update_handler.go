@@ -44,6 +44,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/calculator"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 )
 
@@ -260,7 +261,19 @@ func validateContainersForSidecarSet(
 	allErrs := field.ErrorList{}
 	//validating initContainer
 	var coreInitContainers []core.Container
-	for _, container := range initContainers {
+	for i, container := range initContainers {
+		idxPath := fldPath.Index(i)
+
+		// Validate that initContainers ResourcesPolicy
+		if container.ResourcesPolicy != nil {
+			// resourcesPolicy is only supported for containers with RestartPolicy Always (Native sidecar containers)
+			if container.RestartPolicy == nil || *container.RestartPolicy != v1.ContainerRestartPolicyAlways {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("resourcesPolicy"), container.ResourcesPolicy, "resourcesPolicy is only supported for containers with RestartPolicy Always"))
+			}
+			allErrs = append(allErrs, validateResourcesPolicy(container, idxPath.Child("resourcesPolicy"))...)
+
+		}
+
 		coreContainer := core.Container{}
 		if err := corev1.Convert_v1_Container_To_core_Container(&container.Container, &coreContainer, nil); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("initContainer"), container.Container, fmt.Sprintf("Convert_v1_Container_To_core_Container failed: %v", err)))
@@ -280,6 +293,12 @@ func validateContainersForSidecarSet(
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("container").Child("shareVolumePolicy"), container.ShareVolumePolicy, "unsupported share volume policy"))
 		}
 		allErrs = append(allErrs, validateDownwardAPI(container.TransferEnv, idxPath.Child("transferEnv"))...)
+
+		// Validate ResourcesPolicy if present
+		if container.ResourcesPolicy != nil {
+			allErrs = append(allErrs, validateResourcesPolicy(container, idxPath.Child("resourcesPolicy"))...)
+		}
+
 		coreContainer := core.Container{}
 		if err := corev1.Convert_v1_Container_To_core_Container(&container.Container, &coreContainer, nil); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("container"), container.Container, fmt.Sprintf("Convert_v1_Container_To_core_Container failed: %v", err)))
@@ -488,6 +507,127 @@ func validateObjectFieldSelector(fs *v1.ObjectFieldSelector, expressions *sets.S
 	}
 
 	return allErrs
+}
+
+// validateResourcesPolicy validates the ResourcesPolicy configuration
+func validateResourcesPolicy(container appsv1alpha1.SidecarContainer, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	policy := container.ResourcesPolicy
+
+	// Validate that ResourcesPolicy and Resources are not both configured
+	if len(container.Resources.Limits) > 0 || len(container.Resources.Requests) > 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, policy, "resourcesPolicy and resources cannot be configured together"))
+		// Return early as this is a fundamental conflict
+		return allErrs
+	}
+
+	// Validate TargetContainersNameRegex
+	// empty regex is invalid
+	if len(policy.TargetContainersNameRegex) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("targetContainersNameRegex"), "invalid empty regex"))
+	} else if _, err := regexp.Compile(policy.TargetContainersNameRegex); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetContainersNameRegex"), policy.TargetContainersNameRegex,
+			fmt.Sprintf("invalid regex pattern: %v", err)))
+	}
+
+	// Validate ResourceExpr
+	allErrs = append(allErrs, validateResourceExpr(&policy.ResourceExpr, fldPath.Child("resourceExpr"))...)
+
+	return allErrs
+}
+
+// validateResourceExpr validates the ResourceExpr configuration
+func validateResourceExpr(expr *appsv1alpha1.ResourceExpr, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// At least one of Limits or Requests should be configured
+	if expr.Limits == nil && expr.Requests == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, expr, "at least one of limits or requests must be configured"))
+		return allErrs
+	}
+
+	// Validate Limits if present
+	if expr.Limits != nil {
+		allErrs = append(allErrs, validateResourceExprLimits(expr.Limits, fldPath.Child("limits"))...)
+	}
+
+	// Validate Requests if present
+	if expr.Requests != nil {
+		allErrs = append(allErrs, validateResourceExprRequests(expr.Requests, fldPath.Child("requests"))...)
+	}
+
+	return allErrs
+}
+
+// validateResourceExprLimits validates the ResourceExprLimits configuration
+func validateResourceExprLimits(limits *appsv1alpha1.ResourceExprLimits, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// Validate CPU expression if present
+	if limits.CPU != "" {
+		if err := validateResourceExpression(limits.CPU, "cpu"); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("cpu"), limits.CPU, err.Error()))
+		}
+	}
+
+	// Validate Memory expression if present
+	if limits.Memory != "" {
+		if err := validateResourceExpression(limits.Memory, "memory"); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("memory"), limits.Memory, err.Error()))
+		}
+	}
+
+	return allErrs
+}
+
+// validateResourceExprRequests validates the ResourceExprRequests configuration
+func validateResourceExprRequests(requests *appsv1alpha1.ResourceExprRequests, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// Validate CPU expression if present
+	if requests.CPU != "" {
+		if err := validateResourceExpression(requests.CPU, "cpu"); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("cpu"), requests.CPU, err.Error()))
+		}
+	}
+
+	// Validate Memory expression if present
+	if requests.Memory != "" {
+		if err := validateResourceExpression(requests.Memory, "memory"); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("memory"), requests.Memory, err.Error()))
+		}
+	}
+
+	return allErrs
+}
+
+// validateResourceExpression validates a resource expression string using the calculator engine
+func validateResourceExpression(expr string, variable string) error {
+	if expr == "" {
+		return nil
+	}
+
+	// Use the calculator package to validate the expression
+	// We'll try to parse it with a dummy value for the variable
+	calc := calculator.NewCalculator()
+
+	// Set a dummy value for the variable (cpu or memory)
+	dummyValue := &calculator.Value{
+		IsQuantity: false,
+		Number:     1.0,
+	}
+	calc.SetVariables(map[string]*calculator.Value{
+		variable: dummyValue,
+	})
+
+	// Try to parse the expression
+	_, err := calc.Parse(expr)
+	if err != nil {
+		return fmt.Errorf("invalid expression: %v", err)
+	}
+
+	return nil
 }
 
 var _ admission.Handler = &SidecarSetCreateUpdateHandler{}
