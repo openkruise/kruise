@@ -23,12 +23,12 @@ import (
 	"github.com/openkruise/kruise/pkg/webhook/types"
 )
 
-// +kubebuilder:webhook:path=/mutate-apps-kruise-io-v1alpha1-sidecarset,mutating=true,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=sidecarsets,verbs=create;update,versions=v1alpha1,name=msidecarset.kb.io
+// +kubebuilder:webhook:path=/mutate-apps-kruise-io-sidecarset,mutating=true,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=sidecarsets,verbs=create;update,versions=v1alpha1;v1beta1,name=msidecarset.kb.io
 
 var (
 	// HandlerGetterMap contains admission webhook handlers
 	HandlerGetterMap = map[string]types.HandlerGetter{
-		"mutate-apps-kruise-io-v1alpha1-sidecarset": func(mgr manager.Manager) admission.Handler {
+		"mutate-apps-kruise-io-sidecarset": func(mgr manager.Manager) admission.Handler {
 			return &SidecarSetCreateHandler{Decoder: admission.NewDecoder(mgr.GetScheme())}
 		},
 	}

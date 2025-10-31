@@ -20,12 +20,13 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 )
@@ -46,14 +47,22 @@ func getCoreVolumes(volumes []v1.Volume, fldPath *field.Path) ([]core.Volume, fi
 	return coreVolumes, allErrs
 }
 
-func isSidecarSetNamespaceOverlapping(c client.Client, origin *appsv1alpha1.SidecarSet, other *appsv1alpha1.SidecarSet) bool {
-	originNamespace := origin.Spec.Namespace
-	otherNamespace := other.Spec.Namespace
+func isSidecarSetNamespaceOverlapping(c client.Client, origin *appsv1beta1.SidecarSet, other *appsv1beta1.SidecarSet) bool {
+	var originNamespace string
+	var originSelector *metav1.LabelSelector
+	if origin.Spec.SpecificNamespace != nil {
+		originNamespace = origin.Spec.SpecificNamespace.Namespace
+		originSelector = origin.Spec.SpecificNamespace.NamespaceSelector
+	}
+	var otherNamespace string
+	var otherSelector *metav1.LabelSelector
+	if other.Spec.SpecificNamespace != nil {
+		otherNamespace = other.Spec.SpecificNamespace.Namespace
+		otherSelector = other.Spec.SpecificNamespace.NamespaceSelector
+	}
 	if originNamespace != "" && otherNamespace != "" && originNamespace != otherNamespace {
 		return false
 	}
-	originSelector := origin.Spec.NamespaceSelector
-	otherSelector := other.Spec.NamespaceSelector
 	if originSelector != nil && otherSelector != nil && !util.IsSelectorOverlapping(originSelector, otherSelector) {
 		return false
 	}

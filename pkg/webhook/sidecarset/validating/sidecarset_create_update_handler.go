@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
@@ -74,7 +75,26 @@ type SidecarSetCreateUpdateHandler struct {
 	Decoder admission.Decoder
 }
 
-func (h *SidecarSetCreateUpdateHandler) validatingSidecarSetFn(_ context.Context, obj *appsv1alpha1.SidecarSet, older *appsv1alpha1.SidecarSet) (bool, string, error) {
+func (h *SidecarSetCreateUpdateHandler) validatingSidecarSetV1alpha1Fn(_ context.Context, obj *appsv1alpha1.SidecarSet, older *appsv1alpha1.SidecarSet) (bool, string, error) {
+	v1bata1Obj := &appsv1beta1.SidecarSet{}
+	if err := obj.ConvertTo(v1bata1Obj); err != nil {
+		return false, "", fmt.Errorf("convert v1alpha1 to v1beta1 failed: %v", err)
+	}
+	var v1beta1Older *appsv1beta1.SidecarSet
+	if older != nil {
+		v1beta1Older = &appsv1beta1.SidecarSet{}
+		if err := older.ConvertTo(v1beta1Older); err != nil {
+			return false, "", fmt.Errorf("convert v1alpha1 to v1beta1 failed: %v", err)
+		}
+	}
+	allErrs := h.validateSidecarSet(v1bata1Obj, v1beta1Older)
+	if len(allErrs) != 0 {
+		return false, "", allErrs.ToAggregate()
+	}
+	return true, "allowed to be admitted", nil
+}
+
+func (h *SidecarSetCreateUpdateHandler) validatingSidecarSetFn(_ context.Context, obj *appsv1beta1.SidecarSet, older *appsv1beta1.SidecarSet) (bool, string, error) {
 	allErrs := h.validateSidecarSet(obj, older)
 	if len(allErrs) != 0 {
 		return false, "", allErrs.ToAggregate()
@@ -82,7 +102,7 @@ func (h *SidecarSetCreateUpdateHandler) validatingSidecarSetFn(_ context.Context
 	return true, "allowed to be admitted", nil
 }
 
-func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1alpha1.SidecarSet, older *appsv1alpha1.SidecarSet) field.ErrorList {
+func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1beta1.SidecarSet, older *appsv1beta1.SidecarSet) field.ErrorList {
 	// validating ObjectMeta
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, validateSidecarSetName, field.NewPath("metadata"))
 	// validating spec
@@ -95,7 +115,7 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1alpha1.Sid
 		return allErrs
 	}
 	// iterate across all containers in other sidecarsets to avoid duplication of name
-	sidecarSets := &appsv1alpha1.SidecarSetList{}
+	sidecarSets := &appsv1beta1.SidecarSetList{}
 	if err := h.Client.List(context.TODO(), sidecarSets, &client.ListOptions{}); err != nil {
 		allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("query other sidecarsets failed, err: %v", err)))
 	}
@@ -113,35 +133,35 @@ func validateSidecarSetName(name string, _ bool) (allErrs []string) {
 	return allErrs
 }
 
-func (h *SidecarSetCreateUpdateHandler) validateSidecarSetSpec(obj *appsv1alpha1.SidecarSet, fldPath *field.Path) field.ErrorList {
+func (h *SidecarSetCreateUpdateHandler) validateSidecarSetSpec(obj *appsv1beta1.SidecarSet, fldPath *field.Path) field.ErrorList {
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
 	// currently when initContainer restartPolicy = Always, kruise don't support in-place update
 	for _, c := range obj.Spec.InitContainers {
-		if sidecarcontrol.IsSidecarContainer(c.Container) && obj.Spec.UpdateStrategy.Type == appsv1alpha1.RollingUpdateSidecarSetStrategyType {
+		if sidecarcontrol.IsSidecarContainer(c.Container) && obj.Spec.UpdateStrategy.Type == appsv1beta1.RollingUpdateSidecarSetStrategyType {
 			allErrs = append(allErrs, field.Required(fldPath.Child("updateStrategy"), "The initContainer in-place upgrade is not currently supported."))
 		}
 	}
 
-	//validate spec selector
+	// validate spec selector
 	if spec.Selector == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), "no selector defined for SidecarSet"))
 	} else {
 		allErrs = append(allErrs, validateSelector(spec.Selector, fldPath.Child("selector"))...)
 	}
-	if spec.Namespace != "" && spec.NamespaceSelector != nil {
+	if spec.SpecificNamespace != nil && spec.SpecificNamespace.Namespace != "" && spec.SpecificNamespace.NamespaceSelector != nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("namespace, namespaceSelector"), "namespace and namespaceSelector are mutually exclusive"))
-	} else if spec.NamespaceSelector != nil {
-		allErrs = append(allErrs, validateSelector(spec.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
+	} else if spec.SpecificNamespace != nil && spec.SpecificNamespace.NamespaceSelector != nil {
+		allErrs = append(allErrs, validateSelector(spec.SpecificNamespace.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
 	}
-	//validating SidecarSetInjectionStrategy
+	// validating SidecarSetInjectionStrategy
 	allErrs = append(allErrs, h.validateSidecarSetInjectionStrategy(obj, fldPath.Child("injectionStrategy"))...)
-	//validating SidecarSetUpdateStrategy
+	// validating SidecarSetUpdateStrategy
 	allErrs = append(allErrs, validateSidecarSetUpdateStrategy(&spec.UpdateStrategy, fldPath.Child("updateStrategy"))...)
-	//validating volumes
+	// validating volumes
 	vols, vErrs := getCoreVolumes(spec.Volumes, fldPath.Child("volumes"))
 	allErrs = append(allErrs, vErrs...)
-	//validating sidecar container
+	// validating sidecar container
 	// if don't have any initContainers, containers
 	if len(spec.InitContainers) == 0 && len(spec.Containers) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Root(), "no initContainer or container defined for SidecarSet"))
@@ -153,6 +173,7 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSetSpec(obj *appsv1alpha1
 	if err := sidecarcontrol.ValidateSidecarSetPatchMetadataWhitelist(h.Client, obj); err != nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("patchPodMetadata"), err.Error()))
 	}
+
 	for _, patch := range spec.PatchPodMetadata {
 		if len(patch.Annotations) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("patchPodMetadata"), "no annotations defined for SidecarSet"))
@@ -189,7 +210,7 @@ func validateSelector(selector *metav1.LabelSelector, fldPath *field.Path) field
 	return allErrs
 }
 
-func (h *SidecarSetCreateUpdateHandler) validateSidecarSetInjectionStrategy(obj *appsv1alpha1.SidecarSet, _ *field.Path) field.ErrorList {
+func (h *SidecarSetCreateUpdateHandler) validateSidecarSetInjectionStrategy(obj *appsv1beta1.SidecarSet, _ *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
 	revisionInfo := obj.Spec.InjectionStrategy.Revision
 
@@ -205,10 +226,10 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSetInjectionStrategy(obj 
 		}
 
 		switch revisionInfo.Policy {
-		case "", appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy, appsv1alpha1.PartialSidecarSetInjectRevisionPolicy:
+		case "", appsv1beta1.AlwaysSidecarSetInjectRevisionPolicy, appsv1beta1.PartialSidecarSetInjectRevisionPolicy:
 		default:
 			errList = append(errList, field.Invalid(field.NewPath("revision").Child("policy"), revisionInfo, fmt.Sprintf("Invalid policy %v, supported: [%s, %s]",
-				revisionInfo.Policy, appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy, appsv1alpha1.PartialSidecarSetInjectRevisionPolicy)))
+				revisionInfo.Policy, appsv1beta1.AlwaysSidecarSetInjectRevisionPolicy, appsv1beta1.PartialSidecarSetInjectRevisionPolicy)))
 		}
 	}
 	return errList
@@ -225,10 +246,10 @@ func intStrIsSet(i *intstr.IntOrString) bool {
 	return i.IntVal != 0
 }
 
-func validateSidecarSetUpdateStrategy(strategy *appsv1alpha1.SidecarSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
+func validateSidecarSetUpdateStrategy(strategy *appsv1beta1.SidecarSetUpdateStrategy, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// if SidecarSet update strategy is RollingUpdate
-	if strategy.Type == appsv1alpha1.RollingUpdateSidecarSetStrategyType {
+	if strategy.Type == appsv1beta1.RollingUpdateSidecarSetStrategyType {
 		if intStrIsSet(strategy.Partition) && strategy.Selector != nil {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("updateStrategy"), fmt.Sprintf("%++v", strategy), "Partition and Selector cannot be used together"))
 		}
@@ -254,11 +275,11 @@ func validateSidecarSetUpdateStrategy(strategy *appsv1alpha1.SidecarSetUpdateStr
 }
 
 func validateContainersForSidecarSet(
-	initContainers, containers []appsv1alpha1.SidecarContainer,
+	initContainers, containers []appsv1beta1.SidecarContainer,
 	coreVolumes []core.Volume, fldPath *field.Path) field.ErrorList {
 
 	allErrs := field.ErrorList{}
-	//validating initContainer
+	// validating initContainer
 	var coreInitContainers []core.Container
 	for _, container := range initContainers {
 		coreContainer := core.Container{}
@@ -269,14 +290,14 @@ func validateContainersForSidecarSet(
 		coreInitContainers = append(coreInitContainers, coreContainer)
 	}
 
-	//validating container
+	// validating container
 	var coreContainers []core.Container
 	for i, container := range containers {
 		idxPath := fldPath.Index(i)
-		if container.PodInjectPolicy != appsv1alpha1.BeforeAppContainerType && container.PodInjectPolicy != appsv1alpha1.AfterAppContainerType {
+		if container.PodInjectPolicy != appsv1beta1.BeforeAppContainerType && container.PodInjectPolicy != appsv1beta1.AfterAppContainerType {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("container").Child("podInjectPolicy"), container.PodInjectPolicy, "unsupported pod inject policy"))
 		}
-		if container.ShareVolumePolicy.Type != appsv1alpha1.ShareVolumePolicyEnabled && container.ShareVolumePolicy.Type != appsv1alpha1.ShareVolumePolicyDisabled {
+		if container.ShareVolumePolicy.Type != appsv1beta1.ShareVolumePolicyEnabled && container.ShareVolumePolicy.Type != appsv1beta1.ShareVolumePolicyDisabled {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("container").Child("shareVolumePolicy"), container.ShareVolumePolicy, "unsupported share volume policy"))
 		}
 		allErrs = append(allErrs, validateDownwardAPI(container.TransferEnv, idxPath.Child("transferEnv"))...)
@@ -320,10 +341,10 @@ func validateContainersForSidecarSet(
 	return allErrs
 }
 
-func validateSidecarContainerConflict(newContainers, oldContainers []appsv1alpha1.SidecarContainer, fldPath *field.Path) field.ErrorList {
+func validateSidecarContainerConflict(newContainers, oldContainers []appsv1beta1.SidecarContainer, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	oldStrategy := make(map[string]appsv1alpha1.SidecarContainerUpgradeType)
+	oldStrategy := make(map[string]appsv1beta1.SidecarContainerUpgradeType)
 	for _, container := range oldContainers {
 		oldStrategy[container.Name] = container.UpgradeStrategy.UpgradeType
 	}
@@ -343,20 +364,20 @@ func validateSidecarContainerConflict(newContainers, oldContainers []appsv1alpha
 }
 
 // validate the sidecarset spec.container.name, spec.initContainer.name, volume.name conflicts with others in cluster
-func validateSidecarConflict(c client.Client, sidecarSets *appsv1alpha1.SidecarSetList, sidecarSet *appsv1alpha1.SidecarSet, fldPath *field.Path) field.ErrorList {
+func validateSidecarConflict(c client.Client, sidecarSets *appsv1beta1.SidecarSetList, sidecarSet *appsv1beta1.SidecarSet, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	// record initContainer, container, volume name of other sidecarsets in cluster
 	// container name -> sidecarset
-	containerInOthers := make(map[string]*appsv1alpha1.SidecarSet)
+	containerInOthers := make(map[string]*appsv1beta1.SidecarSet)
 	// volume name -> sidecarset
-	volumeInOthers := make(map[string]*appsv1alpha1.SidecarSet)
+	volumeInOthers := make(map[string]*appsv1beta1.SidecarSet)
 	// init container name -> sidecarset
-	initContainerInOthers := make(map[string]*appsv1alpha1.SidecarSet)
+	initContainerInOthers := make(map[string]*appsv1beta1.SidecarSet)
 	// patch pod annotation key -> sidecarset.Name#patchPolicy
 	annotationsInOthers := make(map[string]string)
 
-	matchedList := make([]*appsv1alpha1.SidecarSet, 0)
+	matchedList := make([]*appsv1beta1.SidecarSet, 0)
 	for i := range sidecarSets.Items {
 		obj := &sidecarSets.Items[i]
 		if isSidecarSetNamespaceOverlapping(c, sidecarSet, obj) && util.IsSelectorOverlapping(sidecarSet.Spec.Selector, obj.Spec.Selector) {
@@ -364,7 +385,7 @@ func validateSidecarConflict(c client.Client, sidecarSets *appsv1alpha1.SidecarS
 		}
 	}
 	for _, set := range matchedList {
-		//ignore this sidecarset
+		// ignore this sidecarset
 		if set.Name == sidecarSet.Name {
 			continue
 		}
@@ -378,7 +399,7 @@ func validateSidecarConflict(c client.Client, sidecarSets *appsv1alpha1.SidecarS
 			volumeInOthers[volume.Name] = set
 		}
 		for _, patch := range set.Spec.PatchPodMetadata {
-			if patch.PatchPolicy == appsv1alpha1.SidecarSetRetainPatchPolicy {
+			if patch.PatchPolicy == appsv1beta1.SidecarSetRetainPatchPolicy {
 				continue
 			}
 			for key := range patch.Annotations {
@@ -415,7 +436,7 @@ func validateSidecarConflict(c client.Client, sidecarSets *appsv1alpha1.SidecarS
 
 	// whether pod metadata conflict
 	for _, patch := range sidecarSet.Spec.PatchPodMetadata {
-		if patch.PatchPolicy == appsv1alpha1.SidecarSetRetainPatchPolicy {
+		if patch.PatchPolicy == appsv1beta1.SidecarSetRetainPatchPolicy {
 			continue
 		}
 		for key := range patch.Annotations {
@@ -424,7 +445,7 @@ func validateSidecarConflict(c client.Client, sidecarSets *appsv1alpha1.SidecarS
 				continue
 			}
 			slice := strings.Split(other, "#")
-			if patch.PatchPolicy == appsv1alpha1.SidecarSetOverwritePatchPolicy || appsv1alpha1.SidecarSetPatchPolicyType(slice[1]) == appsv1alpha1.SidecarSetOverwritePatchPolicy {
+			if patch.PatchPolicy == appsv1beta1.SidecarSetOverwritePatchPolicy || appsv1beta1.SidecarSetPatchPolicyType(slice[1]) == appsv1beta1.SidecarSetOverwritePatchPolicy {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("patchPodMetadata"), key, fmt.Sprintf("annotation %s is in conflict with sidecarset %s", key, slice[0])))
 			}
 		}
@@ -432,7 +453,7 @@ func validateSidecarConflict(c client.Client, sidecarSets *appsv1alpha1.SidecarS
 	return allErrs
 }
 
-func getSidecarsetVolume(volumeName string, sidecarset *appsv1alpha1.SidecarSet) *v1.Volume {
+func getSidecarsetVolume(volumeName string, sidecarset *appsv1beta1.SidecarSet) *v1.Volume {
 	for _, volume := range sidecarset.Spec.Volumes {
 		if volume.Name == volumeName {
 			return &volume
@@ -441,7 +462,7 @@ func getSidecarsetVolume(volumeName string, sidecarset *appsv1alpha1.SidecarSet)
 	return nil
 }
 
-func validateDownwardAPI(envs []appsv1alpha1.TransferEnvVar, fldPath *field.Path) field.ErrorList {
+func validateDownwardAPI(envs []appsv1beta1.TransferEnvVar, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, tEnv := range envs {
 		if tEnv.SourceContainerNameFrom != nil && tEnv.SourceContainerNameFrom.FieldRef != nil {
@@ -494,25 +515,47 @@ var _ admission.Handler = &SidecarSetCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *SidecarSetCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.SidecarSet{}
-
-	err := h.Decoder.Decode(req, obj)
-	if err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
-	}
-	var oldSidecarSet *appsv1alpha1.SidecarSet
-	//when Operation is update, decode older object
-	if req.AdmissionRequest.Operation == admissionv1.Update {
-		oldSidecarSet = new(appsv1alpha1.SidecarSet)
-		if err := h.Decoder.Decode(
-			admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
-			oldSidecarSet); err != nil {
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		obj := &appsv1beta1.SidecarSet{}
+		if err := h.Decoder.Decode(req, obj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
+
+		var oldSidecarSet *appsv1beta1.SidecarSet
+		if req.AdmissionRequest.Operation == admissionv1.Update {
+			oldSidecarSet = &appsv1beta1.SidecarSet{}
+			if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldSidecarSet); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+		}
+
+		allowed, reason, err := h.validatingSidecarSetFn(ctx, obj, oldSidecarSet)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		return admission.ValidationResponse(allowed, reason)
+
+	case appsv1alpha1.GroupVersion.Version:
+		obj := &appsv1alpha1.SidecarSet{}
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+
+		var oldSidecarSet *appsv1alpha1.SidecarSet
+		if req.AdmissionRequest.Operation == admissionv1.Update {
+			oldSidecarSet = &appsv1alpha1.SidecarSet{}
+			if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldSidecarSet); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+		}
+
+		allowed, reason, err := h.validatingSidecarSetV1alpha1Fn(ctx, obj, oldSidecarSet)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		return admission.ValidationResponse(allowed, reason)
 	}
-	allowed, reason, err := h.validatingSidecarSetFn(ctx, obj, oldSidecarSet)
-	if err != nil {
-		return admission.Errored(http.StatusInternalServerError, err)
-	}
-	return admission.ValidationResponse(allowed, reason)
+
+	return admission.Errored(http.StatusBadRequest, fmt.Errorf("unsupported version: %s", req.AdmissionRequest.Resource.Version))
 }

@@ -61,6 +61,10 @@ type ImagePullJobNamespaceListerExpansion interface{}
 // NodeImageLister.
 type NodeImageListerExpansion interface{}
 
+// SidecarSetListerExpansion allows custom methods to be added to
+// SidecarSetLister.
+type SidecarSetListerExpansion interface{}
+
 // StatefulSetListerExpansion allows custom methods to be added to
 // StatefulSetLister.
 type StatefulSetListerExpansion interface{}

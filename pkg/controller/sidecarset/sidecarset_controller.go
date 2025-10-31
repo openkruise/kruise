@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
@@ -46,7 +46,7 @@ func init() {
 
 var (
 	concurrentReconciles = 3
-	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("SidecarSet")
+	controllerKind       = appsv1beta1.SchemeGroupVersion.WithKind("SidecarSet")
 )
 
 /**
@@ -84,9 +84,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to SidecarSet
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.SidecarSet{}, &handler.TypedEnqueueRequestForObject[*appsv1alpha1.SidecarSet]{}, predicate.TypedFuncs[*appsv1alpha1.SidecarSet]{
-		UpdateFunc: func(e event.TypedUpdateEvent[*appsv1alpha1.SidecarSet]) bool {
+	// Watch for changes to SidecarSet v1beta1
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.SidecarSet{}, &handler.TypedEnqueueRequestForObject[*appsv1beta1.SidecarSet]{}, predicate.TypedFuncs[*appsv1beta1.SidecarSet]{
+		UpdateFunc: func(e event.TypedUpdateEvent[*appsv1beta1.SidecarSet]) bool {
 			oldScS := e.ObjectOld
 			newScS := e.ObjectNew
 			if oldScS.GetGeneration() != newScS.GetGeneration() {
@@ -125,8 +125,7 @@ type ReconcileSidecarSet struct {
 // Reconcile reads that state of the cluster for a SidecarSet object and makes changes based on the state read
 // and what is in the SidecarSet.Spec
 func (r *ReconcileSidecarSet) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
-	// Fetch the SidecarSet instance
-	sidecarSet := &appsv1alpha1.SidecarSet{}
+	sidecarSet := &appsv1beta1.SidecarSet{}
 	err := r.Get(context.TODO(), request.NamespacedName, sidecarSet)
 	if err != nil {
 		if errors.IsNotFound(err) {

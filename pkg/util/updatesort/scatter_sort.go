@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 type scatterSort struct {
@@ -31,6 +32,18 @@ type scatterSort struct {
 
 func NewScatterSorter(s appsv1alpha1.UpdateScatterStrategy) Sorter {
 	return &scatterSort{strategy: s}
+}
+
+func NewScatterSorterV1beta1(s appsv1beta1.UpdateScatterStrategy) Sorter {
+	// Convert v1beta1 to v1alpha1
+	v1alpha1Strategy := make(appsv1alpha1.UpdateScatterStrategy, len(s))
+	for i, term := range s {
+		v1alpha1Strategy[i] = appsv1alpha1.UpdateScatterTerm{
+			Key:   term.Key,
+			Value: term.Value,
+		}
+	}
+	return &scatterSort{strategy: v1alpha1Strategy}
 }
 
 // Sort helps scatter the indexes of pods by ScatterStrategy.

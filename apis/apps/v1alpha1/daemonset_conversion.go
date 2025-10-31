@@ -66,12 +66,12 @@ func (ds *DaemonSet) ConvertTo(dst conversion.Hub) error {
 			}
 		}
 
-	// Convert annotation daemonset.kruise.io/progressive-create-pod to scaleStrategy.partitionedScaling
-	if ds.Annotations[ProgressiveCreatePodAnnotation] == "true" {
-		dsv1beta1.Spec.ScaleStrategy = &v1beta1.DaemonSetScaleStrategy{
-			PartitionedScaling: true,
+		// Convert annotation daemonset.kruise.io/progressive-create-pod to scaleStrategy.partitionedScaling
+		if ds.Annotations[ProgressiveCreatePodAnnotation] == "true" {
+			dsv1beta1.Spec.ScaleStrategy = &v1beta1.DaemonSetScaleStrategy{
+				PartitionedScaling: true,
+			}
 		}
-	}
 
 		// status
 		dsv1beta1.Status = v1beta1.DaemonSetStatus{
@@ -126,13 +126,13 @@ func (ds *DaemonSet) ConvertFrom(src conversion.Hub) error {
 			}
 		}
 
-	// Convert scaleStrategy.partitionedScaling to annotation daemonset.kruise.io/progressive-create-pod
-	if dsv1beta1.Spec.ScaleStrategy != nil && dsv1beta1.Spec.ScaleStrategy.PartitionedScaling {
-		if ds.Annotations == nil {
-			ds.Annotations = make(map[string]string)
+		// Convert scaleStrategy.partitionedScaling to annotation daemonset.kruise.io/progressive-create-pod
+		if dsv1beta1.Spec.ScaleStrategy != nil && dsv1beta1.Spec.ScaleStrategy.PartitionedScaling {
+			if ds.Annotations == nil {
+				ds.Annotations = make(map[string]string)
+			}
+			ds.Annotations[ProgressiveCreatePodAnnotation] = "true"
 		}
-		ds.Annotations[ProgressiveCreatePodAnnotation] = "true"
-	}
 
 		// status
 		ds.Status = DaemonSetStatus{
