@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -50,6 +51,8 @@ func init() {
 	testscheme = k8sruntime.NewScheme()
 	utilruntime.Must(corev1.AddToScheme(testscheme))
 	utilruntime.Must(appsv1alpha1.AddToScheme(testscheme))
+	utilruntime.Must(appsv1.AddToScheme(testscheme))
+	utilruntime.Must(appsv1alpha1.AddToScheme(scheme.Scheme))
 }
 
 var testscheme *k8sruntime.Scheme

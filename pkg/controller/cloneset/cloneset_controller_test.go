@@ -20,12 +20,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -36,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -46,7 +50,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/openkruise/kruise/apis/apps/defaults"
+	"github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	revisioncontrol "github.com/openkruise/kruise/pkg/controller/cloneset/revision"
+	synccontrol "github.com/openkruise/kruise/pkg/controller/cloneset/sync"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
@@ -65,9 +72,443 @@ var (
 	clonesetUID     = "123"
 	productionLabel = map[string]string{"type": "production"}
 	nilLabel        = map[string]string{}
+
+	cloneSetDemo = &appsv1alpha1.CloneSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "nginx",
+			Namespace: "default",
+		},
+		Spec: appsv1alpha1.CloneSetSpec{
+			Replicas: getInt32(5),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"nginx": "bar"},
+			},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"nginx": "bar"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "nginx",
+							Image: "nginx:1.9.2",
+						},
+					},
+				},
+			},
+		},
+		Status: appsv1alpha1.CloneSetStatus{
+			AvailableReplicas:        5,
+			CurrentRevision:          revision1Name,
+			ExpectedUpdatedReplicas:  5,
+			ReadyReplicas:            5,
+			Replicas:                 5,
+			UpdatedAvailableReplicas: 0,
+			UpdatedReplicas:          0,
+			UpdatedReadyReplicas:     5,
+			UpdateRevision:           revision2Name,
+		},
+	}
+
+	podDemo = &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "nginx",
+			Labels: map[string]string{
+				"nginx": "bar",
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "nginx",
+					Image: "nginx:1.9.1",
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+
+	revision1Name = "nginx-55b67d85dc"
+	revision1Obj  = `{
+    "spec": {
+        "template": {
+            "$patch": "replace",
+            "metadata": {
+                "creationTimestamp": null,
+                "labels": {
+                    "foo": "bar"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "image": "nginx:1.9.1",
+                        "name": "nginx"
+                    }
+                ]
+            }
+        }
+    }
+}`
+	revision2Name = "nginx-55b67dddfd"
+	revision2Obj  = `{
+    "spec": {
+        "template": {
+            "$patch": "replace",
+            "metadata": {
+                "creationTimestamp": null,
+                "labels": {
+                    "foo": "bar"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "image": "nginx:1.9.2",
+                        "name": "nginx"
+                    }
+                ]
+            }
+        }
+    }
+}`
 )
 
 //const timeout = time.Second * 5
+
+func TestSyncCloneSet(t *testing.T) {
+	cases := []struct {
+		name         string
+		getPods      func() []*v1.Pod
+		getCloneSet  func() *appsv1alpha1.CloneSet
+		getRevisions func() []*appsv1.ControllerRevision
+		// revisionName -> nums(pods)
+		expectedPods func() map[string]int
+	}{
+		{
+			name: "CloneSet updateStrategy=OnDelete, replicas=5, pods=5, don't update anyPod",
+			getPods: func() []*v1.Pod {
+				pods := generatePods(5, "nginx:1.9.1", revision1Name)
+				return pods
+			},
+			getCloneSet: func() *appsv1alpha1.CloneSet {
+				obj := cloneSetDemo.DeepCopy()
+				obj.Spec.UpdateStrategy.Type = appsv1alpha1.OnDeleteCloneSetUpdateStrategyType
+				return obj
+			},
+			getRevisions: func() []*appsv1.ControllerRevision {
+				obj1 := &appsv1.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        revision1Name,
+						Annotations: nil,
+					},
+					Data: runtime.RawExtension{
+						Raw: []byte(revision1Obj),
+					},
+				}
+				obj2 := &appsv1.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        revision2Name,
+						Annotations: nil,
+					},
+					Data: runtime.RawExtension{
+						Raw: []byte(revision2Obj),
+					},
+				}
+
+				return []*appsv1.ControllerRevision{obj1, obj2}
+			},
+			expectedPods: func() map[string]int {
+				obj := map[string]int{
+					revision1Name: 5,
+					revision2Name: 0,
+				}
+				return obj
+			},
+		},
+		{
+			name: "CloneSet updateStrategy=OnDelete, replicas=5, pods=3, scale 2 pods",
+			getPods: func() []*v1.Pod {
+				pods := generatePods(3, "nginx:1.9.1", revision1Name)
+				return pods
+			},
+			getCloneSet: func() *appsv1alpha1.CloneSet {
+				obj := cloneSetDemo.DeepCopy()
+				obj.Spec.UpdateStrategy.Type = appsv1alpha1.OnDeleteCloneSetUpdateStrategyType
+				return obj
+			},
+			getRevisions: func() []*appsv1.ControllerRevision {
+				obj1 := &appsv1.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        revision1Name,
+						Annotations: nil,
+					},
+					Data: runtime.RawExtension{
+						Raw: []byte(revision1Obj),
+					},
+				}
+				obj2 := &appsv1.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        revision2Name,
+						Annotations: nil,
+					},
+					Data: runtime.RawExtension{
+						Raw: []byte(revision2Obj),
+					},
+				}
+
+				return []*appsv1.ControllerRevision{obj1, obj2}
+			},
+			expectedPods: func() map[string]int {
+				obj := map[string]int{
+					revision1Name: 3,
+					revision2Name: 2,
+				}
+				return obj
+			},
+		},
+		{
+			name: "CloneSet updateStrategy=OnDelete, replicas=6, oldPods=3, newPods=5, scale 2 oldPods",
+			getPods: func() []*v1.Pod {
+				var pods []*v1.Pod
+				pods = append(pods, generatePods(3, "nginx:1.9.1", revision1Name)...)
+				pods = append(pods, generatePods(5, "nginx:1.9.2", revision2Name)...)
+				return pods
+			},
+			getCloneSet: func() *appsv1alpha1.CloneSet {
+				obj := cloneSetDemo.DeepCopy()
+				obj.Spec.Replicas = getInt32(6)
+				obj.Spec.UpdateStrategy.Type = appsv1alpha1.OnDeleteCloneSetUpdateStrategyType
+				return obj
+			},
+			getRevisions: func() []*appsv1.ControllerRevision {
+				obj1 := &appsv1.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        revision1Name,
+						Annotations: nil,
+					},
+					Data: runtime.RawExtension{
+						Raw: []byte(revision1Obj),
+					},
+				}
+				obj2 := &appsv1.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        revision2Name,
+						Annotations: nil,
+					},
+					Data: runtime.RawExtension{
+						Raw: []byte(revision2Obj),
+					},
+				}
+
+				return []*appsv1.ControllerRevision{obj1, obj2}
+			},
+			expectedPods: func() map[string]int {
+				obj := map[string]int{
+					revision1Name: 1,
+					revision2Name: 5,
+				}
+				return obj
+			},
+		},
+		{
+			name: "CloneSet updateStrategy=OnDelete, replicas=4, oldPods=3, newPods=5, scale 3 oldPods 1 newPods",
+			getPods: func() []*v1.Pod {
+				var pods []*v1.Pod
+				pods = append(pods, generatePods(3, "nginx:1.9.1", revision1Name)...)
+				pods = append(pods, generatePods(5, "nginx:1.9.2", revision2Name)...)
+				return pods
+			},
+			getCloneSet: func() *appsv1alpha1.CloneSet {
+				obj := cloneSetDemo.DeepCopy()
+				obj.Spec.Replicas = getInt32(4)
+				obj.Spec.UpdateStrategy.Type = appsv1alpha1.OnDeleteCloneSetUpdateStrategyType
+				return obj
+			},
+			getRevisions: func() []*appsv1.ControllerRevision {
+				obj1 := &appsv1.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        revision1Name,
+						Annotations: nil,
+					},
+					Data: runtime.RawExtension{
+						Raw: []byte(revision1Obj),
+					},
+				}
+				obj2 := &appsv1.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        revision2Name,
+						Annotations: nil,
+					},
+					Data: runtime.RawExtension{
+						Raw: []byte(revision2Obj),
+					},
+				}
+
+				return []*appsv1.ControllerRevision{obj1, obj2}
+			},
+			expectedPods: func() map[string]int {
+				obj := map[string]int{
+					revision1Name: 0,
+					revision2Name: 4,
+				}
+				return obj
+			},
+		},
+		{
+			name: "CloneSet updateStrategy=ReCreate, replicas=5, oldPods=5, scale down 1 Pods",
+			getPods: func() []*v1.Pod {
+				pods := generatePods(5, "nginx:1.9.1", revision1Name)
+				return pods
+			},
+			getCloneSet: func() *appsv1alpha1.CloneSet {
+				obj := cloneSetDemo.DeepCopy()
+				maxUnavailable := intstr.FromInt32(1)
+				obj.Spec.UpdateStrategy = appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.RecreateCloneSetUpdateStrategyType,
+					MaxUnavailable: &maxUnavailable,
+				}
+				return obj
+			},
+			getRevisions: func() []*appsv1.ControllerRevision {
+				obj1 := &appsv1.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        revision1Name,
+						Annotations: nil,
+					},
+					Data: runtime.RawExtension{
+						Raw: []byte(revision1Obj),
+					},
+				}
+				obj2 := &appsv1.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        revision2Name,
+						Annotations: nil,
+					},
+					Data: runtime.RawExtension{
+						Raw: []byte(revision2Obj),
+					},
+				}
+
+				return []*appsv1.ControllerRevision{obj1, obj2}
+			},
+			expectedPods: func() map[string]int {
+				obj := map[string]int{
+					revision1Name: 4,
+					revision2Name: 0,
+				}
+				return obj
+			},
+		},
+		{
+			name: "CloneSet updateStrategy=ReCreate, replicas=5, newPods=5, scale down 0 Pods",
+			getPods: func() []*v1.Pod {
+				pods := generatePods(5, "nginx:1.9.2", revision2Name)
+				return pods
+			},
+			getCloneSet: func() *appsv1alpha1.CloneSet {
+				obj := cloneSetDemo.DeepCopy()
+				maxUnavailable := intstr.FromInt32(1)
+				obj.Spec.UpdateStrategy = appsv1alpha1.CloneSetUpdateStrategy{
+					Type:           appsv1alpha1.RecreateCloneSetUpdateStrategyType,
+					MaxUnavailable: &maxUnavailable,
+				}
+				return obj
+			},
+			getRevisions: func() []*appsv1.ControllerRevision {
+				obj1 := &appsv1.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        revision1Name,
+						Annotations: nil,
+					},
+					Data: runtime.RawExtension{
+						Raw: []byte(revision1Obj),
+					},
+				}
+				obj2 := &appsv1.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        revision2Name,
+						Annotations: nil,
+					},
+					Data: runtime.RawExtension{
+						Raw: []byte(revision2Obj),
+					},
+				}
+
+				return []*appsv1.ControllerRevision{obj1, obj2}
+			},
+			expectedPods: func() map[string]int {
+				obj := map[string]int{
+					revision1Name: 0,
+					revision2Name: 5,
+				}
+				return obj
+			},
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			reconciler := newMockCloneSetReconciler()
+			cloneSet := cs.getCloneSet()
+			err := reconciler.Client.Create(context.TODO(), cloneSet)
+			if err != nil {
+				t.Fatalf("create failed: %s", err.Error())
+			}
+			pods := cs.getPods()
+			for i := range pods {
+				pod := pods[i]
+				err = reconciler.Client.Create(context.TODO(), pod)
+				if err != nil {
+					t.Fatalf("create failed: %s", err.Error())
+				}
+			}
+			revisions := cs.getRevisions()
+			for i := range revisions {
+				obj := revisions[i]
+				err = reconciler.Client.Create(context.TODO(), obj)
+				if err != nil {
+					t.Fatalf("create failed: %s", err.Error())
+				}
+			}
+
+			newStatus := cloneSet.Status.DeepCopy()
+			err = reconciler.syncCloneSet(cloneSet, newStatus, revisions[0], revisions[1], revisions, pods, nil)
+			if err != nil {
+				t.Fatalf("syncCloneSet failed: %s", err.Error())
+			}
+
+			for revision, num := range cs.expectedPods() {
+				podList := &v1.PodList{}
+				selector, err := util.ValidatedLabelSelectorAsSelector(&metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						appsv1.ControllerRevisionHashLabelKey: revision,
+					},
+				})
+				opts := &client.ListOptions{
+					LabelSelector: selector,
+				}
+				if err = reconciler.List(context.TODO(), podList, opts); err != nil {
+					t.Fatalf("List pods failed: %s", err.Error())
+				}
+				var newPods []*v1.Pod
+				for i := range podList.Items {
+					obj := &podList.Items[i]
+					if obj.Labels[appsv1alpha1.SpecifiedDeleteKey] == "true" {
+						continue
+					}
+					newPods = append(newPods, obj)
+				}
+				if len(newPods) != num {
+					t.Fatalf("expect(%d), but get(%d)", num, len(newPods))
+				}
+			}
+		})
+	}
+}
 
 func TestReconcile(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
@@ -832,4 +1273,46 @@ func getPVCNames(pvcs []*v1.PersistentVolumeClaim) sets.String {
 		s.Insert(p.Name)
 	}
 	return s
+}
+
+func generatePods(num int, image string, revision string) []*v1.Pod {
+	var pods []*v1.Pod
+	for i := 0; i < num; i++ {
+		obj := podDemo.DeepCopy()
+		obj.Name = fmt.Sprintf("%s-%s", obj.Name, randomString(5))
+		obj.Labels[appsv1.ControllerRevisionHashLabelKey] = revision
+		obj.Labels[appsv1alpha1.CloneSetInstanceID] = strconv.Itoa(i)
+		obj.Labels[pub.LifecycleStateKey] = string(pub.LifecycleStateNormal)
+		strs := strings.Split(revision, "-")
+		obj.Labels[apps.DefaultDeploymentUniqueLabelKey] = strs[1]
+		pods = append(pods, obj)
+	}
+	return pods
+
+}
+
+func newMockCloneSetReconciler() *ReconcileCloneSet {
+	fakeClient := fake.NewClientBuilder().WithScheme(testscheme).Build()
+	fakeRecorder := record.NewFakeRecorder(100)
+	reconciler := &ReconcileCloneSet{
+		Client:            fakeClient,
+		scheme:            testscheme,
+		recorder:          fakeRecorder,
+		statusUpdater:     newStatusUpdater(fakeClient),
+		controllerHistory: historyutil.NewHistory(fakeClient),
+		revisionControl:   revisioncontrol.NewRevisionControl(),
+	}
+	reconciler.syncControl = synccontrol.New(fakeClient, reconciler.recorder)
+	reconciler.reconcileFunc = reconciler.doReconcile
+	return reconciler
+}
+
+func randomString(n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	rand.Seed(time.Now().UnixNano()) // Go 1.20 之前需要这行；Go 1.20+ 可省略（但保留也无妨）
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }
