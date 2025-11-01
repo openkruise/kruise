@@ -682,6 +682,11 @@ spec:
                                   Indicate if cloneSet will reuse already existed pvc to
                                   rebuild a new pod
                                 type: boolean
+                              excludePreparingDelete:
+                                description: |-
+                                  ExcludePreparingDelete indicates whether the CloneSet should calculate scale number excluding Pods in PreparingDelete state.
+                                  Default is false.
+                                type: boolean
                               maxUnavailable:
                                 anyOf:
                                 - type: integer

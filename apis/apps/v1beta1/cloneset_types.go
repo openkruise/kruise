@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kruise Authors.
+Copyright 2025 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	v1 "k8s.io/api/core/v1"
@@ -31,10 +31,6 @@ const (
 
 	// DefaultCloneSetMaxUnavailable is the default value of maxUnavailable for CloneSet update strategy.
 	DefaultCloneSetMaxUnavailable = "20%"
-
-	// CloneSetScalingExcludePreparingDeleteKey is the label key that enables scalingExcludePreparingDelete
-	// only for this CloneSet, which means it will calculate scale number excluding Pods in PreparingDelete state.
-	CloneSetScalingExcludePreparingDeleteKey = "apps.kruise.io/cloneset-scaling-exclude-preparing-delete"
 )
 
 // CloneSetSpec defines the desired state of CloneSet
@@ -89,17 +85,20 @@ type CloneSetScaleStrategy struct {
 	// PodsToDelete is the names of Pod should be deleted.
 	// Note that this list will be truncated for non-existing pod names.
 	PodsToDelete []string `json:"podsToDelete,omitempty"`
+
 	// The maximum number of pods that can be unavailable for scaled pods.
 	// This field can control the changes rate of replicas for CloneSet so as to minimize the impact for users' service.
 	// The scale will fail if the number of unavailable pods were greater than this MaxUnavailable at scaling up.
 	// MaxUnavailable works only when scaling up.
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
-	// Indicate if cloneSet will reuse already existed pvc to
-	// rebuild a new pod.
-	// Default is false for v1alpha1 (backward compatibility).
+	// Indicate if cloneSet will reuse already existed pvc to rebuild a new pod.
+	// Default is true for v1beta1, which means CloneSet will NOT reuse PVC by default.
+	// For v1alpha1, default is false to maintain backward compatibility.
 	// Note: omitempty is removed to ensure the field is always serialized,
-	// preventing v1beta1 CRD default from being applied during conversion.
+	// preventing CRD default from overriding values converted from v1alpha1.
+	// +optional
+	// +kubebuilder:default=true
 	DisablePVCReuse bool `json:"disablePVCReuse"`
 
 	// ExcludePreparingDelete indicates whether the CloneSet should calculate scale number excluding Pods in PreparingDelete state.
@@ -245,6 +244,7 @@ type CloneSetCondition struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.labelSelector
 // +kubebuilder:resource:shortName=clone
+// +kubebuilder:storageversion
 // +kubebuilder:printcolumn:name="DESIRED",type="integer",JSONPath=".spec.replicas",description="The desired number of pods."
 // +kubebuilder:printcolumn:name="UPDATED",type="integer",JSONPath=".status.updatedReplicas",description="The number of pods updated."
 // +kubebuilder:printcolumn:name="UPDATED_READY",type="integer",JSONPath=".status.updatedReadyReplicas",description="The number of pods updated and ready."

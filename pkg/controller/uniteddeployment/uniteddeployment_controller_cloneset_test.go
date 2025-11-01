@@ -1715,8 +1715,8 @@ func TestCsSubsetCount(t *testing.T) {
 	g.Expect(setsubB.Spec.Template.Spec.Containers[0].Image).Should(gomega.BeEquivalentTo("nginx:5.0"))
 }
 
-func expectedCsCount(g *gomega.GomegaWithT, ud *appsv1alpha1.UnitedDeployment, count int) *appsv1alpha1.CloneSetList {
-	csList := &appsv1alpha1.CloneSetList{}
+func expectedCsCount(g *gomega.GomegaWithT, ud *appsv1alpha1.UnitedDeployment, count int) *appsv1beta1.CloneSetList {
+	csList := &appsv1beta1.CloneSetList{}
 
 	selector, err := metav1.LabelSelectorAsSelector(ud.Spec.Selector)
 	g.Expect(err).Should(gomega.BeNil())
@@ -1736,7 +1736,7 @@ func expectedCsCount(g *gomega.GomegaWithT, ud *appsv1alpha1.UnitedDeployment, c
 	return csList
 }
 
-func getSubsetCsByName(csList *appsv1alpha1.CloneSetList, name string) *appsv1alpha1.CloneSet {
+func getSubsetCsByName(csList *appsv1beta1.CloneSetList, name string) *appsv1beta1.CloneSet {
 	for _, cs := range csList.Items {
 		if cs.Labels[appsv1alpha1.SubSetNameLabelKey] == name {
 			return &cs

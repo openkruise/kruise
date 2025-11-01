@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/utils/ptr"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -255,5 +256,52 @@ func SetDefaultsDaemonSetV1beta1(obj *v1beta1.DaemonSet) {
 
 	if obj.Spec.RevisionHistoryLimit == nil {
 		obj.Spec.RevisionHistoryLimit = ptr.To(int32(10))
+	}
+}
+
+// SetDefaultsCloneSetV1beta1 sets default values for v1beta1 CloneSet.
+func SetDefaultsCloneSetV1beta1(obj *v1beta1.CloneSet, injectTemplateDefaults bool) {
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = ptr.To(int32(1))
+	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = ptr.To(int32(10))
+	}
+
+	// For v1beta1, set DisablePVCReuse default to true (safer default)
+	// This is only applied during Create operations by the webhook
+	// Note: v1alpha1 keeps default as false for backward compatibility
+
+	if injectTemplateDefaults {
+		SetDefaultPodSpec(&obj.Spec.Template.Spec)
+		for i := range obj.Spec.VolumeClaimTemplates {
+			a := &obj.Spec.VolumeClaimTemplates[i]
+			v1.SetDefaults_PersistentVolumeClaim(a)
+			v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
+			v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
+			v1.SetDefaults_ResourceList(&a.Status.Capacity)
+		}
+	}
+
+	switch obj.Spec.UpdateStrategy.Type {
+	case "":
+		obj.Spec.UpdateStrategy.Type = v1beta1.RecreateCloneSetUpdateStrategyType
+	case v1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType, v1beta1.InPlaceOnlyCloneSetUpdateStrategyType:
+		if obj.Spec.UpdateStrategy.InPlaceUpdateStrategy == nil {
+			obj.Spec.UpdateStrategy.InPlaceUpdateStrategy = &appspub.InPlaceUpdateStrategy{}
+		}
+	}
+
+	if obj.Spec.UpdateStrategy.Partition == nil {
+		partition := intstr.FromInt(0)
+		obj.Spec.UpdateStrategy.Partition = &partition
+	}
+	if obj.Spec.UpdateStrategy.MaxUnavailable == nil {
+		maxUnavailable := intstr.FromString(v1beta1.DefaultCloneSetMaxUnavailable)
+		obj.Spec.UpdateStrategy.MaxUnavailable = &maxUnavailable
+	}
+	if obj.Spec.UpdateStrategy.MaxSurge == nil {
+		maxSurge := intstr.FromInt(0)
+		obj.Spec.UpdateStrategy.MaxSurge = &maxSurge
 	}
 }

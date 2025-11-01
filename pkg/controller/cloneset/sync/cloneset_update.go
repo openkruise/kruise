@@ -31,6 +31,7 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
@@ -44,7 +45,7 @@ import (
 	"github.com/openkruise/kruise/pkg/util/updatesort"
 )
 
-func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
+func (c *realControl) Update(cs *appsv1beta1.CloneSet,
 	currentRevision, updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 	pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 ) error {
@@ -156,7 +157,7 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	return nil
 }
 
-func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control, pod *v1.Pod, updateRevision string) (bool, time.Duration, error) {
+func (c *realControl) refreshPodState(cs *appsv1beta1.CloneSet, coreControl clonesetcore.Control, pod *v1.Pod, updateRevision string) (bool, time.Duration, error) {
 	opts := coreControl.GetUpdateOptions()
 	opts = inplaceupdate.SetOptionsDefaults(opts)
 
@@ -230,7 +231,7 @@ func (c *realControl) refreshPodState(cs *appsv1alpha1.CloneSet, coreControl clo
 }
 
 // fix the pod-template-hash label for old pods before v1.1
-func (c *realControl) fixPodTemplateHashLabel(cs *appsv1alpha1.CloneSet, pod *v1.Pod) (bool, error) {
+func (c *realControl) fixPodTemplateHashLabel(cs *appsv1beta1.CloneSet, pod *v1.Pod) (bool, error) {
 	if _, exists := pod.Labels[apps.DefaultDeploymentUniqueLabelKey]; exists {
 		return false, nil
 	}
@@ -246,13 +247,13 @@ func (c *realControl) fixPodTemplateHashLabel(cs *appsv1alpha1.CloneSet, pod *v1
 	return true, nil
 }
 
-func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control,
+func (c *realControl) updatePod(cs *appsv1beta1.CloneSet, coreControl clonesetcore.Control,
 	updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 	pod *v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 ) (time.Duration, error) {
 
-	if cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType ||
-		cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
+	if cs.Spec.UpdateStrategy.Type == appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType ||
+		cs.Spec.UpdateStrategy.Type == appsv1beta1.InPlaceOnlyCloneSetUpdateStrategyType {
 		var oldRevision *apps.ControllerRevision
 		for _, r := range revisions {
 			if clonesetutils.EqualToRevisionHash("", pod, r.Name) {
@@ -311,7 +312,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 			}
 		}
 
-		if cs.Spec.UpdateStrategy.Type == appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType {
+		if cs.Spec.UpdateStrategy.Type == appsv1beta1.InPlaceOnlyCloneSetUpdateStrategyType {
 			return 0, fmt.Errorf("find Pod %s update strategy is InPlaceOnly but can not update in-place", pod.Name)
 		}
 		klog.InfoS("CloneSet could not update Pod in-place, so it will back off to ReCreate", "cloneSet", klog.KObj(cs), "pod", klog.KObj(pod))
@@ -333,7 +334,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 }
 
 // SortUpdateIndexes sorts the given oldRevisionIndexes of Pods to update according to the CloneSet strategy.
-func SortUpdateIndexes(coreControl clonesetcore.Control, strategy appsv1alpha1.CloneSetUpdateStrategy, pods []*v1.Pod, waitUpdateIndexes []int) []int {
+func SortUpdateIndexes(coreControl clonesetcore.Control, strategy appsv1beta1.CloneSetUpdateStrategy, pods []*v1.Pod, waitUpdateIndexes []int) []int {
 	// Sort Pods with default sequence
 	sort.Slice(waitUpdateIndexes, coreControl.GetPodsSortFunc(pods, waitUpdateIndexes))
 
@@ -341,7 +342,15 @@ func SortUpdateIndexes(coreControl clonesetcore.Control, strategy appsv1alpha1.C
 		waitUpdateIndexes = updatesort.NewPrioritySorter(strategy.PriorityStrategy).Sort(pods, waitUpdateIndexes)
 	}
 	if strategy.ScatterStrategy != nil {
-		waitUpdateIndexes = updatesort.NewScatterSorter(strategy.ScatterStrategy).Sort(pods, waitUpdateIndexes)
+		// Convert v1beta1.UpdateScatterStrategy to v1alpha1.UpdateScatterStrategy
+		scatterStrategy := make(appsv1alpha1.UpdateScatterStrategy, len(strategy.ScatterStrategy))
+		for i, term := range strategy.ScatterStrategy {
+			scatterStrategy[i] = appsv1alpha1.UpdateScatterTerm{
+				Key:   term.Key,
+				Value: term.Value,
+			}
+		}
+		waitUpdateIndexes = updatesort.NewScatterSorter(scatterStrategy).Sort(pods, waitUpdateIndexes)
 	}
 
 	// PreparingUpdate first

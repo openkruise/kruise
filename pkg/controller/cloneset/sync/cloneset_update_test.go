@@ -39,7 +39,7 @@ import (
 
 	"github.com/openkruise/kruise/apis"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
@@ -52,7 +52,7 @@ import (
 
 type manageCase struct {
 	name           string
-	cs             *appsv1alpha1.CloneSet
+	cs             *appsv1beta1.CloneSet
 	updateRevision *apps.ControllerRevision
 	revisions      []*apps.ControllerRevision
 	pods           []*v1.Pod
@@ -87,7 +87,7 @@ func TestUpdate(t *testing.T) {
 	cases := []manageCase{
 		{
 			name:           "do nothing",
-			cs:             &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{Replicas: getInt32Pointer(1)}},
+			cs:             &appsv1beta1.CloneSet{Spec: appsv1beta1.CloneSetSpec{Replicas: getInt32Pointer(1)}},
 			updateRevision: &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "rev_new"}},
 			pods: []*v1.Pod{
 				{
@@ -112,7 +112,7 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name:           "normal update condition",
-			cs:             &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{Replicas: getInt32Pointer(1)}},
+			cs:             &appsv1beta1.CloneSet{Spec: appsv1beta1.CloneSetSpec{Replicas: getInt32Pointer(1)}},
 			updateRevision: &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "rev_new"}},
 			pods: []*v1.Pod{
 				{
@@ -136,9 +136,9 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "recreate update 1",
-			cs: &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{Spec: appsv1beta1.CloneSetSpec{
 				Replicas:       getInt32Pointer(1),
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.RecreateCloneSetUpdateStrategyType},
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.RecreateCloneSetUpdateStrategyType},
 			}},
 			updateRevision: &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "rev_new"}},
 			pods: []*v1.Pod{
@@ -146,7 +146,7 @@ func TestUpdate(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{
 						apps.ControllerRevisionHashLabelKey:  "rev_old",
 						apps.DefaultDeploymentUniqueLabelKey: "rev_old",
-						appsv1alpha1.CloneSetInstanceID:      "id-0",
+						appsv1beta1.CloneSetInstanceID:       "id-0",
 					}},
 					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
@@ -156,17 +156,17 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 			pvcs: []*v1.PersistentVolumeClaim{
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
 			},
 			expectedPods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", ResourceVersion: "1", Labels: map[string]string{
 						apps.ControllerRevisionHashLabelKey:  "rev_old",
 						apps.DefaultDeploymentUniqueLabelKey: "rev_old",
-						appsv1alpha1.CloneSetInstanceID:      "id-0",
-						appsv1alpha1.SpecifiedDeleteKey:      "true",
+						appsv1beta1.CloneSetInstanceID:       "id-0",
+						appsv1beta1.SpecifiedDeleteKey:       "true",
 					}},
 					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
 					Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{
@@ -176,16 +176,16 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 			expectedPVCs: []*v1.PersistentVolumeClaim{
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
 			},
 		},
 		{
 			name: "recreate update 2",
-			cs: &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{Spec: appsv1beta1.CloneSetSpec{
 				Replicas:       getInt32Pointer(1),
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType},
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType},
 			}},
 			updateRevision: &apps.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{Name: "rev_new"},
@@ -202,7 +202,7 @@ func TestUpdate(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{
 						apps.ControllerRevisionHashLabelKey:  "rev_old",
 						apps.DefaultDeploymentUniqueLabelKey: "rev_old",
-						appsv1alpha1.CloneSetInstanceID:      "id-0",
+						appsv1beta1.CloneSetInstanceID:       "id-0",
 					}},
 					Spec: v1.PodSpec{
 						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
@@ -219,17 +219,17 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 			pvcs: []*v1.PersistentVolumeClaim{
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
 			},
 			expectedPods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", ResourceVersion: "1", Labels: map[string]string{
 						apps.ControllerRevisionHashLabelKey:  "rev_old",
 						apps.DefaultDeploymentUniqueLabelKey: "rev_old",
-						appsv1alpha1.CloneSetInstanceID:      "id-0",
-						appsv1alpha1.SpecifiedDeleteKey:      "true",
+						appsv1beta1.CloneSetInstanceID:       "id-0",
+						appsv1beta1.SpecifiedDeleteKey:       "true",
 					}},
 					Spec: v1.PodSpec{
 						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
@@ -246,16 +246,16 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 			expectedPVCs: []*v1.PersistentVolumeClaim{
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
 			},
 		},
 		{
 			name: "inplace update",
-			cs: &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{Spec: appsv1beta1.CloneSetSpec{
 				Replicas:       getInt32Pointer(1),
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType},
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType},
 			}},
 			updateRevision: &apps.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{Name: "rev_new"},
@@ -272,7 +272,7 @@ func TestUpdate(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{
 						apps.ControllerRevisionHashLabelKey:  "rev_old",
 						apps.DefaultDeploymentUniqueLabelKey: "rev_old",
-						appsv1alpha1.CloneSetInstanceID:      "id-0",
+						appsv1beta1.CloneSetInstanceID:       "id-0",
 					}},
 					Spec: v1.PodSpec{
 						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
@@ -289,9 +289,9 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 			pvcs: []*v1.PersistentVolumeClaim{
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
 			},
 			expectedPods: []*v1.Pod{
 				{
@@ -299,7 +299,7 @@ func TestUpdate(t *testing.T) {
 						Labels: map[string]string{
 							apps.ControllerRevisionHashLabelKey:  "rev_new",
 							apps.DefaultDeploymentUniqueLabelKey: "rev_new",
-							appsv1alpha1.CloneSetInstanceID:      "id-0",
+							appsv1beta1.CloneSetInstanceID:       "id-0",
 							appspub.LifecycleStateKey:            string(appspub.LifecycleStateUpdating),
 						},
 						Annotations: map[string]string{appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
@@ -326,16 +326,16 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 			expectedPVCs: []*v1.PersistentVolumeClaim{
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
 			},
 		},
 		{
 			name: "inplace update with grace period",
-			cs: &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{Spec: appsv1beta1.CloneSetSpec{
 				Replicas:       getInt32Pointer(1),
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
 			}},
 			updateRevision: &apps.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{Name: "rev_new"},
@@ -352,7 +352,7 @@ func TestUpdate(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{
 						apps.ControllerRevisionHashLabelKey:  "rev_old",
 						apps.DefaultDeploymentUniqueLabelKey: "rev_old",
-						appsv1alpha1.CloneSetInstanceID:      "id-0",
+						appsv1beta1.CloneSetInstanceID:       "id-0",
 					}},
 					Spec: v1.PodSpec{
 						ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
@@ -369,9 +369,9 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 			pvcs: []*v1.PersistentVolumeClaim{
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
 			},
 			expectedPods: []*v1.Pod{
 				{
@@ -379,7 +379,7 @@ func TestUpdate(t *testing.T) {
 						Labels: map[string]string{
 							apps.ControllerRevisionHashLabelKey:  "rev_new",
 							apps.DefaultDeploymentUniqueLabelKey: "rev_new",
-							appsv1alpha1.CloneSetInstanceID:      "id-0",
+							appsv1beta1.CloneSetInstanceID:       "id-0",
 							appspub.LifecycleStateKey:            string(appspub.LifecycleStateUpdating),
 						},
 						Annotations: map[string]string{
@@ -407,16 +407,16 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 			expectedPVCs: []*v1.PersistentVolumeClaim{
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
 			},
 		},
 		{
 			name: "inplace update during grace period",
-			cs: &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{Spec: appsv1beta1.CloneSetSpec{
 				Replicas:       getInt32Pointer(1),
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
 			}},
 			updateRevision: &apps.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{Name: "rev_new"},
@@ -431,7 +431,7 @@ func TestUpdate(t *testing.T) {
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
-						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new", appsv1alpha1.CloneSetInstanceID: "id-0"},
+						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new", appsv1beta1.CloneSetInstanceID: "id-0"},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
 								Revision:        "rev_new",
@@ -455,9 +455,9 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 			pvcs: []*v1.PersistentVolumeClaim{
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
 			},
 			expectedPods: []*v1.Pod{
 				{
@@ -465,7 +465,7 @@ func TestUpdate(t *testing.T) {
 						Labels: map[string]string{
 							apps.ControllerRevisionHashLabelKey:  "rev_new",
 							apps.DefaultDeploymentUniqueLabelKey: "rev_new",
-							appsv1alpha1.CloneSetInstanceID:      "id-0",
+							appsv1beta1.CloneSetInstanceID:       "id-0",
 						},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
@@ -490,16 +490,16 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 			expectedPVCs: []*v1.PersistentVolumeClaim{
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
 			},
 		},
 		{
 			name: "inplace update continuously after grace period",
-			cs: &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{Spec: appsv1beta1.CloneSetSpec{
 				Replicas:       getInt32Pointer(1),
-				UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
+				UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType, InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{GracePeriodSeconds: 3630}},
 			}},
 			updateRevision: &apps.ControllerRevision{
 				ObjectMeta: metav1.ObjectMeta{Name: "rev_new"},
@@ -514,7 +514,7 @@ func TestUpdate(t *testing.T) {
 			pods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0",
-						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new", appsv1alpha1.CloneSetInstanceID: "id-0"},
+						Labels: map[string]string{apps.ControllerRevisionHashLabelKey: "rev_new", appsv1beta1.CloneSetInstanceID: "id-0"},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
 								Revision:        "rev_new",
@@ -538,9 +538,9 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 			pvcs: []*v1.PersistentVolumeClaim{
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
 			},
 			expectedPods: []*v1.Pod{
 				{
@@ -548,7 +548,7 @@ func TestUpdate(t *testing.T) {
 						Labels: map[string]string{
 							apps.ControllerRevisionHashLabelKey:  "rev_new",
 							apps.DefaultDeploymentUniqueLabelKey: "rev_new",
-							appsv1alpha1.CloneSetInstanceID:      "id-0",
+							appsv1beta1.CloneSetInstanceID:       "id-0",
 						},
 						Annotations: map[string]string{
 							appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
@@ -575,14 +575,14 @@ func TestUpdate(t *testing.T) {
 				},
 			},
 			expectedPVCs: []*v1.PersistentVolumeClaim{
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-0", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-1", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-1"}}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pvc-2", Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "id-0"}}},
 			},
 		},
 		{
 			name:           "create: preparingNormal->Normal without hook",
-			cs:             &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{Replicas: getInt32Pointer(1)}},
+			cs:             &appsv1beta1.CloneSet{Spec: appsv1beta1.CloneSetSpec{Replicas: getInt32Pointer(1)}},
 			updateRevision: &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "rev_new"}},
 			pods: []*v1.Pod{
 				{
@@ -615,8 +615,8 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "create: preparingNormal->preparingNormal, preNormal does not hook",
-			cs: &appsv1alpha1.CloneSet{
-				Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{
+				Spec: appsv1beta1.CloneSetSpec{
 					Replicas:  getInt32Pointer(1),
 					Lifecycle: &appspub.Lifecycle{PreNormal: &appspub.LifecycleHook{LabelsHandler: map[string]string{"preNormalHooked": "true"}}},
 				},
@@ -653,8 +653,8 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "create: preparingNormal->Normal, preNormal does hook",
-			cs: &appsv1alpha1.CloneSet{
-				Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{
+				Spec: appsv1beta1.CloneSetSpec{
 					Replicas:  getInt32Pointer(1),
 					Lifecycle: &appspub.Lifecycle{PreNormal: &appspub.LifecycleHook{LabelsHandler: map[string]string{"preNormalHooked": "true"}}},
 				},
@@ -693,8 +693,8 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "recreate update: preparingNormal, preNormal does not hook, specific delete",
-			cs: &appsv1alpha1.CloneSet{
-				Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{
+				Spec: appsv1beta1.CloneSetSpec{
 					Replicas:  getInt32Pointer(1),
 					Lifecycle: &appspub.Lifecycle{PreNormal: &appspub.LifecycleHook{FinalizersHandler: []string{"preNormalHooked"}}},
 				},
@@ -719,7 +719,7 @@ func TestUpdate(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Labels: map[string]string{
 						apps.ControllerRevisionHashLabelKey:  "rev_old",
 						apps.DefaultDeploymentUniqueLabelKey: "rev_old",
-						appsv1alpha1.SpecifiedDeleteKey:      "true",
+						appsv1beta1.SpecifiedDeleteKey:       "true",
 						appspub.LifecycleStateKey:            string(appspub.LifecycleStatePreparingNormal),
 					}},
 					Spec: v1.PodSpec{ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}}},
@@ -732,11 +732,11 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "in-place update: preparingNormal->Updating, preNormal & InPlaceUpdate does not hook",
-			cs: &appsv1alpha1.CloneSet{
-				Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{
+				Spec: appsv1beta1.CloneSetSpec{
 					Replicas:       getInt32Pointer(1),
 					Lifecycle:      &appspub.Lifecycle{PreNormal: &appspub.LifecycleHook{FinalizersHandler: []string{"slb.com/online"}}},
-					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType},
+					UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType},
 				},
 			},
 			updateRevision: &apps.ControllerRevision{
@@ -808,14 +808,14 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "in-place update: preparingNormal->Normal, preNormal & InPlaceUpdate does hook",
-			cs: &appsv1alpha1.CloneSet{
-				Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{
+				Spec: appsv1beta1.CloneSetSpec{
 					Replicas: getInt32Pointer(1),
 					Lifecycle: &appspub.Lifecycle{
 						PreNormal:     &appspub.LifecycleHook{FinalizersHandler: []string{"slb/online"}},
 						InPlaceUpdate: &appspub.LifecycleHook{FinalizersHandler: []string{"slb/online"}},
 					},
-					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType},
+					UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType},
 				},
 			},
 			updateRevision: &apps.ControllerRevision{
@@ -879,14 +879,14 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name: "in-place update: Normal->preparingUpdate, preNormal & InPlaceUpdate does hook",
-			cs: &appsv1alpha1.CloneSet{
-				Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{
+				Spec: appsv1beta1.CloneSetSpec{
 					Replicas: getInt32Pointer(1),
 					Lifecycle: &appspub.Lifecycle{
 						PreNormal:     &appspub.LifecycleHook{FinalizersHandler: []string{"slb/online"}},
 						InPlaceUpdate: &appspub.LifecycleHook{FinalizersHandler: []string{"slb/online"}},
 					},
-					UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType},
+					UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType},
 				},
 			},
 			updateRevision: &apps.ControllerRevision{
@@ -950,7 +950,7 @@ func TestUpdate(t *testing.T) {
 		},
 		{
 			name:           "create: preparingNormal->Normal without hook, pod is not scheduled, should stay at preparingNormal",
-			cs:             &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{Replicas: getInt32Pointer(1)}},
+			cs:             &appsv1beta1.CloneSet{Spec: appsv1beta1.CloneSetSpec{Replicas: getInt32Pointer(1)}},
 			updateRevision: &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "rev_new"}},
 			pods: []*v1.Pod{
 				{
@@ -1040,13 +1040,13 @@ func TestUpdate(t *testing.T) {
 
 func TestSortUpdateIndexes(t *testing.T) {
 	cases := []struct {
-		strategy          appsv1alpha1.CloneSetUpdateStrategy
+		strategy          appsv1beta1.CloneSetUpdateStrategy
 		pods              []*v1.Pod
 		waitUpdateIndexes []int
 		expectedIndexes   []int
 	}{
 		{
-			strategy: appsv1alpha1.CloneSetUpdateStrategy{},
+			strategy: appsv1beta1.CloneSetUpdateStrategy{},
 			pods: []*v1.Pod{
 				{Status: v1.PodStatus{Phase: v1.PodPending, Conditions: []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}}},
 				{Status: v1.PodStatus{Phase: v1.PodPending}},
@@ -1059,7 +1059,7 @@ func TestSortUpdateIndexes(t *testing.T) {
 		},
 	}
 
-	coreControl := clonesetcore.New(&appsv1alpha1.CloneSet{})
+	coreControl := clonesetcore.New(&appsv1beta1.CloneSet{})
 	for i, tc := range cases {
 		got := SortUpdateIndexes(coreControl, tc.strategy, tc.pods, tc.waitUpdateIndexes)
 		if !reflect.DeepEqual(got, tc.expectedIndexes) {
@@ -1076,49 +1076,49 @@ func TestCalculateUpdateCount(t *testing.T) {
 		return &v1.Pod{Status: v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}}}
 	}
 	cases := []struct {
-		strategy           appsv1alpha1.CloneSetUpdateStrategy
+		strategy           appsv1beta1.CloneSetUpdateStrategy
 		totalReplicas      int
 		oldRevisionIndexes []int
 		pods               []*v1.Pod
 		expectedResult     int
 	}{
 		{
-			strategy:           appsv1alpha1.CloneSetUpdateStrategy{},
+			strategy:           appsv1beta1.CloneSetUpdateStrategy{},
 			totalReplicas:      3,
 			oldRevisionIndexes: []int{0, 1, 2},
 			pods:               []*v1.Pod{readyPod(), readyPod(), readyPod()},
 			expectedResult:     1,
 		},
 		{
-			strategy:           appsv1alpha1.CloneSetUpdateStrategy{},
+			strategy:           appsv1beta1.CloneSetUpdateStrategy{},
 			totalReplicas:      3,
 			oldRevisionIndexes: []int{0, 1, 2},
 			pods:               []*v1.Pod{readyPod(), {}, readyPod()},
 			expectedResult:     0,
 		},
 		{
-			strategy:           appsv1alpha1.CloneSetUpdateStrategy{},
+			strategy:           appsv1beta1.CloneSetUpdateStrategy{},
 			totalReplicas:      3,
 			oldRevisionIndexes: []int{0, 1, 2},
 			pods:               []*v1.Pod{{}, readyPod(), readyPod()},
 			expectedResult:     1,
 		},
 		{
-			strategy:           appsv1alpha1.CloneSetUpdateStrategy{},
+			strategy:           appsv1beta1.CloneSetUpdateStrategy{},
 			totalReplicas:      10,
 			oldRevisionIndexes: []int{0, 1, 2, 3, 4, 5, 6, 7, 8},
 			pods:               []*v1.Pod{{}, readyPod(), readyPod(), readyPod(), readyPod(), readyPod(), readyPod(), readyPod(), {}, readyPod()},
 			expectedResult:     1,
 		},
 		{
-			strategy:           appsv1alpha1.CloneSetUpdateStrategy{Partition: util.GetIntOrStrPointer(intstrutil.FromInt(2)), MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(3))},
+			strategy:           appsv1beta1.CloneSetUpdateStrategy{Partition: util.GetIntOrStrPointer(intstrutil.FromInt(2)), MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(3))},
 			totalReplicas:      3,
 			oldRevisionIndexes: []int{0, 1},
 			pods:               []*v1.Pod{{}, readyPod(), readyPod()},
 			expectedResult:     0,
 		},
 		{
-			strategy:           appsv1alpha1.CloneSetUpdateStrategy{Partition: util.GetIntOrStrPointer(intstrutil.FromInt(2)), MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromString("50%"))},
+			strategy:           appsv1beta1.CloneSetUpdateStrategy{Partition: util.GetIntOrStrPointer(intstrutil.FromInt(2)), MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromString("50%"))},
 			totalReplicas:      8,
 			oldRevisionIndexes: []int{0, 1, 2, 3, 4, 5, 6},
 			pods:               []*v1.Pod{{}, readyPod(), {}, readyPod(), readyPod(), readyPod(), readyPod(), {}},
@@ -1126,7 +1126,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 		},
 		{
 			// old revision all unavailable, partition = 0, maxUnavailable = 2, should only update 2 pods
-			strategy: appsv1alpha1.CloneSetUpdateStrategy{
+			strategy: appsv1beta1.CloneSetUpdateStrategy{
 				Partition:      util.GetIntOrStrPointer(intstrutil.FromInt(0)),
 				MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(2)),
 			},
@@ -1137,7 +1137,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 		},
 		{
 			// old revision all unavailable, partition = 0, maxUnavailable = 2, 2 updating, should not update pods
-			strategy: appsv1alpha1.CloneSetUpdateStrategy{
+			strategy: appsv1beta1.CloneSetUpdateStrategy{
 				Partition:      util.GetIntOrStrPointer(intstrutil.FromInt(0)),
 				MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(2)),
 			},
@@ -1148,7 +1148,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 		},
 		{
 			// old revision all unavailable, partition = 0, maxUnavailable = 2, 1 updated and 1 updating, should only update 1 pods
-			strategy: appsv1alpha1.CloneSetUpdateStrategy{
+			strategy: appsv1beta1.CloneSetUpdateStrategy{
 				Partition:      util.GetIntOrStrPointer(intstrutil.FromInt(0)),
 				MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(2)),
 			},
@@ -1159,7 +1159,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 		},
 		{
 			// old revision all unavailable, partition = 0, maxUnavailable = 2， maxSurge = 1, 1 creating, should only update 2 pods
-			strategy: appsv1alpha1.CloneSetUpdateStrategy{
+			strategy: appsv1beta1.CloneSetUpdateStrategy{
 				Partition:      util.GetIntOrStrPointer(intstrutil.FromInt(0)),
 				MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(2)),
 				MaxSurge:       intstrutil.ValueOrDefault(nil, intstrutil.FromInt(1)),
@@ -1171,7 +1171,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 		},
 		{
 			// old revision all unavailable, partition = 0, maxUnavailable = 2， maxSurge = 1, 1 updated and 1 updating, should only update 2 pods
-			strategy: appsv1alpha1.CloneSetUpdateStrategy{
+			strategy: appsv1beta1.CloneSetUpdateStrategy{
 				Partition:      util.GetIntOrStrPointer(intstrutil.FromInt(0)),
 				MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(2)),
 				MaxSurge:       intstrutil.ValueOrDefault(nil, intstrutil.FromInt(1)),
@@ -1183,7 +1183,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 		},
 		{
 			// old revision all unavailable, partition = 0, maxUnavailable = 2， maxSurge = 1, 1 updated and 2 updating, should only update 1 pods
-			strategy: appsv1alpha1.CloneSetUpdateStrategy{
+			strategy: appsv1beta1.CloneSetUpdateStrategy{
 				Partition:      util.GetIntOrStrPointer(intstrutil.FromInt(0)),
 				MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(2)),
 				MaxSurge:       intstrutil.ValueOrDefault(nil, intstrutil.FromInt(1)),
@@ -1195,7 +1195,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 		},
 		{
 			// old revision all unavailable, partition = 0, maxUnavailable = 2， maxSurge = 1, 3 updating, should not update pods
-			strategy: appsv1alpha1.CloneSetUpdateStrategy{
+			strategy: appsv1beta1.CloneSetUpdateStrategy{
 				Partition:      util.GetIntOrStrPointer(intstrutil.FromInt(0)),
 				MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(2)),
 				MaxSurge:       intstrutil.ValueOrDefault(nil, intstrutil.FromInt(1)),
@@ -1207,7 +1207,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 		},
 		{
 			// rollback with maxUnavailable and pods in new revision are unavailable
-			strategy: appsv1alpha1.CloneSetUpdateStrategy{
+			strategy: appsv1beta1.CloneSetUpdateStrategy{
 				Partition:      util.GetIntOrStrPointer(intstrutil.FromInt(7)),
 				MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(2)),
 			},
@@ -1218,7 +1218,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 		},
 		{
 			// maxUnavailable = 0 and maxSurge = 2, usedSurge = 1
-			strategy: appsv1alpha1.CloneSetUpdateStrategy{
+			strategy: appsv1beta1.CloneSetUpdateStrategy{
 				MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(0)),
 				MaxSurge:       intstrutil.ValueOrDefault(nil, intstrutil.FromInt(2)),
 			},
@@ -1229,7 +1229,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 		},
 		{
 			// maxUnavailable = 0 and maxSurge = 2, usedSurge = 2
-			strategy: appsv1alpha1.CloneSetUpdateStrategy{
+			strategy: appsv1beta1.CloneSetUpdateStrategy{
 				MaxUnavailable: intstrutil.ValueOrDefault(nil, intstrutil.FromInt(0)),
 				MaxSurge:       intstrutil.ValueOrDefault(nil, intstrutil.FromInt(2)),
 			},
@@ -1240,7 +1240,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 		},
 	}
 
-	coreControl := clonesetcore.New(&appsv1alpha1.CloneSet{})
+	coreControl := clonesetcore.New(&appsv1beta1.CloneSet{})
 	for i, tc := range cases {
 		currentRevision := "current"
 		updateRevision := "updated"
@@ -1256,7 +1256,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 		}
 
 		replicas := int32(tc.totalReplicas)
-		cs := &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{Replicas: &replicas, UpdateStrategy: tc.strategy}}
+		cs := &appsv1beta1.CloneSet{Spec: appsv1beta1.CloneSetSpec{Replicas: &replicas, UpdateStrategy: tc.strategy}}
 		diffRes := calculateDiffsWithExpectation(cs, tc.pods, currentRevision, updateRevision, nil)
 
 		var waitUpdateIndexes []int

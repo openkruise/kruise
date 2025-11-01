@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 // NewPVC for unit tests.
@@ -45,7 +45,7 @@ func NewPVC(name string) v1.PersistentVolumeClaim {
 }
 
 // NewCloneSetWithVolumes for unit tests.
-func NewCloneSetWithVolumes(replicas int, name string, petMounts []v1.VolumeMount, podMounts []v1.VolumeMount) *appsv1alpha1.CloneSet {
+func NewCloneSetWithVolumes(replicas int, name string, petMounts []v1.VolumeMount, podMounts []v1.VolumeMount) *appsv1beta1.CloneSet {
 	mounts := append(petMounts, podMounts...)
 	var claims []v1.PersistentVolumeClaim
 	for _, m := range petMounts {
@@ -79,7 +79,7 @@ func NewCloneSetWithVolumes(replicas int, name string, petMounts []v1.VolumeMoun
 
 	template.Labels = map[string]string{"foo": "bar"}
 
-	return &appsv1alpha1.CloneSet{
+	return &appsv1beta1.CloneSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "CloneSet",
 			APIVersion: "apps.kruise.io/v1alpha1",
@@ -89,14 +89,14 @@ func NewCloneSetWithVolumes(replicas int, name string, petMounts []v1.VolumeMoun
 			Namespace: v1.NamespaceDefault,
 			UID:       types.UID("test"),
 		},
-		Spec: appsv1alpha1.CloneSetSpec{
+		Spec: appsv1beta1.CloneSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
 			Replicas:             func() *int32 { i := int32(replicas); return &i }(),
 			Template:             template,
 			VolumeClaimTemplates: claims,
-			UpdateStrategy:       appsv1alpha1.CloneSetUpdateStrategy{Type: appsv1alpha1.RecreateCloneSetUpdateStrategyType},
+			UpdateStrategy:       appsv1beta1.CloneSetUpdateStrategy{Type: appsv1beta1.RecreateCloneSetUpdateStrategyType},
 			RevisionHistoryLimit: func() *int32 {
 				limit := int32(2)
 				return &limit
@@ -106,7 +106,7 @@ func NewCloneSetWithVolumes(replicas int, name string, petMounts []v1.VolumeMoun
 }
 
 // NewCloneSet for unit tests.
-func NewCloneSet(replicas int) *appsv1alpha1.CloneSet {
+func NewCloneSet(replicas int) *appsv1beta1.CloneSet {
 	petMounts := []v1.VolumeMount{
 		{Name: "datadir", MountPath: "/tmp/data"},
 	}
