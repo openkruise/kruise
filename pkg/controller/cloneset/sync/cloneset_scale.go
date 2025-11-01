@@ -29,7 +29,7 @@ import (
 	"k8s.io/klog/v2"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
@@ -47,7 +47,7 @@ const (
 )
 
 func (r *realControl) Scale(
-	currentCS, updateCS *appsv1alpha1.CloneSet,
+	currentCS, updateCS *appsv1beta1.CloneSet,
 	currentRevision, updateRevision string,
 	pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 ) (bool, error) {
@@ -154,7 +154,7 @@ func (r *realControl) Scale(
 	return false, nil
 }
 
-func (r *realControl) managePreparingDelete(cs *appsv1alpha1.CloneSet, pods, podsInPreDelete []*v1.Pod, numToDelete int) (bool, error) {
+func (r *realControl) managePreparingDelete(cs *appsv1beta1.CloneSet, pods, podsInPreDelete []*v1.Pod, numToDelete int) (bool, error) {
 	//  We do not allow regret once the pod enter PreparingDelete state if MarkPodNotReady is set.
 	// Actually, there is a bug cased by this transformation from PreparingDelete to Normal,
 	// i.e., Lifecycle Updated Hook may be lost if the pod was transformed from Updating state
@@ -188,7 +188,7 @@ func (r *realControl) managePreparingDelete(cs *appsv1alpha1.CloneSet, pods, pod
 
 func (r *realControl) createPods(
 	expectedCreations, expectedCurrentCreations int,
-	currentCS, updateCS *appsv1alpha1.CloneSet,
+	currentCS, updateCS *appsv1beta1.CloneSet,
 	currentRevision, updateRevision string,
 	availableIDs []string, existingPVCNames sets.String,
 ) (bool, error) {
@@ -241,7 +241,7 @@ func (r *realControl) createPods(
 	return true, err
 }
 
-func (r *realControl) createOnePod(cs *appsv1alpha1.CloneSet, pod *v1.Pod, existingPVCNames sets.String) error {
+func (r *realControl) createOnePod(cs *appsv1beta1.CloneSet, pod *v1.Pod, existingPVCNames sets.String) error {
 	claims := clonesetutils.GetPersistentVolumeClaims(cs, pod)
 	for _, c := range claims {
 		if existingPVCNames.Has(c.Name) {
@@ -264,7 +264,7 @@ func (r *realControl) createOnePod(cs *appsv1alpha1.CloneSet, pod *v1.Pod, exist
 	return nil
 }
 
-func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.Pod, pvcs []*v1.PersistentVolumeClaim) (bool, error) {
+func (r *realControl) deletePods(cs *appsv1beta1.CloneSet, podsToDelete []*v1.Pod, pvcs []*v1.PersistentVolumeClaim) (bool, error) {
 	var modified bool
 	for _, pod := range podsToDelete {
 		if cs.Spec.Lifecycle != nil && lifecycle.IsPodHooked(cs.Spec.Lifecycle.PreDelete, pod) {
@@ -291,7 +291,7 @@ func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.P
 
 		// delete pvcs which have the same instance-id
 		for _, pvc := range pvcs {
-			if pvc.Labels[appsv1alpha1.CloneSetInstanceID] != pod.Labels[appsv1alpha1.CloneSetInstanceID] {
+			if pvc.Labels[appsv1beta1.CloneSetInstanceID] != pod.Labels[appsv1beta1.CloneSetInstanceID] {
 				continue
 			}
 
@@ -307,7 +307,7 @@ func (r *realControl) deletePods(cs *appsv1alpha1.CloneSet, podsToDelete []*v1.P
 	return modified, nil
 }
 
-func getPlannedDeletedPods(cs *appsv1alpha1.CloneSet, pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, int) {
+func getPlannedDeletedPods(cs *appsv1beta1.CloneSet, pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, int) {
 	var podsSpecifiedToDelete []*v1.Pod
 	var podsInPreDelete []*v1.Pod
 	names := sets.NewString()
@@ -332,14 +332,14 @@ func getOrGenAvailableIDs(num int, pods []*v1.Pod, pvcs []*v1.PersistentVolumeCl
 	existingIDs := sets.NewString()
 	availableIDs := sets.NewString()
 	for _, pvc := range pvcs {
-		if id := pvc.Labels[appsv1alpha1.CloneSetInstanceID]; len(id) > 0 {
+		if id := pvc.Labels[appsv1beta1.CloneSetInstanceID]; len(id) > 0 {
 			existingIDs.Insert(id)
 			availableIDs.Insert(id)
 		}
 	}
 
 	for _, pod := range pods {
-		if id := pod.Labels[appsv1alpha1.CloneSetInstanceID]; len(id) > 0 {
+		if id := pod.Labels[appsv1beta1.CloneSetInstanceID]; len(id) > 0 {
 			existingIDs.Insert(id)
 			availableIDs.Delete(id)
 		}
@@ -367,7 +367,7 @@ func getOrGenInstanceID(existingIDs, availableIDs sets.String) string {
 	return id
 }
 
-func (r *realControl) choosePodsToDelete(cs *appsv1alpha1.CloneSet, totalDiff int, currentRevDiff int, notUpdatedPods, updatedPods []*v1.Pod) []*v1.Pod {
+func (r *realControl) choosePodsToDelete(cs *appsv1beta1.CloneSet, totalDiff int, currentRevDiff int, notUpdatedPods, updatedPods []*v1.Pod) []*v1.Pod {
 	coreControl := clonesetcore.New(cs)
 	choose := func(pods []*v1.Pod, diff int) []*v1.Pod {
 		// No need to sort pods if we are about to delete all of them.

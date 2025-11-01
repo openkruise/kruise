@@ -413,7 +413,7 @@ func (dsc *ReconcileDaemonSet) syncDaemonSet(ctx context.Context, request reconc
 			hash != ds.Status.UpdateRevision {
 			// get ads pre-download annotation
 			minUpdatedReadyPodsCount := 0
-			if minUpdatedReadyPods, ok := ds.Annotations[appsv1alpha1.ImagePreDownloadMinUpdatedReadyPods]; ok {
+			if minUpdatedReadyPods, ok := ds.Annotations[appsv1beta1.ImagePreDownloadMinUpdatedReadyPods]; ok {
 				minUpdatedReadyPodsIntStr := intstrutil.Parse(minUpdatedReadyPods)
 				minUpdatedReadyPodsCount, err = intstrutil.GetScaledValueFromIntOrPercent(&minUpdatedReadyPodsIntStr, int(ds.Status.DesiredNumberScheduled), true)
 				if err != nil {

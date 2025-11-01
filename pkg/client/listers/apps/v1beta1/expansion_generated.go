@@ -33,6 +33,14 @@ type BroadcastJobListerExpansion interface{}
 // BroadcastJobNamespaceLister.
 type BroadcastJobNamespaceListerExpansion interface{}
 
+// CloneSetListerExpansion allows custom methods to be added to
+// CloneSetLister.
+type CloneSetListerExpansion interface{}
+
+// CloneSetNamespaceListerExpansion allows custom methods to be added to
+// CloneSetNamespaceLister.
+type CloneSetNamespaceListerExpansion interface{}
+
 // DaemonSetListerExpansion allows custom methods to be added to
 // DaemonSetLister.
 type DaemonSetListerExpansion interface{}

@@ -126,7 +126,7 @@ type CloneSetTemplateSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Schemaless
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              CloneSetSpec `json:"spec"`
+	Spec              v1beta1.CloneSetSpec `json:"spec"`
 }
 
 // DeploymentTemplateSpec defines the subset template of Deployment.

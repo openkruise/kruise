@@ -187,6 +187,29 @@ spec:
                               when in-place update a Pod.
                             format: int32
                             type: integer
+                          imagePreDownloadMinUpdatedReadyPods:
+                            description: |-
+                              ImagePreDownloadMinUpdatedReadyPods is the minimum number of updated ready Pods
+                              required before starting image pre-download for the next batch.
+                              In v1alpha1, this corresponds to annotation: apps.kruise.io/image-predownload-min-updated-ready-pods
+                            format: int32
+                            type: integer
+                          imagePreDownloadParallelism:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: |-
+                              ImagePreDownloadParallelism is the requested parallelism, it can be set to any non-negative value. If it is unspecified,
+                              it defaults to 1. If it is specified as 0, then the Job is effectively paused until it is increased.
+                              In v1alpha1, this corresponds to annotation: apps.kruise.io/image-predownload-parallelism
+                            x-kubernetes-int-or-string: true
+                          imagePreDownloadTimeoutSeconds:
+                            description: |-
+                              ImagePreDownloadTimeoutSeconds specifies the timeout of the pulling task.
+                              Defaults to 600
+                              In v1alpha1, this corresponds to annotation: apps.kruise.io/image-predownload-timeout-seconds
+                            format: int32
+                            type: integer
                         type: object
                       maxUnavailable:
                         anyOf:
@@ -766,6 +789,29 @@ spec:
                             description: |-
                               GracePeriodSeconds is the timespan between set Pod status to not-ready and update images in Pod spec
                               when in-place update a Pod.
+                            format: int32
+                            type: integer
+                          imagePreDownloadMinUpdatedReadyPods:
+                            description: |-
+                              ImagePreDownloadMinUpdatedReadyPods is the minimum number of updated ready Pods
+                              required before starting image pre-download for the next batch.
+                              In v1alpha1, this corresponds to annotation: apps.kruise.io/image-predownload-min-updated-ready-pods
+                            format: int32
+                            type: integer
+                          imagePreDownloadParallelism:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: |-
+                              ImagePreDownloadParallelism is the requested parallelism, it can be set to any non-negative value. If it is unspecified,
+                              it defaults to 1. If it is specified as 0, then the Job is effectively paused until it is increased.
+                              In v1alpha1, this corresponds to annotation: apps.kruise.io/image-predownload-parallelism
+                            x-kubernetes-int-or-string: true
+                          imagePreDownloadTimeoutSeconds:
+                            description: |-
+                              ImagePreDownloadTimeoutSeconds specifies the timeout of the pulling task.
+                              Defaults to 600
+                              In v1alpha1, this corresponds to annotation: apps.kruise.io/image-predownload-timeout-seconds
                             format: int32
                             type: integer
                         type: object

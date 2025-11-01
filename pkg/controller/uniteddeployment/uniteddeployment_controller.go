@@ -135,7 +135,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.CloneSet{}, handler.TypedEnqueueRequestForOwner[*appsv1alpha1.CloneSet](
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.CloneSet{}, handler.TypedEnqueueRequestForOwner[*appsv1beta1.CloneSet](
 		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner())))
 	if err != nil {
 		return err

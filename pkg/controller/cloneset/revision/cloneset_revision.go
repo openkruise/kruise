@@ -26,20 +26,20 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/controller/history"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/volumeclaimtemplate"
 )
 
 var (
-	patchCodec = scheme.Codecs.LegacyCodec(appsv1alpha1.SchemeGroupVersion)
+	patchCodec = scheme.Codecs.LegacyCodec(appsv1beta1.SchemeGroupVersion)
 )
 
 // Interface is a interface to new and apply ControllerRevision.
 type Interface interface {
-	NewRevision(cs *appsv1alpha1.CloneSet, revision int64, collisionCount *int32) (*apps.ControllerRevision, error)
-	ApplyRevision(cs *appsv1alpha1.CloneSet, revision *apps.ControllerRevision) (*appsv1alpha1.CloneSet, error)
+	NewRevision(cs *appsv1beta1.CloneSet, revision int64, collisionCount *int32) (*apps.ControllerRevision, error)
+	ApplyRevision(cs *appsv1beta1.CloneSet, revision *apps.ControllerRevision) (*appsv1beta1.CloneSet, error)
 }
 
 // NewRevisionControl create a normal revision control.
@@ -50,7 +50,7 @@ func NewRevisionControl() Interface {
 type realControl struct {
 }
 
-func (c *realControl) NewRevision(cs *appsv1alpha1.CloneSet, revision int64, collisionCount *int32) (*apps.ControllerRevision, error) {
+func (c *realControl) NewRevision(cs *appsv1beta1.CloneSet, revision int64, collisionCount *int32) (*apps.ControllerRevision, error) {
 	coreControl := clonesetcore.New(cs)
 	patch, err := c.getPatch(cs, coreControl)
 	if err != nil {
@@ -79,7 +79,7 @@ func (c *realControl) NewRevision(cs *appsv1alpha1.CloneSet, revision int64, col
 // previous version. If the returned error is nil the patch is valid. The current state that we save is just the
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
-func (c *realControl) getPatch(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control) ([]byte, error) {
+func (c *realControl) getPatch(cs *appsv1beta1.CloneSet, coreControl clonesetcore.Control) ([]byte, error) {
 	str, err := runtime.Encode(patchCodec, cs)
 	if err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func (c *realControl) getPatch(cs *appsv1alpha1.CloneSet, coreControl clonesetco
 	return patch, err
 }
 
-func (c *realControl) ApplyRevision(cs *appsv1alpha1.CloneSet, revision *apps.ControllerRevision) (*appsv1alpha1.CloneSet, error) {
+func (c *realControl) ApplyRevision(cs *appsv1beta1.CloneSet, revision *apps.ControllerRevision) (*appsv1beta1.CloneSet, error) {
 	clone := cs.DeepCopy()
 	cloneBytes, err := runtime.Encode(patchCodec, clone)
 	if err != nil {

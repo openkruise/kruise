@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
@@ -3244,6 +3245,1003 @@ func TestSidecarSet_ConvertFrom(t *testing.T) {
 			err := scs.ConvertFrom(tt.src)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, scs)
+		})
+	}
+}
+
+func TestCloneSet_ConvertTo(t *testing.T) {
+	tests := []struct {
+		name     string
+		cs       *CloneSet
+		expected *v1beta1.CloneSet
+	}{
+		{
+			name: "convert with all fields populated",
+			cs: &CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs",
+					Namespace: "default",
+					Labels:    map[string]string{"app": "test"},
+				},
+				Spec: CloneSetSpec{
+					Replicas: int32Ptr(5),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"app": "test"},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:1.14.2",
+								},
+							},
+						},
+					},
+					VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "data",
+							},
+							Spec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					ScaleStrategy: CloneSetScaleStrategy{
+						PodsToDelete:    []string{"pod-1"},
+						MaxUnavailable:  intstrIntPtr(1),
+						DisablePVCReuse: false,
+					},
+					UpdateStrategy: CloneSetUpdateStrategy{
+						Type:           InPlaceIfPossibleCloneSetUpdateStrategyType,
+						Partition:      intstrIntPtr(2),
+						MaxUnavailable: intstrPtr("20%"),
+						MaxSurge:       intstrIntPtr(1),
+						Paused:         false,
+					},
+					RevisionHistoryLimit: int32Ptr(10),
+					MinReadySeconds:      30,
+				},
+				Status: CloneSetStatus{
+					ObservedGeneration:       1,
+					Replicas:                 5,
+					ReadyReplicas:            5,
+					AvailableReplicas:        5,
+					UpdatedReplicas:          3,
+					UpdatedReadyReplicas:     3,
+					UpdatedAvailableReplicas: 3,
+					ExpectedUpdatedReplicas:  3,
+					UpdateRevision:           "rev-123",
+					CurrentRevision:          "rev-122",
+					CollisionCount:           int32Ptr(0),
+					LabelSelector:            "app=test",
+				},
+			},
+			expected: &v1beta1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs",
+					Namespace: "default",
+					Labels:    map[string]string{"app": "test"},
+				},
+				Spec: v1beta1.CloneSetSpec{
+					Replicas: int32Ptr(5),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"app": "test"},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:1.14.2",
+								},
+							},
+						},
+					},
+					VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "data",
+							},
+							Spec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					ScaleStrategy: v1beta1.CloneSetScaleStrategy{
+						PodsToDelete:   []string{"pod-1"},
+						MaxUnavailable: intstrIntPtr(1),
+						EnablePVCReuse: true,
+					},
+					UpdateStrategy: v1beta1.CloneSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+							PodUpdatePolicy: v1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType,
+							Partition:       intstrIntPtr(2),
+							MaxUnavailable:  intstrPtr("20%"),
+							MaxSurge:        intstrIntPtr(1),
+							Paused:          false,
+						},
+					},
+					RevisionHistoryLimit: int32Ptr(10),
+					MinReadySeconds:      30,
+				},
+				Status: v1beta1.CloneSetStatus{
+					ObservedGeneration:       1,
+					Replicas:                 5,
+					ReadyReplicas:            5,
+					AvailableReplicas:        5,
+					UpdatedReplicas:          3,
+					UpdatedReadyReplicas:     3,
+					UpdatedAvailableReplicas: 3,
+					ExpectedUpdatedReplicas:  3,
+					UpdateRevision:           "rev-123",
+					CurrentRevision:          "rev-122",
+					CollisionCount:           int32Ptr(0),
+					LabelSelector:            "app=test",
+				},
+			},
+		},
+		{
+			name: "convert with label-based excludePreparingDelete to spec field",
+			cs: &CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-label",
+					Namespace: "default",
+					Labels: map[string]string{
+						"app":                                    "test",
+						CloneSetScalingExcludePreparingDeleteKey: "true",
+					},
+				},
+				Spec: CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: CloneSetScaleStrategy{
+						DisablePVCReuse: true,
+					},
+				},
+				Status: CloneSetStatus{},
+			},
+			expected: &v1beta1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-label",
+					Namespace: "default",
+					Labels: map[string]string{
+						"app":                                    "test",
+						CloneSetScalingExcludePreparingDeleteKey: "true",
+					},
+				},
+				Spec: v1beta1.CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: v1beta1.CloneSetScaleStrategy{
+						EnablePVCReuse:         false,
+						ExcludePreparingDelete: true, // Converted from label
+					},
+					UpdateStrategy: v1beta1.CloneSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+							PodUpdatePolicy: v1beta1.RecreateCloneSetPodUpdateStrategyType,
+						},
+					},
+				},
+				Status: v1beta1.CloneSetStatus{},
+			},
+		},
+		{
+			name: "convert with minimal fields",
+			cs: &CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "minimal-cs",
+					Namespace: "default",
+				},
+				Spec: CloneSetSpec{
+					Replicas: int32Ptr(1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+				Status: CloneSetStatus{},
+			},
+			expected: &v1beta1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "minimal-cs",
+					Namespace: "default",
+				},
+				Spec: v1beta1.CloneSetSpec{
+					Replicas: int32Ptr(1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: v1beta1.CloneSetScaleStrategy{
+						EnablePVCReuse: true, // v1alpha1 DisablePVCReuse defaults to false, so EnablePVCReuse should be true
+					},
+					UpdateStrategy: v1beta1.CloneSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+							PodUpdatePolicy: v1beta1.RecreateCloneSetPodUpdateStrategyType,
+						},
+					},
+				},
+				Status: v1beta1.CloneSetStatus{},
+			},
+		},
+		{
+			name: "convert with ReCreate update strategy",
+			cs: &CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-recreate",
+					Namespace: "default",
+				},
+				Spec: CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: CloneSetUpdateStrategy{
+						Type: RecreateCloneSetUpdateStrategyType,
+					},
+				},
+				Status: CloneSetStatus{},
+			},
+			expected: &v1beta1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-recreate",
+					Namespace: "default",
+				},
+				Spec: v1beta1.CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: v1beta1.CloneSetScaleStrategy{
+						EnablePVCReuse: true, // v1alpha1 DisablePVCReuse defaults to false, so EnablePVCReuse should be true
+					},
+					UpdateStrategy: v1beta1.CloneSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+							PodUpdatePolicy: v1beta1.RecreateCloneSetPodUpdateStrategyType,
+						},
+					},
+				},
+				Status: v1beta1.CloneSetStatus{},
+			},
+		},
+		{
+			name: "convert with InPlaceOnly update strategy",
+			cs: &CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-inplaceonly",
+					Namespace: "default",
+				},
+				Spec: CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: CloneSetUpdateStrategy{
+						Type: InPlaceOnlyCloneSetUpdateStrategyType,
+					},
+				},
+				Status: CloneSetStatus{},
+			},
+			expected: &v1beta1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-inplaceonly",
+					Namespace: "default",
+				},
+				Spec: v1beta1.CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: v1beta1.CloneSetScaleStrategy{
+						EnablePVCReuse: true, // v1alpha1 DisablePVCReuse defaults to false, so EnablePVCReuse should be true
+					},
+					UpdateStrategy: v1beta1.CloneSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+							PodUpdatePolicy: v1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType,
+						},
+					},
+				},
+				Status: v1beta1.CloneSetStatus{},
+			},
+		},
+		{
+			name: "convert with image pre-download annotations to spec fields",
+			cs: &CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-with-annotations",
+					Namespace: "default",
+					Annotations: map[string]string{
+						"apps.kruise.io/image-predownload-parallelism":            "2",
+						"apps.kruise.io/image-predownload-timeout-seconds":        "300",
+						"apps.kruise.io/image-predownload-min-updated-ready-pods": "5",
+					},
+				},
+				Spec: CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: CloneSetUpdateStrategy{
+						Type: InPlaceIfPossibleCloneSetUpdateStrategyType,
+					},
+				},
+				Status: CloneSetStatus{},
+			},
+			expected: &v1beta1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-with-annotations",
+					Namespace: "default",
+					Annotations: map[string]string{
+						"apps.kruise.io/image-predownload-parallelism":            "2",
+						"apps.kruise.io/image-predownload-timeout-seconds":        "300",
+						"apps.kruise.io/image-predownload-min-updated-ready-pods": "5",
+					},
+				},
+				Spec: v1beta1.CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: v1beta1.CloneSetScaleStrategy{
+						EnablePVCReuse: true, // v1alpha1 DisablePVCReuse defaults to false, so EnablePVCReuse should be true
+					},
+					UpdateStrategy: v1beta1.CloneSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+							PodUpdatePolicy: v1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType,
+							InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{
+								ImagePreDownloadParallelism:         intstrIntPtr(2),
+								ImagePreDownloadTimeoutSeconds:      int32Ptr(300),
+								ImagePreDownloadMinUpdatedReadyPods: int32Ptr(5),
+							},
+						},
+					},
+				},
+				Status: v1beta1.CloneSetStatus{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dst := &v1beta1.CloneSet{}
+			err := tt.cs.ConvertTo(dst)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, dst)
+		})
+	}
+}
+
+func TestCloneSet_ConvertFrom(t *testing.T) {
+	tests := []struct {
+		name     string
+		src      *v1beta1.CloneSet
+		expected *CloneSet
+	}{
+		{
+			name: "convert from v1beta1 with all fields populated",
+			src: &v1beta1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs",
+					Namespace: "default",
+					Labels:    map[string]string{"app": "test"},
+				},
+				Spec: v1beta1.CloneSetSpec{
+					Replicas: int32Ptr(5),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"app": "test"},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:1.14.2",
+								},
+							},
+						},
+					},
+					VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "data",
+							},
+							Spec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					ScaleStrategy: v1beta1.CloneSetScaleStrategy{
+						PodsToDelete:           []string{"pod-1"},
+						MaxUnavailable:         intstrIntPtr(1),
+						EnablePVCReuse:         false,
+						ExcludePreparingDelete: true,
+					},
+					UpdateStrategy: v1beta1.CloneSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+							PodUpdatePolicy: v1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType,
+							Partition:       intstrIntPtr(2),
+							MaxUnavailable:  intstrPtr("20%"),
+							MaxSurge:        intstrIntPtr(1),
+							Paused:          false,
+						},
+					},
+					RevisionHistoryLimit: int32Ptr(10),
+					MinReadySeconds:      30,
+				},
+				Status: v1beta1.CloneSetStatus{
+					ObservedGeneration:       1,
+					Replicas:                 5,
+					ReadyReplicas:            5,
+					AvailableReplicas:        5,
+					UpdatedReplicas:          3,
+					UpdatedReadyReplicas:     3,
+					UpdatedAvailableReplicas: 3,
+					ExpectedUpdatedReplicas:  3,
+					UpdateRevision:           "rev-123",
+					CurrentRevision:          "rev-122",
+					CollisionCount:           int32Ptr(0),
+					LabelSelector:            "app=test",
+				},
+			},
+			expected: &CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs",
+					Namespace: "default",
+					Labels:    map[string]string{"app": "test"},
+				},
+				Spec: CloneSetSpec{
+					Replicas: int32Ptr(5),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"app": "test"},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:1.14.2",
+								},
+							},
+						},
+					},
+					VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "data",
+							},
+							Spec: corev1.PersistentVolumeClaimSpec{
+								AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							},
+						},
+					},
+					ScaleStrategy: CloneSetScaleStrategy{
+						PodsToDelete:    []string{"pod-1"},
+						MaxUnavailable:  intstrIntPtr(1),
+						DisablePVCReuse: true,
+					},
+					UpdateStrategy: CloneSetUpdateStrategy{
+						Type:           InPlaceIfPossibleCloneSetUpdateStrategyType,
+						Partition:      intstrIntPtr(2),
+						MaxUnavailable: intstrPtr("20%"),
+						MaxSurge:       intstrIntPtr(1),
+						Paused:         false,
+					},
+					RevisionHistoryLimit: int32Ptr(10),
+					MinReadySeconds:      30,
+				},
+				Status: CloneSetStatus{
+					ObservedGeneration:       1,
+					Replicas:                 5,
+					ReadyReplicas:            5,
+					AvailableReplicas:        5,
+					UpdatedReplicas:          3,
+					UpdatedReadyReplicas:     3,
+					UpdatedAvailableReplicas: 3,
+					ExpectedUpdatedReplicas:  3,
+					UpdateRevision:           "rev-123",
+					CurrentRevision:          "rev-122",
+					CollisionCount:           int32Ptr(0),
+					LabelSelector:            "app=test",
+				},
+			},
+		},
+		{
+			name: "convert from v1beta1 with excludePreparingDelete true",
+			src: &v1beta1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-exclude",
+					Namespace: "default",
+				},
+				Spec: v1beta1.CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: v1beta1.CloneSetScaleStrategy{
+						ExcludePreparingDelete: true,
+						EnablePVCReuse:         false,
+					},
+				},
+				Status: v1beta1.CloneSetStatus{},
+			},
+			expected: &CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-exclude",
+					Namespace: "default",
+				},
+				Spec: CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: CloneSetScaleStrategy{
+						DisablePVCReuse: true,
+					},
+					UpdateStrategy: CloneSetUpdateStrategy{
+						Type: RecreateCloneSetUpdateStrategyType,
+					},
+				},
+				Status: CloneSetStatus{},
+			},
+		},
+		{
+			name: "convert from v1beta1 with minimal fields",
+			src: &v1beta1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "minimal-cs",
+					Namespace: "default",
+				},
+				Spec: v1beta1.CloneSetSpec{
+					Replicas: int32Ptr(1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+				},
+				Status: v1beta1.CloneSetStatus{},
+			},
+			expected: &CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "minimal-cs",
+					Namespace: "default",
+				},
+				Spec: CloneSetSpec{
+					Replicas: int32Ptr(1),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: CloneSetScaleStrategy{
+						DisablePVCReuse: true, // v1beta1 EnablePVCReuse defaults to false, so DisablePVCReuse should be true
+					},
+					UpdateStrategy: CloneSetUpdateStrategy{
+						Type: RecreateCloneSetUpdateStrategyType,
+					},
+				},
+				Status: CloneSetStatus{},
+			},
+		},
+		{
+			name: "convert from v1beta1 with disablePVCReuse false",
+			src: &v1beta1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-pvc-reuse",
+					Namespace: "default",
+				},
+				Spec: v1beta1.CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: v1beta1.CloneSetScaleStrategy{
+						EnablePVCReuse: true,
+					},
+				},
+				Status: v1beta1.CloneSetStatus{},
+			},
+			expected: &CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-pvc-reuse",
+					Namespace: "default",
+				},
+				Spec: CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: CloneSetScaleStrategy{
+						DisablePVCReuse: false,
+					},
+					UpdateStrategy: CloneSetUpdateStrategy{
+						Type: RecreateCloneSetUpdateStrategyType,
+					},
+				},
+				Status: CloneSetStatus{},
+			},
+		},
+		{
+			name: "convert from v1beta1 with ReCreate update strategy",
+			src: &v1beta1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-recreate",
+					Namespace: "default",
+				},
+				Spec: v1beta1.CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: v1beta1.CloneSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+							PodUpdatePolicy: v1beta1.RecreateCloneSetPodUpdateStrategyType,
+						},
+					},
+				},
+				Status: v1beta1.CloneSetStatus{},
+			},
+			expected: &CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-recreate",
+					Namespace: "default",
+				},
+				Spec: CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: CloneSetScaleStrategy{
+						DisablePVCReuse: true, // v1beta1 EnablePVCReuse defaults to false, so DisablePVCReuse should be true
+					},
+					UpdateStrategy: CloneSetUpdateStrategy{
+						Type: RecreateCloneSetUpdateStrategyType,
+					},
+				},
+				Status: CloneSetStatus{},
+			},
+		},
+		{
+			name: "convert from v1beta1 with InPlaceOnly update strategy",
+			src: &v1beta1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-inplaceonly",
+					Namespace: "default",
+				},
+				Spec: v1beta1.CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: v1beta1.CloneSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+							PodUpdatePolicy: v1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType,
+						},
+					},
+				},
+				Status: v1beta1.CloneSetStatus{},
+			},
+			expected: &CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-inplaceonly",
+					Namespace: "default",
+				},
+				Spec: CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: CloneSetScaleStrategy{
+						DisablePVCReuse: true, // v1beta1 EnablePVCReuse defaults to false, so DisablePVCReuse should be true
+					},
+					UpdateStrategy: CloneSetUpdateStrategy{
+						Type: InPlaceOnlyCloneSetUpdateStrategyType,
+					},
+				},
+				Status: CloneSetStatus{},
+			},
+		},
+		{
+			name: "convert from v1beta1 with image pre-download spec fields to annotations",
+			src: &v1beta1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-with-spec-fields",
+					Namespace: "default",
+				},
+				Spec: v1beta1.CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					UpdateStrategy: v1beta1.CloneSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+							PodUpdatePolicy: v1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType,
+							InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{
+								ImagePreDownloadParallelism:         intstrIntPtr(3),
+								ImagePreDownloadTimeoutSeconds:      int32Ptr(450),
+								ImagePreDownloadMinUpdatedReadyPods: int32Ptr(10),
+							},
+						},
+					},
+				},
+				Status: v1beta1.CloneSetStatus{},
+			},
+			expected: &CloneSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cs-with-spec-fields",
+					Namespace: "default",
+					Annotations: map[string]string{
+						"apps.kruise.io/image-predownload-parallelism":            "3",
+						"apps.kruise.io/image-predownload-timeout-seconds":        "450",
+						"apps.kruise.io/image-predownload-min-updated-ready-pods": "10",
+					},
+				},
+				Spec: CloneSetSpec{
+					Replicas: int32Ptr(3),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "test"},
+					},
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "nginx",
+									Image: "nginx:latest",
+								},
+							},
+						},
+					},
+					ScaleStrategy: CloneSetScaleStrategy{
+						DisablePVCReuse: true, // v1beta1 EnablePVCReuse defaults to false, so DisablePVCReuse should be true
+					},
+					UpdateStrategy: CloneSetUpdateStrategy{
+						Type:                  InPlaceIfPossibleCloneSetUpdateStrategyType,
+						InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{},
+					},
+				},
+				Status: CloneSetStatus{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs := &CloneSet{}
+			err := cs.ConvertFrom(tt.src)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, cs)
 		})
 	}
 }
