@@ -1,4 +1,3 @@
-// main.go
 /*
 Copyright 2020 The Kruise Authors.
 
