@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/utils/ptr"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/features"
@@ -397,5 +398,75 @@ func setSidecarSetUpdateStrategyV1beta1(strategy *v1beta1.SidecarSetUpdateStrate
 	}
 	if strategy.Partition == nil {
 		strategy.Partition = &intstr.IntOrString{Type: intstr.Int, IntVal: 0}
+	}
+}
+
+// SetDefaultsCloneSetV1beta1 sets default values for v1beta1 CloneSet.
+func SetDefaultsCloneSetV1beta1(obj *v1beta1.CloneSet, injectTemplateDefaults bool) {
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = ptr.To(int32(1))
+	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = ptr.To(int32(10))
+	}
+
+	// For v1beta1, EnablePVCReuse defaults to false (safer default - do not reuse PVC)
+	// This is set by CRD (+kubebuilder:default=false)
+	// Note: v1alpha1 keeps DisablePVCReuse default as false (enable reuse) for backward compatibility
+
+	if injectTemplateDefaults {
+		SetDefaultPodSpec(&obj.Spec.Template.Spec)
+		for i := range obj.Spec.VolumeClaimTemplates {
+			a := &obj.Spec.VolumeClaimTemplates[i]
+			v1.SetDefaults_PersistentVolumeClaim(a)
+			v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
+			v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
+			v1.SetDefaults_ResourceList(&a.Status.Capacity)
+		}
+	}
+
+	// Set default UpdateStrategy Type
+	if obj.Spec.UpdateStrategy.Type == "" {
+		obj.Spec.UpdateStrategy.Type = v1beta1.RollingUpdateCloneSetUpdateStrategyType
+	}
+
+	// Ensure RollingUpdate is initialized for RollingUpdate strategy
+	if obj.Spec.UpdateStrategy.Type == v1beta1.RollingUpdateCloneSetUpdateStrategyType {
+		if obj.Spec.UpdateStrategy.RollingUpdate == nil {
+			obj.Spec.UpdateStrategy.RollingUpdate = &v1beta1.RollingUpdateCloneSetStrategy{}
+		}
+
+		// Set default PodUpdatePolicy
+		if obj.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy == "" {
+			obj.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy = v1beta1.RecreateCloneSetPodUpdateStrategyType
+		}
+
+		// Set default InPlaceUpdateStrategy grace period for in-place updates
+		if obj.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy == v1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType ||
+			obj.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy == v1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType {
+			if obj.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy == nil {
+				obj.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy = &appspub.InPlaceUpdateStrategy{}
+			}
+			// Note: GracePeriodSeconds default should be handled by webhook or controller if needed
+			// The v1beta1 API doesn't define a default constant for this yet
+		}
+
+		// Set default Partition
+		if obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
+			partition := intstr.FromInt(0)
+			obj.Spec.UpdateStrategy.RollingUpdate.Partition = &partition
+		}
+
+		// Set default MaxUnavailable
+		if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
+			maxUnavailable := intstr.FromString(v1beta1.DefaultCloneSetMaxUnavailable)
+			obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+		}
+
+		// Set default MaxSurge
+		if obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge == nil {
+			maxSurge := intstr.FromInt(0)
+			obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge = &maxSurge
+		}
 	}
 }
