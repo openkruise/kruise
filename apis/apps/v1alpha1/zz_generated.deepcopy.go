@@ -571,7 +571,7 @@ func (in *CloneSetUpdateStrategy) DeepCopyInto(out *CloneSetUpdateStrategy) {
 	if in.InPlaceUpdateStrategy != nil {
 		in, out := &in.InPlaceUpdateStrategy, &out.InPlaceUpdateStrategy
 		*out = new(pub.InPlaceUpdateStrategy)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 }
 
@@ -2719,7 +2719,7 @@ func (in *RollingUpdateStatefulSetStrategy) DeepCopyInto(out *RollingUpdateState
 	if in.InPlaceUpdateStrategy != nil {
 		in, out := &in.InPlaceUpdateStrategy, &out.InPlaceUpdateStrategy
 		*out = new(pub.InPlaceUpdateStrategy)
-		**out = **in
+		(*in).DeepCopyInto(*out)
 	}
 	if in.MinReadySeconds != nil {
 		in, out := &in.MinReadySeconds, &out.MinReadySeconds

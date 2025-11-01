@@ -30,7 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
@@ -38,42 +39,48 @@ import (
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
-func (r *ReconcileCloneSet) createImagePullJobsForInPlaceUpdate(cs *appsv1alpha1.CloneSet, currentRevision, updateRevision *apps.ControllerRevision) error {
-	if _, ok := updateRevision.Labels[appsv1alpha1.ImagePreDownloadCreatedKey]; ok {
+func (r *ReconcileCloneSet) createImagePullJobsForInPlaceUpdate(cs *appsv1beta1.CloneSet, currentRevision, updateRevision *apps.ControllerRevision) error {
+	if _, ok := updateRevision.Labels[appsv1beta1.ImagePreDownloadCreatedKey]; ok {
 		return nil
-	} else if _, ok := updateRevision.Labels[appsv1alpha1.ImagePreDownloadIgnoredKey]; ok {
+	} else if _, ok := updateRevision.Labels[appsv1beta1.ImagePreDownloadIgnoredKey]; ok {
 		return nil
 	}
 
-	// ignore if update type is ReCreate
-	if cs.Spec.UpdateStrategy.Type == appsv1alpha1.RecreateCloneSetUpdateStrategyType {
+	// ignore if update type is ReCreate (PodUpdatePolicy is ReCreate or RollingUpdate is nil)
+	if cs.Spec.UpdateStrategy.RollingUpdate == nil || cs.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy == appsv1beta1.RecreateCloneSetPodUpdateStrategyType {
 		klog.V(4).InfoS("CloneSet skipped to create ImagePullJob for update type is ReCreate", "cloneSet", klog.KObj(cs))
-		return r.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+		return r.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
 	}
 
 	// ignore if replicas <= minimumReplicasToPreDownloadImage
 	if *cs.Spec.Replicas <= minimumReplicasToPreDownloadImage {
 		klog.V(4).InfoS("CloneSet skipped to create ImagePullJob because replicas less than or equal to the minimum threshold",
 			"cloneSet", klog.KObj(cs), "replicas", *cs.Spec.Replicas, "minimumReplicasToPreDownloadImage", minimumReplicasToPreDownloadImage)
-		return r.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+		return r.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
 	}
 
 	// ignore if all Pods update in one batch
 	var partition, maxUnavailable int
-	if cs.Spec.UpdateStrategy.Partition != nil {
-		pValue, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.Partition, cs.Spec.Replicas)
-		if err != nil {
-			klog.ErrorS(err, "CloneSet partition value was illegal", "cloneSet", klog.KObj(cs))
-			return err
+	if cs.Spec.UpdateStrategy.RollingUpdate != nil {
+		if cs.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
+			pValue, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.RollingUpdate.Partition, cs.Spec.Replicas)
+			if err != nil {
+				klog.ErrorS(err, "CloneSet partition value was illegal", "cloneSet", klog.KObj(cs))
+				return err
+			}
+			partition = pValue
 		}
-		partition = pValue
+		maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
+			intstrutil.ValueOrDefault(cs.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromString(appsv1beta1.DefaultCloneSetMaxUnavailable)), int(*cs.Spec.Replicas), false)
+	} else {
+		defaultMaxUnavailable := intstrutil.FromString(appsv1beta1.DefaultCloneSetMaxUnavailable)
+		maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
+			&defaultMaxUnavailable, int(*cs.Spec.Replicas), false)
 	}
-	maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
-		intstrutil.ValueOrDefault(cs.Spec.UpdateStrategy.MaxUnavailable, intstrutil.FromString(appsv1alpha1.DefaultCloneSetMaxUnavailable)), int(*cs.Spec.Replicas), false)
 	if partition == 0 && maxUnavailable >= int(*cs.Spec.Replicas) {
 		klog.V(4).InfoS("CloneSet skipped to create ImagePullJob for all Pods update in one batch",
 			"cloneSet", klog.KObj(cs), "replicas", *cs.Spec.Replicas, "partition", partition, "maxUnavailable", maxUnavailable)
-		return r.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+		return r.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
 	}
 
 	// ignore if this revision can not update in-place
@@ -82,7 +89,7 @@ func (r *ReconcileCloneSet) createImagePullJobsForInPlaceUpdate(cs *appsv1alpha1
 	if !inplaceControl.CanUpdateInPlace(currentRevision, updateRevision, coreControl.GetUpdateOptions()) {
 		klog.V(4).InfoS("CloneSet skipped to create ImagePullJob because in-place update was not possible",
 			"cloneSet", klog.KObj(cs), "currentRevision", klog.KObj(currentRevision), "updateRevision", klog.KObj(updateRevision))
-		return r.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadIgnoredKey, "true")
+		return r.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
 	}
 
 	// start to create jobs
@@ -116,10 +123,17 @@ func (r *ReconcileCloneSet) createImagePullJobsForInPlaceUpdate(cs *appsv1alpha1
 	containerImages := diffImagesBetweenRevisions(currentRevision, updateRevision)
 	klog.V(3).InfoS("CloneSet began to create ImagePullJobs for the revision changes",
 		"cloneSet", klog.KObj(cs), "currentRevision", klog.KObj(currentRevision), "updateRevision", klog.KObj(updateRevision), "containerImages", containerImages)
+
+	// Get InPlaceUpdateStrategy for v1beta1
+	var inPlaceStrategy *appspub.InPlaceUpdateStrategy
+	if cs.Spec.UpdateStrategy.RollingUpdate != nil {
+		inPlaceStrategy = cs.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy
+	}
+
 	for name, image := range containerImages {
 		// job name is revision name + container name, it can not be more than 255 characters
 		jobName := fmt.Sprintf("%s-%s", updateRevision.Name, name)
-		err := imagejobutilfunc.CreateJobForWorkload(r.Client, cs, clonesetutils.ControllerKind, jobName, image, labelMap, annotationMap, *selector, pullSecrets)
+		err := imagejobutilfunc.CreateJobForWorkloadWithStrategy(r.Client, cs, clonesetutils.ControllerKind, jobName, image, labelMap, annotationMap, *selector, pullSecrets, inPlaceStrategy)
 		if err != nil {
 			if !errors.IsAlreadyExists(err) {
 				klog.ErrorS(err, "CloneSet failed to create ImagePullJob", "cloneSet", klog.KObj(cs), "jobName", jobName)
@@ -131,7 +145,7 @@ func (r *ReconcileCloneSet) createImagePullJobsForInPlaceUpdate(cs *appsv1alpha1
 		r.recorder.Eventf(cs, v1.EventTypeNormal, "CreatedImagePullJob", "created ImagePullJob %s for image: %s", jobName, image)
 	}
 
-	return r.patchControllerRevisionLabels(updateRevision, appsv1alpha1.ImagePreDownloadCreatedKey, "true")
+	return r.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadCreatedKey, "true")
 }
 
 func (r *ReconcileCloneSet) patchControllerRevisionLabels(revision *apps.ControllerRevision, key, value string) error {

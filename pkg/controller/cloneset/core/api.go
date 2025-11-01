@@ -19,7 +19,7 @@ package core
 import (
 	v1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
@@ -28,11 +28,11 @@ type Control interface {
 	// common
 	IsInitializing() bool
 	SetRevisionTemplate(revisionSpec map[string]interface{}, template map[string]interface{})
-	ApplyRevisionPatch(patched []byte) (*appsv1alpha1.CloneSet, error)
+	ApplyRevisionPatch(patched []byte) (*appsv1beta1.CloneSet, error)
 
 	// scale
 	IsReadyToScale() bool
-	NewVersionedPods(currentCS, updateCS *appsv1alpha1.CloneSet,
+	NewVersionedPods(currentCS, updateCS *appsv1beta1.CloneSet,
 		currentRevision, updateRevision string,
 		expectedCreations, expectedCurrentCreations int,
 		availableIDs []string,
@@ -44,15 +44,15 @@ type Control interface {
 	IsPodUpdateReady(pod *v1.Pod, minReadySeconds int32) bool
 	GetPodsSortFunc(pods []*v1.Pod, waitUpdateIndexes []int) func(i, j int) bool
 	GetUpdateOptions() *inplaceupdate.UpdateOptions
-	ExtraStatusCalculation(status *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error
+	ExtraStatusCalculation(status *appsv1beta1.CloneSetStatus, pods []*v1.Pod) error
 
 	// validation
-	ValidateCloneSetUpdate(oldCS, newCS *appsv1alpha1.CloneSet) error
+	ValidateCloneSetUpdate(oldCS, newCS *appsv1beta1.CloneSet) error
 
 	// event handler
 	IgnorePodUpdateEvent(oldPod, newPod *v1.Pod) bool
 }
 
-func New(cs *appsv1alpha1.CloneSet) Control {
+func New(cs *appsv1beta1.CloneSet) Control {
 	return &commonControl{CloneSet: cs}
 }

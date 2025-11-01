@@ -75,7 +75,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-cloneset
+      path: /mutate-apps-kruise-io-cloneset
   failurePolicy: Fail
   name: mcloneset.kb.io
   rules:
@@ -83,6 +83,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -422,7 +423,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-apps-kruise-io-v1alpha1-cloneset
+      path: /validate-apps-kruise-io-cloneset
   failurePolicy: Fail
   name: vcloneset.kb.io
   rules:
@@ -430,6 +431,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
