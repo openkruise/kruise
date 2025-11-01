@@ -20,6 +20,7 @@ import (
 	"github.com/openkruise/kruise/apis/apps/defaults"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 )
 
@@ -669,6 +670,103 @@ func TestValidate(t *testing.T) {
 				}
 				if !found {
 					t.Errorf("field not failure for %v", k)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateImagePreDownloadParallelism(t *testing.T) {
+	tests := []struct {
+		name        string
+		parallelism *intstr.IntOrString
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "valid integer parallelism",
+			parallelism: &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+			expectError: false,
+		},
+		{
+			name:        "valid zero parallelism",
+			parallelism: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+			expectError: false,
+		},
+		{
+			name:        "invalid negative parallelism",
+			parallelism: &intstr.IntOrString{Type: intstr.Int, IntVal: -1},
+			expectError: true,
+			errorMsg:    "imagePreDownloadParallelism must be non-negative",
+		},
+		{
+			name:        "invalid percentage parallelism",
+			parallelism: &intstr.IntOrString{Type: intstr.String, StrVal: "50%"},
+			expectError: true,
+			errorMsg:    "imagePreDownloadParallelism does not support percentage value",
+		},
+		{
+			name:        "valid string integer parallelism",
+			parallelism: &intstr.IntOrString{Type: intstr.String, StrVal: "50"},
+			expectError: false,
+		},
+		{
+			name:        "valid string zero parallelism",
+			parallelism: &intstr.IntOrString{Type: intstr.String, StrVal: "0"},
+			expectError: false,
+		},
+		{
+			name:        "invalid string negative parallelism",
+			parallelism: &intstr.IntOrString{Type: intstr.String, StrVal: "-1"},
+			expectError: true,
+			errorMsg:    "imagePreDownloadParallelism must be non-negative",
+		},
+		{
+			name:        "invalid string non-numeric parallelism",
+			parallelism: &intstr.IntOrString{Type: intstr.String, StrVal: "abc"},
+			expectError: true,
+			errorMsg:    "imagePreDownloadParallelism must be a valid integer",
+		},
+		{
+			name:        "nil parallelism",
+			parallelism: nil,
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			maxUnavailable := intstr.FromInt(1)
+			strategy := &v1beta1.CloneSetUpdateStrategy{
+				Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+				RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+					PodUpdatePolicy: v1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType,
+					MaxUnavailable:  &maxUnavailable,
+					Partition:       &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+					InPlaceUpdateStrategy: &appspub.InPlaceUpdateStrategy{
+						ImagePreDownloadParallelism: tt.parallelism,
+					},
+				},
+			}
+
+			allErrs := validateUpdateStrategyV1beta1(strategy, 3, field.NewPath("updateStrategy"))
+
+			hasError := len(allErrs) > 0
+			if hasError != tt.expectError {
+				t.Errorf("expected error: %v, got error: %v, errors: %v", tt.expectError, hasError, allErrs)
+				return
+			}
+
+			if tt.expectError && len(allErrs) > 0 {
+				found := false
+				for _, err := range allErrs {
+					if strings.Contains(err.Error(), tt.errorMsg) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected error message containing '%s', got: %v", tt.errorMsg, allErrs)
 				}
 			}
 		})
