@@ -28,6 +28,7 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/revision"
@@ -39,7 +40,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 
 	cases := []struct {
 		name               string
-		set                *appsv1alpha1.CloneSet
+		set                *appsv1beta1.CloneSet
 		setLabels          map[string]string
 		pods               []*v1.Pod
 		revisionConsistent bool
@@ -1012,11 +1013,11 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 	}
 }
 
-func createTestCloneSet(replicas int32, partition, maxUnavailable, maxSurge intstr.IntOrString) *appsv1alpha1.CloneSet {
-	return &appsv1alpha1.CloneSet{
-		Spec: appsv1alpha1.CloneSetSpec{
+func createTestCloneSet(replicas int32, partition, maxUnavailable, maxSurge intstr.IntOrString) *appsv1beta1.CloneSet {
+	return &appsv1beta1.CloneSet{
+		Spec: appsv1beta1.CloneSetSpec{
 			Replicas: &replicas,
-			UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+			UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
 				Partition:      &partition,
 				MaxSurge:       &maxSurge,
 				MaxUnavailable: &maxUnavailable,
@@ -1025,8 +1026,8 @@ func createTestCloneSet(replicas int32, partition, maxUnavailable, maxSurge ints
 	}
 }
 
-func setScaleStrategy(cs *appsv1alpha1.CloneSet, maxUnavailable intstr.IntOrString) *appsv1alpha1.CloneSet {
-	cs.Spec.ScaleStrategy = appsv1alpha1.CloneSetScaleStrategy{
+func setScaleStrategy(cs *appsv1beta1.CloneSet, maxUnavailable intstr.IntOrString) *appsv1beta1.CloneSet {
+	cs.Spec.ScaleStrategy = appsv1beta1.CloneSetScaleStrategy{
 		MaxUnavailable: &maxUnavailable,
 	}
 	return cs
@@ -1041,13 +1042,13 @@ func createTestPod(revisionHash string, lifecycleState appspub.LifecycleStateTyp
 		pod.Status = v1.PodStatus{Phase: v1.PodRunning, Conditions: []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}}
 	}
 	if specifiedDelete {
-		pod.Labels[appsv1alpha1.SpecifiedDeleteKey] = "true"
+		pod.Labels[appsv1beta1.SpecifiedDeleteKey] = "true"
 	}
 	return pod
 }
 
-func setUpdateStrategyPaused(cs *appsv1alpha1.CloneSet, paused bool) *appsv1alpha1.CloneSet {
-	cs.Spec.UpdateStrategy = appsv1alpha1.CloneSetUpdateStrategy{
+func setUpdateStrategyPaused(cs *appsv1beta1.CloneSet, paused bool) *appsv1beta1.CloneSet {
+	cs.Spec.UpdateStrategy = appsv1beta1.CloneSetUpdateStrategy{
 		Partition:      cs.Spec.UpdateStrategy.Partition,
 		MaxSurge:       cs.Spec.UpdateStrategy.MaxSurge,
 		MaxUnavailable: cs.Spec.UpdateStrategy.MaxUnavailable,

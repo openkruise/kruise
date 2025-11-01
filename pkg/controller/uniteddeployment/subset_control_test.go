@@ -17,6 +17,7 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/apis/apps/v1beta1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
 )
 
@@ -87,19 +88,19 @@ func TestSubsetControl_convertToSubset(t *testing.T) {
 		},
 	}
 	oneIntStr := intstr.FromInt32(int32(1))
-	cloneset := &appsv1alpha1.CloneSet{
+	cloneset := &appsv1beta1.CloneSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   "cloneset",
 			Labels: subsetLabels,
 		},
-		Spec: appsv1alpha1.CloneSetSpec{
+		Spec: appsv1beta1.CloneSetSpec{
 			Selector: selector,
 			Replicas: ptr.To(int32(2)),
-			UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+			UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
 				Partition: &oneIntStr,
 			},
 		},
-		Status: appsv1alpha1.CloneSetStatus{
+		Status: appsv1beta1.CloneSetStatus{
 			ObservedGeneration: 1,
 			Replicas:           2,
 			ReadyReplicas:      1,

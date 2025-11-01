@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	"github.com/openkruise/kruise/pkg/controller/cloneset/sync"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
@@ -35,7 +35,7 @@ import (
 
 // StatusUpdater is interface for updating CloneSet status.
 type StatusUpdater interface {
-	UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error
+	UpdateCloneSetStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus, pods []*v1.Pod) error
 }
 
 func newStatusUpdater(c client.Client) StatusUpdater {
@@ -46,7 +46,7 @@ type realStatusUpdater struct {
 	client.Client
 }
 
-func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error {
+func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus, pods []*v1.Pod) error {
 	r.calculateStatus(cs, newStatus, pods)
 	if err := clonesetcore.New(cs).ExtraStatusCalculation(newStatus, pods); err != nil {
 		return fmt.Errorf("failed to calculate extra status for cloneSet %s/%s: %v", cs.Namespace, cs.Name, err)
@@ -59,9 +59,9 @@ func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newS
 	return r.updateStatus(cs, newStatus)
 }
 
-func (r *realStatusUpdater) updateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) error {
+func (r *realStatusUpdater) updateStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		clone := &appsv1alpha1.CloneSet{}
+		clone := &appsv1beta1.CloneSet{}
 		if err := r.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, clone); err != nil {
 			return err
 		}
@@ -70,7 +70,7 @@ func (r *realStatusUpdater) updateStatus(cs *appsv1alpha1.CloneSet, newStatus *a
 	})
 }
 
-func (r *realStatusUpdater) inconsistentStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) bool {
+func (r *realStatusUpdater) inconsistentStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus) bool {
 	oldStatus := cs.Status
 	return newStatus.ObservedGeneration > oldStatus.ObservedGeneration ||
 		newStatus.Replicas != oldStatus.Replicas ||
@@ -85,7 +85,7 @@ func (r *realStatusUpdater) inconsistentStatus(cs *appsv1alpha1.CloneSet, newSta
 		newStatus.LabelSelector != oldStatus.LabelSelector
 }
 
-func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) {
+func (r *realStatusUpdater) calculateStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus, pods []*v1.Pod) {
 	coreControl := clonesetcore.New(cs)
 	for _, pod := range pods {
 		newStatus.Replicas++
