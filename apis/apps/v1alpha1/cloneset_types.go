@@ -141,6 +141,10 @@ type CloneSetUpdateStrategy struct {
 type CloneSetUpdateStrategyType string
 
 const (
+	// OnDeleteCloneSetUpdateStrategyType triggers the legacy behavior. Version
+	// tracking and ordered rolling restarts are disabled. Pods are recreated
+	// from the CloneSet when they are manually deleted.
+	OnDeleteCloneSetUpdateStrategyType CloneSetUpdateStrategyType = "OnDelete"
 	// RecreateCloneSetUpdateStrategyType indicates that we always delete Pod and create new Pod
 	// during Pod update, which is the default behavior.
 	RecreateCloneSetUpdateStrategyType CloneSetUpdateStrategyType = "ReCreate"
