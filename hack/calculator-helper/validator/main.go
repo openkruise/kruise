@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/openkruise/kruise/pkg/util/calculator/helper"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -41,7 +40,7 @@ func main() {
 
 	// Plot expression
 	fmt.Printf("Plotting expression to %s\n", *output)
-	config := &helper.PlotConfig{
+	config := &PlotConfig{
 		Expression: *expression,
 		Variable:   *variable,
 		MinValue:   minQty,
@@ -53,7 +52,7 @@ func main() {
 
 	// Validate expression
 	fmt.Printf("Validating expression: %s\n", *expression)
-	if err := helper.ValidateExpression(config); err != nil {
+	if err := ValidateExpression(config); err != nil {
 		fmt.Printf("Validation failed: %v\n", err)
 		os.Exit(1)
 	}
@@ -70,7 +69,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := helper.PlotExpression(config); err != nil {
+	if err := PlotExpression(config); err != nil {
 		fmt.Printf("Plot generation failed: %v\n", err)
 		os.Exit(1)
 	}
