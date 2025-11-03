@@ -49,6 +49,11 @@ func (c *realControl) Update(cs *appsv1alpha1.CloneSet,
 	pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 ) error {
 
+	if cs.Spec.UpdateStrategy.Type == appsv1alpha1.OnDeleteCloneSetUpdateStrategyType {
+		klog.V(5).InfoS("CloneSet UpdateStrategy is OnDelete", "cloneSet", klog.KObj(cs))
+		return nil
+	}
+
 	key := clonesetutils.GetControllerKey(cs)
 	coreControl := clonesetcore.New(cs)
 
