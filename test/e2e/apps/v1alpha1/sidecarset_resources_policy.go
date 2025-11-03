@@ -35,8 +35,8 @@ import (
 	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
 )
 
-var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), func() {
-	f := v1alpha1.NewDefaultFramework("sidecarset")
+var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResourcesPolicy", "workload"), func() {
+	f := v1alpha1.NewDefaultFramework("sidecarresourcespolicy")
 	var ns string
 	var c clientset.Interface
 	var kc kruiseclientset.Interface
@@ -49,7 +49,7 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 		tester = v1alpha1.NewSidecarSetTester(c, kc)
 	})
 
-	ginkgo.Context("SidecarSet ResourcesPolicy functionality [SidecarSetResourcesPolicy]", func() {
+	ginkgo.Context("Sidecar ResourcesPolicy functionality [SidecarResourcesPolicy]", func() {
 		ginkgo.AfterEach(func() {
 			if ginkgo.CurrentSpecReport().Failed() {
 				apps2.DumpDebugInfo(c, ns)
@@ -873,8 +873,9 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{
-									Name:  "app1",
-									Image: "nginx:1.14.2",
+									Name:    "app1",
+									Image:   "busybox:latest",
+									Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 									Resources: corev1.ResourceRequirements{
 										Limits: corev1.ResourceList{
 											corev1.ResourceCPU:    resource.MustParse("400m"),
@@ -887,8 +888,9 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 									},
 								},
 								{
-									Name:  "app2",
-									Image: "nginx:1.14.2",
+									Name:    "app2",
+									Image:   "busybox:latest",
+									Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 									Resources: corev1.ResourceRequirements{
 										Limits: corev1.ResourceList{
 											corev1.ResourceCPU:    resource.MustParse("600m"),
