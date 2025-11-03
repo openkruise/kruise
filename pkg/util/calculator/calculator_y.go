@@ -293,7 +293,7 @@ const yyEofCode = 1
 const yyErrCode = 2
 const yyInitialStackSize = 16
 
-//line calculator.y:377
+//line calculator.y:378
 
 //line yacctab:1
 var yyExca = [...]int8{
@@ -809,15 +809,16 @@ yydefault:
 			if yyDollar[2].val == nil {
 				yyVAL.val = nil
 			} else if yyDollar[2].val.IsQuantity {
-				negQ := resource.NewQuantity(-yyDollar[2].val.Quantity.Value(), resource.DecimalSI)
-				yyVAL.val = &Value{IsQuantity: true, Quantity: *negQ}
+				negQ := yyDollar[2].val.Quantity.DeepCopy()
+				negQ.Neg()
+				yyVAL.val = &Value{IsQuantity: true, Quantity: negQ}
 			} else {
 				yyVAL.val = &Value{IsQuantity: false, Number: -yyDollar[2].val.Number}
 			}
 		}
 	case 14:
 		yyDollar = yyS[yypt-4 : yypt+1]
-//line calculator.y:361
+//line calculator.y:362
 		{
 			calc := yylex.(*yyLex).calc
 			yyVAL.val = calc.callFunc(yyDollar[1].str, []*Value{yyDollar[3].val})
@@ -827,7 +828,7 @@ yydefault:
 		}
 	case 15:
 		yyDollar = yyS[yypt-6 : yypt+1]
-//line calculator.y:368
+//line calculator.y:369
 		{
 			calc := yylex.(*yyLex).calc
 			yyVAL.val = calc.callFunc(yyDollar[1].str, []*Value{yyDollar[3].val, yyDollar[5].val})

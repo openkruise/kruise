@@ -317,6 +317,24 @@ func TestVariables(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name: "max(min(2*cpu,-cpu+3.0),2*cpu-3.0)",
+			expr: "max(min(2*cpu,-cpu+3.0),2*cpu-3.0)",
+			variables: map[string]*Value{
+				"cpu": &Value{IsQuantity: true, Quantity: func() resource.Quantity { calc := NewCalculator(); q, _ := calc.parseQuantity("1.5"); return q }()},
+			},
+			expected: "1500m",
+			wantErr:  false,
+		},
+		{
+			name: "max(min(2*cpu,3.0-cpu),2*cpu-3.0)",
+			expr: "max(min(2*cpu,3.0-cpu),2*cpu-3.0)",
+			variables: map[string]*Value{
+				"cpu": &Value{IsQuantity: true, Quantity: func() resource.Quantity { calc := NewCalculator(); q, _ := calc.parseQuantity("1.5"); return q }()},
+			},
+			expected: "1500m",
+			wantErr:  false,
+		},
+		{
 			name:      "undefined variable",
 			expr:      "undefined_var",
 			variables: map[string]*Value{},

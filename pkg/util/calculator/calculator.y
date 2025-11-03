@@ -263,7 +263,7 @@ func (c *Calculator) getVariable(name string) (*Value, bool) {
 %type <val> expr term factor func_call
 %left '+' '-'
 %left '*' '/'
-%left UMINUS
+%right UMINUS
 
 %%
 
@@ -349,8 +349,9 @@ factor:
 		if $2 == nil {
 			$$ = nil
 		} else if $2.IsQuantity {
-			negQ := resource.NewQuantity(-$2.Quantity.Value(), resource.DecimalSI)
-			$$ = &Value{IsQuantity: true, Quantity: *negQ}
+			negQ := $2.Quantity.DeepCopy()
+			negQ.Neg()
+			$$ = &Value{IsQuantity: true, Quantity: negQ}
 		} else {
 			$$ = &Value{IsQuantity: false, Number: -$2.Number}
 		}
