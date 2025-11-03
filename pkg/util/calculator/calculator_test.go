@@ -18,6 +18,7 @@ func TestParseNumber(t *testing.T) {
 		{"50%", 0.5, false},
 		{"100.5%", 1.005, false},
 		{"invalid", 0, true},
+		{"5..5", 0, true},
 	}
 
 	calc := NewCalculator()
@@ -47,6 +48,8 @@ func TestBasicArithmetic(t *testing.T) {
 		{"3 * 4", "12", false},
 		{"15 / 3", "5", false},
 		{"(2 + 3) * 4", "20", false},
+		{"5..5", "", true},
+		{"5%%", "", true},
 
 		// Percentages
 		{"50%", "0.5", false},
@@ -55,6 +58,10 @@ func TestBasicArithmetic(t *testing.T) {
 		// Function calls - only max and min are supported
 		{"max(10, 20)", "20", false},
 		{"min(10, 20)", "10", false},
+
+		// ExponentDigit
+		{"1e2", "100", false},
+		{"1E2", "100", false},
 
 		// Error cases
 		{"10 / 0", "", true},
@@ -86,6 +93,7 @@ func TestQuantityOperations(t *testing.T) {
 		{"100Mi - 50Mi", "50Mi", false},
 		{"2 * 40m", "80m", false},
 		{"100m / 2", "50m", false},
+		{"100m", "100m", false},
 
 		// Mixed operations
 		{"max(40m, 20)", "20", false}, // 40m (0.04) < 20 (base unit)
@@ -1120,4 +1128,211 @@ func TestScientificNotationEdgeCases(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestLexerCoverageEdgeCases tests specific lexer edge cases to improve code coverage
+func TestLexerCoverageEdgeCases(t *testing.T) {
+	tests := []struct {
+		name    string
+		expr    string
+		wantErr bool
+		desc    string
+	}{
+		{
+			name:    "number starting with dot",
+			expr:    ".5 + .5",
+			wantErr: false,
+			desc:    "Numbers can start with decimal point",
+		},
+		{
+			name:    "dot followed by non-digit as quantity check",
+			expr:    ".5Mi",
+			wantErr: false,
+			desc:    "Decimal starting number with quantity unit",
+		},
+		{
+			name:    "exponent followed by unit (invalid scientific notation)",
+			expr:    "1eKi",
+			wantErr: true,
+			desc:    "Scientific notation exponent should not be followed by unit letters",
+		},
+		{
+			name:    "number with sign in exponent not after e",
+			expr:    "1.5+2",
+			wantErr: false,
+			desc:    "Plus sign not immediately after e should be operator",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Parse(tt.expr)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Parse(%q) error = %v, wantErr %v\nDescription: %s",
+					tt.expr, err, tt.wantErr, tt.desc)
+			}
+		})
+	}
+}
+
+// TestLexerInternalFunctions tests internal lexer functions directly
+func TestLexerInternalFunctions(t *testing.T) {
+	t.Run("isQuantityUnitChar", func(t *testing.T) {
+		// Test that all letters are considered unit chars
+		if !isQuantityUnitChar('m') {
+			t.Error("Expected 'm' to be a quantity unit char")
+		}
+		if !isQuantityUnitChar('K') {
+			t.Error("Expected 'K' to be a quantity unit char")
+		}
+		if isQuantityUnitChar('1') {
+			t.Error("Expected '1' to not be a quantity unit char")
+		}
+		if isQuantityUnitChar('+') {
+			t.Error("Expected '+' to not be a quantity unit char")
+		}
+	})
+
+	t.Run("isIdentifierChar", func(t *testing.T) {
+		if !isIdentifierChar('a') {
+			t.Error("Expected 'a' to be an identifier char")
+		}
+		if !isIdentifierChar('1') {
+			t.Error("Expected '1' to be an identifier char")
+		}
+		if !isIdentifierChar('_') {
+			t.Error("Expected '_' to be an identifier char")
+		}
+		if isIdentifierChar('+') {
+			t.Error("Expected '+' to not be an identifier char")
+		}
+	})
+
+	t.Run("isQuantity with empty string", func(t *testing.T) {
+		lex := &yyLex{}
+		if lex.isQuantity("") {
+			t.Error("Expected empty string to not be a quantity")
+		}
+	})
+
+	t.Run("isQuantity with no unit", func(t *testing.T) {
+		lex := &yyLex{}
+		if lex.isQuantity("123") {
+			t.Error("Expected number without unit to not be a quantity")
+		}
+	})
+
+	t.Run("isQuantity with invalid unit", func(t *testing.T) {
+		lex := &yyLex{}
+		if lex.isQuantity("123xyz") {
+			t.Error("Expected number with invalid unit to not be a quantity")
+		}
+	})
+
+	t.Run("isQuantity with valid units", func(t *testing.T) {
+		lex := &yyLex{}
+		validUnits := []string{"100m", "1k", "1M", "1G", "1T", "1P", "1Ki", "100Mi", "1Gi", "1Ti", "1Pi"}
+		for _, unit := range validUnits {
+			if !lex.isQuantity(unit) {
+				t.Errorf("Expected %s to be a valid quantity", unit)
+			}
+		}
+	})
+
+	t.Run("lex error handling", func(t *testing.T) {
+		lex := &yyLex{}
+		lex.init("test")
+		lex.Error("test error")
+		if lex.err == nil {
+			t.Error("Expected error to be set")
+		}
+		if !strings.Contains(lex.err.Error(), "test error") {
+			t.Errorf("Expected error message to contain 'test error', got: %v", lex.err)
+		}
+		if !strings.Contains(lex.err.Error(), "line 1") {
+			t.Errorf("Expected error message to contain line number, got: %v", lex.err)
+		}
+	})
+
+	t.Run("lexer next and peek with newline", func(t *testing.T) {
+		lex := &yyLex{}
+		lex.init("a\nb")
+
+		r := lex.next()
+		if r != 'a' {
+			t.Errorf("Expected 'a', got %c", r)
+		}
+		if lex.line != 1 || lex.col != 2 {
+			t.Errorf("Expected line 1, col 2, got line %d, col %d", lex.line, lex.col)
+		}
+
+		r = lex.next()
+		if r != '\n' {
+			t.Errorf("Expected newline, got %c", r)
+		}
+		if lex.line != 2 || lex.col != 1 {
+			t.Errorf("Expected line 2, col 1 after newline, got line %d, col %d", lex.line, lex.col)
+		}
+
+		r = lex.next()
+		if r != 'b' {
+			t.Errorf("Expected 'b', got %c", r)
+		}
+	})
+
+	t.Run("lexer peek at end of input", func(t *testing.T) {
+		lex := &yyLex{}
+		lex.init("a")
+		lex.next() // consume 'a'
+
+		r := lex.peek()
+		if r != 0 {
+			t.Errorf("Expected 0 at end of input, got %c", r)
+		}
+	})
+
+	t.Run("lexer next at end of input", func(t *testing.T) {
+		lex := &yyLex{}
+		lex.init("a")
+		lex.next() // consume 'a'
+
+		r := lex.next()
+		if r != 0 {
+			t.Errorf("Expected 0 at end of input, got %c", r)
+		}
+	})
+
+	t.Run("readNumber edge case - pos at end", func(t *testing.T) {
+		lex := &yyLex{}
+		lex.init("")
+		lex.pos = 0 // at end already
+		num := lex.readNumber()
+		if num != "" {
+			t.Errorf("Expected empty string when reading number at end of input, got: %s", num)
+		}
+	})
+
+	t.Run("readIdentifier edge case - pos at end", func(t *testing.T) {
+		lex := &yyLex{}
+		lex.init("")
+		lex.pos = 0 // at end already
+		ident := lex.readIdentifier()
+		if ident != "" {
+			t.Errorf("Expected empty string when reading identifier at end of input, got: %s", ident)
+		}
+	})
+
+	t.Run("readNumber with multiple percents (double percent)", func(t *testing.T) {
+		// This tests the seenPercent check in readNumber
+		// When we have already seen a percent, we should stop at the second one
+		lex := &yyLex{}
+		lex.init("50%")
+		num := lex.readNumber()
+		if num != "50%" {
+			t.Errorf("Expected '50%%', got: %s", num)
+		}
+		// Verify that reading another number starting with % stops immediately
+		// This is difficult to test directly through readNumber,
+		// but the parser should reject "50%%" in the existing tests
+	})
 }
