@@ -33,8 +33,8 @@ func (c *Calculator) toQuantity(v *Value) *resource.Quantity {
 		q := v.Quantity.DeepCopy()
 		return &q
 	}
-	// Convert number to Quantity
-	return resource.NewQuantity(int64(v.Number), resource.DecimalSI)
+	// Convert number to Quantity, preserving decimal precision
+	return resource.NewMilliQuantity(int64(v.Number * 1000), resource.DecimalSI)
 }
 
 // add performs addition operation
@@ -168,21 +168,21 @@ func (c *Calculator) maxFunc(args []*Value) *Value {
 	if left.IsQuantity {
 		// Left is Quantity, right is number
 		leftQ := left.Quantity.DeepCopy()
-		rightQ := resource.NewQuantity(int64(right.Number), resource.DecimalSI)
-		cmp := leftQ.Cmp(*rightQ)
+		rightQ := *resource.NewMilliQuantity(int64(right.Number * 1000), resource.DecimalSI)
+		cmp := leftQ.Cmp(rightQ)
 		if cmp >= 0 {
 			return &Value{IsQuantity: true, Quantity: left.Quantity}
 		}
-		return &Value{IsQuantity: true, Quantity: *rightQ}
+		return &Value{IsQuantity: true, Quantity: rightQ}
 	}
-	
+
 	if right.IsQuantity {
 		// Right is Quantity, left is number
-		leftQ := resource.NewQuantity(int64(left.Number), resource.DecimalSI)
+		leftQ := *resource.NewMilliQuantity(int64(left.Number * 1000), resource.DecimalSI)
 		rightQ := right.Quantity.DeepCopy()
 		cmp := leftQ.Cmp(rightQ)
 		if cmp >= 0 {
-			return &Value{IsQuantity: true, Quantity: *leftQ}
+			return &Value{IsQuantity: true, Quantity: leftQ}
 		}
 		return &Value{IsQuantity: true, Quantity: rightQ}
 	}
@@ -217,20 +217,20 @@ func (c *Calculator) minFunc(args []*Value) *Value {
 	
 	if left.IsQuantity {
 		// Left is Quantity, right is number
-		rightQ := resource.NewQuantity(int64(right.Number), resource.DecimalSI)
-		cmp := left.Quantity.Cmp(*rightQ)
+		rightQ := *resource.NewMilliQuantity(int64(right.Number * 1000), resource.DecimalSI)
+		cmp := left.Quantity.Cmp(rightQ)
 		if cmp <= 0 {
 			return &Value{IsQuantity: true, Quantity: left.Quantity}
 		}
-		return &Value{IsQuantity: true, Quantity: *rightQ}
+		return &Value{IsQuantity: true, Quantity: rightQ}
 	}
-	
+
 	if right.IsQuantity {
 		// Right is Quantity, left is number
-		leftQ := resource.NewQuantity(int64(left.Number), resource.DecimalSI)
+		leftQ := *resource.NewMilliQuantity(int64(left.Number * 1000), resource.DecimalSI)
 		cmp := leftQ.Cmp(right.Quantity)
 		if cmp <= 0 {
-			return &Value{IsQuantity: true, Quantity: *leftQ}
+			return &Value{IsQuantity: true, Quantity: leftQ}
 		}
 		return &Value{IsQuantity: true, Quantity: right.Quantity}
 	}

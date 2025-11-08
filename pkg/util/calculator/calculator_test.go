@@ -63,6 +63,9 @@ func TestBasicArithmetic(t *testing.T) {
 		{"1e2", "100", false},
 		{"1E2", "100", false},
 
+		// complex
+		{"min(max(max(max(0.5,0.5*0.5),0.5-1.0),0.5-1.0),3.0)", "0.5", false},
+
 		// Error cases
 		{"10 / 0", "", true},
 		{"unknown(1, 2)", "", true},
@@ -98,6 +101,8 @@ func TestQuantityOperations(t *testing.T) {
 		// Mixed operations
 		{"max(40m, 20)", "20", false}, // 40m (0.04) < 20 (base unit)
 		{"min(40m, 20m)", "20m", false},
+		{"min(max(max(max(0.5,0.5*0.5),0.5-1.0),0.5-1.0),3.0)", "0.5", false},
+		{"min(max(max(max(500m,0.5*0.5),0.5-1.0),0.5-1.0),3.0)", "500m", false},
 
 		// Error cases
 		{"40m * 2m", "", true}, // Two Quantities multiplied, invalid
@@ -322,6 +327,51 @@ func TestVariables(t *testing.T) {
 				"cpu": &Value{IsQuantity: true, Quantity: func() resource.Quantity { calc := NewCalculator(); q, _ := calc.parseQuantity("100m"); return q }()},
 			},
 			expected: "200m",
+			wantErr:  false,
+		},
+		{
+			name: "min(max(max(max(0.5,0.5*cpu),cpu-1.0),cpu-1.0),3.0)",
+			expr: "min(max(max(max(0.5,0.5*cpu),cpu-1.0),cpu-1.0),3.0)",
+			variables: map[string]*Value{
+				"cpu": &Value{IsQuantity: true, Quantity: func() resource.Quantity { calc := NewCalculator(); q, _ := calc.parseQuantity("0.5"); return q }()},
+			},
+			expected: "500m",
+			wantErr:  false,
+		},
+		{
+			name: "max with decimal number and quantity",
+			expr: "max(0.25, cpu)",
+			variables: map[string]*Value{
+				"cpu": &Value{IsQuantity: true, Quantity: func() resource.Quantity { calc := NewCalculator(); q, _ := calc.parseQuantity("100m"); return q }()},
+			},
+			expected: "250m",
+			wantErr:  false,
+		},
+		{
+			name: "max with quantity and decimal number",
+			expr: "max(cpu, 0.75)",
+			variables: map[string]*Value{
+				"cpu": &Value{IsQuantity: true, Quantity: func() resource.Quantity { calc := NewCalculator(); q, _ := calc.parseQuantity("500m"); return q }()},
+			},
+			expected: "750m",
+			wantErr:  false,
+		},
+		{
+			name: "min with decimal number and quantity",
+			expr: "min(0.8, cpu)",
+			variables: map[string]*Value{
+				"cpu": &Value{IsQuantity: true, Quantity: func() resource.Quantity { calc := NewCalculator(); q, _ := calc.parseQuantity("1.0"); return q }()},
+			},
+			expected: "800m",
+			wantErr:  false,
+		},
+		{
+			name: "min with quantity and decimal number",
+			expr: "min(cpu, 1.5)",
+			variables: map[string]*Value{
+				"cpu": &Value{IsQuantity: true, Quantity: func() resource.Quantity { calc := NewCalculator(); q, _ := calc.parseQuantity("2.0"); return q }()},
+			},
+			expected: "1500m",
 			wantErr:  false,
 		},
 		{
