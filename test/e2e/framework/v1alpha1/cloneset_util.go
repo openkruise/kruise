@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	v1 "k8s.io/api/core/v1"
@@ -25,11 +26,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
 )
 
@@ -200,4 +203,74 @@ func (t *CloneSetTester) GetSelectorPods(namespace string, selector *metav1.Labe
 
 func (t *CloneSetTester) DeletePod(name string) error {
 	return t.c.CoreV1().Pods(t.ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
+}
+
+func (t *CloneSetTester) GetCloneSetProgressingCondition(name string) (*appsv1alpha1.CloneSetCondition, error) {
+	return t.GetCloneSetCondition(name, appsv1alpha1.CloneSetConditionTypeProgressing)
+}
+
+func (t *CloneSetTester) GetCloneSetProgressingConditionWithoutTime(name string) (*appsv1alpha1.CloneSetCondition, error) {
+	condition, err := t.GetCloneSetCondition(name, appsv1alpha1.CloneSetConditionTypeProgressing)
+	if err != nil {
+		return nil, err
+	}
+	if condition == nil {
+		return nil, nil
+	}
+	condition.LastTransitionTime, condition.LastUpdateTime = metav1.Time{}, metav1.Time{}
+	return condition, nil
+}
+
+func (t *CloneSetTester) GetCloneSetCondition(name string, conditionType appsv1alpha1.CloneSetConditionType) (*appsv1alpha1.CloneSetCondition, error) {
+	cs, err := t.kc.AppsV1alpha1().CloneSets(t.ns).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	klog.Infof("cloneset(%s/%s) status(%s)", cs.Namespace, cs.Name, util.DumpJSON(cs.Status))
+	return clonesetutils.GetCloneSetCondition(cs.Status, conditionType), nil
+}
+
+func (t *CloneSetTester) NewCloneSetAvailableCondition() *appsv1alpha1.CloneSetCondition {
+	return &appsv1alpha1.CloneSetCondition{
+		Type:    appsv1alpha1.CloneSetConditionTypeProgressing,
+		Status:  v1.ConditionTrue,
+		Reason:  string(appsv1alpha1.CloneSetAvailable),
+		Message: "CloneSet is available",
+	}
+}
+
+func (t *CloneSetTester) NewCloneSetUpdatedCondition() *appsv1alpha1.CloneSetCondition {
+	return &appsv1alpha1.CloneSetCondition{
+		Type:    appsv1alpha1.CloneSetConditionTypeProgressing,
+		Status:  v1.ConditionTrue,
+		Reason:  string(appsv1alpha1.CloneSetProgressUpdated),
+		Message: "CloneSet is progressing",
+	}
+}
+
+func (t *CloneSetTester) NewCloneSetDeadlineExceededCondition(revision string) *appsv1alpha1.CloneSetCondition {
+	return &appsv1alpha1.CloneSetCondition{
+		Type:    appsv1alpha1.CloneSetConditionTypeProgressing,
+		Status:  v1.ConditionFalse,
+		Reason:  string(appsv1alpha1.CloneSetProgressDeadlineExceeded),
+		Message: fmt.Sprintf("CloneSet revision %s has timed out progressing", revision),
+	}
+}
+
+func (t *CloneSetTester) NewCloneSetPausedCondition() *appsv1alpha1.CloneSetCondition {
+	return &appsv1alpha1.CloneSetCondition{
+		Type:    appsv1alpha1.CloneSetConditionTypeProgressing,
+		Status:  v1.ConditionTrue,
+		Reason:  string(appsv1alpha1.CloneSetProgressPaused),
+		Message: "CloneSet is paused",
+	}
+}
+
+func (t *CloneSetTester) NewCloneSetPartitionAvailableCondition() *appsv1alpha1.CloneSetCondition {
+	return &appsv1alpha1.CloneSetCondition{
+		Type:    appsv1alpha1.CloneSetConditionTypeProgressing,
+		Status:  v1.ConditionTrue,
+		Reason:  string(appsv1alpha1.CloneSetProgressPartitionAvailable),
+		Message: "CloneSet has been paused due to partition ready",
+	}
 }
