@@ -19,6 +19,7 @@ package mutating
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"reflect"
 
@@ -29,7 +30,7 @@ import (
 
 	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 )
 
@@ -45,59 +46,71 @@ type SidecarSetCreateHandler struct {
 	Decoder admission.Decoder
 }
 
-func setHashSidecarSet(sidecarset *appsv1alpha1.SidecarSet) error {
-	if sidecarset.Annotations == nil {
-		sidecarset.Annotations = make(map[string]string)
-	}
-
-	hash, err := sidecarcontrol.SidecarSetHash(sidecarset)
-	if err != nil {
-		return err
-	}
-	sidecarset.Annotations[sidecarcontrol.SidecarSetHashAnnotation] = hash
-
-	hash, err = sidecarcontrol.SidecarSetHashWithoutImage(sidecarset)
-	if err != nil {
-		return err
-	}
-	sidecarset.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = hash
-
-	return nil
-}
-
 var _ admission.Handler = &SidecarSetCreateHandler{}
 
 // Handle handles admission requests.
 func (h *SidecarSetCreateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.SidecarSet{}
-
-	err := h.Decoder.Decode(req, obj)
-	if err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
-	}
-	var copy runtime.Object = obj.DeepCopy()
-	switch req.AdmissionRequest.Operation {
-	case admissionv1.Create, admissionv1.Update:
-		defaults.SetDefaultsSidecarSet(obj)
-		if err := setHashSidecarSet(obj); err != nil {
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		obj := &appsv1beta1.SidecarSet{}
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		var copy runtime.Object = obj.DeepCopy()
+		switch req.AdmissionRequest.Operation {
+		case admissionv1.Create, admissionv1.Update:
+			defaults.SetDefaultsSidecarSetV1beta1(obj)
+			if err := defaults.SetHashSidecarSetV1beta1(obj); err != nil {
+				return admission.Errored(http.StatusInternalServerError, err)
+			}
+		}
+		klog.V(4).InfoS("sidecarset after mutating", "object", util.DumpJSON(obj))
+		if reflect.DeepEqual(obj, copy) {
+			return admission.Allowed("")
+		}
+		marshaled, err := json.Marshal(obj)
+		if err != nil {
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
+		resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
+		if len(resp.Patches) > 0 {
+			klog.V(5).InfoS("Admit SidecarSet patches", "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
+		}
+		return resp
+	case appsv1alpha1.GroupVersion.Version:
+		obj := &appsv1alpha1.SidecarSet{}
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		var copy runtime.Object = obj.DeepCopy()
+		switch req.AdmissionRequest.Operation {
+		case admissionv1.Create, admissionv1.Update:
+			defaults.SetDefaultsSidecarSet(obj)
+			if err := defaults.SetHashSidecarSet(obj); err != nil {
+				return admission.Errored(http.StatusInternalServerError, err)
+			}
+		}
+		klog.V(4).InfoS("sidecarset after mutating", "object", util.DumpJSON(obj))
+		if reflect.DeepEqual(obj, copy) {
+			return admission.Allowed("")
+		}
+		marshaled, err := json.Marshal(obj)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
+		if len(resp.Patches) > 0 {
+			klog.V(5).InfoS("Admit SidecarSet patches", "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
+		}
+		return resp
 	}
-	klog.V(4).InfoS("sidecarset after mutating", "object", util.DumpJSON(obj))
-	if reflect.DeepEqual(obj, copy) {
-		return admission.Allowed("")
-	}
-	marshaled, err := json.Marshal(obj)
-	if err != nil {
-		return admission.Errored(http.StatusInternalServerError, err)
-	}
-	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
+	return admission.Errored(http.StatusBadRequest, fmt.Errorf("unsupported version: %s", req.AdmissionRequest.Resource.Version))
 }
 
-//var _ inject.Client = &SidecarSetCreateHandler{}
+// var _ inject.Client = &SidecarSetCreateHandler{}
 //
-//// InjectClient injects the client into the SidecarSetCreateHandler
-//func (h *SidecarSetCreateHandler) InjectClient(c client.Client) error {
+// // InjectClient injects the client into the SidecarSetCreateHandler
+// func (h *SidecarSetCreateHandler) InjectClient(c client.Client) error {
 //	h.Client = c
 //	return nil
-//}
+// }

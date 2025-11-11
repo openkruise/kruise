@@ -205,7 +205,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-sidecarset
+      path: /mutate-apps-kruise-io-sidecarset
   failurePolicy: Fail
   name: msidecarset.kb.io
   rules:
@@ -213,6 +213,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -738,7 +739,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-apps-kruise-io-v1alpha1-sidecarset
+      path: /validate-apps-kruise-io-sidecarset
   failurePolicy: Fail
   name: vsidecarset.kb.io
   rules:
@@ -746,6 +747,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE

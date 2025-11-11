@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kruise Authors.
+Copyright 2025 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	"fmt"
@@ -26,26 +26,26 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework/common"
-	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
+	"github.com/openkruise/kruise/test/e2e/framework/v1beta1"
 )
 
 var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), func() {
-	f := v1alpha1.NewDefaultFramework("sidecarset")
+	f := v1beta1.NewDefaultFramework("sidecarset-v1beta1")
 	var ns string
 	var c clientset.Interface
 	var kc kruiseclientset.Interface
-	var tester *v1alpha1.SidecarSetTester
+	var tester *v1beta1.SidecarSetTester
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		kc = f.KruiseClientSet
 		ns = f.Namespace.Name
-		tester = v1alpha1.NewSidecarSetTester(c, kc)
+		tester = v1beta1.NewSidecarSetTester(c, kc)
 	})
 
 	ginkgo.Context("SidecarSet HotUpgrade functionality [SidecarSetHotUpgrade]", func() {
@@ -62,10 +62,11 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet(ns)
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
-			// Get the dynamically generated container name
 			sidecarContainerName := sidecarSetIn.Spec.Containers[0].Name
-			sidecarSetIn.Spec.Containers[0].UpgradeStrategy = appsv1alpha1.SidecarContainerUpgradeStrategy{
-				UpgradeType:          appsv1alpha1.SidecarContainerHotUpgrade,
+			hotUpgradeContainer1 := sidecarContainerName + "-1"
+			hotUpgradeContainer2 := sidecarContainerName + "-2"
+			sidecarSetIn.Spec.Containers[0].UpgradeStrategy = appsv1beta1.SidecarContainerUpgradeStrategy{
+				UpgradeType:          appsv1beta1.SidecarContainerHotUpgrade,
 				HotUpgradeEmptyImage: common.BusyboxImage,
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
@@ -80,9 +81,7 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods[0].Spec.Containers).To(gomega.HaveLen(len(sidecarSetIn.Spec.Containers) + len(deploymentIn.Spec.Template.Spec.Containers) + 1))
-			// check pod sidecarSet version in annotations (hot upgrade containers have -1 and -2 suffixes)
-			hotUpgradeContainer1 := sidecarContainerName + "-1"
-			hotUpgradeContainer2 := sidecarContainerName + "-2"
+			// check pod sidecarSet version in annotations
 			gomega.Expect(pods[0].Annotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation(hotUpgradeContainer1)]).To(gomega.Equal("1"))
 			gomega.Expect(pods[0].Annotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation(hotUpgradeContainer1)]).To(gomega.Equal("0"))
 			gomega.Expect(pods[0].Annotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation(hotUpgradeContainer2)]).To(gomega.Equal("0"))
@@ -104,17 +103,16 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 		ginkgo.It("sidecarSet upgrade hot sidecar container image", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet(ns)
-			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
-				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
+			sidecarSetIn.Spec.UpdateStrategy = appsv1beta1.SidecarSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateSidecarSetStrategyType,
 			}
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
-			// Get the dynamically generated container name
 			sidecarContainerName := sidecarSetIn.Spec.Containers[0].Name
 			hotUpgradeContainer1 := sidecarContainerName + "-1"
 			hotUpgradeContainer2 := sidecarContainerName + "-2"
 			sidecarSetIn.Spec.Containers[0].Image = common.NginxImage
-			sidecarSetIn.Spec.Containers[0].UpgradeStrategy = appsv1alpha1.SidecarContainerUpgradeStrategy{
-				UpgradeType:          appsv1alpha1.SidecarContainerHotUpgrade,
+			sidecarSetIn.Spec.Containers[0].UpgradeStrategy = appsv1beta1.SidecarContainerUpgradeStrategy{
+				UpgradeType:          appsv1beta1.SidecarContainerHotUpgrade,
 				HotUpgradeEmptyImage: common.BusyboxImage,
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
@@ -148,7 +146,7 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 			ginkgo.By(fmt.Sprintf("update sidecarSet(%s) sidecar container image to new nginx", sidecarSetIn.Name))
 			sidecarSetIn.Spec.Containers[0].Image = common.NewNginxImage
 			tester.UpdateSidecarSet(sidecarSetIn)
-			except := &appsv1alpha1.SidecarSetStatus{
+			except := &appsv1beta1.SidecarSetStatus{
 				MatchedPods:      1,
 				UpdatedPods:      1,
 				UpdatedReadyPods: 1,
@@ -173,7 +171,7 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 			ginkgo.By(fmt.Sprintf("update sidecarSet(%s) sidecar container image to nginx", sidecarSetIn.Name))
 			sidecarSetIn.Spec.Containers[0].Image = common.NginxImage
 			tester.UpdateSidecarSet(sidecarSetIn)
-			except = &appsv1alpha1.SidecarSetStatus{
+			except = &appsv1beta1.SidecarSetStatus{
 				MatchedPods:      1,
 				UpdatedPods:      1,
 				UpdatedReadyPods: 1,
@@ -204,7 +202,7 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 				},
 			}
 			tester.UpdateSidecarSet(sidecarSetIn)
-			except = &appsv1alpha1.SidecarSetStatus{
+			except = &appsv1beta1.SidecarSetStatus{
 				MatchedPods:      1,
 				UpdatedPods:      0,
 				UpdatedReadyPods: 0,
@@ -219,17 +217,16 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 		ginkgo.It("sidecarSet upgrade hot sidecar container failed image", func() {
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet(ns)
-			sidecarSetIn.Spec.UpdateStrategy = appsv1alpha1.SidecarSetUpdateStrategy{
-				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
+			sidecarSetIn.Spec.UpdateStrategy = appsv1beta1.SidecarSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateSidecarSetStrategyType,
 			}
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
-			// Get the dynamically generated container name
 			sidecarContainerName := sidecarSetIn.Spec.Containers[0].Name
 			hotUpgradeContainer1 := sidecarContainerName + "-1"
 			hotUpgradeContainer2 := sidecarContainerName + "-2"
 			sidecarSetIn.Spec.Containers[0].Image = common.NginxImage
-			sidecarSetIn.Spec.Containers[0].UpgradeStrategy = appsv1alpha1.SidecarContainerUpgradeStrategy{
-				UpgradeType:          appsv1alpha1.SidecarContainerHotUpgrade,
+			sidecarSetIn.Spec.Containers[0].UpgradeStrategy = appsv1beta1.SidecarContainerUpgradeStrategy{
+				UpgradeType:          appsv1beta1.SidecarContainerHotUpgrade,
 				HotUpgradeEmptyImage: common.BusyboxImage,
 			}
 			ginkgo.By(fmt.Sprintf("Creating SidecarSet %s", sidecarSetIn.Name))
@@ -258,7 +255,7 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 			// update sidecarSet sidecar container failed image
 			sidecarSetIn.Spec.Containers[0].Image = common.InvalidImage
 			tester.UpdateSidecarSet(sidecarSetIn)
-			except := &appsv1alpha1.SidecarSetStatus{
+			except := &appsv1beta1.SidecarSetStatus{
 				MatchedPods:      2,
 				UpdatedPods:      1,
 				UpdatedReadyPods: 0,
@@ -271,7 +268,7 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 			// update sidecarSet sidecar container again, and success image
 			sidecarSetIn.Spec.Containers[0].Image = common.NewNginxImage
 			tester.UpdateSidecarSet(sidecarSetIn)
-			except = &appsv1alpha1.SidecarSetStatus{
+			except = &appsv1beta1.SidecarSetStatus{
 				MatchedPods:      2,
 				UpdatedPods:      2,
 				UpdatedReadyPods: 2,

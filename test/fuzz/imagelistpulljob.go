@@ -18,8 +18,9 @@ package fuzz
 
 import (
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
-	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func generateValidNames(cf *fuzz.ConsumeFuzzer) []string {

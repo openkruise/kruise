@@ -25,12 +25,13 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
@@ -70,14 +71,14 @@ func TestUpdateColdUpgradeSidecar(t *testing.T) {
 	testUpdateColdUpgradeSidecar(t, podInput, sidecarSetInput, handlers)
 }
 
-func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetInput *appsv1alpha1.SidecarSet, handlers map[string]HandlePod) {
+func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetInput *appsv1beta1.SidecarSet, handlers map[string]HandlePod) {
 	podInput1 := podDemo.DeepCopy()
 	podInput2 := podDemo.DeepCopy()
 	podInput2.Name = "test-pod-2"
 	cases := []struct {
 		name          string
 		getPods       func() []*corev1.Pod
-		getSidecarset func() *appsv1alpha1.SidecarSet
+		getSidecarset func() *appsv1beta1.SidecarSet
 		// pod.name -> infos []string{Image, Env, volumeMounts}
 		expectedInfo map[*corev1.Pod][]string
 		// MatchedPods, UpdatedPods, ReadyPods, AvailablePods, UnavailablePods
@@ -91,7 +92,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 				}
 				return pods
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				return sidecarSetInput.DeepCopy()
 			},
 			expectedInfo: map[*corev1.Pod][]string{
@@ -108,7 +109,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 				}
 				return pods
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				return sidecarSetInput.DeepCopy()
 			},
 			expectedInfo: map[*corev1.Pod][]string{
@@ -126,7 +127,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 				}
 				return pods
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				return sidecarSetInput.DeepCopy()
 			},
 			expectedInfo: map[*corev1.Pod][]string{
@@ -143,7 +144,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 				}
 				return pods
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				return sidecarSetInput.DeepCopy()
 			},
 			expectedInfo: map[*corev1.Pod][]string{
@@ -161,7 +162,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 				}
 				return pods
 			},
-			getSidecarset: func() *appsv1alpha1.SidecarSet {
+			getSidecarset: func() *appsv1beta1.SidecarSet {
 				return sidecarSetInput.DeepCopy()
 			},
 			expectedInfo: map[*corev1.Pod][]string{
@@ -177,7 +178,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 			sidecarset := cs.getSidecarset()
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).
 				WithObjects(sidecarset, pods[0], pods[1]).
-				WithStatusSubresource(&appsv1alpha1.SidecarSet{}).Build()
+				WithStatusSubresource(&appsv1beta1.SidecarSet{}).Build()
 			processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
 			_, err := processor.UpdateSidecarSet(sidecarset)
 			if err != nil {
@@ -233,7 +234,7 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 					t.Fatalf("except sidecarset status(%d:%d), but get value(%d)", k, v, actualValue)
 				}
 			}
-			//handle potInput
+			// handle potInput
 			if handle, ok := handlers[cs.name]; ok {
 				handle([]*corev1.Pod{podInput1, podInput2})
 			}
@@ -243,8 +244,27 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 
 func TestScopeNamespacePods(t *testing.T) {
 	sidecarSet := sidecarSetDemo.DeepCopy()
-	sidecarSet.Spec.Namespace = "test-ns"
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet).Build()
+	// Create namespaces with labels
+	testNs := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-ns",
+			Labels: map[string]string{
+				"test": "true",
+			},
+		},
+	}
+	defaultNs := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default",
+		},
+	}
+	// Use NamespaceSelector to select namespaces with label "test: true"
+	sidecarSet.Spec.NamespaceSelector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"test": "true",
+		},
+	}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet, testNs, defaultNs).Build()
 	for i := 0; i < 100; i++ {
 		pod := podDemo.DeepCopy()
 		pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
@@ -273,7 +293,7 @@ func TestCanUpgradePods(t *testing.T) {
 		StrVal: "50%",
 	}
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet).
-		WithStatusSubresource(&appsv1alpha1.SidecarSet{}).Build()
+		WithStatusSubresource(&appsv1beta1.SidecarSet{}).Build()
 	pods := factoryPodsCommon(100, 0, sidecarSet)
 	for i := range pods {
 		pods[i].Annotations[sidecarcontrol.SidecarSetListAnnotation] = `test-sidecarset`
@@ -313,7 +333,7 @@ func TestGetActiveRevisions(t *testing.T) {
 	sidecarSet := factorySidecarSet()
 	sidecarSet.SetUID("1223344")
 	kubeSysNs := &corev1.Namespace{}
-	//Note that webhookutil.GetNamespace() return "" here
+	// Note that webhookutil.GetNamespace() return "" here
 	kubeSysNs.SetName(webhookutil.GetNamespace())
 	kubeSysNs.SetNamespace(webhookutil.GetNamespace())
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet, kubeSysNs).Build()
@@ -328,7 +348,7 @@ func TestGetActiveRevisions(t *testing.T) {
 
 	// case 2
 	newSidecar := sidecarSet.DeepCopy()
-	newSidecar.Spec.InitContainers = []appsv1alpha1.SidecarContainer{
+	newSidecar.Spec.InitContainers = []appsv1beta1.SidecarContainer{
 		{Container: corev1.Container{Name: "emptyInitC"}},
 	}
 	newSidecar.Spec.Volumes = []corev1.Volume{
@@ -428,7 +448,7 @@ func TestTruncateHistory(t *testing.T) {
 		sidecarSet.Spec.Selector.MatchLabels = make(map[string]string)
 	}
 	kubeSysNs := &corev1.Namespace{}
-	kubeSysNs.SetName(webhookutil.GetNamespace()) //Note that util.GetKruiseManagerNamespace() return "" here
+	kubeSysNs.SetName(webhookutil.GetNamespace()) // Note that util.GetKruiseManagerNamespace() return "" here
 	kubeSysNs.SetNamespace(webhookutil.GetNamespace())
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet, kubeSysNs).Build()
 	processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
