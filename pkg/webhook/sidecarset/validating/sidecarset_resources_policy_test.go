@@ -25,12 +25,12 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func init() {
 	testScheme = runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(testScheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(testScheme))
 	utilruntime.Must(corev1.AddToScheme(testScheme))
 	handler = &SidecarSetCreateUpdateHandler{}
 }
@@ -38,32 +38,32 @@ func init() {
 func TestValidateResourcesPolicy(t *testing.T) {
 	tests := []struct {
 		name          string
-		container     appsv1alpha1.SidecarContainer
+		container     appsv1beta1.SidecarContainer
 		expectErrors  int
 		errorContains []string
 	}{
 		{
 			name: "valid resources policy with sum mode and both limits and requests",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "max(cpu*50%, 50m)",
 							Memory: "max(memory*50%, 100Mi)",
 						},
-						Requests: &appsv1alpha1.ResourceExprRequests{
+						Requests: &appsv1beta1.ResourceExprRequests{
 							CPU:    "max(cpu*50%, 50m)",
 							Memory: "max(memory*50%, 100Mi)",
 						},
@@ -74,22 +74,22 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "valid resources policy with max mode and only limits",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeMax,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeMax,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "cpu*50%",
 						},
 					},
@@ -99,22 +99,22 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "valid resources policy with only requests",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 					TargetContainersNameRegex: ".*",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Requests: &appsv1alpha1.ResourceExprRequests{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Requests: &appsv1beta1.ResourceExprRequests{
 							CPU:    "max(cpu*50%, 50m)",
 							Memory: "100Mi",
 						},
@@ -125,22 +125,22 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "valid resources policy with empty regex",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 					TargetContainersNameRegex: "",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "cpu*50%",
 						},
 					},
@@ -150,7 +150,7 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "resources policy and resources.limits both configured - should fail",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
@@ -163,14 +163,14 @@ func TestValidateResourcesPolicy(t *testing.T) {
 						},
 					},
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode: appsv1alpha1.TargetContainerModeSum,
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode: appsv1beta1.TargetContainerModeSum,
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "cpu*50%",
 						},
 					},
@@ -181,7 +181,7 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "resources policy and resources.requests both configured - should fail",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
@@ -193,14 +193,14 @@ func TestValidateResourcesPolicy(t *testing.T) {
 						},
 					},
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode: appsv1alpha1.TargetContainerModeSum,
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode: appsv1beta1.TargetContainerModeSum,
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "cpu*50%",
 						},
 					},
@@ -211,22 +211,22 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "invalid regex pattern - should fail",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 					TargetContainersNameRegex: "[invalid(regex",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "cpu*50%",
 						},
 					},
@@ -237,21 +237,21 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "no limits and requests - should fail",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr:              appsv1alpha1.ResourceExpr{},
+					ResourceExpr:              appsv1beta1.ResourceExpr{},
 				},
 			},
 			expectErrors:  1,
@@ -259,22 +259,22 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "invalid cpu expression - should fail",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "invalid expression @#$",
 						},
 					},
@@ -285,22 +285,22 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "unbalanced parentheses - should fail",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "max(cpu*50%, 50m",
 						},
 					},
@@ -311,22 +311,22 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "invalid function syntax - should fail",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "max(cpu*50%)",
 						},
 					},
@@ -337,22 +337,22 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "invalid variable name - should fail",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "invalidvar * 50%",
 						},
 					},
@@ -363,22 +363,22 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "valid complex expression from story 5",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "0.5*cpu - 0.3*max(0, cpu-4) + 0.3*max(0, cpu-8)",
 							Memory: "max(memory*50%, 100Mi)",
 						},
@@ -389,22 +389,22 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "valid with only cpu in limits",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeMax,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeMax,
 					TargetContainersNameRegex: "^.*",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "cpu*50%",
 						},
 					},
@@ -414,22 +414,22 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "valid with only memory in limits",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeMax,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeMax,
 					TargetContainersNameRegex: "^.*",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							Memory: "memory*50%",
 						},
 					},
@@ -439,22 +439,22 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "empty cpu expression in requests is valid",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 					TargetContainersNameRegex: "^.*",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Requests: &appsv1alpha1.ResourceExprRequests{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Requests: &appsv1beta1.ResourceExprRequests{
 							Memory: "100Mi",
 						},
 					},
@@ -464,22 +464,22 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "invalid cpu expression in requests - should fail",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 					TargetContainersNameRegex: "^.*",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Requests: &appsv1alpha1.ResourceExprRequests{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Requests: &appsv1beta1.ResourceExprRequests{
 							CPU: "invalid_cpu_expr",
 						},
 					},
@@ -490,22 +490,22 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "invalid memory expression in limits - should fail",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 					TargetContainersNameRegex: "^.*",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							Memory: "bad_memory_expr",
 						},
 					},
@@ -516,22 +516,22 @@ func TestValidateResourcesPolicy(t *testing.T) {
 		},
 		{
 			name: "invalid memory expression in requests - should fail",
-			container: appsv1alpha1.SidecarContainer{
+			container: appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:                     "test-sidecar",
 					Image:                    "test-image",
 					ImagePullPolicy:          corev1.PullIfNotPresent,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 				},
-				PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-				ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-					Type: appsv1alpha1.ShareVolumePolicyDisabled,
+				PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+				ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
 					TargetContainersNameRegex: "^.*",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Requests: &appsv1alpha1.ResourceExprRequests{
+					ResourceExpr: appsv1beta1.ResourceExpr{
+						Requests: &appsv1beta1.ResourceExprRequests{
 							Memory: "bad_memory_expr",
 						},
 					},

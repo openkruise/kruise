@@ -26,6 +26,7 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	"github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 )
 
 const (
@@ -61,6 +62,26 @@ func SetDefaultsSidecarSet(obj *v1alpha1.SidecarSet) {
 
 	// default setting injectRevisionStrategy
 	SetDefaultInjectRevision(&obj.Spec.InjectionStrategy)
+}
+
+func SetHashSidecarSet(sidecarset *v1alpha1.SidecarSet) error {
+	if sidecarset.Annotations == nil {
+		sidecarset.Annotations = make(map[string]string)
+	}
+
+	hash, err := sidecarcontrol.SidecarSetHash(sidecarset)
+	if err != nil {
+		return err
+	}
+	sidecarset.Annotations[sidecarcontrol.SidecarSetHashAnnotation] = hash
+
+	hash, err = sidecarcontrol.SidecarSetHashWithoutImage(sidecarset)
+	if err != nil {
+		return err
+	}
+	sidecarset.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = hash
+
+	return nil
 }
 
 func SetDefaultInjectRevision(strategy *v1alpha1.SidecarSetInjectionStrategy) {

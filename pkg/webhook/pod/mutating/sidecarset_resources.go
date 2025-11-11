@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util/calculator"
 )
@@ -33,7 +33,7 @@ import (
 // based on the target containers in the pod
 func applyResourcesPolicy(
 	pod *corev1.Pod,
-	sidecarContainer *appsv1alpha1.SidecarContainer,
+	sidecarContainer *appsv1beta1.SidecarContainer,
 	matchedSidecarSets []sidecarcontrol.SidecarControl,
 ) error {
 	// Only apply when ResourcesPolicy is configured
@@ -225,15 +225,15 @@ func getTargetContainers(
 // aggregateResources aggregates resources from target containers based on mode
 func aggregateResources(
 	containers []corev1.Container,
-	mode appsv1alpha1.TargetContainerModeType,
+	mode appsv1beta1.TargetContainerModeType,
 ) (limits, requests corev1.ResourceList) {
 	limits = corev1.ResourceList{}
 	requests = corev1.ResourceList{}
 
 	switch mode {
-	case appsv1alpha1.TargetContainerModeSum:
+	case appsv1beta1.TargetContainerModeSum:
 		limits, requests = aggregateResourcesBySum(containers)
-	case appsv1alpha1.TargetContainerModeMax:
+	case appsv1beta1.TargetContainerModeMax:
 		limits, requests = aggregateResourcesByMax(containers)
 	}
 

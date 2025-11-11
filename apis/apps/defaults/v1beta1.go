@@ -24,6 +24,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
@@ -255,5 +256,146 @@ func SetDefaultsDaemonSetV1beta1(obj *v1beta1.DaemonSet) {
 
 	if obj.Spec.RevisionHistoryLimit == nil {
 		obj.Spec.RevisionHistoryLimit = ptr.To(int32(10))
+	}
+}
+
+func setDefaultContainerV1beta1(sidecarContainer *v1beta1.SidecarContainer) {
+	container := &sidecarContainer.Container
+	v1.SetDefaults_Container(container)
+	for i := range container.Ports {
+		p := &container.Ports[i]
+		if p.Protocol == "" {
+			p.Protocol = "TCP"
+		}
+	}
+	for i := range sidecarContainer.TransferEnv {
+		tEnv := &sidecarContainer.TransferEnv[i]
+		if tEnv.SourceContainerNameFrom != nil {
+			v1.SetDefaults_ObjectFieldSelector(tEnv.SourceContainerNameFrom.FieldRef)
+		}
+	}
+	for i := range container.Env {
+		e := &container.Env[i]
+		if e.ValueFrom != nil {
+			if e.ValueFrom.FieldRef != nil {
+				v1.SetDefaults_ObjectFieldSelector(e.ValueFrom.FieldRef)
+			}
+		}
+	}
+	v1.SetDefaults_ResourceList(&container.Resources.Limits)
+	v1.SetDefaults_ResourceList(&container.Resources.Requests)
+	if container.LivenessProbe != nil {
+		v1.SetDefaults_Probe(container.LivenessProbe)
+		if container.LivenessProbe.ProbeHandler.HTTPGet != nil {
+			v1.SetDefaults_HTTPGetAction(container.LivenessProbe.ProbeHandler.HTTPGet)
+		}
+	}
+	if container.ReadinessProbe != nil {
+		v1.SetDefaults_Probe(container.ReadinessProbe)
+		if container.ReadinessProbe.ProbeHandler.HTTPGet != nil {
+			v1.SetDefaults_HTTPGetAction(container.ReadinessProbe.ProbeHandler.HTTPGet)
+		}
+	}
+	if container.Lifecycle != nil {
+		if container.Lifecycle.PostStart != nil {
+			if container.Lifecycle.PostStart.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(container.Lifecycle.PostStart.HTTPGet)
+			}
+		}
+		if container.Lifecycle.PreStop != nil {
+			if container.Lifecycle.PreStop.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(container.Lifecycle.PreStop.HTTPGet)
+			}
+		}
+	}
+}
+
+func SetDefaultRevisionHistoryLimitV1beta1(revisionHistoryLimit **int32) {
+	if *revisionHistoryLimit == nil {
+		*revisionHistoryLimit = ptr.To(int32(10))
+	}
+}
+
+func SetHashSidecarSetV1beta1(sidecarset *v1beta1.SidecarSet) error {
+	if sidecarset.Annotations == nil {
+		sidecarset.Annotations = make(map[string]string)
+	}
+
+	hash, err := sidecarcontrol.SidecarSetHashV1beta1(sidecarset)
+	if err != nil {
+		return err
+	}
+	sidecarset.Annotations[sidecarcontrol.SidecarSetHashAnnotation] = hash
+
+	hash, err = sidecarcontrol.SidecarSetHashWithoutImageV1beta1(sidecarset)
+	if err != nil {
+		return err
+	}
+	sidecarset.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = hash
+
+	return nil
+}
+
+// SetDefaultsSidecarSetV1beta1 set default values for SidecarSet v1beta1.
+func SetDefaultsSidecarSetV1beta1(obj *v1beta1.SidecarSet) {
+	setSidecarSetUpdateStrategyV1beta1(&obj.Spec.UpdateStrategy)
+
+	for i := range obj.Spec.InitContainers {
+		setDefaultSidecarContainerV1beta1(&obj.Spec.InitContainers[i], v1beta1.AfterAppContainerType)
+	}
+
+	for i := range obj.Spec.Containers {
+		setDefaultSidecarContainerV1beta1(&obj.Spec.Containers[i], v1beta1.BeforeAppContainerType)
+	}
+
+	// default setting volumes
+	SetDefaultPodVolumes(obj.Spec.Volumes)
+
+	// default setting history revision limitation
+	SetDefaultRevisionHistoryLimitV1beta1(&obj.Spec.RevisionHistoryLimit)
+
+	// default patchPolicy is 'Retain'
+	for i := range obj.Spec.PatchPodMetadata {
+		patch := &obj.Spec.PatchPodMetadata[i]
+		if patch.PatchPolicy == "" {
+			patch.PatchPolicy = v1beta1.SidecarSetRetainPatchPolicy
+		}
+	}
+
+	// default setting injectRevisionStrategy
+	SetDefaultInjectRevisionV1beta1(&obj.Spec.InjectionStrategy)
+}
+
+func SetDefaultInjectRevisionV1beta1(strategy *v1beta1.SidecarSetInjectionStrategy) {
+	if strategy.Revision != nil && strategy.Revision.Policy == "" {
+		strategy.Revision.Policy = v1beta1.AlwaysSidecarSetInjectRevisionPolicy
+	}
+}
+
+func setDefaultSidecarContainerV1beta1(sidecarContainer *v1beta1.SidecarContainer, injectPolicy v1beta1.PodInjectPolicyType) {
+	if sidecarContainer.PodInjectPolicy == "" {
+		sidecarContainer.PodInjectPolicy = injectPolicy
+	}
+
+	if sidecarContainer.UpgradeStrategy.UpgradeType == "" {
+		sidecarContainer.UpgradeStrategy.UpgradeType = v1beta1.SidecarContainerColdUpgrade
+	}
+	if sidecarContainer.ShareVolumePolicy.Type == "" {
+		sidecarContainer.ShareVolumePolicy.Type = v1beta1.ShareVolumePolicyDisabled
+	}
+
+	setDefaultContainerV1beta1(sidecarContainer)
+}
+
+func setSidecarSetUpdateStrategyV1beta1(strategy *v1beta1.SidecarSetUpdateStrategy) {
+	if strategy.Type == "" {
+		strategy.Type = v1beta1.RollingUpdateSidecarSetStrategyType
+	}
+	if strategy.MaxUnavailable == nil {
+		maxUnavailable := intstr.FromInt(1)
+		strategy.MaxUnavailable = &maxUnavailable
+	}
+	if strategy.Partition == nil {
+		strategy.Partition = &intstr.IntOrString{Type: intstr.Int, IntVal: 0}
 	}
 }

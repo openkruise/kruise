@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/configuration"
@@ -44,15 +44,15 @@ var (
 
 func init() {
 	_ = clientgoscheme.AddToScheme(fakeScheme)
-	_ = appsv1alpha1.AddToScheme(fakeScheme)
-	_ = appsv1alpha1.AddToScheme(clientgoscheme.Scheme)
+	_ = appsv1beta1.AddToScheme(fakeScheme)
+	_ = appsv1beta1.AddToScheme(clientgoscheme.Scheme)
 }
 
 func FuzzValidateSidecarSetSpec(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cf := fuzz.NewConsumer(data)
 
-		ss := &appsv1alpha1.SidecarSet{}
+		ss := &appsv1beta1.SidecarSet{}
 		if err := cf.GenerateStruct(ss); err != nil {
 			return
 		}
@@ -78,7 +78,7 @@ func FuzzValidateSidecarSetSpec(f *testing.F) {
 	})
 }
 
-func newFakeSidecarSetCreateUpdateHandler(cf *fuzz.ConsumeFuzzer, ss *appsv1alpha1.SidecarSet) (*SidecarSetCreateUpdateHandler, error) {
+func newFakeSidecarSetCreateUpdateHandler(cf *fuzz.ConsumeFuzzer, ss *appsv1beta1.SidecarSet) (*SidecarSetCreateUpdateHandler, error) {
 	name, hash := "", ""
 	if ss.Spec.InjectionStrategy.Revision != nil && ss.Spec.InjectionStrategy.Revision.RevisionName != nil {
 		name = *ss.Spec.InjectionStrategy.Revision.RevisionName
@@ -102,8 +102,8 @@ func newFakeSidecarSetCreateUpdateHandler(cf *fuzz.ConsumeFuzzer, ss *appsv1alph
 					Namespace: webhookutil.GetNamespace(),
 					Name:      "default",
 					Labels: map[string]string{
-						sidecarcontrol.SidecarSetKindName:         ss.GetName(),
-						appsv1alpha1.SidecarSetCustomVersionLabel: hash,
+						sidecarcontrol.SidecarSetKindName:        ss.GetName(),
+						appsv1beta1.SidecarSetCustomVersionLabel: hash,
 					},
 				},
 			},

@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 )
 
@@ -96,7 +96,7 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.TypedRateLimitingInterface[
 		return
 	}
 	for _, sidecarSet := range matchedSidecarSets {
-		if sidecarSet.Spec.UpdateStrategy.Type == appsv1alpha1.NotUpdateSidecarSetStrategyType {
+		if sidecarSet.Spec.UpdateStrategy.Type == appsv1beta1.NotUpdateSidecarSetStrategyType {
 			continue
 		}
 		var isChanged bool
@@ -117,13 +117,13 @@ func (p *enqueueRequestForPod) updatePod(q workqueue.TypedRateLimitingInterface[
 
 }
 
-func (p *enqueueRequestForPod) getPodMatchedSidecarSets(pod *corev1.Pod) ([]*appsv1alpha1.SidecarSet, error) {
+func (p *enqueueRequestForPod) getPodMatchedSidecarSets(pod *corev1.Pod) ([]*appsv1beta1.SidecarSet, error) {
 	sidecarSetNames, ok := pod.Annotations[sidecarcontrol.SidecarSetListAnnotation]
 
-	var matchedSidecarSets []*appsv1alpha1.SidecarSet
+	var matchedSidecarSets []*appsv1beta1.SidecarSet
 	if ok && len(sidecarSetNames) > 0 {
 		for _, sidecarSetName := range strings.Split(sidecarSetNames, ",") {
-			sidecarSet := new(appsv1alpha1.SidecarSet)
+			sidecarSet := new(appsv1beta1.SidecarSet)
 			if err := p.reader.Get(context.TODO(), types.NamespacedName{
 				Name: sidecarSetName,
 			}, sidecarSet); err != nil {
@@ -167,7 +167,7 @@ func isPodStatusChanged(oldPod, newPod *corev1.Pod) bool {
 	return false
 }
 
-func isPodConsistentChanged(oldPod, newPod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) (bool, time.Duration) {
+func isPodConsistentChanged(oldPod, newPod *corev1.Pod, sidecarSet *appsv1beta1.SidecarSet) (bool, time.Duration) {
 	control := sidecarcontrol.New(sidecarSet)
 	var enqueueDelayTime time.Duration
 	// contain sidecar empty container
