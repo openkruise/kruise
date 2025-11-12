@@ -22,12 +22,12 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/scale/scheme/appsv1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/apis/apps/v1beta1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func TestPostUpdate(t *testing.T) {
@@ -186,8 +186,8 @@ func getPodAnnotationsFromSubset(object client.Object) map[string]string {
 	switch object.(type) {
 	case *v1beta1.StatefulSet:
 		return object.(*v1beta1.StatefulSet).Spec.Template.Annotations
-	case *appsv1alpha1.CloneSet:
-		return object.(*appsv1alpha1.CloneSet).Spec.Template.Annotations
+	case *appsv1beta1.CloneSet:
+		return object.(*appsv1beta1.CloneSet).Spec.Template.Annotations
 	case *appsv1.Deployment:
 		return object.(*appsv1.Deployment).Spec.Template.Annotations
 	case *appsv1.StatefulSet:
@@ -223,7 +223,7 @@ func newUnitedDeploymentWithAdapter(adapter Adapter) *appsv1alpha1.UnitedDeploym
 		ud.Spec.Template.AdvancedStatefulSetTemplate = &appsv1alpha1.AdvancedStatefulSetTemplateSpec{}
 		ud.Spec.Template.AdvancedStatefulSetTemplate.Labels = map[string]string{"custom-label-1": "custom-value-1"}
 		ud.Spec.Template.AdvancedStatefulSetTemplate.Annotations = map[string]string{"annotation-key": "annotation-value"}
-	case *appsv1alpha1.CloneSet:
+	case *appsv1beta1.CloneSet:
 		ud.Spec.Template.CloneSetTemplate = &appsv1alpha1.CloneSetTemplateSpec{}
 		ud.Spec.Template.CloneSetTemplate.Labels = map[string]string{"custom-label-1": "custom-value-1"}
 		ud.Spec.Template.CloneSetTemplate.Annotations = map[string]string{"annotation-key": "annotation-value"}

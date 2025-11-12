@@ -27,6 +27,8 @@ type Interface interface {
 	AdvancedCronJobs() AdvancedCronJobInformer
 	// BroadcastJobs returns a BroadcastJobInformer.
 	BroadcastJobs() BroadcastJobInformer
+	// CloneSets returns a CloneSetInformer.
+	CloneSets() CloneSetInformer
 	// DaemonSets returns a DaemonSetInformer.
 	DaemonSets() DaemonSetInformer
 	// ImageListPullJobs returns a ImageListPullJobInformer.
@@ -60,6 +62,11 @@ func (v *version) AdvancedCronJobs() AdvancedCronJobInformer {
 // BroadcastJobs returns a BroadcastJobInformer.
 func (v *version) BroadcastJobs() BroadcastJobInformer {
 	return &broadcastJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// CloneSets returns a CloneSetInformer.
+func (v *version) CloneSets() CloneSetInformer {
+	return &cloneSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // DaemonSets returns a DaemonSetInformer.

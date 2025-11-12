@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
@@ -15,13 +15,13 @@ import (
 func TestHasProgressDeadline(t *testing.T) {
 	tests := []struct {
 		name     string
-		cs       *appsv1alpha1.CloneSet
+		cs       *appsv1beta1.CloneSet
 		expected bool
 	}{
 		{
 			name: "Has ProgressDeadlineSeconds",
-			cs: &appsv1alpha1.CloneSet{
-				Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{
+				Spec: appsv1beta1.CloneSetSpec{
 					ProgressDeadlineSeconds: ptr.To(int32(600)),
 				},
 			},
@@ -29,13 +29,13 @@ func TestHasProgressDeadline(t *testing.T) {
 		},
 		{
 			name:     "No ProgressDeadlineSeconds",
-			cs:       &appsv1alpha1.CloneSet{Spec: appsv1alpha1.CloneSetSpec{}},
+			cs:       &appsv1beta1.CloneSet{Spec: appsv1beta1.CloneSetSpec{}},
 			expected: false,
 		},
 		{
 			name: "ProgressDeadlineSeconds with MaxInt32",
-			cs: &appsv1alpha1.CloneSet{
-				Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{
+				Spec: appsv1beta1.CloneSetSpec{
 					ProgressDeadlineSeconds: ptr.To(int32(math.MaxInt32)),
 				},
 			},
@@ -53,23 +53,23 @@ func TestHasProgressDeadline(t *testing.T) {
 }
 
 func TestGetCloneSetCondition(t *testing.T) {
-	condType := appsv1alpha1.CloneSetConditionTypeProgressing
-	condition := appsv1alpha1.CloneSetCondition{
+	condType := appsv1beta1.CloneSetConditionTypeProgressing
+	condition := appsv1beta1.CloneSetCondition{
 		Type:   condType,
 		Status: v1.ConditionTrue,
 	}
 
 	tests := []struct {
 		name       string
-		status     appsv1alpha1.CloneSetStatus
-		condType   appsv1alpha1.CloneSetConditionType
+		status     appsv1beta1.CloneSetStatus
+		condType   appsv1beta1.CloneSetConditionType
 		wantExist  bool
 		wantStatus v1.ConditionStatus
 	}{
 		{
 			name: "Condition exists",
-			status: appsv1alpha1.CloneSetStatus{
-				Conditions: []appsv1alpha1.CloneSetCondition{condition},
+			status: appsv1beta1.CloneSetStatus{
+				Conditions: []appsv1beta1.CloneSetCondition{condition},
 			},
 			condType:   condType,
 			wantExist:  true,
@@ -77,8 +77,8 @@ func TestGetCloneSetCondition(t *testing.T) {
 		},
 		{
 			name: "Condition not exists",
-			status: appsv1alpha1.CloneSetStatus{
-				Conditions: []appsv1alpha1.CloneSetCondition{},
+			status: appsv1beta1.CloneSetStatus{
+				Conditions: []appsv1beta1.CloneSetCondition{},
 			},
 			condType:  condType,
 			wantExist: false,
@@ -103,28 +103,28 @@ func TestGetCloneSetCondition(t *testing.T) {
 
 func TestSetCloneSetCondition(t *testing.T) {
 	now := time.Now()
-	condType := appsv1alpha1.CloneSetConditionTypeProgressing
+	condType := appsv1beta1.CloneSetConditionTypeProgressing
 
 	tests := []struct {
 		name           string
-		initialStatus  appsv1alpha1.CloneSetStatus
-		newCondition   *appsv1alpha1.CloneSetCondition
-		expectedStatus appsv1alpha1.CloneSetStatus
+		initialStatus  appsv1beta1.CloneSetStatus
+		newCondition   *appsv1beta1.CloneSetCondition
+		expectedStatus appsv1beta1.CloneSetStatus
 	}{
 		{
 			name: "Add new condition",
-			initialStatus: appsv1alpha1.CloneSetStatus{
-				Conditions: []appsv1alpha1.CloneSetCondition{},
+			initialStatus: appsv1beta1.CloneSetStatus{
+				Conditions: []appsv1beta1.CloneSetCondition{},
 			},
-			newCondition: NewCloneSetCondition(condType, v1.ConditionTrue, appsv1alpha1.CloneSetAvailable, "test", now),
-			expectedStatus: appsv1alpha1.CloneSetStatus{
-				Conditions: []appsv1alpha1.CloneSetCondition{
+			newCondition: NewCloneSetCondition(condType, v1.ConditionTrue, appsv1beta1.CloneSetAvailable, "test", now),
+			expectedStatus: appsv1beta1.CloneSetStatus{
+				Conditions: []appsv1beta1.CloneSetCondition{
 					{
 						Type:               condType,
 						Status:             v1.ConditionTrue,
 						LastUpdateTime:     metav1.NewTime(now),
 						LastTransitionTime: metav1.NewTime(now),
-						Reason:             string(appsv1alpha1.CloneSetAvailable),
+						Reason:             string(appsv1beta1.CloneSetAvailable),
 						Message:            "test",
 					},
 				},
@@ -132,8 +132,8 @@ func TestSetCloneSetCondition(t *testing.T) {
 		},
 		{
 			name: "Update existing condition with different status",
-			initialStatus: appsv1alpha1.CloneSetStatus{
-				Conditions: []appsv1alpha1.CloneSetCondition{
+			initialStatus: appsv1beta1.CloneSetStatus{
+				Conditions: []appsv1beta1.CloneSetCondition{
 					{
 						Type:               condType,
 						Status:             v1.ConditionTrue,
@@ -144,15 +144,15 @@ func TestSetCloneSetCondition(t *testing.T) {
 					},
 				},
 			},
-			newCondition: NewCloneSetCondition(condType, v1.ConditionFalse, appsv1alpha1.CloneSetProgressDeadlineExceeded, "new", now.Add(time.Second)),
-			expectedStatus: appsv1alpha1.CloneSetStatus{
-				Conditions: []appsv1alpha1.CloneSetCondition{
+			newCondition: NewCloneSetCondition(condType, v1.ConditionFalse, appsv1beta1.CloneSetProgressDeadlineExceeded, "new", now.Add(time.Second)),
+			expectedStatus: appsv1beta1.CloneSetStatus{
+				Conditions: []appsv1beta1.CloneSetCondition{
 					{
 						Type:               condType,
 						Status:             v1.ConditionFalse,
 						LastUpdateTime:     metav1.NewTime(now.Add(time.Second)),
 						LastTransitionTime: metav1.NewTime(now.Add(time.Second)),
-						Reason:             string(appsv1alpha1.CloneSetProgressDeadlineExceeded),
+						Reason:             string(appsv1beta1.CloneSetProgressDeadlineExceeded),
 						Message:            "new",
 					},
 				},
@@ -160,27 +160,27 @@ func TestSetCloneSetCondition(t *testing.T) {
 		},
 		{
 			name: "Update existing condition with same condition",
-			initialStatus: appsv1alpha1.CloneSetStatus{
-				Conditions: []appsv1alpha1.CloneSetCondition{
+			initialStatus: appsv1beta1.CloneSetStatus{
+				Conditions: []appsv1beta1.CloneSetCondition{
 					{
 						Type:               condType,
 						Status:             v1.ConditionTrue,
 						LastUpdateTime:     metav1.NewTime(now.Add(-time.Minute)),
 						LastTransitionTime: metav1.NewTime(now.Add(-time.Minute)),
-						Reason:             string(appsv1alpha1.CloneSetAvailable),
+						Reason:             string(appsv1beta1.CloneSetAvailable),
 						Message:            "",
 					},
 				},
 			},
-			newCondition: NewCloneSetCondition(condType, v1.ConditionTrue, appsv1alpha1.CloneSetAvailable, "", now.Add(time.Second)),
-			expectedStatus: appsv1alpha1.CloneSetStatus{
-				Conditions: []appsv1alpha1.CloneSetCondition{
+			newCondition: NewCloneSetCondition(condType, v1.ConditionTrue, appsv1beta1.CloneSetAvailable, "", now.Add(time.Second)),
+			expectedStatus: appsv1beta1.CloneSetStatus{
+				Conditions: []appsv1beta1.CloneSetCondition{
 					{
 						Type:               condType,
 						Status:             v1.ConditionTrue,
 						LastUpdateTime:     metav1.NewTime(now.Add(time.Second)),
 						LastTransitionTime: metav1.NewTime(now.Add(-time.Minute)),
-						Reason:             string(appsv1alpha1.CloneSetAvailable),
+						Reason:             string(appsv1beta1.CloneSetAvailable),
 						Message:            "",
 					},
 				},
@@ -188,27 +188,27 @@ func TestSetCloneSetCondition(t *testing.T) {
 		},
 		{
 			name: "Update existing condition with same status",
-			initialStatus: appsv1alpha1.CloneSetStatus{
-				Conditions: []appsv1alpha1.CloneSetCondition{
+			initialStatus: appsv1beta1.CloneSetStatus{
+				Conditions: []appsv1beta1.CloneSetCondition{
 					{
 						Type:               condType,
 						Status:             v1.ConditionTrue,
 						LastUpdateTime:     metav1.NewTime(now.Add(-time.Minute)),
 						LastTransitionTime: metav1.NewTime(now.Add(-10 * time.Minute)),
-						Reason:             string(appsv1alpha1.CloneSetProgressPartitionAvailable),
+						Reason:             string(appsv1beta1.CloneSetProgressPartitionAvailable),
 						Message:            "",
 					},
 				},
 			},
-			newCondition: NewCloneSetCondition(condType, v1.ConditionTrue, appsv1alpha1.CloneSetAvailable, "", now.Add(time.Second)),
-			expectedStatus: appsv1alpha1.CloneSetStatus{
-				Conditions: []appsv1alpha1.CloneSetCondition{
+			newCondition: NewCloneSetCondition(condType, v1.ConditionTrue, appsv1beta1.CloneSetAvailable, "", now.Add(time.Second)),
+			expectedStatus: appsv1beta1.CloneSetStatus{
+				Conditions: []appsv1beta1.CloneSetCondition{
 					{
 						Type:               condType,
 						Status:             v1.ConditionTrue,
 						LastUpdateTime:     metav1.NewTime(now.Add(time.Second)),
 						LastTransitionTime: metav1.NewTime(now.Add(-10 * time.Minute)),
-						Reason:             string(appsv1alpha1.CloneSetAvailable),
+						Reason:             string(appsv1beta1.CloneSetAvailable),
 						Message:            "",
 					},
 				},
@@ -235,20 +235,20 @@ func TestSetCloneSetCondition(t *testing.T) {
 
 func TestCloneSetProgressing(t *testing.T) {
 	now := time.Now()
-	cs := &appsv1alpha1.CloneSet{
-		Spec: appsv1alpha1.CloneSetSpec{
-			UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+	cs := &appsv1beta1.CloneSet{
+		Spec: appsv1beta1.CloneSetSpec{
+			UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
 				Paused: false,
 			},
 		},
-		Status: appsv1alpha1.CloneSetStatus{
-			Conditions: []appsv1alpha1.CloneSetCondition{
+		Status: appsv1beta1.CloneSetStatus{
+			Conditions: []appsv1beta1.CloneSetCondition{
 				{
-					Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
+					Type:               appsv1beta1.CloneSetConditionTypeProgressing,
 					Status:             v1.ConditionTrue,
 					LastUpdateTime:     metav1.NewTime(now),
 					LastTransitionTime: metav1.NewTime(now),
-					Reason:             string(appsv1alpha1.CloneSetAvailable),
+					Reason:             string(appsv1beta1.CloneSetAvailable),
 				},
 			},
 			UpdatedReplicas:         1,
@@ -258,7 +258,7 @@ func TestCloneSetProgressing(t *testing.T) {
 		},
 	}
 
-	newStatus := &appsv1alpha1.CloneSetStatus{
+	newStatus := &appsv1beta1.CloneSetStatus{
 		UpdatedReplicas:         1,
 		ExpectedUpdatedReplicas: 2,
 		ReadyReplicas:           2,
@@ -267,34 +267,34 @@ func TestCloneSetProgressing(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		updateSpec   func(*appsv1alpha1.CloneSet)
-		updateStatus func(*appsv1alpha1.CloneSet)
+		updateSpec   func(*appsv1beta1.CloneSet)
+		updateStatus func(*appsv1beta1.CloneSet)
 		wantResult   bool
 	}{
 		{
 			name: "Paused strategy",
-			updateSpec: func(cs *appsv1alpha1.CloneSet) {
+			updateSpec: func(cs *appsv1beta1.CloneSet) {
 				cs.Spec.UpdateStrategy.Paused = true
 			},
 			wantResult: false,
 		},
 		{
 			name: "No progressing condition",
-			updateStatus: func(cs *appsv1alpha1.CloneSet) {
+			updateStatus: func(cs *appsv1beta1.CloneSet) {
 				cs.Status.Conditions = nil
 			},
 			wantResult: true,
 		},
 		{
 			name: "Resumed from pause",
-			updateStatus: func(cs *appsv1alpha1.CloneSet) {
-				cs.Status.Conditions[0].Reason = string(appsv1alpha1.CloneSetProgressPaused)
+			updateStatus: func(cs *appsv1beta1.CloneSet) {
+				cs.Status.Conditions[0].Reason = string(appsv1beta1.CloneSetProgressPaused)
 			},
 			wantResult: true,
 		},
 		{
 			name: "Status changes",
-			updateStatus: func(cs *appsv1alpha1.CloneSet) {
+			updateStatus: func(cs *appsv1beta1.CloneSet) {
 				cs.Status.UpdatedReplicas = 0
 			},
 			wantResult: true,
@@ -322,14 +322,14 @@ func TestCloneSetProgressing(t *testing.T) {
 
 func TestCloneSetDeadlineExceeded(t *testing.T) {
 	now := time.Now()
-	cs := &appsv1alpha1.CloneSet{
-		Spec: appsv1alpha1.CloneSetSpec{
+	cs := &appsv1beta1.CloneSet{
+		Spec: appsv1beta1.CloneSetSpec{
 			ProgressDeadlineSeconds: ptr.To(int32(600)),
 		},
-		Status: appsv1alpha1.CloneSetStatus{
-			Conditions: []appsv1alpha1.CloneSetCondition{
+		Status: appsv1beta1.CloneSetStatus{
+			Conditions: []appsv1beta1.CloneSetCondition{
 				{
-					Type:           appsv1alpha1.CloneSetConditionTypeProgressing,
+					Type:           appsv1beta1.CloneSetConditionTypeProgressing,
 					Status:         v1.ConditionTrue,
 					LastUpdateTime: metav1.NewTime(now.Add(-700 * time.Second)),
 					Reason:         "other",
@@ -340,7 +340,7 @@ func TestCloneSetDeadlineExceeded(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		modifyStatus func(*appsv1alpha1.CloneSet)
+		modifyStatus func(*appsv1beta1.CloneSet)
 		wantTimedOut bool
 	}{
 		{
@@ -349,21 +349,21 @@ func TestCloneSetDeadlineExceeded(t *testing.T) {
 		},
 		{
 			name: "Already exceeded",
-			modifyStatus: func(cs *appsv1alpha1.CloneSet) {
-				cs.Status.Conditions[0].Reason = string(appsv1alpha1.CloneSetProgressDeadlineExceeded)
+			modifyStatus: func(cs *appsv1beta1.CloneSet) {
+				cs.Status.Conditions[0].Reason = string(appsv1beta1.CloneSetProgressDeadlineExceeded)
 			},
 			wantTimedOut: true,
 		},
 		{
 			name: "Recently updated",
-			modifyStatus: func(cs *appsv1alpha1.CloneSet) {
+			modifyStatus: func(cs *appsv1beta1.CloneSet) {
 				cs.Status.Conditions[0].LastUpdateTime = metav1.NewTime(now)
 			},
 			wantTimedOut: false,
 		},
 		{
 			name: "No progressing condition",
-			modifyStatus: func(cs *appsv1alpha1.CloneSet) {
+			modifyStatus: func(cs *appsv1beta1.CloneSet) {
 				cs.Status.Conditions = nil
 			},
 			wantTimedOut: false,
@@ -385,11 +385,11 @@ func TestCloneSetDeadlineExceeded(t *testing.T) {
 
 func TestCloneSetAvailable(t *testing.T) {
 	replicas := int32(3)
-	cs := &appsv1alpha1.CloneSet{
-		Spec: appsv1alpha1.CloneSetSpec{
+	cs := &appsv1beta1.CloneSet{
+		Spec: appsv1beta1.CloneSetSpec{
 			Replicas: &replicas,
 		},
-		Status: appsv1alpha1.CloneSetStatus{
+		Status: appsv1beta1.CloneSetStatus{
 			CurrentRevision:          "1",
 			UpdateRevision:           "1",
 			Replicas:                 replicas,
@@ -397,7 +397,7 @@ func TestCloneSetAvailable(t *testing.T) {
 			UpdatedAvailableReplicas: replicas,
 		},
 	}
-	newStatus := &appsv1alpha1.CloneSetStatus{
+	newStatus := &appsv1beta1.CloneSetStatus{
 		CurrentRevision:          "1",
 		UpdateRevision:           "1",
 		Replicas:                 replicas,
@@ -407,31 +407,31 @@ func TestCloneSetAvailable(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		modifyStatus   func(*appsv1alpha1.CloneSetStatus)
+		modifyStatus   func(*appsv1beta1.CloneSetStatus)
 		expectedResult bool
 	}{
 		{
 			name:           "All conditions met",
-			modifyStatus:   func(status *appsv1alpha1.CloneSetStatus) {},
+			modifyStatus:   func(status *appsv1beta1.CloneSetStatus) {},
 			expectedResult: true,
 		},
 		{
 			name: "CurrentRevision != UpdateRevision",
-			modifyStatus: func(status *appsv1alpha1.CloneSetStatus) {
+			modifyStatus: func(status *appsv1beta1.CloneSetStatus) {
 				status.CurrentRevision = "2"
 			},
 			expectedResult: false,
 		},
 		{
 			name: "Replicas != Spec.Replicas",
-			modifyStatus: func(status *appsv1alpha1.CloneSetStatus) {
+			modifyStatus: func(status *appsv1beta1.CloneSetStatus) {
 				status.Replicas = 2
 			},
 			expectedResult: false,
 		},
 		{
 			name: "UpdatedAvailableReplicas != Spec.Replicas",
-			modifyStatus: func(status *appsv1alpha1.CloneSetStatus) {
+			modifyStatus: func(status *appsv1beta1.CloneSetStatus) {
 				status.UpdatedAvailableReplicas = 2
 			},
 			expectedResult: false,
@@ -450,35 +450,35 @@ func TestCloneSetAvailable(t *testing.T) {
 }
 
 func TestCloneSetPartitionAvailable(t *testing.T) {
-	cs := &appsv1alpha1.CloneSet{
-		Spec: appsv1alpha1.CloneSetSpec{
+	cs := &appsv1beta1.CloneSet{
+		Spec: appsv1beta1.CloneSetSpec{
 			Replicas: pointer.Int32(5),
-			UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+			UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
 				Paused: false,
 			},
 		},
 	}
-	newStatus := &appsv1alpha1.CloneSetStatus{
+	newStatus := &appsv1beta1.CloneSetStatus{
 		ExpectedUpdatedReplicas:  5,
 		UpdatedAvailableReplicas: 5,
 	}
 
 	tests := []struct {
 		name           string
-		modifySpec     func(*appsv1alpha1.CloneSet)
-		modifyStatus   func(*appsv1alpha1.CloneSetStatus)
+		modifySpec     func(*appsv1beta1.CloneSet)
+		modifyStatus   func(*appsv1beta1.CloneSetStatus)
 		expectedResult bool
 	}{
 		{
 			name:           "expected <= available, not partition, false",
-			modifySpec:     func(cs *appsv1alpha1.CloneSet) {},
-			modifyStatus:   func(status *appsv1alpha1.CloneSetStatus) {},
+			modifySpec:     func(cs *appsv1beta1.CloneSet) {},
+			modifyStatus:   func(status *appsv1beta1.CloneSetStatus) {},
 			expectedResult: false,
 		},
 		{
 			name:       "expected <= available, partition, true",
-			modifySpec: func(cs *appsv1alpha1.CloneSet) {},
-			modifyStatus: func(status *appsv1alpha1.CloneSetStatus) {
+			modifySpec: func(cs *appsv1beta1.CloneSet) {},
+			modifyStatus: func(status *appsv1beta1.CloneSetStatus) {
 				status.ExpectedUpdatedReplicas = 3
 				status.UpdatedAvailableReplicas = 3
 			},
@@ -486,8 +486,8 @@ func TestCloneSetPartitionAvailable(t *testing.T) {
 		},
 		{
 			name:       "expected > available, partition, false",
-			modifySpec: func(cs *appsv1alpha1.CloneSet) {},
-			modifyStatus: func(status *appsv1alpha1.CloneSetStatus) {
+			modifySpec: func(cs *appsv1beta1.CloneSet) {},
+			modifyStatus: func(status *appsv1beta1.CloneSetStatus) {
 				status.ExpectedUpdatedReplicas = 3
 				status.UpdatedAvailableReplicas = 2
 			},
@@ -509,17 +509,17 @@ func TestCloneSetPartitionAvailable(t *testing.T) {
 }
 
 func TestCloneSetPaused(t *testing.T) {
-	cs := &appsv1alpha1.CloneSet{
-		Spec: appsv1alpha1.CloneSetSpec{
-			UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+	cs := &appsv1beta1.CloneSet{
+		Spec: appsv1beta1.CloneSetSpec{
+			UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
 				Paused: true,
 			},
 		},
-		Status: appsv1alpha1.CloneSetStatus{
-			Conditions: []appsv1alpha1.CloneSetCondition{
+		Status: appsv1beta1.CloneSetStatus{
+			Conditions: []appsv1beta1.CloneSetCondition{
 				{
-					Type:   appsv1alpha1.CloneSetConditionTypeProgressing,
-					Reason: string(appsv1alpha1.CloneSetProgressPaused),
+					Type:   appsv1beta1.CloneSetConditionTypeProgressing,
+					Reason: string(appsv1beta1.CloneSetProgressPaused),
 				},
 			},
 		},
@@ -527,26 +527,26 @@ func TestCloneSetPaused(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		modifySpec     func(*appsv1alpha1.CloneSet)
-		modifyStatus   func(*appsv1alpha1.CloneSet)
+		modifySpec     func(*appsv1beta1.CloneSet)
+		modifyStatus   func(*appsv1beta1.CloneSet)
 		expectedResult bool
 	}{
 		{
 			name: "Not paused",
-			modifySpec: func(cs *appsv1alpha1.CloneSet) {
+			modifySpec: func(cs *appsv1beta1.CloneSet) {
 				cs.Spec.UpdateStrategy.Paused = false
 			},
-			modifyStatus: func(cs *appsv1alpha1.CloneSet) {
+			modifyStatus: func(cs *appsv1beta1.CloneSet) {
 				cs.Status.Conditions = nil
 			},
 			expectedResult: false,
 		},
 		{
 			name: "Paused with no conditions",
-			modifySpec: func(cs *appsv1alpha1.CloneSet) {
+			modifySpec: func(cs *appsv1beta1.CloneSet) {
 				cs.Spec.UpdateStrategy.Paused = true
 			},
-			modifyStatus: func(cs *appsv1alpha1.CloneSet) {
+			modifyStatus: func(cs *appsv1beta1.CloneSet) {
 				cs.Status.Conditions = nil
 			},
 			expectedResult: true,
@@ -566,12 +566,12 @@ func TestCloneSetPaused(t *testing.T) {
 }
 
 func TestRemoveCloneSetCondition(t *testing.T) {
-	condType := appsv1alpha1.CloneSetConditionTypeProgressing
+	condType := appsv1beta1.CloneSetConditionTypeProgressing
 	tests := []struct {
 		name           string
-		initialStatus  *appsv1alpha1.CloneSetStatus
-		removeType     appsv1alpha1.CloneSetConditionType
-		expectedStatus *appsv1alpha1.CloneSetStatus
+		initialStatus  *appsv1beta1.CloneSetStatus
+		removeType     appsv1beta1.CloneSetConditionType
+		expectedStatus *appsv1beta1.CloneSetStatus
 	}{
 		{
 			name:           "Nil Status",
@@ -581,23 +581,23 @@ func TestRemoveCloneSetCondition(t *testing.T) {
 		},
 		{
 			name: "Condition exists",
-			initialStatus: &appsv1alpha1.CloneSetStatus{
-				Conditions: []appsv1alpha1.CloneSetCondition{
+			initialStatus: &appsv1beta1.CloneSetStatus{
+				Conditions: []appsv1beta1.CloneSetCondition{
 					{
-						Type:   appsv1alpha1.CloneSetConditionTypeProgressing,
+						Type:   appsv1beta1.CloneSetConditionTypeProgressing,
 						Status: v1.ConditionTrue,
 					},
 					{
-						Type:   appsv1alpha1.CloneSetConditionFailedUpdate,
+						Type:   appsv1beta1.CloneSetConditionFailedUpdate,
 						Status: v1.ConditionFalse,
 					},
 				},
 			},
 			removeType: condType,
-			expectedStatus: &appsv1alpha1.CloneSetStatus{
-				Conditions: []appsv1alpha1.CloneSetCondition{
+			expectedStatus: &appsv1beta1.CloneSetStatus{
+				Conditions: []appsv1beta1.CloneSetCondition{
 					{
-						Type:   appsv1alpha1.CloneSetConditionFailedUpdate,
+						Type:   appsv1beta1.CloneSetConditionFailedUpdate,
 						Status: v1.ConditionFalse,
 					},
 				},
@@ -605,19 +605,19 @@ func TestRemoveCloneSetCondition(t *testing.T) {
 		},
 		{
 			name: "Condition does not exist",
-			initialStatus: &appsv1alpha1.CloneSetStatus{
-				Conditions: []appsv1alpha1.CloneSetCondition{
+			initialStatus: &appsv1beta1.CloneSetStatus{
+				Conditions: []appsv1beta1.CloneSetCondition{
 					{
-						Type:   appsv1alpha1.CloneSetConditionFailedUpdate,
+						Type:   appsv1beta1.CloneSetConditionFailedUpdate,
 						Status: v1.ConditionFalse,
 					},
 				},
 			},
 			removeType: condType,
-			expectedStatus: &appsv1alpha1.CloneSetStatus{
-				Conditions: []appsv1alpha1.CloneSetCondition{
+			expectedStatus: &appsv1beta1.CloneSetStatus{
+				Conditions: []appsv1beta1.CloneSetCondition{
 					{
-						Type:   appsv1alpha1.CloneSetConditionFailedUpdate,
+						Type:   appsv1beta1.CloneSetConditionFailedUpdate,
 						Status: v1.ConditionFalse,
 					},
 				},
@@ -625,11 +625,11 @@ func TestRemoveCloneSetCondition(t *testing.T) {
 		},
 		{
 			name: "Empty Conditions",
-			initialStatus: &appsv1alpha1.CloneSetStatus{
+			initialStatus: &appsv1beta1.CloneSetStatus{
 				Conditions: nil,
 			},
 			removeType: condType,
-			expectedStatus: &appsv1alpha1.CloneSetStatus{
+			expectedStatus: &appsv1beta1.CloneSetStatus{
 				Conditions: nil,
 			},
 		},

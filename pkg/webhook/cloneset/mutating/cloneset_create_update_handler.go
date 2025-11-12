@@ -19,6 +19,7 @@ package mutating
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"reflect"
 
@@ -29,6 +30,7 @@ import (
 
 	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -44,40 +46,77 @@ var _ admission.Handler = &CloneSetCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *CloneSetCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.CloneSet{}
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		obj := &appsv1beta1.CloneSet{}
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		var copy runtime.Object = obj.DeepCopy()
 
-	err := h.Decoder.Decode(req, obj)
-	if err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
-	}
-
-	var copy runtime.Object = obj.DeepCopy()
-
-	injectTemplateDefaults := false
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TemplateNoDefaults) {
-		if req.AdmissionRequest.Operation == admissionv1.Update {
-			oldObj := &appsv1alpha1.CloneSet{}
-			if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
-				return admission.Errored(http.StatusBadRequest, err)
-			}
-			if !reflect.DeepEqual(obj.Spec.Template, oldObj.Spec.Template) {
+		injectTemplateDefaults := false
+		if !utilfeature.DefaultFeatureGate.Enabled(features.TemplateNoDefaults) {
+			if req.AdmissionRequest.Operation == admissionv1.Update {
+				oldObj := &appsv1beta1.CloneSet{}
+				if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
+					return admission.Errored(http.StatusBadRequest, err)
+				}
+				if !reflect.DeepEqual(obj.Spec.Template, oldObj.Spec.Template) {
+					injectTemplateDefaults = true
+				}
+			} else {
 				injectTemplateDefaults = true
 			}
-		} else {
-			injectTemplateDefaults = true
 		}
+		defaults.SetDefaultsCloneSetV1beta1(obj, injectTemplateDefaults)
+		// Note: DisablePVCReuse default for v1beta1 is set by CRD (+kubebuilder:default=true)
+		if reflect.DeepEqual(obj, copy) {
+			return admission.Allowed("")
+		}
+		marshaled, err := json.Marshal(obj)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
+		if len(resp.Patches) > 0 {
+			klog.V(5).InfoS("Admit CloneSet patches", "namespace", obj.Namespace, "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
+		}
+		return resp
+
+	case appsv1alpha1.GroupVersion.Version:
+		obj := &appsv1alpha1.CloneSet{}
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		var copy runtime.Object = obj.DeepCopy()
+
+		injectTemplateDefaults := false
+		if !utilfeature.DefaultFeatureGate.Enabled(features.TemplateNoDefaults) {
+			if req.AdmissionRequest.Operation == admissionv1.Update {
+				oldObj := &appsv1alpha1.CloneSet{}
+				if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
+					return admission.Errored(http.StatusBadRequest, err)
+				}
+				if !reflect.DeepEqual(obj.Spec.Template, oldObj.Spec.Template) {
+					injectTemplateDefaults = true
+				}
+			} else {
+				injectTemplateDefaults = true
+			}
+		}
+		defaults.SetDefaultsCloneSet(obj, injectTemplateDefaults)
+		if reflect.DeepEqual(obj, copy) {
+			return admission.Allowed("")
+		}
+		marshaled, err := json.Marshal(obj)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
+		if len(resp.Patches) > 0 {
+			klog.V(5).InfoS("Admit CloneSet patches", "namespace", obj.Namespace, "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
+		}
+		return resp
 	}
-	defaults.SetDefaultsCloneSet(obj, injectTemplateDefaults)
-	if reflect.DeepEqual(obj, copy) {
-		return admission.Allowed("")
-	}
-	marshaled, err := json.Marshal(obj)
-	if err != nil {
-		return admission.Errored(http.StatusInternalServerError, err)
-	}
-	resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
-	if len(resp.Patches) > 0 {
-		klog.V(5).InfoS("Admit CloneSet patches", "namespace", obj.Namespace, "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
-	}
-	return resp
+	return admission.Errored(http.StatusBadRequest, fmt.Errorf("unsupported version: %s", req.AdmissionRequest.Resource.Version))
 }

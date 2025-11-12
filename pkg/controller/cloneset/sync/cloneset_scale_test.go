@@ -41,7 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesettest "github.com/openkruise/kruise/pkg/controller/cloneset/test"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
@@ -54,7 +54,7 @@ var (
 
 func init() {
 	kscheme = runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme.Scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme.Scheme))
 	utilruntime.Must(corev1.AddToScheme(kscheme))
 }
 
@@ -100,7 +100,7 @@ func TestCreatePods(t *testing.T) {
 				Name:         "foo-id1",
 				GenerateName: "foo-",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID:      "id1",
+					appsv1beta1.CloneSetInstanceID:       "id1",
 					apps.ControllerRevisionHashLabelKey:  "revision_abc",
 					apps.DefaultDeploymentUniqueLabelKey: "revision_abc",
 					"foo":                                "bar",
@@ -108,7 +108,7 @@ func TestCreatePods(t *testing.T) {
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -157,7 +157,7 @@ func TestCreatePods(t *testing.T) {
 				Name:         "foo-id3",
 				GenerateName: "foo-",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID:      "id3",
+					appsv1beta1.CloneSetInstanceID:       "id3",
 					apps.ControllerRevisionHashLabelKey:  "revision_xyz",
 					apps.DefaultDeploymentUniqueLabelKey: "revision_xyz",
 					"foo":                                "bar",
@@ -165,7 +165,7 @@ func TestCreatePods(t *testing.T) {
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -215,7 +215,7 @@ func TestCreatePods(t *testing.T) {
 				Name:         "foo-id4",
 				GenerateName: "foo-",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID:      "id4",
+					appsv1beta1.CloneSetInstanceID:       "id4",
 					apps.ControllerRevisionHashLabelKey:  "revision_xyz",
 					apps.DefaultDeploymentUniqueLabelKey: "revision_xyz",
 					"foo":                                "bar",
@@ -223,7 +223,7 @@ func TestCreatePods(t *testing.T) {
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -297,12 +297,12 @@ func TestCreatePods(t *testing.T) {
 				Namespace: "default",
 				Name:      "datadir-foo-id1",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID: "id1",
-					"foo":                           "bar",
+					appsv1beta1.CloneSetInstanceID: "id1",
+					"foo":                          "bar",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -325,12 +325,12 @@ func TestCreatePods(t *testing.T) {
 				Namespace: "default",
 				Name:      "datadir-foo-id4",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID: "id4",
-					"foo":                           "bar",
+					appsv1beta1.CloneSetInstanceID: "id4",
+					"foo":                          "bar",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -365,7 +365,7 @@ func TestCreatePods(t *testing.T) {
 }
 
 func TestDeletePods(t *testing.T) {
-	cs := &appsv1alpha1.CloneSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo"}}
+	cs := &appsv1beta1.CloneSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo"}}
 	podsToDelete := []*v1.Pod{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -373,12 +373,12 @@ func TestDeletePods(t *testing.T) {
 				Name:         "foo-id1",
 				GenerateName: "foo-",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID: "id1",
-					"foo":                           "bar",
+					appsv1beta1.CloneSetInstanceID: "id1",
+					"foo":                          "bar",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -394,12 +394,12 @@ func TestDeletePods(t *testing.T) {
 				Name:         "foo-id3",
 				GenerateName: "foo-",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID: "id3",
-					"foo":                           "bar",
+					appsv1beta1.CloneSetInstanceID: "id3",
+					"foo":                          "bar",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -417,12 +417,12 @@ func TestDeletePods(t *testing.T) {
 				Namespace: "default",
 				Name:      "datadir-foo-id1",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID: "id1",
-					"foo":                           "bar",
+					appsv1beta1.CloneSetInstanceID: "id1",
+					"foo":                          "bar",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -437,12 +437,12 @@ func TestDeletePods(t *testing.T) {
 				Namespace: "default",
 				Name:      "datadir-foo-id2",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID: "id2",
-					"foo":                           "bar",
+					appsv1beta1.CloneSetInstanceID: "id2",
+					"foo":                          "bar",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -457,12 +457,12 @@ func TestDeletePods(t *testing.T) {
 				Namespace: "default",
 				Name:      "datadir-foo-id3",
 				Labels: map[string]string{
-					appsv1alpha1.CloneSetInstanceID: "id3",
-					"foo":                           "bar",
+					appsv1beta1.CloneSetInstanceID: "id3",
+					"foo":                          "bar",
 				},
 				OwnerReferences: []metav1.OwnerReference{
 					{
-						APIVersion:         "apps.kruise.io/v1alpha1",
+						APIVersion:         "apps.kruise.io/v1beta1",
 						Kind:               "CloneSet",
 						Name:               "foo",
 						UID:                "test",
@@ -510,12 +510,12 @@ func TestGetOrGenAvailableIDs(t *testing.T) {
 	pods := []*v1.Pod{
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "a"},
+				Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "a"},
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "b"},
+				Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "b"},
 			},
 		},
 	}
@@ -523,12 +523,12 @@ func TestGetOrGenAvailableIDs(t *testing.T) {
 	pvcs := []*v1.PersistentVolumeClaim{
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "b"},
+				Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "b"},
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{appsv1alpha1.CloneSetInstanceID: "c"},
+				Labels: map[string]string{appsv1beta1.CloneSetInstanceID: "c"},
 			},
 		},
 	}
@@ -551,7 +551,7 @@ func TestGetOrGenAvailableIDs(t *testing.T) {
 func TestScale(t *testing.T) {
 	cases := []struct {
 		name             string
-		getCloneSets     func() [2]*appsv1alpha1.CloneSet
+		getCloneSets     func() [2]*appsv1beta1.CloneSet
 		getRevisions     func() [2]string
 		getPods          func() []*v1.Pod
 		expectedPodsLen  int
@@ -559,15 +559,15 @@ func TestScale(t *testing.T) {
 	}{
 		{
 			name: "cloneSet(replicas=3,maxUnavailable=20%,partition=nil,maxSurge=nil,minReadySeconds=9999), pods=5, and scale replicas 5 -> 3",
-			getCloneSets: func() [2]*appsv1alpha1.CloneSet {
-				obj := &appsv1alpha1.CloneSet{
+			getCloneSets: func() [2]*appsv1beta1.CloneSet {
+				obj := &appsv1beta1.CloneSet{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "sample",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Replicas:        utilpointer.Int32(3),
 						MinReadySeconds: 9999,
-						UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+						UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
 							MaxUnavailable: &intstr.IntOrString{
 								Type:   intstr.String,
 								StrVal: "20%",
@@ -575,7 +575,7 @@ func TestScale(t *testing.T) {
 						},
 					},
 				}
-				return [2]*appsv1alpha1.CloneSet{obj.DeepCopy(), obj.DeepCopy()}
+				return [2]*appsv1beta1.CloneSet{obj.DeepCopy(), obj.DeepCopy()}
 			},
 			getRevisions: func() [2]string {
 				return [2]string{"sample-b976d4544", "sample-b976d4544"}
@@ -615,14 +615,14 @@ func TestScale(t *testing.T) {
 		},
 		{
 			name: "cloneSet(replicas=3,maxUnavailable=20%,partition=nil,maxSurge=nil,minReadySeconds=0), specified delete pod-0, pods=5, and scale replicas 5 -> 3",
-			getCloneSets: func() [2]*appsv1alpha1.CloneSet {
-				obj := &appsv1alpha1.CloneSet{
+			getCloneSets: func() [2]*appsv1beta1.CloneSet {
+				obj := &appsv1beta1.CloneSet{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "sample",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Replicas: utilpointer.Int32(3),
-						UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+						UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
 							MaxUnavailable: &intstr.IntOrString{
 								Type:   intstr.String,
 								StrVal: "20%",
@@ -630,7 +630,7 @@ func TestScale(t *testing.T) {
 						},
 					},
 				}
-				return [2]*appsv1alpha1.CloneSet{obj.DeepCopy(), obj.DeepCopy()}
+				return [2]*appsv1beta1.CloneSet{obj.DeepCopy(), obj.DeepCopy()}
 			},
 			getRevisions: func() [2]string {
 				return [2]string{"sample-b976d4544", "sample-b976d4544"}
@@ -664,7 +664,7 @@ func TestScale(t *testing.T) {
 					},
 				}
 				pods := generatePods(obj, 5)
-				pods[0].Labels[appsv1alpha1.SpecifiedDeleteKey] = "true"
+				pods[0].Labels[appsv1beta1.SpecifiedDeleteKey] = "true"
 				return pods
 			},
 			expectedPodsLen:  4,
@@ -672,14 +672,14 @@ func TestScale(t *testing.T) {
 		},
 		{
 			name: "cloneSet(replicas=3,maxUnavailable=20%,partition=nil,maxSurge=nil,minReadySeconds=0), pods=5, and scale replicas 5 -> 3",
-			getCloneSets: func() [2]*appsv1alpha1.CloneSet {
-				obj := &appsv1alpha1.CloneSet{
+			getCloneSets: func() [2]*appsv1beta1.CloneSet {
+				obj := &appsv1beta1.CloneSet{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "sample",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Replicas: utilpointer.Int32(3),
-						UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
+						UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
 							MaxUnavailable: &intstr.IntOrString{
 								Type:   intstr.String,
 								StrVal: "20%",
@@ -687,7 +687,7 @@ func TestScale(t *testing.T) {
 						},
 					},
 				}
-				return [2]*appsv1alpha1.CloneSet{obj.DeepCopy(), obj.DeepCopy()}
+				return [2]*appsv1beta1.CloneSet{obj.DeepCopy(), obj.DeepCopy()}
 			},
 			getRevisions: func() [2]string {
 				return [2]string{"sample-b976d4544", "sample-b976d4544"}

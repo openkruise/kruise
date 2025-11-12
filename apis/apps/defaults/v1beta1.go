@@ -17,6 +17,7 @@ limitations under the License.
 package defaults
 
 import (
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -397,5 +398,52 @@ func setSidecarSetUpdateStrategyV1beta1(strategy *v1beta1.SidecarSetUpdateStrate
 	}
 	if strategy.Partition == nil {
 		strategy.Partition = &intstr.IntOrString{Type: intstr.Int, IntVal: 0}
+	}
+}
+
+// SetDefaultsCloneSetV1beta1 sets default values for v1beta1 CloneSet.
+func SetDefaultsCloneSetV1beta1(obj *v1beta1.CloneSet, injectTemplateDefaults bool) {
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = ptr.To(int32(1))
+	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = ptr.To(int32(10))
+	}
+
+	// For v1beta1, set DisablePVCReuse default to true (safer default)
+	// This is only applied during Create operations by the webhook
+	// Note: v1alpha1 keeps default as false for backward compatibility
+
+	if injectTemplateDefaults {
+		SetDefaultPodSpec(&obj.Spec.Template.Spec)
+		for i := range obj.Spec.VolumeClaimTemplates {
+			a := &obj.Spec.VolumeClaimTemplates[i]
+			v1.SetDefaults_PersistentVolumeClaim(a)
+			v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
+			v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
+			v1.SetDefaults_ResourceList(&a.Status.Capacity)
+		}
+	}
+
+	switch obj.Spec.UpdateStrategy.Type {
+	case "":
+		obj.Spec.UpdateStrategy.Type = v1beta1.RecreateCloneSetUpdateStrategyType
+	case v1beta1.InPlaceIfPossibleCloneSetUpdateStrategyType, v1beta1.InPlaceOnlyCloneSetUpdateStrategyType:
+		if obj.Spec.UpdateStrategy.InPlaceUpdateStrategy == nil {
+			obj.Spec.UpdateStrategy.InPlaceUpdateStrategy = &appspub.InPlaceUpdateStrategy{}
+		}
+	}
+
+	if obj.Spec.UpdateStrategy.Partition == nil {
+		partition := intstr.FromInt(0)
+		obj.Spec.UpdateStrategy.Partition = &partition
+	}
+	if obj.Spec.UpdateStrategy.MaxUnavailable == nil {
+		maxUnavailable := intstr.FromString(v1beta1.DefaultCloneSetMaxUnavailable)
+		obj.Spec.UpdateStrategy.MaxUnavailable = &maxUnavailable
+	}
+	if obj.Spec.UpdateStrategy.MaxSurge == nil {
+		maxSurge := intstr.FromInt(0)
+		obj.Spec.UpdateStrategy.MaxSurge = &maxSurge
 	}
 }
