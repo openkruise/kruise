@@ -292,8 +292,7 @@ goyacc -o calculator_y.go -p yy calculator.y
 go test -v ./...
 
 # 4. Check coverage
-go test -coverprofile=coverage.out
-go tool cover -html=coverage.out -o coverage.html
+go test -coverprofile=coverage.out && sed -i.bak '/yaccpar/d' coverage.out && go tool cover -html=coverage.out -o coverage.html
 
 # 5. Commit changes (include both .y and generated .go files)
 git add calculator.y calculator_y.go

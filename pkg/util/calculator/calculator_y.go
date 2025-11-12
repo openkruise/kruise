@@ -39,8 +39,8 @@ func (c *Calculator) toQuantity(v *Value) *resource.Quantity {
 		q := v.Quantity.DeepCopy()
 		return &q
 	}
-	// Convert number to Quantity
-	return resource.NewQuantity(int64(v.Number), resource.DecimalSI)
+	// Convert number to Quantity, preserving decimal precision
+	return resource.NewMilliQuantity(int64(v.Number*1000), resource.DecimalSI)
 }
 
 // add performs addition operation
@@ -174,21 +174,21 @@ func (c *Calculator) maxFunc(args []*Value) *Value {
 	if left.IsQuantity {
 		// Left is Quantity, right is number
 		leftQ := left.Quantity.DeepCopy()
-		rightQ := resource.NewQuantity(int64(right.Number), resource.DecimalSI)
-		cmp := leftQ.Cmp(*rightQ)
+		rightQ := *resource.NewMilliQuantity(int64(right.Number*1000), resource.DecimalSI)
+		cmp := leftQ.Cmp(rightQ)
 		if cmp >= 0 {
 			return &Value{IsQuantity: true, Quantity: left.Quantity}
 		}
-		return &Value{IsQuantity: true, Quantity: *rightQ}
+		return &Value{IsQuantity: true, Quantity: rightQ}
 	}
 
 	if right.IsQuantity {
 		// Right is Quantity, left is number
-		leftQ := resource.NewQuantity(int64(left.Number), resource.DecimalSI)
+		leftQ := *resource.NewMilliQuantity(int64(left.Number*1000), resource.DecimalSI)
 		rightQ := right.Quantity.DeepCopy()
 		cmp := leftQ.Cmp(rightQ)
 		if cmp >= 0 {
-			return &Value{IsQuantity: true, Quantity: *leftQ}
+			return &Value{IsQuantity: true, Quantity: leftQ}
 		}
 		return &Value{IsQuantity: true, Quantity: rightQ}
 	}
@@ -223,20 +223,20 @@ func (c *Calculator) minFunc(args []*Value) *Value {
 
 	if left.IsQuantity {
 		// Left is Quantity, right is number
-		rightQ := resource.NewQuantity(int64(right.Number), resource.DecimalSI)
-		cmp := left.Quantity.Cmp(*rightQ)
+		rightQ := *resource.NewMilliQuantity(int64(right.Number*1000), resource.DecimalSI)
+		cmp := left.Quantity.Cmp(rightQ)
 		if cmp <= 0 {
 			return &Value{IsQuantity: true, Quantity: left.Quantity}
 		}
-		return &Value{IsQuantity: true, Quantity: *rightQ}
+		return &Value{IsQuantity: true, Quantity: rightQ}
 	}
 
 	if right.IsQuantity {
 		// Right is Quantity, left is number
-		leftQ := resource.NewQuantity(int64(left.Number), resource.DecimalSI)
+		leftQ := *resource.NewMilliQuantity(int64(left.Number*1000), resource.DecimalSI)
 		cmp := leftQ.Cmp(right.Quantity)
 		if cmp <= 0 {
-			return &Value{IsQuantity: true, Quantity: *leftQ}
+			return &Value{IsQuantity: true, Quantity: leftQ}
 		}
 		return &Value{IsQuantity: true, Quantity: right.Quantity}
 	}
@@ -293,7 +293,7 @@ const yyEofCode = 1
 const yyErrCode = 2
 const yyInitialStackSize = 16
 
-//line calculator.y:377
+//line calculator.y:378
 
 //line yacctab:1
 var yyExca = [...]int8{
@@ -809,15 +809,16 @@ yydefault:
 			if yyDollar[2].val == nil {
 				yyVAL.val = nil
 			} else if yyDollar[2].val.IsQuantity {
-				negQ := resource.NewQuantity(-yyDollar[2].val.Quantity.Value(), resource.DecimalSI)
-				yyVAL.val = &Value{IsQuantity: true, Quantity: *negQ}
+				negQ := yyDollar[2].val.Quantity.DeepCopy()
+				negQ.Neg()
+				yyVAL.val = &Value{IsQuantity: true, Quantity: negQ}
 			} else {
 				yyVAL.val = &Value{IsQuantity: false, Number: -yyDollar[2].val.Number}
 			}
 		}
 	case 14:
 		yyDollar = yyS[yypt-4 : yypt+1]
-//line calculator.y:361
+//line calculator.y:362
 		{
 			calc := yylex.(*yyLex).calc
 			yyVAL.val = calc.callFunc(yyDollar[1].str, []*Value{yyDollar[3].val})
@@ -827,7 +828,7 @@ yydefault:
 		}
 	case 15:
 		yyDollar = yyS[yypt-6 : yypt+1]
-//line calculator.y:368
+//line calculator.y:369
 		{
 			calc := yylex.(*yyLex).calc
 			yyVAL.val = calc.callFunc(yyDollar[1].str, []*Value{yyDollar[3].val, yyDollar[5].val})
