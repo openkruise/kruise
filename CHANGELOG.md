@@ -1,5 +1,61 @@
 # Change Log
 
+## v1.9.0
+> Change log since v1.8.2
+
+### Upgrade Notice
+> No, really, you must read this before you upgrade
+- Update Kubernetes dependency to v1.32.6 and Golang to v1.23 ([#2067](https://github.com/openkruise/kruise/pull/2067), [@chengjoey](https://github.com/chengjoey))
+- Upgrade kruise apis(BroadcastJob, AdvancedCronJob, ImagePullJob, ImageListPullJob, NodeImage, Advanced DaemonSet, SidecarSet) from v1alpha1 to v1beta1. ([#2186](https://github.com/openkruise/kruise/pull/2186),[#2201](https://github.com/openkruise/kruise/pull/2201), [@PersistentJZH](https://github.com/PersistentJZH))
+
+### Key Features
+- UnitedDeployment support feature ReserveUnschedulablePods. ([#1941](https://github.com/openkruise/kruise/pull/1941), [@AiRanthem](https://github.com/AiRanthem))
+- AdvancedCronJob support cron ImagePullJob. ([#2207](https://github.com/openkruise/kruise/pull/2207), [@AiRanthem](https://github.com/AiRanthem))
+- CloneSet support progressDeadlineSeconds. ([#2108](https://github.com/openkruise/kruise/pull/2108), [@MichaelRren](https://github.com/MichaelRren))
+- SidecarSet supports setting up sidecar resources based on pod specification. ([#2200](https://github.com/openkruise/kruise/pull/2200), [@Colvin-Y](https://github.com/Colvin-Y))
+
+### Other Notable Changes
+#### Sidecar Management
+- SidecarSet supports injecting containers in order, with the option to sort by container name. ([#1983](https://github.com/openkruise/kruise/pull/1983), [@zmberg](https://github.com/zmberg))
+- JobSidecarTerminator supports configuring whether to ignore container exit codes via environment KRUISE_TERMINATE_SIDECAR_IGNORE_EXIT_CODE. ([#1949](https://github.com/openkruise/kruise/pull/1949), [@zmberg](https://github.com/zmberg))
+- SidecarSet support shareVolumeDevicePolicy. ([#2011](https://github.com/openkruise/kruise/pull/2011), [@zmberg](https://github.com/zmberg))
+#### Others
+- OpenKruise Daemon support Windows. ([#1909](https://github.com/openkruise/kruise/pull/1909), [@peng2x](https://github.com/peng2x))
+- ImagePullJob increases node-side concurrency control. ([#1918](https://github.com/openkruise/kruise/pull/1918), [@ABNER-1](https://github.com/ABNER-1))
+- PodProbeMarker support http prober. ([#2011](https://github.com/openkruise/kruise/pull/2011), [@zmberg](https://github.com/zmberg))
+- PodUnavailableBudget support protect Pod RESIZE action. ([#2061](https://github.com/openkruise/kruise/pull/2061), [@Colvin-Y](https://github.com/Colvin-Y))
+- CloneSet UpdateStrategy support OnDelete. ([#2224](https://github.com/openkruise/kruise/pull/2224), [@zmberg](https://github.com/zmberg))
+
+### Bug Fixes
+- Fixed a null pointer panic issue in kruise-daemon caused by PodProbeMarker. ([#1974](https://github.com/openkruise/kruise/pull/1974), [@zmberg](https://github.com/zmberg))
+- Fix the issue of crash caused by index out of range in the WorkloadSpread's util NestedField function. ([#1967](https://github.com/openkruise/kruise/pull/1967), [@Slideee](https://github.com/Slideee))
+- Fix workloadSpread mutating validate get targetRef StatefulSet failed. ([#1965](https://github.com/openkruise/kruise/pull/1965), [@Slideee](https://github.com/Slideee))
+- Set the ResourceIsPod of DefaultPodValidationOptions to false. ([#1986](https://github.com/openkruise/kruise/pull/1986), [@Yesphet](https://github.com/Yesphet))
+- Fix cloneSet no process preNormal hook while enable FeatureGate CloneSetEventHandlerOptimization. ([#2060](https://github.com/openkruise/kruise/pull/2060), [@MichaelRren](https://github.com/MichaelRren))
+- Transition cloneSet pod lifecycle from PreparingNormal to Normal after scheduling when PreNormal hook is not specified. ([#2087](https://github.com/openkruise/kruise/pull/2087), [@MichaelRren](https://github.com/MichaelRren))
+- CloneSet/SidecarSet prioritySort sorter is stable if no priority(weight, order) rules be matched. ([#2107](https://github.com/openkruise/kruise/pull/2107), [@Spground](https://github.com/Spground))
+- Fix statefulSet actions stop when pod is stuck in terminating. ([#2109](https://github.com/openkruise/kruise/pull/2109), [@derlopes-amzn](https://github.com/derlopes-amzn))
+- Numerical maxUnavailable / maxSurge string values like "5" will be rejected by validation webhook. ([#2111](https://github.com/openkruise/kruise/pull/2111), [@AiRanthem](https://github.com/AiRanthem))
+- Fix PodProbeMarker TCP Probe failure due to empty IP address. ([#2162](https://github.com/openkruise/kruise/pull/2162), [@zmberg](https://github.com/zmberg))
+- Fix imagepulljob parallelism control. ([#2212](https://github.com/openkruise/kruise/pull/2212), [@furykerry](https://github.com/furykerry))
+
+### Misc (Chores and tests)
+- Readme add 'Get Your Own OpenKruise Demo with Alibaba Cloud'. ([#1930](https://github.com/openkruise/kruise/pull/1930), [@taosher](https://github.com/taosher))
+- Fix Makefile manifests gen crd bugs. ([#1940](https://github.com/openkruise/kruise/pull/1940), [@ABNER-1](https://github.com/ABNER-1))
+- Add webhook initialize timeout args, and default is 60s. ([#1947](https://github.com/openkruise/kruise/pull/1947), [@zmberg](https://github.com/zmberg))
+- Add some logs for WorkloadSpread managing existing pods. ([#1976](https://github.com/openkruise/kruise/pull/1976), [@AiRanthem](https://github.com/AiRanthem))
+- Add fuzz test for workloadSpread, unitedDeployment, resourceDistribution, sidecarSet. ([#1990](https://github.com/openkruise/kruise/pull/1990),[#1998](https://github.com/openkruise/kruise/pull/1998),[#2010](https://github.com/openkruise/kruise/pull/2010), [@Slideee](https://github.com/Slideee))
+- Use ubuntu 24.04 to run github check. ([#1997](https://github.com/openkruise/kruise/pull/1997), [@ABNER-1](https://github.com/ABNER-1))
+- Fix: WorkloadSpread e2e tests that run in parallel frequently encounter failures. ([#1996](https://github.com/openkruise/kruise/pull/1996), [@ABNER-1](https://github.com/ABNER-1))
+- Update golang-lint to v2 and fix related goimports error. ([#2019](https://github.com/openkruise/kruise/pull/2019), [@furykerry](https://github.com/furykerry))
+- Github CI add Fuzzing test. ([#2012](https://github.com/openkruise/kruise/pull/2012), [@Slideee](https://github.com/Slideee))
+- Correct grammatical errors in documentation. ([#2024](https://github.com/openkruise/kruise/pull/2024), [@arya2004](https://github.com/arya2004))
+- Optimize Inplace-VPA E2E Case, Add Wait Rule or Adjust Expected State. ([#1999](https://github.com/openkruise/kruise/pull/1999), [@ABNER-1](https://github.com/ABNER-1))
+- Refactor: Replace deprecated wait.PollImmediate, utilpointer.BoolPtr, utilpointer.Int32Ptr. ([#2076](https://github.com/openkruise/kruise/pull/2076),[#2070](https://github.com/openkruise/kruise/pull/2070),[#2068](https://github.com/openkruise/kruise/pull/2068), [@arya2004](https://github.com/arya2004))
+- Before accessing sidecarSet volumesMap[mount.Name], check if it is nil to avoid a null pointer access. ([#2079](https://github.com/openkruise/kruise/pull/2079), [@Slideee](https://github.com/Slideee))
+- Add some unit tests. ([#2099](https://github.com/openkruise/kruise/pull/2099),[#2103](https://github.com/openkruise/kruise/pull/2103),[#2098](https://github.com/openkruise/kruise/pull/2098), [@GautamBytes](https://github.com/GautamBytes)). ([#2118](https://github.com/openkruise/kruise/pull/2118),[#2117](https://github.com/openkruise/kruise/pull/2117),[#2125](https://github.com/openkruise/kruise/pull/2125), [@Parship12](https://github.com/Parship12)). ([#2143](https://github.com/openkruise/kruise/pull/2143), [@kincoy](https://github.com/kincoy))
+- Fix controller-gen version inconsistency. ([#2202](https://github.com/openkruise/kruise/pull/2202), [@chengjoey](https://github.com/chengjoey))
+
 ## v1.8.2
 > Change log since v1.8.1
 
