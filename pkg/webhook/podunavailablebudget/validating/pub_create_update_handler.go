@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -60,6 +61,13 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) Handle(ctx context.Context, re
 			features.PodUnavailableBudgetDeleteGate, features.PodUnavailableBudgetUpdateGate))
 	}
 
+	// Check if this is v1beta1 or v1alpha1
+	gvk := req.Kind
+	if gvk.Version == "v1beta1" {
+		return h.handleV1beta1(ctx, req)
+	}
+
+	// Handle v1alpha1
 	obj := &policyv1alpha1.PodUnavailableBudget{}
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
@@ -82,21 +90,46 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) Handle(ctx context.Context, re
 	return admission.ValidationResponse(true, "")
 }
 
+// handleV1beta1 handles v1beta1 admission requests
+func (h *PodUnavailableBudgetCreateUpdateHandler) handleV1beta1(ctx context.Context, req admission.Request) admission.Response {
+	obj := &policyv1beta1.PodUnavailableBudget{}
+	err := h.Decoder.Decode(req, obj)
+	if err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
+	}
+	var old *policyv1beta1.PodUnavailableBudget
+	//when Operation is update, decode older object
+	if req.AdmissionRequest.Operation == admissionv1.Update {
+		old = new(policyv1beta1.PodUnavailableBudget)
+		if err := h.Decoder.Decode(
+			admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
+			old); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+	}
+	allErrs := h.validatingPodUnavailableBudgetV1beta1Fn(obj, old)
+	if len(allErrs) != 0 {
+		return admission.Errored(http.StatusBadRequest, allErrs.ToAggregate())
+	}
+	return admission.ValidationResponse(true, "")
+}
+
 func (h *PodUnavailableBudgetCreateUpdateHandler) validatingPodUnavailableBudgetFn(obj, old *policyv1alpha1.PodUnavailableBudget) field.ErrorList {
-	// validate pub.annotations
+	// validate pub.annotations (for backward compatibility with v1alpha1)
 	allErrs := field.ErrorList{}
 	if operationsValue, ok := obj.Annotations[policyv1alpha1.PubProtectOperationAnnotation]; ok {
 		operations := strings.Split(operationsValue, ",")
 		for _, operation := range operations {
-			if operation != string(policyv1alpha1.PubUpdateOperation) && operation != string(policyv1alpha1.PubDeleteOperation) &&
-				operation != string(policyv1alpha1.PubEvictOperation) && operation != string(policyv1alpha1.PubResizeOperation) {
-				allErrs = append(allErrs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("annotation[%s] is invalid", policyv1alpha1.PubProtectOperationAnnotation)))
+			op := strings.TrimSpace(operation)
+			if op != string(policyv1alpha1.PubUpdateOperation) && op != string(policyv1alpha1.PubDeleteOperation) &&
+				op != string(policyv1alpha1.PubEvictOperation) && op != string(policyv1alpha1.PubResizeOperation) {
+				allErrs = append(allErrs, field.InternalError(field.NewPath("metadata.annotations"), fmt.Errorf("annotation[%s] value '%s' is invalid, must be one of: UPDATE, DELETE, EVICT, RESIZE", policyv1alpha1.PubProtectOperationAnnotation, op)))
 			}
 		}
 	}
 	if replicasValue, ok := obj.Annotations[policyv1alpha1.PubProtectTotalReplicasAnnotation]; ok {
 		if _, err := strconv.ParseInt(replicasValue, 10, 32); err != nil {
-			allErrs = append(allErrs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("annotation[%s] is invalid", policyv1alpha1.PubProtectTotalReplicasAnnotation)))
+			allErrs = append(allErrs, field.InternalError(field.NewPath("metadata.annotations"), fmt.Errorf("annotation[%s] value '%s' is invalid, must be a valid int32", policyv1alpha1.PubProtectTotalReplicasAnnotation, replicasValue)))
 		}
 	}
 
@@ -167,6 +200,124 @@ func validatePodUnavailableBudgetSpec(obj *policyv1alpha1.PodUnavailableBudget, 
 }
 
 func validatePubConflict(pub *policyv1alpha1.PodUnavailableBudget, others []policyv1alpha1.PodUnavailableBudget, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for _, other := range others {
+		if pub.Name == other.Name {
+			continue
+		}
+		// pod cannot be controlled by multiple pubs
+		if pub.Spec.TargetReference != nil && other.Spec.TargetReference != nil {
+			curRef := pub.Spec.TargetReference
+			otherRef := other.Spec.TargetReference
+			// The previous has been verified, there is no possibility of error here
+			curGv, _ := schema.ParseGroupVersion(curRef.APIVersion)
+			otherGv, _ := schema.ParseGroupVersion(otherRef.APIVersion)
+			if curGv.Group == otherGv.Group && curRef.Kind == otherRef.Kind && curRef.Name == otherRef.Name {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("targetReference"), pub.Spec.TargetReference, fmt.Sprintf(
+					"pub.spec.targetReference is in conflict with other PodUnavailableBudget %s", other.Name)))
+				return allErrs
+			}
+		} else if pub.Spec.Selector != nil && other.Spec.Selector != nil {
+			if util.IsSelectorLooseOverlap(pub.Spec.Selector, other.Spec.Selector) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), pub.Spec.Selector, fmt.Sprintf(
+					"pub.spec.selector is in conflict with other PodUnavailableBudget %s", other.Name)))
+				return allErrs
+			}
+		}
+	}
+	return allErrs
+}
+
+// v1beta1 validation functions
+func (h *PodUnavailableBudgetCreateUpdateHandler) validatingPodUnavailableBudgetV1beta1Fn(obj, old *policyv1beta1.PodUnavailableBudget) field.ErrorList {
+	// validate pub spec fields (protectOperations and protectTotalReplicas are now fields in v1beta1)
+	allErrs := field.ErrorList{}
+
+	// Validate protectOperations field
+	for i, operation := range obj.Spec.ProtectOperations {
+		if operation != policyv1beta1.PubUpdateOperation && operation != policyv1beta1.PubDeleteOperation &&
+			operation != policyv1beta1.PubEvictOperation && operation != policyv1beta1.PubResizeOperation {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("protectOperations").Index(i), operation,
+				"must be one of: UPDATE, DELETE, EVICT, RESIZE"))
+		}
+	}
+
+	// Validate protectTotalReplicas field
+	if obj.Spec.ProtectTotalReplicas != nil && *obj.Spec.ProtectTotalReplicas < 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("protectTotalReplicas"), *obj.Spec.ProtectTotalReplicas,
+			"must be non-negative"))
+	}
+
+	// Validate Pub.Spec
+	allErrs = append(allErrs, validatePodUnavailableBudgetV1beta1Spec(obj, field.NewPath("spec"))...)
+
+	// when operation is update, validating whether old and new pub conflict
+	if old != nil {
+		allErrs = append(allErrs, validateUpdatePubV1beta1Conflict(obj, old, field.NewPath("spec"))...)
+	}
+
+	// validate whether pub is in conflict with others
+	pubList := &policyv1beta1.PodUnavailableBudgetList{}
+	if err := h.Client.List(context.TODO(), pubList, &client.ListOptions{Namespace: obj.Namespace}); err != nil {
+		allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("query other podUnavailableBudget failed, err: %v", err)))
+	} else {
+		allErrs = append(allErrs, validatePubV1beta1Conflict(obj, pubList.Items, field.NewPath("spec"))...)
+	}
+	return allErrs
+}
+
+func validateUpdatePubV1beta1Conflict(obj, old *policyv1beta1.PodUnavailableBudget, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// selector and targetRef can't be changed
+	if !reflect.DeepEqual(obj.Spec.Selector, old.Spec.Selector) || !reflect.DeepEqual(obj.Spec.TargetReference, old.Spec.TargetReference) {
+		allErrs = append(allErrs, field.Required(fldPath.Child("selector, targetRef"), "selector and targetRef cannot be modified"))
+	}
+	return allErrs
+}
+
+func validatePodUnavailableBudgetV1beta1Spec(obj *policyv1beta1.PodUnavailableBudget, fldPath *field.Path) field.ErrorList {
+	spec := &obj.Spec
+	allErrs := field.ErrorList{}
+
+	if spec.Selector == nil && spec.TargetReference == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("selector, targetRef"), "no selector or targetRef defined in PodUnavailableBudget"))
+	} else if spec.Selector != nil && spec.TargetReference != nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("selector, targetRef"), "selector and targetRef are mutually exclusive"))
+	} else if spec.TargetReference != nil {
+		if spec.TargetReference.APIVersion == "" || spec.TargetReference.Name == "" || spec.TargetReference.Kind == "" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("targetReference"), spec.TargetReference, "empty TargetReference is not valid for PodUnavailableBudget."))
+		}
+		_, err := schema.ParseGroupVersion(spec.TargetReference.APIVersion)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("targetReference"), spec.TargetReference, err.Error()))
+		}
+	} else {
+		allErrs = append(allErrs, metavalidation.ValidateLabelSelector(spec.Selector, metavalidation.LabelSelectorValidationOptions{}, fldPath.Child("selector"))...)
+		if len(spec.Selector.MatchLabels)+len(spec.Selector.MatchExpressions) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "empty selector is not valid for PodUnavailableBudget."))
+		}
+		_, err := metav1.LabelSelectorAsSelector(spec.Selector)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, ""))
+		}
+	}
+
+	if spec.MaxUnavailable == nil && spec.MinAvailable == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("maxUnavailable, minAvailable"), "no maxUnavailable or minAvailable defined in PodUnavailableBudget"))
+	} else if spec.MaxUnavailable != nil && spec.MinAvailable != nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("maxUnavailable, minAvailable"), "maxUnavailable and minAvailable are mutually exclusive"))
+	} else if spec.MaxUnavailable != nil {
+		allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*spec.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*spec.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	} else {
+		allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*spec.MinAvailable, fldPath.Child("minAvailable"))...)
+		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*spec.MinAvailable, fldPath.Child("minAvailable"))...)
+	}
+	return allErrs
+}
+
+func validatePubV1beta1Conflict(pub *policyv1beta1.PodUnavailableBudget, others []policyv1beta1.PodUnavailableBudget, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	for _, other := range others {
