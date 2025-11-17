@@ -7,3 +7,4 @@ nodes:
   - role: worker
 featureGates:
   InPlacePodVerticalScaling: true
+  SidecarContainers: true
