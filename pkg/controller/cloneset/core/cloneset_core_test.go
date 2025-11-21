@@ -8,7 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
@@ -16,7 +16,7 @@ import (
 
 func Test_CommonControl_GetUpdateOptions(t *testing.T) {
 	type fields struct {
-		CloneSet *appsv1alpha1.CloneSet
+		CloneSet *appsv1beta1.CloneSet
 	}
 
 	defaultOps := &inplaceupdate.UpdateOptions{}
@@ -29,10 +29,13 @@ func Test_CommonControl_GetUpdateOptions(t *testing.T) {
 		{
 			name: "inplace only update type",
 			fields: fields{
-				&appsv1alpha1.CloneSet{
-					Spec: appsv1alpha1.CloneSetSpec{
-						UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-							Type: appsv1alpha1.InPlaceOnlyCloneSetUpdateStrategyType,
+				&appsv1beta1.CloneSet{
+					Spec: appsv1beta1.CloneSetSpec{
+						UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+							Type: appsv1beta1.RollingUpdateCloneSetUpdateStrategyType,
+							RollingUpdate: &appsv1beta1.RollingUpdateCloneSetStrategy{
+								PodUpdatePolicy: appsv1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType,
+							},
 						},
 					},
 				},
@@ -42,10 +45,13 @@ func Test_CommonControl_GetUpdateOptions(t *testing.T) {
 		{
 			name: "inplace if possible update type",
 			fields: fields{
-				&appsv1alpha1.CloneSet{
-					Spec: appsv1alpha1.CloneSetSpec{
-						UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-							Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				&appsv1beta1.CloneSet{
+					Spec: appsv1beta1.CloneSetSpec{
+						UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+							Type: appsv1beta1.RollingUpdateCloneSetUpdateStrategyType,
+							RollingUpdate: &appsv1beta1.RollingUpdateCloneSetStrategy{
+								PodUpdatePolicy: appsv1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType,
+							},
 						},
 					},
 				},
@@ -56,10 +62,13 @@ func Test_CommonControl_GetUpdateOptions(t *testing.T) {
 			// unexpected case: the method should not be called with recreate update strategy type.
 			name: "recreate update type",
 			fields: fields{
-				&appsv1alpha1.CloneSet{
-					Spec: appsv1alpha1.CloneSetSpec{
-						UpdateStrategy: appsv1alpha1.CloneSetUpdateStrategy{
-							Type: appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				&appsv1beta1.CloneSet{
+					Spec: appsv1beta1.CloneSetSpec{
+						UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+							Type: appsv1beta1.RollingUpdateCloneSetUpdateStrategyType,
+							RollingUpdate: &appsv1beta1.RollingUpdateCloneSetStrategy{
+								PodUpdatePolicy: appsv1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType,
+							},
 						},
 					},
 				},
@@ -85,7 +94,7 @@ func TestIgnorePodUpdateEvent(t *testing.T) {
 		option   func()
 		oldPod   *v1.Pod
 		curPod   *v1.Pod
-		cs       *appsv1alpha1.CloneSet
+		cs       *appsv1beta1.CloneSet
 		expected bool
 	}{
 		{
@@ -112,7 +121,7 @@ func TestIgnorePodUpdateEvent(t *testing.T) {
 					},
 				},
 			},
-			cs:       &appsv1alpha1.CloneSet{},
+			cs:       &appsv1beta1.CloneSet{},
 			expected: true,
 		},
 		{
@@ -139,7 +148,7 @@ func TestIgnorePodUpdateEvent(t *testing.T) {
 					},
 				},
 			},
-			cs:       &appsv1alpha1.CloneSet{},
+			cs:       &appsv1beta1.CloneSet{},
 			expected: false,
 		},
 		{
@@ -166,7 +175,7 @@ func TestIgnorePodUpdateEvent(t *testing.T) {
 					},
 				},
 			},
-			cs:       &appsv1alpha1.CloneSet{},
+			cs:       &appsv1beta1.CloneSet{},
 			expected: false,
 		},
 		{
@@ -174,7 +183,7 @@ func TestIgnorePodUpdateEvent(t *testing.T) {
 			option:   func() {},
 			oldPod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{appspub.LifecycleStateKey: string(appspub.LifecycleStatePreparingNormal)}}},
 			curPod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{appspub.LifecycleStateKey: string(appspub.LifecycleStatePreparingNormal)}}},
-			cs:       &appsv1alpha1.CloneSet{},
+			cs:       &appsv1beta1.CloneSet{},
 			expected: true,
 		},
 		{
@@ -187,8 +196,8 @@ func TestIgnorePodUpdateEvent(t *testing.T) {
 					Finalizers: []string{"finalizers.sigs.k8s.io/test"},
 				},
 			},
-			cs: &appsv1alpha1.CloneSet{
-				Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{
+				Spec: appsv1beta1.CloneSetSpec{
 					Lifecycle: &appspub.Lifecycle{
 						PreNormal: &appspub.LifecycleHook{FinalizersHandler: []string{"finalizers.sigs.k8s.io/test"}},
 					},
@@ -211,8 +220,8 @@ func TestIgnorePodUpdateEvent(t *testing.T) {
 					Finalizers: []string{"finalizers.sigs.k8s.io/test"},
 				},
 			},
-			cs: &appsv1alpha1.CloneSet{
-				Spec: appsv1alpha1.CloneSetSpec{
+			cs: &appsv1beta1.CloneSet{
+				Spec: appsv1beta1.CloneSetSpec{
 					Lifecycle: &appspub.Lifecycle{
 						PreNormal: &appspub.LifecycleHook{FinalizersHandler: []string{"finalizers.sigs.k8s.io/test"}},
 					},

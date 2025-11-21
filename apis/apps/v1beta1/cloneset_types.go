@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kruise Authors.
+Copyright 2025 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	v1 "k8s.io/api/core/v1"
@@ -95,19 +95,21 @@ type CloneSetScaleStrategy struct {
 	// PodsToDelete is the names of Pod should be deleted.
 	// Note that this list will be truncated for non-existing pod names.
 	PodsToDelete []string `json:"podsToDelete,omitempty"`
+
 	// The maximum number of pods that can be unavailable for scaled pods.
 	// This field can control the changes rate of replicas for CloneSet so as to minimize the impact for users' service.
 	// The scale will fail if the number of unavailable pods were greater than this MaxUnavailable at scaling up.
 	// MaxUnavailable works only when scaling up.
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
-	// Indicate if cloneSet will reuse already existed pvc to
-	// rebuild a new pod.
-	// Default is false for v1alpha1 (backward compatibility).
+	// EnablePVCReuse indicates whether CloneSet should reuse already existed PVC to rebuild a new pod.
+	// Default is false for v1beta1, which means CloneSet will NOT reuse PVC by default.
+	// For v1alpha1, the corresponding field DisablePVCReuse has default false (enable reuse) to maintain backward compatibility.
 	// Note: omitempty is removed to ensure the field is always serialized,
-	// preventing v1beta1 CRD default from being applied during conversion.
+	// preventing CRD default from overriding values converted from v1alpha1.
+	// +optional
 	// +kubebuilder:default=false
-	DisablePVCReuse bool `json:"disablePVCReuse"`
+	EnablePVCReuse bool `json:"enablePVCReuse"`
 
 	// ExcludePreparingDelete indicates whether the CloneSet should calculate scale number excluding Pods in PreparingDelete state.
 	// Default is false.
@@ -115,11 +117,8 @@ type CloneSetScaleStrategy struct {
 	ExcludePreparingDelete bool `json:"excludePreparingDelete,omitempty"`
 }
 
-// CloneSetUpdateStrategy defines strategies for pods update.
-type CloneSetUpdateStrategy struct {
-	// Type indicates the type of the CloneSetUpdateStrategy.
-	// Default is ReCreate.
-	Type CloneSetUpdateStrategyType `json:"type,omitempty"`
+// RollingUpdateCloneSetStrategy is used to communicate parameter for RollingUpdateCloneSetStrategy.
+type RollingUpdateCloneSetStrategy struct {
 	// Partition is the desired number of pods in old revisions.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
 	// Absolute number is calculated from percentage by rounding up by default.
@@ -137,6 +136,10 @@ type CloneSetUpdateStrategy struct {
 	// Absolute number is calculated from percentage by rounding up.
 	// Defaults to 0.
 	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty"`
+	// PodUpdatePolicy indicates how pods should be updated
+	// Default value is "ReCreate"
+	// +optional
+	PodUpdatePolicy CloneSetPodUpdateStrategyType `json:"podUpdatePolicy,omitempty"`
 	// Paused indicates that the CloneSet is paused.
 	// Default value is false
 	Paused bool `json:"paused,omitempty"`
@@ -152,25 +155,47 @@ type CloneSetUpdateStrategy struct {
 	InPlaceUpdateStrategy *appspub.InPlaceUpdateStrategy `json:"inPlaceUpdateStrategy,omitempty"`
 }
 
+// CloneSetPodUpdateStrategyType is a string enumeration type that enumerates
+// all possible ways we can update a Pod when updating application
+type CloneSetPodUpdateStrategyType string
+
+const (
+	// RecreateCloneSetPodUpdateStrategyType indicates that we always delete Pod and create new Pod
+	// during Pod update, which is the default behavior
+	RecreateCloneSetPodUpdateStrategyType CloneSetPodUpdateStrategyType = "ReCreate"
+	// InPlaceIfPossibleCloneSetPodUpdateStrategyType indicates that we try to in-place update Pod instead of
+	// recreating Pod when possible. Currently, only image update of pod spec is allowed. Any other changes to the pod
+	// spec will fall back to ReCreate PodUpdateStrategyType where pod will be recreated.
+	InPlaceIfPossibleCloneSetPodUpdateStrategyType CloneSetPodUpdateStrategyType = "InPlaceIfPossible"
+	// InPlaceOnlyCloneSetPodUpdateStrategyType indicates that we will in-place update Pod instead of
+	// recreating pod. Currently we only allow image update for pod spec. Any other changes to the pod spec will be
+	// rejected by kube-apiserver
+	InPlaceOnlyCloneSetPodUpdateStrategyType CloneSetPodUpdateStrategyType = "InPlaceOnly"
+)
+
+// CloneSetUpdateStrategy defines strategies for pods update.
+type CloneSetUpdateStrategy struct {
+	// Type indicates the type of the CloneSetUpdateStrategy.
+	// Default is RollingUpdate.
+	// +optional
+	Type CloneSetUpdateStrategyType `json:"type,omitempty"`
+
+	// RollingUpdate is used to communicate parameters when Type is RollingUpdateCloneSetStrategy.
+	// +optional
+	RollingUpdate *RollingUpdateCloneSetStrategy `json:"rollingUpdate,omitempty"`
+}
+
 // CloneSetUpdateStrategyType defines strategies for pods in-place update.
 type CloneSetUpdateStrategyType string
 
 const (
+	// RollingUpdateCloneSetUpdateStrategyType indicates that we will update Pods in a rolling update method
+	// which is the default behavior.
+	RollingUpdateCloneSetUpdateStrategyType CloneSetUpdateStrategyType = "RollingUpdate"
 	// OnDeleteCloneSetUpdateStrategyType triggers the legacy behavior. Version
 	// tracking and ordered rolling restarts are disabled. Pods are recreated
 	// from the CloneSet when they are manually deleted.
 	OnDeleteCloneSetUpdateStrategyType CloneSetUpdateStrategyType = "OnDelete"
-	// RecreateCloneSetUpdateStrategyType indicates that we always delete Pod and create new Pod
-	// during Pod update, which is the default behavior.
-	RecreateCloneSetUpdateStrategyType CloneSetUpdateStrategyType = "ReCreate"
-	// InPlaceIfPossibleCloneSetUpdateStrategyType indicates that we try to in-place update Pod instead of
-	// recreating Pod when possible. Currently, only image update of pod spec is allowed. Any other changes to the pod
-	// spec will fall back to ReCreate CloneSetUpdateStrategyType where pod will be recreated.
-	InPlaceIfPossibleCloneSetUpdateStrategyType CloneSetUpdateStrategyType = "InPlaceIfPossible"
-	// InPlaceOnlyCloneSetUpdateStrategyType indicates that we will in-place update Pod instead of
-	// recreating pod. Currently we only allow image update for pod spec. Any other changes to the pod spec will be
-	// rejected by kube-apiserver
-	InPlaceOnlyCloneSetUpdateStrategyType CloneSetUpdateStrategyType = "InPlaceOnly"
 )
 
 // CloneSetStatus defines the observed state of CloneSet
@@ -276,6 +301,7 @@ type CloneSetCondition struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.labelSelector
 // +kubebuilder:resource:shortName=clone
+// +kubebuilder:storageversion
 // +kubebuilder:printcolumn:name="DESIRED",type="integer",JSONPath=".spec.replicas",description="The desired number of pods."
 // +kubebuilder:printcolumn:name="UPDATED",type="integer",JSONPath=".status.updatedReplicas",description="The number of pods updated."
 // +kubebuilder:printcolumn:name="UPDATED_READY",type="integer",JSONPath=".status.updatedReadyReplicas",description="The number of pods updated and ready."
