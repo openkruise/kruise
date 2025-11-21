@@ -390,9 +390,9 @@ func convertResourcesPolicyToV1Beta1(policy *ResourcesPolicy) *v1beta1.Resources
 		return nil
 	}
 	return &v1beta1.ResourcesPolicy{
-		TargetContainerMode:       v1beta1.TargetContainerModeType(policy.TargetContainerMode),
+		TargetContainersMode:      v1beta1.TargetContainersModeType(policy.TargetContainersMode),
 		TargetContainersNameRegex: policy.TargetContainersNameRegex,
-		ResourceExpr:              convertResourceExprToV1Beta1(policy.ResourceExpr),
+		ResourcesExpr:             convertResourceExprToV1Beta1(policy.ResourcesExpr),
 	}
 }
 
@@ -401,14 +401,14 @@ func convertResourcesPolicyToV1Alpha1(policy *v1beta1.ResourcesPolicy) *Resource
 		return nil
 	}
 	return &ResourcesPolicy{
-		TargetContainerMode:       TargetContainerModeType(policy.TargetContainerMode),
+		TargetContainersMode:      TargetContainersModeType(policy.TargetContainersMode),
 		TargetContainersNameRegex: policy.TargetContainersNameRegex,
-		ResourceExpr:              convertResourceExprToV1Alpha1(policy.ResourceExpr),
+		ResourcesExpr:             convertResourceExprToV1Alpha1(policy.ResourcesExpr),
 	}
 }
 
-func convertResourceExprToV1Beta1(expr ResourceExpr) v1beta1.ResourceExpr {
-	result := v1beta1.ResourceExpr{}
+func convertResourceExprToV1Beta1(expr ResourcesExpr) v1beta1.ResourcesExpr {
+	result := v1beta1.ResourcesExpr{}
 	if expr.Limits != nil {
 		result.Limits = &v1beta1.ResourceExprLimits{
 			CPU:    expr.Limits.CPU,
@@ -424,8 +424,8 @@ func convertResourceExprToV1Beta1(expr ResourceExpr) v1beta1.ResourceExpr {
 	return result
 }
 
-func convertResourceExprToV1Alpha1(expr v1beta1.ResourceExpr) ResourceExpr {
-	result := ResourceExpr{}
+func convertResourceExprToV1Alpha1(expr v1beta1.ResourcesExpr) ResourcesExpr {
+	result := ResourcesExpr{}
 	if expr.Limits != nil {
 		result.Limits = &ResourceExprLimits{
 			CPU:    expr.Limits.CPU,

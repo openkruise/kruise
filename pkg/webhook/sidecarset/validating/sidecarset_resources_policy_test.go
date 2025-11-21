@@ -56,9 +56,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "max(cpu*50%, 50m)",
 							Memory: "max(memory*50%, 100Mi)",
@@ -86,9 +86,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeMax,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeMax,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "cpu*50%",
 						},
@@ -111,9 +111,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: ".*",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Requests: &appsv1beta1.ResourceExprRequests{
 							CPU:    "max(cpu*50%, 50m)",
 							Memory: "100Mi",
@@ -137,9 +137,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "cpu*50%",
 						},
@@ -168,8 +168,8 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode: appsv1beta1.TargetContainerModeSum,
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					TargetContainersMode: appsv1beta1.TargetContainersModeSum,
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "cpu*50%",
 						},
@@ -198,8 +198,8 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode: appsv1beta1.TargetContainerModeSum,
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					TargetContainersMode: appsv1beta1.TargetContainersModeSum,
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "cpu*50%",
 						},
@@ -223,9 +223,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "[invalid(regex",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "cpu*50%",
 						},
@@ -249,9 +249,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr:              appsv1beta1.ResourceExpr{},
+					ResourcesExpr:             appsv1beta1.ResourcesExpr{},
 				},
 			},
 			expectErrors:  1,
@@ -271,9 +271,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "invalid expression @#$",
 						},
@@ -297,9 +297,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "max(cpu*50%, 50m",
 						},
@@ -323,9 +323,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "max(cpu*50%)",
 						},
@@ -349,9 +349,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "invalidvar * 50%",
 						},
@@ -375,9 +375,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "0.5*cpu - 0.3*max(0, cpu-4) + 0.3*max(0, cpu-8)",
 							Memory: "max(memory*50%, 100Mi)",
@@ -401,9 +401,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeMax,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeMax,
 					TargetContainersNameRegex: "^.*",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "cpu*50%",
 						},
@@ -426,9 +426,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeMax,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeMax,
 					TargetContainersNameRegex: "^.*",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							Memory: "memory*50%",
 						},
@@ -451,9 +451,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^.*",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Requests: &appsv1beta1.ResourceExprRequests{
 							Memory: "100Mi",
 						},
@@ -476,9 +476,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^.*",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Requests: &appsv1beta1.ResourceExprRequests{
 							CPU: "invalid_cpu_expr",
 						},
@@ -502,9 +502,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^.*",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							Memory: "bad_memory_expr",
 						},
@@ -528,9 +528,9 @@ func TestValidateResourcesPolicy(t *testing.T) {
 					Type: appsv1beta1.ShareVolumePolicyDisabled,
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^.*",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Requests: &appsv1beta1.ResourceExprRequests{
 							Memory: "bad_memory_expr",
 						},

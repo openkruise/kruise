@@ -78,8 +78,8 @@ spec:
                         ResourcesPolicy defines the policy for dynamically configuring container resources based on Pod specification during pod creation.
                         Validation webhook will reject pod creation request if both resourcesPolicy and resources are configured.
                       properties:
-                        resourceExpr:
-                          description: ResourceExpr defines the expressions for calculating
+                        resourcesExpr:
+                          description: ResourcesExpr defines the expressions for calculating
                             resource values
                           properties:
                             limits:
@@ -123,8 +123,8 @@ spec:
                                   type: string
                               type: object
                           type: object
-                        targetContainerMode:
-                          description: TargetContainerMode defines how to aggregate
+                        targetContainersMode:
+                          description: TargetContainersMode defines how to aggregate
                             resources from target containers
                           enum:
                           - sum
@@ -138,8 +138,8 @@ spec:
                             Target containers include native sidecar containers and plain containers, excluding Kruise sidecar containers
                           type: string
                       required:
-                      - resourceExpr
-                      - targetContainerMode
+                      - resourcesExpr
+                      - targetContainersMode
                       type: object
                     shareVolumeDevicePolicy:
                       description: |-
@@ -255,8 +255,8 @@ spec:
                         ResourcesPolicy defines the policy for dynamically configuring container resources based on Pod specification during pod creation.
                         Validation webhook will reject pod creation request if both resourcesPolicy and resources are configured.
                       properties:
-                        resourceExpr:
-                          description: ResourceExpr defines the expressions for calculating
+                        resourcesExpr:
+                          description: ResourcesExpr defines the expressions for calculating
                             resource values
                           properties:
                             limits:
@@ -300,8 +300,8 @@ spec:
                                   type: string
                               type: object
                           type: object
-                        targetContainerMode:
-                          description: TargetContainerMode defines how to aggregate
+                        targetContainersMode:
+                          description: TargetContainersMode defines how to aggregate
                             resources from target containers
                           enum:
                           - sum
@@ -315,8 +315,8 @@ spec:
                             Target containers include native sidecar containers and plain containers, excluding Kruise sidecar containers
                           type: string
                       required:
-                      - resourceExpr
-                      - targetContainerMode
+                      - resourcesExpr
+                      - targetContainersMode
                       type: object
                     shareVolumeDevicePolicy:
                       description: |-
@@ -869,8 +869,8 @@ spec:
                         ResourcesPolicy defines the policy for dynamically configuring container resources based on Pod specification during pod creation.
                         Validation webhook will reject pod creation request if both resourcesPolicy and resources are configured.
                       properties:
-                        resourceExpr:
-                          description: ResourceExpr defines the expressions for calculating
+                        resourcesExpr:
+                          description: ResourcesExpr defines the expressions for calculating
                             resource values
                           properties:
                             limits:
@@ -914,8 +914,8 @@ spec:
                                   type: string
                               type: object
                           type: object
-                        targetContainerMode:
-                          description: TargetContainerMode defines how to aggregate
+                        targetContainersMode:
+                          description: TargetContainersMode defines how to aggregate
                             resources from target containers
                           enum:
                           - sum
@@ -929,8 +929,8 @@ spec:
                             Target containers include native sidecar containers and plain containers, excluding Kruise sidecar containers
                           type: string
                       required:
-                      - resourceExpr
-                      - targetContainerMode
+                      - resourcesExpr
+                      - targetContainersMode
                       type: object
                     shareVolumeDevicePolicy:
                       description: |-
@@ -1055,8 +1055,8 @@ spec:
                         ResourcesPolicy defines the policy for dynamically configuring container resources based on Pod specification during pod creation.
                         Validation webhook will reject pod creation request if both resourcesPolicy and resources are configured.
                       properties:
-                        resourceExpr:
-                          description: ResourceExpr defines the expressions for calculating
+                        resourcesExpr:
+                          description: ResourcesExpr defines the expressions for calculating
                             resource values
                           properties:
                             limits:
@@ -1100,8 +1100,8 @@ spec:
                                   type: string
                               type: object
                           type: object
-                        targetContainerMode:
-                          description: TargetContainerMode defines how to aggregate
+                        targetContainersMode:
+                          description: TargetContainersMode defines how to aggregate
                             resources from target containers
                           enum:
                           - sum
@@ -1115,8 +1115,8 @@ spec:
                             Target containers include native sidecar containers and plain containers, excluding Kruise sidecar containers
                           type: string
                       required:
-                      - resourceExpr
-                      - targetContainerMode
+                      - resourcesExpr
+                      - targetContainersMode
                       type: object
                     shareVolumeDevicePolicy:
                       description: |-

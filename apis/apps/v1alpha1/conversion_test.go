@@ -2173,9 +2173,9 @@ func TestSidecarSet_ConvertTo(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &ResourcesPolicy{
-								TargetContainerMode:       TargetContainerModeSum,
+								TargetContainersMode:      TargetContainersModeSum,
 								TargetContainersNameRegex: "^large-engine-v.*$",
-								ResourceExpr: ResourceExpr{
+								ResourcesExpr: ResourcesExpr{
 									Limits: &ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
@@ -2205,9 +2205,9 @@ func TestSidecarSet_ConvertTo(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &v1beta1.ResourcesPolicy{
-								TargetContainerMode:       v1beta1.TargetContainerModeSum,
+								TargetContainersMode:      v1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: "^large-engine-v.*$",
-								ResourceExpr: v1beta1.ResourceExpr{
+								ResourcesExpr: v1beta1.ResourcesExpr{
 									Limits: &v1beta1.ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
@@ -2240,9 +2240,9 @@ func TestSidecarSet_ConvertTo(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &ResourcesPolicy{
-								TargetContainerMode:       TargetContainerModeMax,
+								TargetContainersMode:      TargetContainersModeMax,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: ResourceExpr{
+								ResourcesExpr: ResourcesExpr{
 									Limits: &ResourceExprLimits{
 										CPU:    "cpu*30%",
 										Memory: "memory*25%",
@@ -2272,9 +2272,9 @@ func TestSidecarSet_ConvertTo(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &v1beta1.ResourcesPolicy{
-								TargetContainerMode:       v1beta1.TargetContainerModeMax,
+								TargetContainersMode:      v1beta1.TargetContainersModeMax,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: v1beta1.ResourceExpr{
+								ResourcesExpr: v1beta1.ResourcesExpr{
 									Limits: &v1beta1.ResourceExprLimits{
 										CPU:    "cpu*30%",
 										Memory: "memory*25%",
@@ -2307,9 +2307,9 @@ func TestSidecarSet_ConvertTo(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &ResourcesPolicy{
-								TargetContainerMode:       TargetContainerModeSum,
+								TargetContainersMode:      TargetContainersModeSum,
 								TargetContainersNameRegex: "^app.*$",
-								ResourceExpr: ResourceExpr{
+								ResourcesExpr: ResourcesExpr{
 									Limits: &ResourceExprLimits{
 										CPU:    "cpu*50% + 100m",
 										Memory: "max(memory*20% + 100Mi, 200Mi)",
@@ -2335,9 +2335,9 @@ func TestSidecarSet_ConvertTo(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &v1beta1.ResourcesPolicy{
-								TargetContainerMode:       v1beta1.TargetContainerModeSum,
+								TargetContainersMode:      v1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: "^app.*$",
-								ResourceExpr: v1beta1.ResourceExpr{
+								ResourcesExpr: v1beta1.ResourcesExpr{
 									Limits: &v1beta1.ResourceExprLimits{
 										CPU:    "cpu*50% + 100m",
 										Memory: "max(memory*20% + 100Mi, 200Mi)",
@@ -2366,9 +2366,9 @@ func TestSidecarSet_ConvertTo(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &ResourcesPolicy{
-								TargetContainerMode:       TargetContainerModeMax,
+								TargetContainersMode:      TargetContainersModeMax,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: ResourceExpr{
+								ResourcesExpr: ResourcesExpr{
 									Requests: &ResourceExprRequests{
 										CPU:    "cpu*30% + 50m",
 										Memory: "memory*15% + 50Mi",
@@ -2394,9 +2394,9 @@ func TestSidecarSet_ConvertTo(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &v1beta1.ResourcesPolicy{
-								TargetContainerMode:       v1beta1.TargetContainerModeMax,
+								TargetContainersMode:      v1beta1.TargetContainersModeMax,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: v1beta1.ResourceExpr{
+								ResourcesExpr: v1beta1.ResourcesExpr{
 									Requests: &v1beta1.ResourceExprRequests{
 										CPU:    "cpu*30% + 50m",
 										Memory: "memory*15% + 50Mi",
@@ -2425,9 +2425,9 @@ func TestSidecarSet_ConvertTo(t *testing.T) {
 								Image: "init:latest",
 							},
 							ResourcesPolicy: &ResourcesPolicy{
-								TargetContainerMode:       TargetContainerModeSum,
+								TargetContainersMode:      TargetContainersModeSum,
 								TargetContainersNameRegex: "^app.*$",
-								ResourceExpr: ResourceExpr{
+								ResourcesExpr: ResourcesExpr{
 									Limits: &ResourceExprLimits{
 										CPU:    "max(cpu*30%, 50m)",
 										Memory: "max(memory*25%, 100Mi)",
@@ -2457,9 +2457,9 @@ func TestSidecarSet_ConvertTo(t *testing.T) {
 								Image: "init:latest",
 							},
 							ResourcesPolicy: &v1beta1.ResourcesPolicy{
-								TargetContainerMode:       v1beta1.TargetContainerModeSum,
+								TargetContainersMode:      v1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: "^app.*$",
-								ResourceExpr: v1beta1.ResourceExpr{
+								ResourcesExpr: v1beta1.ResourcesExpr{
 									Limits: &v1beta1.ResourceExprLimits{
 										CPU:    "max(cpu*30%, 50m)",
 										Memory: "max(memory*25%, 100Mi)",
@@ -2893,9 +2893,9 @@ func TestSidecarSet_ConvertFrom(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &v1beta1.ResourcesPolicy{
-								TargetContainerMode:       v1beta1.TargetContainerModeSum,
+								TargetContainersMode:      v1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: "^large-engine-v.*$",
-								ResourceExpr: v1beta1.ResourceExpr{
+								ResourcesExpr: v1beta1.ResourcesExpr{
 									Limits: &v1beta1.ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
@@ -2925,9 +2925,9 @@ func TestSidecarSet_ConvertFrom(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &ResourcesPolicy{
-								TargetContainerMode:       TargetContainerModeSum,
+								TargetContainersMode:      TargetContainersModeSum,
 								TargetContainersNameRegex: "^large-engine-v.*$",
-								ResourceExpr: ResourceExpr{
+								ResourcesExpr: ResourcesExpr{
 									Limits: &ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
@@ -2960,9 +2960,9 @@ func TestSidecarSet_ConvertFrom(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &v1beta1.ResourcesPolicy{
-								TargetContainerMode:       v1beta1.TargetContainerModeMax,
+								TargetContainersMode:      v1beta1.TargetContainersModeMax,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: v1beta1.ResourceExpr{
+								ResourcesExpr: v1beta1.ResourcesExpr{
 									Limits: &v1beta1.ResourceExprLimits{
 										CPU:    "cpu*30%",
 										Memory: "memory*25%",
@@ -2992,9 +2992,9 @@ func TestSidecarSet_ConvertFrom(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &ResourcesPolicy{
-								TargetContainerMode:       TargetContainerModeMax,
+								TargetContainersMode:      TargetContainersModeMax,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: ResourceExpr{
+								ResourcesExpr: ResourcesExpr{
 									Limits: &ResourceExprLimits{
 										CPU:    "cpu*30%",
 										Memory: "memory*25%",
@@ -3027,9 +3027,9 @@ func TestSidecarSet_ConvertFrom(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &v1beta1.ResourcesPolicy{
-								TargetContainerMode:       v1beta1.TargetContainerModeSum,
+								TargetContainersMode:      v1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: "^app.*$",
-								ResourceExpr: v1beta1.ResourceExpr{
+								ResourcesExpr: v1beta1.ResourcesExpr{
 									Limits: &v1beta1.ResourceExprLimits{
 										CPU:    "cpu*50% + 100m",
 										Memory: "max(memory*20% + 100Mi, 200Mi)",
@@ -3055,9 +3055,9 @@ func TestSidecarSet_ConvertFrom(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &ResourcesPolicy{
-								TargetContainerMode:       TargetContainerModeSum,
+								TargetContainersMode:      TargetContainersModeSum,
 								TargetContainersNameRegex: "^app.*$",
-								ResourceExpr: ResourceExpr{
+								ResourcesExpr: ResourcesExpr{
 									Limits: &ResourceExprLimits{
 										CPU:    "cpu*50% + 100m",
 										Memory: "max(memory*20% + 100Mi, 200Mi)",
@@ -3086,9 +3086,9 @@ func TestSidecarSet_ConvertFrom(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &v1beta1.ResourcesPolicy{
-								TargetContainerMode:       v1beta1.TargetContainerModeMax,
+								TargetContainersMode:      v1beta1.TargetContainersModeMax,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: v1beta1.ResourceExpr{
+								ResourcesExpr: v1beta1.ResourcesExpr{
 									Requests: &v1beta1.ResourceExprRequests{
 										CPU:    "cpu*30% + 50m",
 										Memory: "memory*15% + 50Mi",
@@ -3114,9 +3114,9 @@ func TestSidecarSet_ConvertFrom(t *testing.T) {
 								Image: "sidecar:latest",
 							},
 							ResourcesPolicy: &ResourcesPolicy{
-								TargetContainerMode:       TargetContainerModeMax,
+								TargetContainersMode:      TargetContainersModeMax,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: ResourceExpr{
+								ResourcesExpr: ResourcesExpr{
 									Requests: &ResourceExprRequests{
 										CPU:    "cpu*30% + 50m",
 										Memory: "memory*15% + 50Mi",
@@ -3145,9 +3145,9 @@ func TestSidecarSet_ConvertFrom(t *testing.T) {
 								Image: "init:latest",
 							},
 							ResourcesPolicy: &v1beta1.ResourcesPolicy{
-								TargetContainerMode:       v1beta1.TargetContainerModeSum,
+								TargetContainersMode:      v1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: "^app.*$",
-								ResourceExpr: v1beta1.ResourceExpr{
+								ResourcesExpr: v1beta1.ResourcesExpr{
 									Limits: &v1beta1.ResourceExprLimits{
 										CPU:    "max(cpu*30%, 50m)",
 										Memory: "max(memory*25%, 100Mi)",
@@ -3177,9 +3177,9 @@ func TestSidecarSet_ConvertFrom(t *testing.T) {
 								Image: "init:latest",
 							},
 							ResourcesPolicy: &ResourcesPolicy{
-								TargetContainerMode:       TargetContainerModeSum,
+								TargetContainersMode:      TargetContainersModeSum,
 								TargetContainersNameRegex: "^app.*$",
-								ResourceExpr: ResourceExpr{
+								ResourcesExpr: ResourcesExpr{
 									Limits: &ResourceExprLimits{
 										CPU:    "max(cpu*30%, 50m)",
 										Memory: "max(memory*25%, 100Mi)",

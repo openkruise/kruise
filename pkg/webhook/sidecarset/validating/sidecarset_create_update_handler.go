@@ -530,14 +530,14 @@ func validateResourcesPolicy(container appsv1beta1.SidecarContainer, fldPath *fi
 			fmt.Sprintf("invalid regex pattern: %v", err)))
 	}
 
-	// Validate ResourceExpr
-	allErrs = append(allErrs, validateResourceExpr(&policy.ResourceExpr, fldPath.Child("resourceExpr"))...)
+	// Validate ResourcesExpr
+	allErrs = append(allErrs, validateResourceExpr(&policy.ResourcesExpr, fldPath.Child("resourcesExpr"))...)
 
 	return allErrs
 }
 
-// validateResourceExpr validates the ResourceExpr configuration
-func validateResourceExpr(expr *appsv1beta1.ResourceExpr, fldPath *field.Path) field.ErrorList {
+// validateResourceExpr validates the ResourcesExpr configuration
+func validateResourceExpr(expr *appsv1beta1.ResourcesExpr, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	// At least one of Limits or Requests should be configured

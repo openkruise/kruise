@@ -710,8 +710,8 @@ func TestValidateSidecarSet(t *testing.T) {
 								},
 							},
 							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-								TargetContainerMode: appsv1beta1.TargetContainerModeSum,
-								ResourceExpr: appsv1beta1.ResourceExpr{
+								TargetContainersMode: appsv1beta1.TargetContainersModeSum,
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
 									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU: "cpu*50%",
 									},
@@ -747,8 +747,8 @@ func TestValidateSidecarSet(t *testing.T) {
 								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 							},
 							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-								TargetContainerMode: "invalid",
-								ResourceExpr: appsv1beta1.ResourceExpr{
+								TargetContainersMode: "invalid",
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
 									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU: "cpu*50%",
 									},
@@ -785,9 +785,9 @@ func TestValidateSidecarSet(t *testing.T) {
 								// Plain init-container without RestartPolicy: Always
 							},
 							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-								TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+								TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: appsv1beta1.ResourceExpr{
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
 									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU: "cpu*50%",
 									},
@@ -827,9 +827,9 @@ func TestValidateSidecarSet(t *testing.T) {
 								RestartPolicy:            &always, // Native sidecar container
 							},
 							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-								TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+								TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: appsv1beta1.ResourceExpr{
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
 									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU: "cpu*50%",
 									},

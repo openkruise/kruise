@@ -87,9 +87,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-								TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+								TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: "^large-engine-v4$", // Only match large-engine-v4
-								ResourceExpr: appsv1beta1.ResourceExpr{
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
 									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
@@ -243,9 +243,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-								TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+								TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: "^large-engine-v.*$",
-								ResourceExpr: appsv1beta1.ResourceExpr{
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
 									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
@@ -394,9 +394,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-								TargetContainerMode:       appsv1beta1.TargetContainerModeMax,
+								TargetContainersMode:      appsv1beta1.TargetContainersModeMax,
 								TargetContainersNameRegex: "^large-engine-v.*$",
-								ResourceExpr: appsv1beta1.ResourceExpr{
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
 									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
@@ -545,9 +545,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-								TargetContainerMode:       appsv1beta1.TargetContainerModeMax,
+								TargetContainersMode:      appsv1beta1.TargetContainersModeMax,
 								TargetContainersNameRegex: "^large-engine-v.*$",
-								ResourceExpr: appsv1beta1.ResourceExpr{
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
 									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
@@ -700,9 +700,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-								TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+								TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: appsv1beta1.ResourceExpr{
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
 									Limits: &appsv1beta1.ResourceExprLimits{
 										// Complex expression with arithmetic operations
 										CPU:    "cpu*50% + 100m",
@@ -864,9 +864,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								RestartPolicy: &restartAlways, // Native sidecar container
 							},
 							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-								TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+								TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: "^app.*$",
-								ResourceExpr: appsv1beta1.ResourceExpr{
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
 									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU:    "max(cpu*30%, 50m)",
 										Memory: "max(memory*25%, 100Mi)",
@@ -1025,9 +1025,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-								TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+								TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: ".*", // Match all containers
-								ResourceExpr: appsv1beta1.ResourceExpr{
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
 									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU:    "cpu*50%",
 										Memory: "memory*50%",
@@ -1246,9 +1246,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-								TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+								TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: appsv1beta1.ResourceExpr{
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
 									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU:    "cpu*50%",
 										Memory: "memory*50%",
