@@ -185,10 +185,10 @@ type SourceContainerNameSource struct {
 
 // ResourcesPolicy defines the policy for dynamically configuring container resources based on Pod specification during pod creation.
 type ResourcesPolicy struct {
-	// TargetContainerMode defines how to aggregate resources from target containers
+	// TargetContainersMode defines how to aggregate resources from target containers
 	// +kubebuilder:validation:Enum=sum;max
 	// +kubebuilder:validation:Required
-	TargetContainerMode TargetContainerModeType `json:"targetContainerMode"`
+	TargetContainersMode TargetContainersModeType `json:"targetContainersMode"`
 
 	// TargetContainersNameRegex is the regex pattern to match target container names
 	// If no container names match this regex, the pod creation request will be rejected by the webhook
@@ -197,24 +197,24 @@ type ResourcesPolicy struct {
 	// +kubebuilder:default=".*"
 	TargetContainersNameRegex string `json:"targetContainersNameRegex,omitempty"`
 
-	// ResourceExpr defines the expressions for calculating resource values
+	// ResourcesExpr defines the expressions for calculating resource values
 	// +kubebuilder:validation:Required
-	ResourceExpr ResourceExpr `json:"resourceExpr"`
+	ResourcesExpr ResourcesExpr `json:"resourcesExpr"`
 }
 
-// TargetContainerModeType defines how to aggregate resources from target containers
-type TargetContainerModeType string
+// TargetContainersModeType defines how to aggregate resources from target containers
+type TargetContainersModeType string
 
 const (
-	// TargetContainerModeSum aggregates resources by summing up all matched containers
-	TargetContainerModeSum TargetContainerModeType = "sum"
+	// TargetContainersModeSum aggregates resources by summing up all matched containers
+	TargetContainersModeSum TargetContainersModeType = "sum"
 
-	// TargetContainerModeMax aggregates resources by taking the maximum of all matched containers
-	TargetContainerModeMax TargetContainerModeType = "max"
+	// TargetContainersModeMax aggregates resources by taking the maximum of all matched containers
+	TargetContainersModeMax TargetContainersModeType = "max"
 )
 
-// ResourceExpr defines the expressions for calculating resource values
-type ResourceExpr struct {
+// ResourcesExpr defines the expressions for calculating resource values
+type ResourcesExpr struct {
 	// Limits defines expressions for calculating resource limits
 	// +optional
 	Limits *ResourceExprLimits `json:"limits,omitempty"`

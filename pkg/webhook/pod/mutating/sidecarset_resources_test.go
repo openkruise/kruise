@@ -84,9 +84,9 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					Image: "sidecar:latest",
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: ".*",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "cpu*50%",
 							Memory: "200Mi",
@@ -147,9 +147,9 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					Image: "sidecar:latest",
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeMax,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeMax,
 					TargetContainersNameRegex: "^large.engine.v.*$",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "max(cpu*50%, 50m)",
 							Memory: "200Mi",
@@ -210,9 +210,9 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					Image: "sidecar:latest",
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^large.engine.v4$",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "max(cpu*50%, 50m)",
 							Memory: "200Mi",
@@ -254,9 +254,9 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					Image: "sidecar:latest",
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^nonexistent$",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "cpu*50%",
 						},
@@ -308,9 +308,9 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					Image: "sidecar:latest",
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: ".*",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "cpu*50%",
 							Memory: "memory*30%",
@@ -375,9 +375,9 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					Image: "sidecar:latest",
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeMax,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeMax,
 					TargetContainersNameRegex: ".*",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "cpu*40%",
 							Memory: "memory*30%",
@@ -439,9 +439,9 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					Image: "sidecar:latest",
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: ".*",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "cpu*50%",
 							Memory: "memory*30%",
@@ -521,9 +521,9 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					Image: "sidecar:latest",
 				},
 				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
-					TargetContainerMode:       appsv1beta1.TargetContainerModeSum,
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1beta1.ResourceExpr{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
 						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "max(cpu*30%, 50m)",
 							Memory: "max(memory*25%, 100Mi)",
