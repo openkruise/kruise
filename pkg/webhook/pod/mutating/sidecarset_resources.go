@@ -43,7 +43,7 @@ func applyResourcesPolicy(
 
 	policy := sidecarContainer.ResourcesPolicy
 	klog.V(4).InfoS("Applying resources policy", "container", sidecarContainer.Name,
-		"mode", policy.TargetContainerMode, "regex", policy.TargetContainersNameRegex)
+		"mode", policy.TargetContainersMode, "regex", policy.TargetContainersNameRegex)
 
 	// Get target containers (exclude Kruise sidecar containers)
 	targetContainers, err := getTargetContainers(pod, policy.TargetContainersNameRegex, matchedSidecarSets)
@@ -59,21 +59,21 @@ func applyResourcesPolicy(
 		"names", getContainerNames(targetContainers))
 
 	// Calculate aggregated resources based on mode
-	aggregatedLimits, aggregatedRequests := aggregateResources(targetContainers, policy.TargetContainerMode)
+	aggregatedLimits, aggregatedRequests := aggregateResources(targetContainers, policy.TargetContainersMode)
 
 	// Apply resource expressions
 	resources := corev1.ResourceRequirements{}
 
 	// Calculate limits
-	if policy.ResourceExpr.Limits != nil {
+	if policy.ResourcesExpr.Limits != nil {
 		limits := corev1.ResourceList{}
 
 		// CPU limits
-		if policy.ResourceExpr.Limits.CPU != "" {
+		if policy.ResourcesExpr.Limits.CPU != "" {
 			// Check if aggregated CPU limit exists (not unlimited)
 			if cpuValue, exists := aggregatedLimits[corev1.ResourceCPU]; exists {
 				cpuLimit, err := evaluateResourceExpression(
-					policy.ResourceExpr.Limits.CPU,
+					policy.ResourcesExpr.Limits.CPU,
 					cpuValue,
 					true, // isLimit
 				)
@@ -88,11 +88,11 @@ func applyResourcesPolicy(
 		}
 
 		// Memory limits
-		if policy.ResourceExpr.Limits.Memory != "" {
+		if policy.ResourcesExpr.Limits.Memory != "" {
 			// Check if aggregated Memory limit exists (not unlimited)
 			if memValue, exists := aggregatedLimits[corev1.ResourceMemory]; exists {
 				memLimit, err := evaluateResourceExpression(
-					policy.ResourceExpr.Limits.Memory,
+					policy.ResourcesExpr.Limits.Memory,
 					memValue,
 					true, // isLimit
 				)
@@ -112,13 +112,13 @@ func applyResourcesPolicy(
 	}
 
 	// Calculate requests
-	if policy.ResourceExpr.Requests != nil {
+	if policy.ResourcesExpr.Requests != nil {
 		requests := corev1.ResourceList{}
 
 		// CPU requests
-		if policy.ResourceExpr.Requests.CPU != "" {
+		if policy.ResourcesExpr.Requests.CPU != "" {
 			cpuRequest, err := evaluateResourceExpression(
-				policy.ResourceExpr.Requests.CPU,
+				policy.ResourcesExpr.Requests.CPU,
 				aggregatedRequests[corev1.ResourceCPU],
 				false, // isLimit
 			)
@@ -131,9 +131,9 @@ func applyResourcesPolicy(
 		}
 
 		// Memory requests
-		if policy.ResourceExpr.Requests.Memory != "" {
+		if policy.ResourcesExpr.Requests.Memory != "" {
 			memRequest, err := evaluateResourceExpression(
-				policy.ResourceExpr.Requests.Memory,
+				policy.ResourcesExpr.Requests.Memory,
 				aggregatedRequests[corev1.ResourceMemory],
 				false, // isLimit
 			)
@@ -225,15 +225,15 @@ func getTargetContainers(
 // aggregateResources aggregates resources from target containers based on mode
 func aggregateResources(
 	containers []corev1.Container,
-	mode appsv1beta1.TargetContainerModeType,
+	mode appsv1beta1.TargetContainersModeType,
 ) (limits, requests corev1.ResourceList) {
 	limits = corev1.ResourceList{}
 	requests = corev1.ResourceList{}
 
 	switch mode {
-	case appsv1beta1.TargetContainerModeSum:
+	case appsv1beta1.TargetContainersModeSum:
 		limits, requests = aggregateResourcesBySum(containers)
-	case appsv1beta1.TargetContainerModeMax:
+	case appsv1beta1.TargetContainersModeMax:
 		limits, requests = aggregateResourcesByMax(containers)
 	}
 
