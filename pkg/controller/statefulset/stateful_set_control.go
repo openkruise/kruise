@@ -37,7 +37,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
@@ -287,7 +286,7 @@ func (ssc *defaultStatefulSetControl) getStatefulSetRevisions(
 			}
 		}
 	} else {
-		//if there is no equivalent revision we create a new one
+		// if there is no equivalent revision we create a new one
 		updateRevision, err = ssc.controllerHistory.CreateControllerRevision(set, updateRevision, &collisionCount)
 		if err != nil {
 			return nil, nil, collisionCount, err
@@ -318,7 +317,7 @@ func (ssc *defaultStatefulSetControl) doPreDownload(set *appsv1beta1.StatefulSet
 	if currentRevision.Name != updateRevision.Name {
 		// get asts pre-download annotation
 		minUpdatedReadyPodsCount := 0
-		if minUpdatedReadyPods, ok := set.Annotations[appsv1alpha1.ImagePreDownloadMinUpdatedReadyPods]; ok {
+		if minUpdatedReadyPods, ok := set.Annotations[appsv1beta1.ImagePreDownloadMinUpdatedReadyPods]; ok {
 			minUpdatedReadyPodsIntStr := intstrutil.Parse(minUpdatedReadyPods)
 			minUpdatedReadyPodsCount, err = intstrutil.GetScaledValueFromIntOrPercent(&minUpdatedReadyPodsIntStr, int(*set.Spec.Replicas), true)
 			if err != nil {
@@ -1287,7 +1286,7 @@ func runForAllWithBreak(pods []*v1.Pod, fn func(i int) (bool, bool, error), mono
 			if shouldExit, shouldBreak, err := fn(i); shouldExit || err != nil {
 				return true, err
 			} else if shouldBreak {
-				//Introduce this branch to exit the for-loop while proceeding with subsequent update logic.
+				// Introduce this branch to exit the for-loop while proceeding with subsequent update logic.
 				break
 			}
 		}

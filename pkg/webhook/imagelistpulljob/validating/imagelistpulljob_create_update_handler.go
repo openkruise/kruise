@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -123,6 +125,26 @@ func validate(obj *appsv1alpha1.ImageListPullJob) error {
 		}
 	}
 
+	// Validate Parallelism (only supports integer, not percentage)
+	if obj.Spec.Parallelism != nil {
+		parallelism := obj.Spec.Parallelism
+		if parallelism.Type == 1 { // 1 is String type
+			if strings.HasSuffix(parallelism.StrVal, "%") {
+				return fmt.Errorf("parallelism does not support percentage value")
+			}
+			// Try to parse as integer
+			val, err := strconv.ParseInt(parallelism.StrVal, 10, 32)
+			if err != nil {
+				return fmt.Errorf("parallelism must be a valid integer: %v", err)
+			}
+			if val < 0 {
+				return fmt.Errorf("parallelism must be non-negative")
+			}
+		} else if parallelism.IntVal < 0 {
+			return fmt.Errorf("parallelism must be non-negative")
+		}
+	}
+
 	switch obj.Spec.CompletionPolicy.Type {
 	case appsv1alpha1.Always:
 	// is a no-op here.No need to do parameter dependency verification in this type.
@@ -182,6 +204,26 @@ func validateV1beta1(obj *appsv1beta1.ImageListPullJob) error {
 	for _, image := range obj.Spec.Images {
 		if _, err := daemonutil.NormalizeImageRef(image); err != nil {
 			return fmt.Errorf("invalid image %s: %v", image, err)
+		}
+	}
+
+	// Validate Parallelism (only supports integer, not percentage)
+	if obj.Spec.Parallelism != nil {
+		parallelism := obj.Spec.Parallelism
+		if parallelism.Type == 1 { // 1 is String type
+			if strings.HasSuffix(parallelism.StrVal, "%") {
+				return fmt.Errorf("parallelism does not support percentage value")
+			}
+			// Try to parse as integer
+			val, err := strconv.ParseInt(parallelism.StrVal, 10, 32)
+			if err != nil {
+				return fmt.Errorf("parallelism must be a valid integer: %v", err)
+			}
+			if val < 0 {
+				return fmt.Errorf("parallelism must be non-negative")
+			}
+		} else if parallelism.IntVal < 0 {
+			return fmt.Errorf("parallelism must be non-negative")
 		}
 	}
 

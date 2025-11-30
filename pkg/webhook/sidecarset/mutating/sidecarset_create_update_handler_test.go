@@ -533,4 +533,3 @@ func TestSidecarSetHandlerHashAnnotations(t *testing.T) {
 		t.Log("Warning: Expected hash annotations in patches")
 	}
 }
-

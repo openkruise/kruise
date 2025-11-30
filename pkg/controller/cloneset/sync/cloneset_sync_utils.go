@@ -28,7 +28,7 @@ import (
 	"k8s.io/utils/integer"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
@@ -98,27 +98,33 @@ type IsPodUpdateFunc func(pod *v1.Pod, updateRevision string) bool
 
 // This is the most important algorithm in cloneset-controller.
 // It calculates the pod numbers to scaling and updating for current CloneSet.
-func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string, isPodUpdate IsPodUpdateFunc) (res expectationDiffs) {
+func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string, isPodUpdate IsPodUpdateFunc) (res expectationDiffs) {
 	coreControl := clonesetcore.New(cs)
 	replicas := int(*cs.Spec.Replicas)
 	var partition, maxSurge, maxUnavailable, scaleMaxUnavailable int
-	if cs.Spec.UpdateStrategy.Partition != nil {
-		if pValue, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.Partition, cs.Spec.Replicas); err != nil {
-			// TODO: maybe, we should block pod update if partition settings is wrong
-			klog.ErrorS(err, "CloneSet partition value was illegal", "cloneSet", klog.KObj(cs))
-		} else {
-			partition = pValue
+	if cs.Spec.UpdateStrategy.RollingUpdate != nil {
+		if cs.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
+			if pValue, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.RollingUpdate.Partition, cs.Spec.Replicas); err != nil {
+				// TODO: maybe, we should block pod update if partition settings is wrong
+				klog.ErrorS(err, "CloneSet partition value was illegal", "cloneSet", klog.KObj(cs))
+			} else {
+				partition = pValue
+			}
 		}
-	}
-	if cs.Spec.UpdateStrategy.MaxSurge != nil {
-		maxSurge, _ = intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.MaxSurge, replicas, true)
-		if cs.Spec.UpdateStrategy.Paused {
-			maxSurge = 0
-			klog.V(3).InfoS("Because CloneSet updateStrategy.paused=true, and Set maxSurge=0", "cloneSet", klog.KObj(cs))
+		if cs.Spec.UpdateStrategy.RollingUpdate.MaxSurge != nil {
+			maxSurge, _ = intstrutil.GetValueFromIntOrPercent(cs.Spec.UpdateStrategy.RollingUpdate.MaxSurge, replicas, true)
+			if cs.Spec.UpdateStrategy.RollingUpdate.Paused {
+				maxSurge = 0
+				klog.V(3).InfoS("Because CloneSet updateStrategy.paused=true, and Set maxSurge=0", "cloneSet", klog.KObj(cs))
+			}
 		}
+		maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
+			intstrutil.ValueOrDefault(cs.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromString(appsv1beta1.DefaultCloneSetMaxUnavailable)), replicas, maxSurge == 0)
+	} else {
+		defaultMaxUnavailable := intstrutil.FromString(appsv1beta1.DefaultCloneSetMaxUnavailable)
+		maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
+			&defaultMaxUnavailable, replicas, false)
 	}
-	maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
-		intstrutil.ValueOrDefault(cs.Spec.UpdateStrategy.MaxUnavailable, intstrutil.FromString(appsv1alpha1.DefaultCloneSetMaxUnavailable)), replicas, maxSurge == 0)
 	scaleMaxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
 		intstrutil.ValueOrDefault(cs.Spec.ScaleStrategy.MaxUnavailable, intstrutil.FromInt(math.MaxInt32)), replicas, true)
 
@@ -275,7 +281,7 @@ func calculateDiffsWithExpectation(cs *appsv1alpha1.CloneSet, pods []*v1.Pod, cu
 	return
 }
 
-func isSpecifiedDelete(cs *appsv1alpha1.CloneSet, pod *v1.Pod) bool {
+func isSpecifiedDelete(cs *appsv1beta1.CloneSet, pod *v1.Pod) bool {
 	if specifieddelete.IsSpecifiedDelete(pod) {
 		return true
 	}
@@ -299,6 +305,6 @@ func IsPodAvailable(coreControl clonesetcore.Control, pod *v1.Pod, minReadySecon
 	return coreControl.IsPodUpdateReady(pod, minReadySeconds)
 }
 
-func shouldScalingExcludePreparingDelete(cs *appsv1alpha1.CloneSet) bool {
-	return scalingExcludePreparingDelete || cs.Labels[appsv1alpha1.CloneSetScalingExcludePreparingDeleteKey] == "true"
+func shouldScalingExcludePreparingDelete(cs *appsv1beta1.CloneSet) bool {
+	return scalingExcludePreparingDelete || cs.Spec.ScaleStrategy.ExcludePreparingDelete
 }
