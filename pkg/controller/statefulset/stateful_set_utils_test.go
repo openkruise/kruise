@@ -265,6 +265,62 @@ func TestUpdateStorage(t *testing.T) {
 	}
 }
 
+func TestGetPersistentVolumeClaimsMergesLabels(t *testing.T) {
+	// Test that labels from VolumeClaimTemplate are preserved and merged with selector labels
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 1)
+
+	// Add custom labels to VolumeClaimTemplate
+	for i := range set.Spec.VolumeClaimTemplates {
+		if set.Spec.VolumeClaimTemplates[i].Labels == nil {
+			set.Spec.VolumeClaimTemplates[i].Labels = make(map[string]string)
+		}
+		set.Spec.VolumeClaimTemplates[i].Labels["custom-label"] = "custom-value"
+		set.Spec.VolumeClaimTemplates[i].Labels["another-label"] = "another-value"
+	}
+
+	claims := getPersistentVolumeClaims(set, pod)
+
+	for _, claim := range claims {
+		// Verify custom labels from template are preserved
+		if claim.Labels["custom-label"] != "custom-value" {
+			t.Errorf("Custom label from VolumeClaimTemplate was lost, expected 'custom-value', got '%s'", claim.Labels["custom-label"])
+		}
+		if claim.Labels["another-label"] != "another-value" {
+			t.Errorf("Another label from VolumeClaimTemplate was lost, expected 'another-value', got '%s'", claim.Labels["another-label"])
+		}
+
+		// Verify selector labels are also present
+		for key, value := range set.Spec.Selector.MatchLabels {
+			if claim.Labels[key] != value {
+				t.Errorf("Selector label '%s' was not added to claim, expected '%s', got '%s'", key, value, claim.Labels[key])
+			}
+		}
+	}
+}
+
+func TestGetPersistentVolumeClaimsWithNilLabels(t *testing.T) {
+	// Test that when VolumeClaimTemplate has no labels, selector labels are used
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 1)
+
+	// Ensure VolumeClaimTemplate has nil labels
+	for i := range set.Spec.VolumeClaimTemplates {
+		set.Spec.VolumeClaimTemplates[i].Labels = nil
+	}
+
+	claims := getPersistentVolumeClaims(set, pod)
+
+	for _, claim := range claims {
+		// Verify selector labels are present
+		for key, value := range set.Spec.Selector.MatchLabels {
+			if claim.Labels[key] != value {
+				t.Errorf("Selector label '%s' was not set on claim, expected '%s', got '%s'", key, value, claim.Labels[key])
+			}
+		}
+	}
+}
+
 func TestGetPersistentVolumeClaimRetentionPolicy(t *testing.T) {
 	retainPolicy := appsv1beta1.StatefulSetPersistentVolumeClaimRetentionPolicy{
 		WhenScaled:  appsv1beta1.RetainPersistentVolumeClaimRetentionPolicyType,
