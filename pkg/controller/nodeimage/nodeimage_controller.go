@@ -300,6 +300,7 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1beta1.NodeImage,
 			for _, ref := range tagSpec.OwnerReferences {
 				gvk := ref.GroupVersionKind()
 				if gvk.Group != controllerKind.Group || gvk.Kind != "ImagePullJob" {
+					klog.InfoS("un-supported ownerreference kind, keep it", "imageName", fullName, "nodeImageName", name, "job", util.DumpJSON(ref))
 					activeRefs = append(activeRefs, ref)
 					continue
 				}
@@ -317,15 +318,21 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1beta1.NodeImage,
 					klog.InfoS("When check owners for image in NodeImage, found job UID not equal", "imageName", fullName, "nodeImageName", name, "job", util.DumpJSON(ref), "jobUID", job.UID)
 					continue
 				}
+
+				if job.Status.CompletionTime != nil {
+					klog.InfoS("job has completed", "imageName", fullName, "nodeImageName", name, "job", util.DumpJSON(ref))
+					continue
+				}
 				activeRefs = append(activeRefs, ref)
 			}
 			if len(activeRefs) != len(tagSpec.OwnerReferences) {
 				modified = true
-				messages = append(messages, fmt.Sprintf("image %s owners changed from %v to %v",
-					fullName, util.DumpJSON(tagSpec.OwnerReferences), util.DumpJSON(activeRefs)))
 				if len(activeRefs) == 0 {
+					messages = append(messages, fmt.Sprintf("image %s owners is cleared", fullName))
 					continue
 				}
+				messages = append(messages, fmt.Sprintf("image %s owners changed from %v to %v",
+					fullName, util.DumpJSON(tagSpec.OwnerReferences), util.DumpJSON(activeRefs)))
 				tagSpec.OwnerReferences = activeRefs
 			}
 
