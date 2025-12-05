@@ -134,7 +134,7 @@ func (t *UnitedDeploymentTester) NewUnitedDeploymentManager(name string, statele
 						"app": name,
 					},
 				},
-				Spec: appsv1alpha1.CloneSetSpec{
+				Spec: appsv1beta1.CloneSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"app": name,

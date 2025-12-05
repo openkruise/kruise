@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -108,6 +109,24 @@ type InPlaceUpdateStrategy struct {
 	// GracePeriodSeconds is the timespan between set Pod status to not-ready and update images in Pod spec
 	// when in-place update a Pod.
 	GracePeriodSeconds int32 `json:"gracePeriodSeconds,omitempty"`
+
+	// ImagePreDownloadParallelism is the requested parallelism, it can be set to any non-negative value. If it is unspecified,
+	// it defaults to 1. If it is specified as 0, then the Job is effectively paused until it is increased.
+	// In v1alpha1, this corresponds to annotation: apps.kruise.io/image-predownload-parallelism
+	// +optional
+	ImagePreDownloadParallelism *intstr.IntOrString `json:"imagePreDownloadParallelism,omitempty"`
+
+	// ImagePreDownloadTimeoutSeconds specifies the timeout of the pulling task.
+	// Defaults to 600
+	// In v1alpha1, this corresponds to annotation: apps.kruise.io/image-predownload-timeout-seconds
+	// +optional
+	ImagePreDownloadTimeoutSeconds *int32 `json:"imagePreDownloadTimeoutSeconds,omitempty"`
+
+	// ImagePreDownloadMinUpdatedReadyPods is the minimum number of updated ready Pods
+	// required before starting image pre-download for the next batch.
+	// In v1alpha1, this corresponds to annotation: apps.kruise.io/image-predownload-min-updated-ready-pods
+	// +optional
+	ImagePreDownloadMinUpdatedReadyPods *int32 `json:"imagePreDownloadMinUpdatedReadyPods,omitempty"`
 }
 
 func GetInPlaceUpdateState(obj metav1.Object) (string, bool) {
