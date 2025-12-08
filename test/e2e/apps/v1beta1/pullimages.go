@@ -114,7 +114,7 @@ var _ = ginkgo.Describe("PullImage", ginkgo.Label("PullImage", "operation"), gin
 			baseJob = &appsv1beta1.ImagePullJob{ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "test-imagepulljob"}}
 		})
 
-		ginkgo.It("pull image with secret", func() {
+		ginkgo.It("pull image with secret and ttl cleaned", func() {
 			var err error
 			base64Code := "eyJhdXRocyI6eyJodHRwczovL2luZGV4LmRvY2tlci5pby92MS8iOnsidXNlcm5hbWUiOiJtaW5jaG91IiwicGFzc3dvcmQiOiJtaW5nemhvdS5zd3giLCJlbWFpbCI6InZlYy5nLnN1bkBnbWFpbC5jb20iLCJhdXRoIjoiYldsdVkyaHZkVHB0YVc1bmVtaHZkUzV6ZDNnPSJ9fX0="
 			bytes, err := base64.StdEncoding.DecodeString(base64Code)
@@ -186,6 +186,88 @@ var _ = ginkgo.Describe("PullImage", ginkgo.Label("PullImage", "operation"), gin
 				_, err = testerForImagePullJob.GetJob(job)
 				return err != nil && errors.IsNotFound(err)
 			}, 25*time.Second, 2*time.Second).Should(gomega.Equal(true))
+
+			ginkgo.By("Check image should be cleaned in NodeImage")
+			gomega.Eventually(func() bool {
+				found, err := testerForNodeImage.IsImageInSpec(job.Spec.Image, nodes[0].Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return found
+			}, 25*time.Second, time.Second).Should(gomega.Equal(false))
+
+			ginkgo.By("Check secrets should be cleaned in kruise-daemon-config")
+			gomega.Eventually(func() bool {
+				synced, _ := testerForImagePullJob.ListSyncedSecrets(secret)
+				return len(synced) == 0
+			}, 10*time.Second, time.Second).Should(gomega.Equal(true))
+		})
+
+		ginkgo.It("pull image with secret and completed", func() {
+			var err error
+			base64Code := "eyJhdXRocyI6eyJodHRwczovL2luZGV4LmRvY2tlci5pby92MS8iOnsidXNlcm5hbWUiOiJtaW5jaG91IiwicGFzc3dvcmQiOiJtaW5nemhvdS5zd3giLCJlbWFpbCI6InZlYy5nLnN1bkBnbWFpbC5jb20iLCJhdXRoIjoiYldsdVkyaHZkVHB0YVc1bmVtaHZkUzV6ZDNnPSJ9fX0="
+			bytes, err := base64.StdEncoding.DecodeString(base64Code)
+			secret := &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: ns,
+					Name:      "pull-secret",
+				},
+				Type: "kubernetes.io/dockerconfigjson",
+				Data: map[string][]byte{
+					".dockerconfigjson": bytes,
+				},
+			}
+			secret, err = testerForImagePullJob.CreateSecret(secret)
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+
+			job := baseJob.DeepCopy()
+			job.Spec = appsv1beta1.ImagePullJobSpec{
+				Image: common.NginxImage,
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					Selector: &appsv1beta1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+						{Key: v1beta1.FakeNodeImageLabelKey, Operator: metav1.LabelSelectorOpDoesNotExist},
+					}}},
+					PullPolicy: &appsv1beta1.PullPolicy{
+						TimeoutSeconds: ptr.To(int32(50)),
+						BackoffLimit:   ptr.To(int32(2)),
+					},
+					PullSecrets: []string{secret.Name},
+					Parallelism: &intorstr4,
+					CompletionPolicy: appsv1beta1.CompletionPolicy{
+						Type:                  appsv1beta1.Always,
+						ActiveDeadlineSeconds: ptr.To(int64(50)),
+						// do not clean the imagepulljob
+						// TTLSecondsAfterFinished: ptr.To(int32(20)),
+					},
+				},
+			}
+			err = testerForImagePullJob.CreateJob(job)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Desired should be equal to number of nodes")
+			gomega.Eventually(func() int32 {
+				job, err = testerForImagePullJob.GetJob(job)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return job.Status.Desired
+			}, 3*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
+
+			ginkgo.By("Secret is synced")
+			gomega.Eventually(func() bool {
+				synced, _ := testerForImagePullJob.ListSyncedSecrets(secret)
+				if len(synced) != 1 {
+					return false
+				}
+				if _, exists := referenceSetFromTarget(&synced[0])[client.ObjectKeyFromObject(job)]; !exists {
+					return false
+				}
+				return reflect.DeepEqual(synced[0].Data, secret.Data)
+			}, 10*time.Second, time.Second).Should(gomega.Equal(true))
+
+			ginkgo.By("Wait completed in 180s")
+			gomega.Eventually(func() bool {
+				job, err = testerForImagePullJob.GetJob(job)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return job.Status.CompletionTime != nil
+			}, 180*time.Second, 3*time.Second).Should(gomega.Equal(true))
+			gomega.Expect(job.Status.Succeeded).To(gomega.Equal(int32(len(nodes))))
 
 			ginkgo.By("Check image should be cleaned in NodeImage")
 			gomega.Eventually(func() bool {
