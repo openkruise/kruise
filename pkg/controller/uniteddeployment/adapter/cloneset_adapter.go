@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
 )
@@ -26,44 +27,44 @@ type CloneSetAdapter struct {
 }
 
 func (a *CloneSetAdapter) NewResourceObject() client.Object {
-	return &alpha1.CloneSet{}
+	return &beta1.CloneSet{}
 }
 
 func (a *CloneSetAdapter) NewResourceListObject() client.ObjectList {
-	return &alpha1.CloneSetList{}
+	return &beta1.CloneSetList{}
 }
 
 func (a *CloneSetAdapter) GetObjectMeta(obj metav1.Object) *metav1.ObjectMeta {
-	return &obj.(*alpha1.CloneSet).ObjectMeta
+	return &obj.(*beta1.CloneSet).ObjectMeta
 }
 
 func (a *CloneSetAdapter) GetStatusObservedGeneration(obj metav1.Object) int64 {
-	return obj.(*alpha1.CloneSet).Status.ObservedGeneration
+	return obj.(*beta1.CloneSet).Status.ObservedGeneration
 }
 
 func (a *CloneSetAdapter) GetSubsetPods(obj metav1.Object) ([]*corev1.Pod, error) {
-	return a.getCloneSetPods(obj.(*alpha1.CloneSet))
+	return a.getCloneSetPods(obj.(*beta1.CloneSet))
 }
 
 func (a *CloneSetAdapter) GetSpecReplicas(obj metav1.Object) *int32 {
-	return obj.(*alpha1.CloneSet).Spec.Replicas
+	return obj.(*beta1.CloneSet).Spec.Replicas
 }
 
 func (a *CloneSetAdapter) GetSpecPartition(obj metav1.Object, _ []*corev1.Pod) *int32 {
-	set := obj.(*alpha1.CloneSet)
-	if set.Spec.UpdateStrategy.Partition != nil {
-		partition, _ := intstr.GetScaledValueFromIntOrPercent(set.Spec.UpdateStrategy.Partition, int(*set.Spec.Replicas), true)
+	set := obj.(*beta1.CloneSet)
+	if set.Spec.UpdateStrategy.RollingUpdate != nil && set.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
+		partition, _ := intstr.GetScaledValueFromIntOrPercent(set.Spec.UpdateStrategy.RollingUpdate.Partition, int(*set.Spec.Replicas), true)
 		return ptr.To(int32(partition))
 	}
 	return nil
 }
 
 func (a *CloneSetAdapter) GetStatusReplicas(obj metav1.Object) int32 {
-	return obj.(*alpha1.CloneSet).Status.Replicas
+	return obj.(*beta1.CloneSet).Status.Replicas
 }
 
 func (a *CloneSetAdapter) GetStatusReadyReplicas(obj metav1.Object) int32 {
-	return obj.(*alpha1.CloneSet).Status.ReadyReplicas
+	return obj.(*beta1.CloneSet).Status.ReadyReplicas
 }
 
 func (a *CloneSetAdapter) GetSubsetFailure() *string {
@@ -71,14 +72,17 @@ func (a *CloneSetAdapter) GetSubsetFailure() *string {
 }
 
 func (a *CloneSetAdapter) SetMaxUnavailable(obj metav1.Object, val int32) metav1.Object {
-	set := obj.(*alpha1.CloneSet)
-	set.Spec.UpdateStrategy.MaxUnavailable = &intstr.IntOrString{Type: intstr.Int, IntVal: val}
+	set := obj.(*beta1.CloneSet)
+	if set.Spec.UpdateStrategy.RollingUpdate == nil {
+		set.Spec.UpdateStrategy.RollingUpdate = &beta1.RollingUpdateCloneSetStrategy{}
+	}
+	set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &intstr.IntOrString{Type: intstr.Int, IntVal: val}
 	return set
 }
 
 func (a *CloneSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subsetName, revision string, replicas, partition int32, obj runtime.Object) error {
 
-	set := obj.(*alpha1.CloneSet)
+	set := obj.(*beta1.CloneSet)
 
 	var subSetConfig *alpha1.Subset
 
@@ -127,7 +131,11 @@ func (a *CloneSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subse
 	set.Spec.Selector = selectors
 	set.Spec.Replicas = &replicas
 
-	set.Spec.UpdateStrategy.Partition = util.GetIntOrStrPointer(intstr.FromInt32(partition))
+	// Ensure RollingUpdate is initialized
+	if set.Spec.UpdateStrategy.RollingUpdate == nil {
+		set.Spec.UpdateStrategy.RollingUpdate = &beta1.RollingUpdateCloneSetStrategy{}
+	}
+	set.Spec.UpdateStrategy.RollingUpdate.Partition = util.GetIntOrStrPointer(intstr.FromInt32(partition))
 
 	if set.Spec.Template.Labels == nil {
 		set.Spec.Template.Labels = map[string]string{}
@@ -165,7 +173,7 @@ func (a *CloneSetAdapter) PostUpdate(_ *alpha1.UnitedDeployment, _ runtime.Objec
 	return nil
 }
 
-func (a *CloneSetAdapter) getCloneSetPods(set *alpha1.CloneSet) ([]*corev1.Pod, error) {
+func (a *CloneSetAdapter) getCloneSetPods(set *beta1.CloneSet) ([]*corev1.Pod, error) {
 
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 
