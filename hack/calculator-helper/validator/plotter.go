@@ -8,11 +8,12 @@ import (
 	"image/png"
 	"os"
 
-	"github.com/openkruise/kruise/pkg/util/calculator"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/math/fixed"
 	"k8s.io/apimachinery/pkg/api/resource"
+
+	"github.com/openkruise/kruise/pkg/util/calculator"
 )
 
 // PlotConfig contains configuration for plotting

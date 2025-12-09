@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 )
 
@@ -32,7 +32,7 @@ func TestApplyResourcesPolicy(t *testing.T) {
 	tests := []struct {
 		name                  string
 		pod                   *corev1.Pod
-		sidecarContainer      *appsv1alpha1.SidecarContainer
+		sidecarContainer      *appsv1beta1.SidecarContainer
 		matchedSidecarSets    []sidecarcontrol.SidecarControl
 		expectError           bool
 		expectedCPULimit      string
@@ -78,20 +78,20 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					},
 				},
 			},
-			sidecarContainer: &appsv1alpha1.SidecarContainer{
+			sidecarContainer: &appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:  "sidecar1",
 					Image: "sidecar:latest",
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: ".*",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "cpu*50%",
 							Memory: "200Mi",
 						},
-						Requests: &appsv1alpha1.ResourceExprRequests{
+						Requests: &appsv1beta1.ResourceExprRequests{
 							CPU:    "cpu*50%",
 							Memory: "100Mi",
 						},
@@ -141,20 +141,20 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					},
 				},
 			},
-			sidecarContainer: &appsv1alpha1.SidecarContainer{
+			sidecarContainer: &appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:  "sidecar1",
 					Image: "sidecar:latest",
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeMax,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainersMode:      appsv1beta1.TargetContainersModeMax,
 					TargetContainersNameRegex: "^large.engine.v.*$",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "max(cpu*50%, 50m)",
 							Memory: "200Mi",
 						},
-						Requests: &appsv1alpha1.ResourceExprRequests{
+						Requests: &appsv1beta1.ResourceExprRequests{
 							CPU:    "max(cpu*50%, 50m)",
 							Memory: "100Mi",
 						},
@@ -204,20 +204,20 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					},
 				},
 			},
-			sidecarContainer: &appsv1alpha1.SidecarContainer{
+			sidecarContainer: &appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:  "sidecar1",
 					Image: "sidecar:latest",
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^large.engine.v4$",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "max(cpu*50%, 50m)",
 							Memory: "200Mi",
 						},
-						Requests: &appsv1alpha1.ResourceExprRequests{
+						Requests: &appsv1beta1.ResourceExprRequests{
 							CPU:    "max(cpu*50%, 50m)",
 							Memory: "100Mi",
 						},
@@ -248,16 +248,16 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					},
 				},
 			},
-			sidecarContainer: &appsv1alpha1.SidecarContainer{
+			sidecarContainer: &appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:  "sidecar1",
 					Image: "sidecar:latest",
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^nonexistent$",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU: "cpu*50%",
 						},
 					},
@@ -302,20 +302,20 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					},
 				},
 			},
-			sidecarContainer: &appsv1alpha1.SidecarContainer{
+			sidecarContainer: &appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:  "sidecar1",
 					Image: "sidecar:latest",
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: ".*",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "cpu*50%",
 							Memory: "memory*30%",
 						},
-						Requests: &appsv1alpha1.ResourceExprRequests{
+						Requests: &appsv1beta1.ResourceExprRequests{
 							CPU:    "cpu*30%",
 							Memory: "memory*20%",
 						},
@@ -369,20 +369,20 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					},
 				},
 			},
-			sidecarContainer: &appsv1alpha1.SidecarContainer{
+			sidecarContainer: &appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:  "sidecar1",
 					Image: "sidecar:latest",
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeMax,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainersMode:      appsv1beta1.TargetContainersModeMax,
 					TargetContainersNameRegex: ".*",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "cpu*40%",
 							Memory: "memory*30%",
 						},
-						Requests: &appsv1alpha1.ResourceExprRequests{
+						Requests: &appsv1beta1.ResourceExprRequests{
 							CPU:    "cpu*25%",
 							Memory: "memory*20%",
 						},
@@ -433,20 +433,20 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					},
 				},
 			},
-			sidecarContainer: &appsv1alpha1.SidecarContainer{
+			sidecarContainer: &appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:  "sidecar1",
 					Image: "sidecar:latest",
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: ".*",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "cpu*50%",
 							Memory: "memory*30%",
 						},
-						Requests: &appsv1alpha1.ResourceExprRequests{
+						Requests: &appsv1beta1.ResourceExprRequests{
 							CPU:    "cpu*30%",
 							Memory: "memory*20%",
 						},
@@ -515,20 +515,20 @@ func TestApplyResourcesPolicy(t *testing.T) {
 					},
 				},
 			},
-			sidecarContainer: &appsv1alpha1.SidecarContainer{
+			sidecarContainer: &appsv1beta1.SidecarContainer{
 				Container: corev1.Container{
 					Name:  "init-sidecar",
 					Image: "sidecar:latest",
 				},
-				ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-					TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+				ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+					TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 					TargetContainersNameRegex: "^app.*$",
-					ResourceExpr: appsv1alpha1.ResourceExpr{
-						Limits: &appsv1alpha1.ResourceExprLimits{
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{
 							CPU:    "max(cpu*30%, 50m)",
 							Memory: "max(memory*25%, 100Mi)",
 						},
-						Requests: &appsv1alpha1.ResourceExprRequests{
+						Requests: &appsv1beta1.ResourceExprRequests{
 							CPU:    "cpu*20%",
 							Memory: "memory*15%",
 						},
@@ -974,19 +974,19 @@ func TestAggregateResourcesByMax(t *testing.T) {
 
 func TestGetTargetContainers(t *testing.T) {
 	// Mock sidecarset
-	mockSidecarSet := &appsv1alpha1.SidecarSet{
+	mockSidecarSet := &appsv1beta1.SidecarSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-sidecarset",
 		},
-		Spec: appsv1alpha1.SidecarSetSpec{
-			InitContainers: []appsv1alpha1.SidecarContainer{
+		Spec: appsv1beta1.SidecarSetSpec{
+			InitContainers: []appsv1beta1.SidecarContainer{
 				{
 					Container: corev1.Container{
 						Name: "init-sidecar1",
 					},
 				},
 			},
-			Containers: []appsv1alpha1.SidecarContainer{
+			Containers: []appsv1beta1.SidecarContainer{
 				{
 					Container: corev1.Container{
 						Name: "sidecar1",

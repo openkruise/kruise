@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 
@@ -64,9 +65,10 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 			apps2.Logf("Testing User Story 1: Specific container name matching")
 
 			// Create SidecarSet with ResourcesPolicy targeting specific container
+			randStr := rand.String(5)
 			sidecarSet := &appsv1alpha1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-sidecarset-story1",
+					Name: fmt.Sprintf("test-sidecarset-story1-%s", randStr),
 				},
 				Spec: appsv1alpha1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
@@ -81,9 +83,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+								TargetContainersMode:      appsv1alpha1.TargetContainersModeSum,
 								TargetContainersNameRegex: "^large-engine-v4$", // Only match large-engine-v4
-								ResourceExpr: appsv1alpha1.ResourceExpr{
+								ResourcesExpr: appsv1alpha1.ResourcesExpr{
 									Limits: &appsv1alpha1.ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
@@ -215,9 +217,10 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 			apps2.Logf("Testing User Story 2: Sum mode aggregation")
 
 			// Create SidecarSet with sum mode
+			randStr := rand.String(5)
 			sidecarSet := &appsv1alpha1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-sidecarset-story2",
+					Name: fmt.Sprintf("test-sidecarset-story2-%s", randStr),
 				},
 				Spec: appsv1alpha1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
@@ -232,9 +235,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+								TargetContainersMode:      appsv1alpha1.TargetContainersModeSum,
 								TargetContainersNameRegex: "^large-engine-v.*$",
-								ResourceExpr: appsv1alpha1.ResourceExpr{
+								ResourcesExpr: appsv1alpha1.ResourcesExpr{
 									Limits: &appsv1alpha1.ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
@@ -361,9 +364,10 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 			apps2.Logf("Testing User Story 3: Max mode aggregation")
 
 			// Create SidecarSet with max mode
+			randStr := rand.String(5)
 			sidecarSet := &appsv1alpha1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-sidecarset-story3",
+					Name: fmt.Sprintf("test-sidecarset-story3-%s", randStr),
 				},
 				Spec: appsv1alpha1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
@@ -378,9 +382,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeMax,
+								TargetContainersMode:      appsv1alpha1.TargetContainersModeMax,
 								TargetContainersNameRegex: "^large-engine-v.*$",
-								ResourceExpr: appsv1alpha1.ResourceExpr{
+								ResourcesExpr: appsv1alpha1.ResourcesExpr{
 									Limits: &appsv1alpha1.ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
@@ -507,9 +511,10 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 			apps2.Logf("Testing User Story 4: Unlimited resources handling")
 
 			// Create SidecarSet
+			randStr := rand.String(5)
 			sidecarSet := &appsv1alpha1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-sidecarset-story4",
+					Name: fmt.Sprintf("test-sidecarset-story4-%s", randStr),
 				},
 				Spec: appsv1alpha1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
@@ -524,9 +529,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeMax,
+								TargetContainersMode:      appsv1alpha1.TargetContainersModeMax,
 								TargetContainersNameRegex: "^large-engine-v.*$",
-								ResourceExpr: appsv1alpha1.ResourceExpr{
+								ResourcesExpr: appsv1alpha1.ResourcesExpr{
 									Limits: &appsv1alpha1.ResourceExprLimits{
 										CPU:    "max(cpu*50%, 50m)",
 										Memory: "200Mi",
@@ -657,9 +662,10 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 			// Create SidecarSet with complex expression
 			// Expression: 0.5*cpu - 0.3*max(0, cpu-4) + 0.3*max(0, cpu-8)
 			// Simplified for testing: Use cpu*40% for simplicity
+			randStr := rand.String(5)
 			sidecarSet := &appsv1alpha1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-sidecarset-story5",
+					Name: fmt.Sprintf("test-sidecarset-story5-%s", randStr),
 				},
 				Spec: appsv1alpha1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
@@ -674,9 +680,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+								TargetContainersMode:      appsv1alpha1.TargetContainersModeSum,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: appsv1alpha1.ResourceExpr{
+								ResourcesExpr: appsv1alpha1.ResourcesExpr{
 									Limits: &appsv1alpha1.ResourceExprLimits{
 										// Complex expression with arithmetic operations
 										CPU:    "cpu*50% + 100m",
@@ -812,9 +818,10 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 			restartAlways := corev1.ContainerRestartPolicyAlways
 
 			// Create SidecarSet with init-container resource policy
+			randStr := rand.String(5)
 			sidecarSet := &appsv1alpha1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-sidecarset-story6",
+					Name: fmt.Sprintf("test-sidecarset-story6-%s", randStr),
 				},
 				Spec: appsv1alpha1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
@@ -833,9 +840,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								RestartPolicy: &restartAlways, // Native sidecar container
 							},
 							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+								TargetContainersMode:      appsv1alpha1.TargetContainersModeSum,
 								TargetContainersNameRegex: "^app.*$",
-								ResourceExpr: appsv1alpha1.ResourceExpr{
+								ResourcesExpr: appsv1alpha1.ResourcesExpr{
 									Limits: &appsv1alpha1.ResourceExprLimits{
 										CPU:    "max(cpu*30%, 50m)",
 										Memory: "max(memory*25%, 100Mi)",
@@ -972,9 +979,10 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 			apps2.Logf("Testing filtering of non-native sidecar init-containers")
 
 			// Create SidecarSet
+			randStr := rand.String(5)
 			sidecarSet := &appsv1alpha1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-sidecarset-filter-plain-init",
+					Name: fmt.Sprintf("test-sidecarset-filter-plain-init-%s", randStr),
 				},
 				Spec: appsv1alpha1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
@@ -989,9 +997,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+								TargetContainersMode:      appsv1alpha1.TargetContainersModeSum,
 								TargetContainersNameRegex: ".*", // Match all containers
-								ResourceExpr: appsv1alpha1.ResourceExpr{
+								ResourcesExpr: appsv1alpha1.ResourcesExpr{
 									Limits: &appsv1alpha1.ResourceExprLimits{
 										CPU:    "cpu*50%",
 										Memory: "memory*50%",
@@ -1129,9 +1137,10 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 			restartAlways := corev1.ContainerRestartPolicyAlways
 
 			// Create first SidecarSet that will inject containers to be filtered
+			randStr := rand.String(5)
 			sidecarSet1 := &appsv1alpha1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-sidecarset-filter-kruise-1",
+					Name: fmt.Sprintf("test-sidecarset-filter-kruise-1-%s", randStr),
 				},
 				Spec: appsv1alpha1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
@@ -1186,7 +1195,7 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 			// Create second SidecarSet with ResourcesPolicy that should exclude kruise sidecars
 			sidecarSet2 := &appsv1alpha1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-sidecarset-filter-kruise-2",
+					Name: fmt.Sprintf("test-sidecarset-filter-kruise-2-%s", randStr),
 				},
 				Spec: appsv1alpha1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
@@ -1201,9 +1210,9 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+								TargetContainersMode:      appsv1alpha1.TargetContainersModeSum,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: appsv1alpha1.ResourceExpr{
+								ResourcesExpr: appsv1alpha1.ResourcesExpr{
 									Limits: &appsv1alpha1.ResourceExprLimits{
 										CPU:    "cpu*50%",
 										Memory: "memory*50%",

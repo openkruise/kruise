@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -86,18 +87,16 @@ type SidecarSetUpgradeSpec struct {
 }
 
 // PodMatchSidecarSet determines if pod match Selector of sidecar.
-func PodMatchedSidecarSet(c client.Client, pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) (bool, error) {
+func PodMatchedSidecarSet(c client.Client, pod *corev1.Pod, sidecarSet *appsv1beta1.SidecarSet) (bool, error) {
 	podNamespace := pod.Namespace
 	if podNamespace == "" {
 		podNamespace = "default"
 	}
-	//If Namespace is not empty, sidecarSet will only match the pods in the namespaces
-	if sidecarSet.Spec.Namespace != "" && sidecarSet.Spec.Namespace != podNamespace {
-		return false, nil
-	}
-	if sidecarSet.Spec.NamespaceSelector != nil &&
-		!IsSelectorNamespace(c, podNamespace, sidecarSet.Spec.NamespaceSelector) {
-		return false, nil
+	// If NamespaceSelector is not empty, sidecarSet will only match the pods in the selected namespaces
+	if sidecarSet.Spec.NamespaceSelector != nil {
+		if !IsSelectorNamespace(c, podNamespace, sidecarSet.Spec.NamespaceSelector) {
+			return false, nil
+		}
 	}
 
 	// if selector not matched, then continue
@@ -126,13 +125,11 @@ func IsSelectorNamespace(c client.Client, ns string, nsSelector *metav1.LabelSel
 }
 
 // FetchSidecarSetMatchedNamespace fetch sidecarSet matched namespaces
-func FetchSidecarSetMatchedNamespace(c client.Client, sidecarSet *appsv1alpha1.SidecarSet) (sets.String, error) {
+// Note: This function should only be called when NamespaceSelector is not nil
+// When NamespaceSelector is nil, the caller should use empty string "" to list pods in all namespaces (more efficient)
+func FetchSidecarSetMatchedNamespace(c client.Client, sidecarSet *appsv1beta1.SidecarSet) (sets.String, error) {
 	ns := sets.NewString()
-	//If Namespace is not empty, sidecarSet will only match the pods in the namespaces
-	if sidecarSet.Spec.Namespace != "" {
-		return ns.Insert(sidecarSet.Spec.Namespace), nil
-	}
-	// get more faster selector
+	// Use NamespaceSelector to match namespaces
 	selector, err := util.ValidatedLabelSelectorAsSelector(sidecarSet.Spec.NamespaceSelector)
 	if err != nil {
 		return nil, err
@@ -157,11 +154,19 @@ func IsActivePod(pod *corev1.Pod) bool {
 	return kubecontroller.IsPodActive(pod)
 }
 
-func GetSidecarSetRevision(sidecarSet *appsv1alpha1.SidecarSet) string {
+func GetSidecarSetRevisionV1alpha1(sidecarSet *appsv1alpha1.SidecarSet) string {
 	return sidecarSet.Annotations[SidecarSetHashAnnotation]
 }
 
-func GetSidecarSetWithoutImageRevision(sidecarSet *appsv1alpha1.SidecarSet) string {
+func GetSidecarSetRevision(sidecarSet *appsv1beta1.SidecarSet) string {
+	return sidecarSet.Annotations[SidecarSetHashAnnotation]
+}
+
+func GetSidecarSetWithoutImageRevisionV1alpha1(sidecarSet *appsv1alpha1.SidecarSet) string {
+	return sidecarSet.Annotations[SidecarSetHashWithoutImageAnnotation]
+}
+
+func GetSidecarSetWithoutImageRevision(sidecarSet *appsv1beta1.SidecarSet) string {
 	return sidecarSet.Annotations[SidecarSetHashWithoutImageAnnotation]
 }
 
@@ -207,12 +212,12 @@ func GetPodSidecarSetWithoutImageRevision(sidecarSetName string, pod metav1.Obje
 }
 
 // whether this pod has been updated based on the latest sidecarSet
-func IsPodSidecarUpdated(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) bool {
+func IsPodSidecarUpdated(sidecarSet *appsv1beta1.SidecarSet, pod *corev1.Pod) bool {
 	return GetSidecarSetRevision(sidecarSet) == GetPodSidecarSetRevision(sidecarSet.Name, pod)
 }
 
 // UpdatePodSidecarSetHash when sidecarSet in-place update sidecar container, Update sidecarSet hash in Pod annotations[kruise.io/sidecarset-hash]
-func UpdatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) {
+func UpdatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1beta1.SidecarSet) {
 	hashKey := SidecarSetHashAnnotation
 	sidecarSetHash := make(map[string]SidecarSetUpgradeSpec)
 	if err := json.Unmarshal([]byte(pod.Annotations[hashKey]), &sidecarSetHash); err != nil {
@@ -256,7 +261,7 @@ func UpdatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSe
 	pod.Annotations[hashKey] = string(newHash)
 }
 
-func GetSidecarContainersInPod(sidecarSet *appsv1alpha1.SidecarSet) sets.String {
+func GetSidecarContainersInPod(sidecarSet *appsv1beta1.SidecarSet) sets.String {
 	names := sets.NewString()
 	for _, sidecarContainer := range sidecarSet.Spec.Containers {
 		if IsHotUpgradeContainer(&sidecarContainer) {
@@ -277,7 +282,7 @@ func GetPodsSortFunc(pods []*corev1.Pod, waitUpdateIndexes []int) func(i, j int)
 	}
 }
 
-func IsPodInjectedSidecarSet(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) bool {
+func IsPodInjectedSidecarSet(pod *corev1.Pod, sidecarSet *appsv1beta1.SidecarSet) bool {
 	sidecarSetNameStr, ok := pod.Annotations[SidecarSetListAnnotation]
 	if !ok || len(sidecarSetNameStr) == 0 {
 		return false
@@ -286,11 +291,11 @@ func IsPodInjectedSidecarSet(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSe
 	return sidecarSetNames.Has(sidecarSet.Name)
 }
 
-func IsPodConsistentWithSidecarSet(pod *corev1.Pod, sidecarSet *appsv1alpha1.SidecarSet) bool {
+func IsPodConsistentWithSidecarSet(pod *corev1.Pod, sidecarSet *appsv1beta1.SidecarSet) bool {
 	for i := range sidecarSet.Spec.Containers {
 		container := &sidecarSet.Spec.Containers[i]
 		switch container.UpgradeStrategy.UpgradeType {
-		case appsv1alpha1.SidecarContainerHotUpgrade:
+		case appsv1beta1.SidecarContainerHotUpgrade:
 			_, exist := GetPodHotUpgradeInfoInAnnotations(pod)[container.Name]
 			if !exist || util.GetContainer(fmt.Sprintf("%v-1", container.Name), pod) == nil ||
 				util.GetContainer(fmt.Sprintf("%v-2", container.Name), pod) == nil {
@@ -310,8 +315,8 @@ func IsInjectedSidecarContainerInPod(container *corev1.Container) bool {
 	return util.GetContainerEnvValue(container, SidecarEnvKey) == "true"
 }
 
-func IsSharePodVolumeMounts(container *appsv1alpha1.SidecarContainer) bool {
-	return container.ShareVolumePolicy.Type == appsv1alpha1.ShareVolumePolicyEnabled
+func IsSharePodVolumeMounts(container *appsv1beta1.SidecarContainer) bool {
+	return container.ShareVolumePolicy.Type == appsv1beta1.ShareVolumePolicyEnabled
 }
 
 // TODO:
@@ -319,7 +324,7 @@ func IsSharePodVolumeMounts(container *appsv1alpha1.SidecarContainer) bool {
 // resulting in a failed pod creation.
 // For example, if the user's main container volumeDevice has devicePath /var/log and the sidecar container has volumeMounts path /var/log,
 // the path will conflict and the creation will fail.
-func GetInjectedVolumeMountsAndEnvs(control SidecarControl, sidecarContainer *appsv1alpha1.SidecarContainer, pod *corev1.Pod) ([]corev1.VolumeMount, []corev1.EnvVar) {
+func GetInjectedVolumeMountsAndEnvs(control SidecarControl, sidecarContainer *appsv1beta1.SidecarContainer, pod *corev1.Pod) ([]corev1.VolumeMount, []corev1.EnvVar) {
 	if !IsSharePodVolumeMounts(sidecarContainer) {
 		return nil, nil
 	}
@@ -339,9 +344,9 @@ func GetInjectedVolumeMountsAndEnvs(control SidecarControl, sidecarContainer *ap
 				continue
 			}
 			injectedMounts = append(injectedMounts, volumeMount)
-			//If volumeMounts.SubPathExpr contains expansions, copy environment
-			//for example: SubPathExpr=foo/$(ODD_NAME)/$(POD_NAME), we need copy environment ODD_NAME、POD_NAME
-			//envs = [$(ODD_NAME) $(POD_NAME)]
+			// If volumeMounts.SubPathExpr contains expansions, copy environment
+			// for example: SubPathExpr=foo/$(ODD_NAME)/$(POD_NAME), we need copy environment ODD_NAME、POD_NAME
+			// envs = [$(ODD_NAME) $(POD_NAME)]
 			envs := SubPathExprEnvReg.FindAllString(volumeMount.SubPathExpr, -1)
 			for _, env := range envs {
 				// $(ODD_NAME) -> ODD_NAME
@@ -360,14 +365,14 @@ func GetInjectedVolumeMountsAndEnvs(control SidecarControl, sidecarContainer *ap
 	return injectedMounts, injectedEnvs
 }
 
-func IsSharePodVolumeDevices(container *appsv1alpha1.SidecarContainer) bool {
+func IsSharePodVolumeDevices(container *appsv1beta1.SidecarContainer) bool {
 	if container.ShareVolumeDevicePolicy == nil {
 		return false
 	}
-	return container.ShareVolumeDevicePolicy.Type == appsv1alpha1.ShareVolumePolicyEnabled
+	return container.ShareVolumeDevicePolicy.Type == appsv1beta1.ShareVolumePolicyEnabled
 }
 
-func GetInjectedVolumeDevices(sidecarContainer *appsv1alpha1.SidecarContainer, pod *corev1.Pod) []corev1.VolumeDevice {
+func GetInjectedVolumeDevices(sidecarContainer *appsv1beta1.SidecarContainer, pod *corev1.Pod) []corev1.VolumeDevice {
 	if !IsSharePodVolumeDevices(sidecarContainer) {
 		return nil
 	}
@@ -388,7 +393,7 @@ func GetInjectedVolumeDevices(sidecarContainer *appsv1alpha1.SidecarContainer, p
 	return volumeDevices
 }
 
-func GetSidecarTransferEnvs(sidecarContainer *appsv1alpha1.SidecarContainer, pod *corev1.Pod) (injectedEnvs []corev1.EnvVar) {
+func GetSidecarTransferEnvs(sidecarContainer *appsv1beta1.SidecarContainer, pod *corev1.Pod) (injectedEnvs []corev1.EnvVar) {
 	// pre-process envs in pod, format: container.name/env.name -> container.env
 	// if SourceContainerName is set, use it as source container name
 	// if SourceContainerNameFrom.FieldRef, use the fieldref value as source container name
@@ -481,7 +486,7 @@ func ConvertDownwardAPIFieldLabel(version, label, value string) (string, string,
 }
 
 // PatchPodMetadata patch pod annotations and labels
-func PatchPodMetadata(originMetadata *metav1.ObjectMeta, patches []appsv1alpha1.SidecarSetPatchPodMetadata) (skip bool, err error) {
+func PatchPodMetadata(originMetadata *metav1.ObjectMeta, patches []appsv1beta1.SidecarSetPatchPodMetadata) (skip bool, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v", r)
@@ -493,11 +498,11 @@ func PatchPodMetadata(originMetadata *metav1.ObjectMeta, patches []appsv1alpha1.
 	oldData := originMetadata.DeepCopy()
 	for _, patch := range patches {
 		switch patch.PatchPolicy {
-		case appsv1alpha1.SidecarSetRetainPatchPolicy, "":
+		case appsv1beta1.SidecarSetRetainPatchPolicy, "":
 			retainPatchPodMetadata(originMetadata, patch)
-		case appsv1alpha1.SidecarSetOverwritePatchPolicy:
+		case appsv1beta1.SidecarSetOverwritePatchPolicy:
 			overwritePatchPodMetadata(originMetadata, patch)
-		case appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy:
+		case appsv1beta1.SidecarSetMergePatchJsonPatchPolicy:
 			if err = mergePatchJsonPodMetadata(originMetadata, patch); err != nil {
 				return
 			}
@@ -509,7 +514,7 @@ func PatchPodMetadata(originMetadata *metav1.ObjectMeta, patches []appsv1alpha1.
 	return
 }
 
-func retainPatchPodMetadata(originMetadata *metav1.ObjectMeta, patchPodField appsv1alpha1.SidecarSetPatchPodMetadata) {
+func retainPatchPodMetadata(originMetadata *metav1.ObjectMeta, patchPodField appsv1beta1.SidecarSetPatchPodMetadata) {
 	for k, v := range patchPodField.Annotations {
 		if _, ok := originMetadata.Annotations[k]; !ok {
 			originMetadata.Annotations[k] = v
@@ -517,13 +522,13 @@ func retainPatchPodMetadata(originMetadata *metav1.ObjectMeta, patchPodField app
 	}
 }
 
-func overwritePatchPodMetadata(originMetadata *metav1.ObjectMeta, patchPodField appsv1alpha1.SidecarSetPatchPodMetadata) {
+func overwritePatchPodMetadata(originMetadata *metav1.ObjectMeta, patchPodField appsv1beta1.SidecarSetPatchPodMetadata) {
 	for k, v := range patchPodField.Annotations {
 		originMetadata.Annotations[k] = v
 	}
 }
 
-func mergePatchJsonPodMetadata(originMetadata *metav1.ObjectMeta, patchPodField appsv1alpha1.SidecarSetPatchPodMetadata) error {
+func mergePatchJsonPodMetadata(originMetadata *metav1.ObjectMeta, patchPodField appsv1beta1.SidecarSetPatchPodMetadata) error {
 	for key, patchJSON := range patchPodField.Annotations {
 		if origin, ok := originMetadata.Annotations[key]; ok && origin != "" {
 			modified, err := jsonpatch.MergePatch([]byte(origin), []byte(patchJSON))
@@ -538,7 +543,7 @@ func mergePatchJsonPodMetadata(originMetadata *metav1.ObjectMeta, patchPodField 
 	return nil
 }
 
-func ValidateSidecarSetPatchMetadataWhitelist(c client.Client, sidecarSet *appsv1alpha1.SidecarSet) error {
+func ValidateSidecarSetPatchMetadataWhitelist(c client.Client, sidecarSet *appsv1beta1.SidecarSet) error {
 	if len(sidecarSet.Spec.PatchPodMetadata) == 0 {
 		return nil
 	}
@@ -606,7 +611,7 @@ func IsSidecarContainer(container corev1.Container) bool {
 }
 
 // listSidecarNameInSidecarSet list always init containers and sidecar containers
-func listSidecarNameInSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) sets.String {
+func listSidecarNameInSidecarSet(sidecarSet *appsv1beta1.SidecarSet) sets.String {
 	sidecarList := sets.NewString()
 	for _, sidecar := range sidecarSet.Spec.InitContainers {
 		if IsSidecarContainer(sidecar.Container) {

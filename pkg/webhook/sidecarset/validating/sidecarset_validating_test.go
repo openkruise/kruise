@@ -16,18 +16,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 var (
-	sidecarsetList = &appsv1alpha1.SidecarSetList{
-		Items: []appsv1alpha1.SidecarSet{
+	sidecarsetList = &appsv1beta1.SidecarSetList{
+		Items: []appsv1beta1.SidecarSet{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "sidecarset1"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
@@ -35,9 +35,9 @@ var (
 			},
 		},
 	}
-	sidecarset = &appsv1alpha1.SidecarSet{
+	sidecarset = &appsv1beta1.SidecarSet{
 		ObjectMeta: metav1.ObjectMeta{Name: "sidecarset2"},
-		Spec: appsv1alpha1.SidecarSetSpec{
+		Spec: appsv1beta1.SidecarSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"a": "b"},
 			},
@@ -60,25 +60,25 @@ func init() {
 func TestValidateSidecarSet(t *testing.T) {
 	testErrorCases := []struct {
 		caseName   string
-		sidecarSet appsv1alpha1.SidecarSet
+		sidecarSet appsv1beta1.SidecarSet
 		expectErrs int
 	}{
 		{
 			caseName: "missing-selector",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+				Spec: appsv1beta1.SidecarSetSpec{
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
 					},
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyDisabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -94,15 +94,15 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "wrong-updateStrategy",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
-						ScatterStrategy: appsv1alpha1.UpdateScatterStrategy{
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.RollingUpdateSidecarSetStrategyType,
+						ScatterStrategy: appsv1beta1.UpdateScatterStrategy{
 							{
 								Key:   "key-1",
 								Value: "value-1",
@@ -113,14 +113,14 @@ func TestValidateSidecarSet(t *testing.T) {
 							},
 						},
 					},
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyDisabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -136,9 +136,9 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "wrong-selector",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -149,14 +149,14 @@ func TestValidateSidecarSet(t *testing.T) {
 							},
 						},
 					},
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyEnabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyEnabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -172,9 +172,9 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "wrong-namespaceSelector",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -195,14 +195,14 @@ func TestValidateSidecarSet(t *testing.T) {
 							},
 						},
 					},
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyEnabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyEnabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -217,10 +217,10 @@ func TestValidateSidecarSet(t *testing.T) {
 			expectErrs: 2,
 		},
 		{
-			caseName: "wrong-namespace",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			caseName: "wrong-namespace-selector",
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 						MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -231,19 +231,18 @@ func TestValidateSidecarSet(t *testing.T) {
 							},
 						},
 					},
-					Namespace: "ns-test",
 					NamespaceSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
 
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyEnabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyEnabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -255,20 +254,20 @@ func TestValidateSidecarSet(t *testing.T) {
 					},
 				},
 			},
-			expectErrs: 1,
+			expectErrs: 0, // No error expected now as we only have NamespaceSelector
 		},
 		{
 			caseName: "wrong-initContainer",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
 					},
-					InitContainers: []appsv1alpha1.SidecarContainer{
+					InitContainers: []appsv1beta1.SidecarContainer{
 						{
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -283,14 +282,14 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "missing-container",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
 					},
 				},
 			},
@@ -298,21 +297,21 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "wrong-containers",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
 					},
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
 
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -328,23 +327,23 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "wrong-volumes",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
 					},
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyDisabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -382,23 +381,23 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "wrong-volumeDevice-volumes",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
 					},
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyDisabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -420,23 +419,23 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "right-volumeDevice-volumes",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
 					},
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyDisabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -468,23 +467,23 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "volumeDevice-volumeMount-path-conflict",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
 					},
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyDisabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -528,23 +527,23 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "wrong-metadata",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
 					},
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyDisabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -554,18 +553,18 @@ func TestValidateSidecarSet(t *testing.T) {
 							},
 						},
 					},
-					PatchPodMetadata: []appsv1alpha1.SidecarSetPatchPodMetadata{
+					PatchPodMetadata: []appsv1beta1.SidecarSetPatchPodMetadata{
 						{
 							Annotations: map[string]string{
 								"key1": "value1",
 							},
-							PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
+							PatchPolicy: appsv1beta1.SidecarSetMergePatchJsonPatchPolicy,
 						},
 						{
 							Annotations: map[string]string{
 								"key1": "value1",
 							},
-							PatchPolicy: appsv1alpha1.SidecarSetOverwritePatchPolicy,
+							PatchPolicy: appsv1beta1.SidecarSetOverwritePatchPolicy,
 						},
 					},
 				},
@@ -574,28 +573,28 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "wrong-name-injectionStrategy",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
-					InjectionStrategy: appsv1alpha1.SidecarSetInjectionStrategy{
-						Revision: &appsv1alpha1.SidecarSetInjectRevision{
+					InjectionStrategy: appsv1beta1.SidecarSetInjectionStrategy{
+						Revision: &appsv1beta1.SidecarSetInjectRevision{
 							CustomVersion: pointer.String("normal-sidecarset-01234"),
 						},
 					},
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
 					},
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyDisabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -611,29 +610,29 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "not-existing-injectionStrategy",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
-					InjectionStrategy: appsv1alpha1.SidecarSetInjectionStrategy{
-						Revision: &appsv1alpha1.SidecarSetInjectRevision{
+					InjectionStrategy: appsv1beta1.SidecarSetInjectionStrategy{
+						Revision: &appsv1beta1.SidecarSetInjectRevision{
 							RevisionName: pointer.String("test-sidecarset-678235"),
-							Policy:       appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy,
+							Policy:       appsv1beta1.AlwaysSidecarSetInjectRevisionPolicy,
 						},
 					},
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
 					},
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyDisabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -649,23 +648,23 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "The initContainer in-place upgrade is not currently supported.",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"a": "b"},
 					},
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.RollingUpdateSidecarSetStrategyType,
 					},
-					InitContainers: []appsv1alpha1.SidecarContainer{
+					InitContainers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyDisabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -683,20 +682,20 @@ func TestValidateSidecarSet(t *testing.T) {
 		// ResourcesPolicy validation test cases
 		{
 			caseName: "resources-policy-and-resources-conflict",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"app": "test"},
 					},
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyDisabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -710,10 +709,10 @@ func TestValidateSidecarSet(t *testing.T) {
 									},
 								},
 							},
-							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode: appsv1alpha1.TargetContainerModeSum,
-								ResourceExpr: appsv1alpha1.ResourceExpr{
-									Limits: &appsv1alpha1.ResourceExprLimits{
+							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+								TargetContainersMode: appsv1beta1.TargetContainersModeSum,
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
+									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU: "cpu*50%",
 									},
 								},
@@ -726,20 +725,20 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "invalid-target-container-mode",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"app": "test"},
 					},
-					Containers: []appsv1alpha1.SidecarContainer{
+					Containers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyDisabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-sidecar",
@@ -747,10 +746,10 @@ func TestValidateSidecarSet(t *testing.T) {
 								ImagePullPolicy:          corev1.PullIfNotPresent,
 								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 							},
-							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode: "invalid",
-								ResourceExpr: appsv1alpha1.ResourceExpr{
-									Limits: &appsv1alpha1.ResourceExprLimits{
+							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+								TargetContainersMode: "invalid",
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
+									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU: "cpu*50%",
 									},
 								},
@@ -763,20 +762,20 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "initContainer-with-resources-policy-forbidden",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"app": "test"},
 					},
-					InitContainers: []appsv1alpha1.SidecarContainer{
+					InitContainers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyDisabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-init",
@@ -785,11 +784,11 @@ func TestValidateSidecarSet(t *testing.T) {
 								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 								// Plain init-container without RestartPolicy: Always
 							},
-							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+								TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: appsv1alpha1.ResourceExpr{
-									Limits: &appsv1alpha1.ResourceExprLimits{
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
+									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU: "cpu*50%",
 									},
 								},
@@ -802,23 +801,23 @@ func TestValidateSidecarSet(t *testing.T) {
 		},
 		{
 			caseName: "native-sidecar-initContainer-with-resources-policy-allowed",
-			sidecarSet: appsv1alpha1.SidecarSet{
+			sidecarSet: appsv1beta1.SidecarSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
-				Spec: appsv1alpha1.SidecarSetSpec{
+				Spec: appsv1beta1.SidecarSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"app": "test"},
 					},
-					UpdateStrategy: appsv1alpha1.SidecarSetUpdateStrategy{
-						Type: appsv1alpha1.NotUpdateSidecarSetStrategyType,
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
 					},
-					InitContainers: []appsv1alpha1.SidecarContainer{
+					InitContainers: []appsv1beta1.SidecarContainer{
 						{
-							PodInjectPolicy: appsv1alpha1.BeforeAppContainerType,
-							ShareVolumePolicy: appsv1alpha1.ShareVolumePolicy{
-								Type: appsv1alpha1.ShareVolumePolicyDisabled,
+							PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+							ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+								Type: appsv1beta1.ShareVolumePolicyDisabled,
 							},
-							UpgradeStrategy: appsv1alpha1.SidecarContainerUpgradeStrategy{
-								UpgradeType: appsv1alpha1.SidecarContainerColdUpgrade,
+							UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+								UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
 							},
 							Container: corev1.Container{
 								Name:                     "test-init",
@@ -827,11 +826,11 @@ func TestValidateSidecarSet(t *testing.T) {
 								TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 								RestartPolicy:            &always, // Native sidecar container
 							},
-							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
-								TargetContainerMode:       appsv1alpha1.TargetContainerModeSum,
+							ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+								TargetContainersMode:      appsv1beta1.TargetContainersModeSum,
 								TargetContainersNameRegex: ".*",
-								ResourceExpr: appsv1alpha1.ResourceExpr{
-									Limits: &appsv1alpha1.ResourceExprLimits{
+								ResourcesExpr: appsv1beta1.ResourcesExpr{
+									Limits: &appsv1beta1.ResourceExprLimits{
 										CPU: "cpu*50%",
 									},
 								},
@@ -874,25 +873,25 @@ func TestValidateSidecarSet(t *testing.T) {
 func TestSidecarSetNameConflict(t *testing.T) {
 	cases := []struct {
 		name           string
-		getSidecarSet  func() *appsv1alpha1.SidecarSet
-		getSidecarList func() *appsv1alpha1.SidecarSetList
+		getSidecarSet  func() *appsv1beta1.SidecarSet
+		getSidecarList func() *appsv1beta1.SidecarSetList
 		expect         int
 	}{
 		{
 			name: "test1",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
-				return &appsv1alpha1.SidecarSet{
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
+				return &appsv1beta1.SidecarSet{
 					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset2"},
-					Spec: appsv1alpha1.SidecarSetSpec{
+					Spec: appsv1beta1.SidecarSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"a": "b"},
 						},
-						Containers: []appsv1alpha1.SidecarContainer{
+						Containers: []appsv1beta1.SidecarContainer{
 							{
 								Container: corev1.Container{Name: "container-name"},
 							},
 						},
-						InitContainers: []appsv1alpha1.SidecarContainer{
+						InitContainers: []appsv1beta1.SidecarContainer{
 							{
 								Container: corev1.Container{Name: "init-name"},
 							},
@@ -905,21 +904,21 @@ func TestSidecarSetNameConflict(t *testing.T) {
 					},
 				}
 			},
-			getSidecarList: func() *appsv1alpha1.SidecarSetList {
-				return &appsv1alpha1.SidecarSetList{
-					Items: []appsv1alpha1.SidecarSet{
+			getSidecarList: func() *appsv1beta1.SidecarSetList {
+				return &appsv1beta1.SidecarSetList{
+					Items: []appsv1beta1.SidecarSet{
 						{
 							ObjectMeta: metav1.ObjectMeta{Name: "sidecarset1"},
-							Spec: appsv1alpha1.SidecarSetSpec{
+							Spec: appsv1beta1.SidecarSetSpec{
 								Selector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"a": "b"},
 								},
-								Containers: []appsv1alpha1.SidecarContainer{
+								Containers: []appsv1beta1.SidecarContainer{
 									{
 										Container: corev1.Container{Name: "container-name"},
 									},
 								},
-								InitContainers: []appsv1alpha1.SidecarContainer{
+								InitContainers: []appsv1beta1.SidecarContainer{
 									{
 										Container: corev1.Container{Name: "init-name"},
 									},
@@ -938,17 +937,17 @@ func TestSidecarSetNameConflict(t *testing.T) {
 		},
 		{
 			name: "test2",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
-				return &appsv1alpha1.SidecarSet{
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
+				return &appsv1beta1.SidecarSet{
 					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset2"},
-					Spec: appsv1alpha1.SidecarSetSpec{
+					Spec: appsv1beta1.SidecarSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"a": "b"},
 						},
 						NamespaceSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"app": "nginx"},
 						},
-						Containers: []appsv1alpha1.SidecarContainer{
+						Containers: []appsv1beta1.SidecarContainer{
 							{
 								Container: corev1.Container{Name: "container-name"},
 							},
@@ -956,19 +955,21 @@ func TestSidecarSetNameConflict(t *testing.T) {
 					},
 				}
 			},
-			getSidecarList: func() *appsv1alpha1.SidecarSetList {
-				return &appsv1alpha1.SidecarSetList{
-					Items: []appsv1alpha1.SidecarSet{
+			getSidecarList: func() *appsv1beta1.SidecarSetList {
+				return &appsv1beta1.SidecarSetList{
+					Items: []appsv1beta1.SidecarSet{
 						{
 							ObjectMeta: metav1.ObjectMeta{Name: "sidecarset1"},
-							Spec: appsv1alpha1.SidecarSetSpec{
+							Spec: appsv1beta1.SidecarSetSpec{
 								Selector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"a": "b"},
 								},
+
 								NamespaceSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"app": "nginx"},
 								},
-								Containers: []appsv1alpha1.SidecarContainer{
+
+								Containers: []appsv1beta1.SidecarContainer{
 									{
 										Container: corev1.Container{Name: "container-name"},
 									},
@@ -982,17 +983,17 @@ func TestSidecarSetNameConflict(t *testing.T) {
 		},
 		{
 			name: "test3",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
-				return &appsv1alpha1.SidecarSet{
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
+				return &appsv1beta1.SidecarSet{
 					ObjectMeta: metav1.ObjectMeta{Name: "sidecarset2"},
-					Spec: appsv1alpha1.SidecarSetSpec{
+					Spec: appsv1beta1.SidecarSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"a": "b"},
 						},
 						NamespaceSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"app": "nginx"},
 						},
-						Containers: []appsv1alpha1.SidecarContainer{
+						Containers: []appsv1beta1.SidecarContainer{
 							{
 								Container: corev1.Container{Name: "container-name"},
 							},
@@ -1000,19 +1001,19 @@ func TestSidecarSetNameConflict(t *testing.T) {
 					},
 				}
 			},
-			getSidecarList: func() *appsv1alpha1.SidecarSetList {
-				return &appsv1alpha1.SidecarSetList{
-					Items: []appsv1alpha1.SidecarSet{
+			getSidecarList: func() *appsv1beta1.SidecarSetList {
+				return &appsv1beta1.SidecarSetList{
+					Items: []appsv1beta1.SidecarSet{
 						{
 							ObjectMeta: metav1.ObjectMeta{Name: "sidecarset1"},
-							Spec: appsv1alpha1.SidecarSetSpec{
+							Spec: appsv1beta1.SidecarSetSpec{
 								Selector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"a": "b"},
 								},
 								NamespaceSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"app": "redis"},
 								},
-								Containers: []appsv1alpha1.SidecarContainer{
+								Containers: []appsv1beta1.SidecarContainer{
 									{
 										Container: corev1.Container{Name: "container-name"},
 									},
@@ -1191,17 +1192,17 @@ func TestSelectorConflict(t *testing.T) {
 func TestSidecarSetPodMetadataConflict(t *testing.T) {
 	cases := []struct {
 		name              string
-		getSidecarSet     func() *appsv1alpha1.SidecarSet
-		getSidecarSetList func() *appsv1alpha1.SidecarSetList
+		getSidecarSet     func() *appsv1beta1.SidecarSet
+		getSidecarSetList func() *appsv1beta1.SidecarSetList
 		expectErrLen      int
 	}{
 		{
 			name: "sidecarset annotation key conflict",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
 				demo := sidecarset.DeepCopy()
-				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+				demo.Spec.PatchPodMetadata = []appsv1beta1.SidecarSetPatchPodMetadata{
 					{
-						PatchPolicy: appsv1alpha1.SidecarSetOverwritePatchPolicy,
+						PatchPolicy: appsv1beta1.SidecarSetOverwritePatchPolicy,
 						Annotations: map[string]string{
 							"key1": "value1",
 						},
@@ -1209,11 +1210,11 @@ func TestSidecarSetPodMetadataConflict(t *testing.T) {
 				}
 				return demo
 			},
-			getSidecarSetList: func() *appsv1alpha1.SidecarSetList {
+			getSidecarSetList: func() *appsv1beta1.SidecarSetList {
 				demo := sidecarsetList.DeepCopy()
-				demo.Items[0].Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+				demo.Items[0].Spec.PatchPodMetadata = []appsv1beta1.SidecarSetPatchPodMetadata{
 					{
-						PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
+						PatchPolicy: appsv1beta1.SidecarSetMergePatchJsonPatchPolicy,
 						Annotations: map[string]string{
 							"key1": "value1",
 						},
@@ -1225,11 +1226,11 @@ func TestSidecarSetPodMetadataConflict(t *testing.T) {
 		},
 		{
 			name: "sidecarset annotation key different",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
 				demo := sidecarset.DeepCopy()
-				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+				demo.Spec.PatchPodMetadata = []appsv1beta1.SidecarSetPatchPodMetadata{
 					{
-						PatchPolicy: appsv1alpha1.SidecarSetRetainPatchPolicy,
+						PatchPolicy: appsv1beta1.SidecarSetRetainPatchPolicy,
 						Annotations: map[string]string{
 							"key1": "value1",
 						},
@@ -1237,11 +1238,11 @@ func TestSidecarSetPodMetadataConflict(t *testing.T) {
 				}
 				return demo
 			},
-			getSidecarSetList: func() *appsv1alpha1.SidecarSetList {
+			getSidecarSetList: func() *appsv1beta1.SidecarSetList {
 				demo := sidecarsetList.DeepCopy()
-				demo.Items[0].Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+				demo.Items[0].Spec.PatchPodMetadata = []appsv1beta1.SidecarSetPatchPodMetadata{
 					{
-						PatchPolicy: appsv1alpha1.SidecarSetOverwritePatchPolicy,
+						PatchPolicy: appsv1beta1.SidecarSetOverwritePatchPolicy,
 						Annotations: map[string]string{
 							"key2": "value2",
 						},
@@ -1253,11 +1254,11 @@ func TestSidecarSetPodMetadataConflict(t *testing.T) {
 		},
 		{
 			name: "sidecarset annotation key same, and json",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
 				demo := sidecarset.DeepCopy()
-				demo.Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+				demo.Spec.PatchPodMetadata = []appsv1beta1.SidecarSetPatchPodMetadata{
 					{
-						PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
+						PatchPolicy: appsv1beta1.SidecarSetMergePatchJsonPatchPolicy,
 						Annotations: map[string]string{
 							"oom-score": `{"log-agent": 1}`,
 						},
@@ -1265,11 +1266,11 @@ func TestSidecarSetPodMetadataConflict(t *testing.T) {
 				}
 				return demo
 			},
-			getSidecarSetList: func() *appsv1alpha1.SidecarSetList {
+			getSidecarSetList: func() *appsv1beta1.SidecarSetList {
 				demo := sidecarsetList.DeepCopy()
-				demo.Items[0].Spec.PatchPodMetadata = []appsv1alpha1.SidecarSetPatchPodMetadata{
+				demo.Items[0].Spec.PatchPodMetadata = []appsv1beta1.SidecarSetPatchPodMetadata{
 					{
-						PatchPolicy: appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
+						PatchPolicy: appsv1beta1.SidecarSetMergePatchJsonPatchPolicy,
 						Annotations: map[string]string{
 							"oom-score": `{"envoy": 1}`,
 						},
@@ -1296,13 +1297,13 @@ func TestSidecarSetPodMetadataConflict(t *testing.T) {
 func TestSidecarSetVolumeConflict(t *testing.T) {
 	cases := []struct {
 		name              string
-		getSidecarSet     func() *appsv1alpha1.SidecarSet
-		getSidecarSetList func() *appsv1alpha1.SidecarSetList
+		getSidecarSet     func() *appsv1beta1.SidecarSet
+		getSidecarSetList func() *appsv1beta1.SidecarSetList
 		expectErrLen      int
 	}{
 		{
 			name: "sidecarset volume name different",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
 				newSidecar := sidecarset.DeepCopy()
 				newSidecar.Spec.Volumes = []corev1.Volume{
 					{
@@ -1314,7 +1315,7 @@ func TestSidecarSetVolumeConflict(t *testing.T) {
 				}
 				return newSidecar
 			},
-			getSidecarSetList: func() *appsv1alpha1.SidecarSetList {
+			getSidecarSetList: func() *appsv1beta1.SidecarSetList {
 				newSidecarList := sidecarsetList.DeepCopy()
 				newSidecarList.Items[0].Spec.Volumes = []corev1.Volume{
 					{
@@ -1330,7 +1331,7 @@ func TestSidecarSetVolumeConflict(t *testing.T) {
 		},
 		{
 			name: "sidecarset volume name same and equal",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
 				newSidecar := sidecarset.DeepCopy()
 				newSidecar.Spec.Volumes = []corev1.Volume{
 					{
@@ -1347,7 +1348,7 @@ func TestSidecarSetVolumeConflict(t *testing.T) {
 				}
 				return newSidecar
 			},
-			getSidecarSetList: func() *appsv1alpha1.SidecarSetList {
+			getSidecarSetList: func() *appsv1beta1.SidecarSetList {
 				newSidecarList := sidecarsetList.DeepCopy()
 				newSidecarList.Items[0].Spec.Volumes = []corev1.Volume{
 					{
@@ -1368,7 +1369,7 @@ func TestSidecarSetVolumeConflict(t *testing.T) {
 		},
 		{
 			name: "sidecarset volume name same, but not equal",
-			getSidecarSet: func() *appsv1alpha1.SidecarSet {
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
 				newSidecar := sidecarset.DeepCopy()
 				newSidecar.Spec.Volumes = []corev1.Volume{
 					{
@@ -1385,7 +1386,7 @@ func TestSidecarSetVolumeConflict(t *testing.T) {
 				}
 				return newSidecar
 			},
-			getSidecarSetList: func() *appsv1alpha1.SidecarSetList {
+			getSidecarSetList: func() *appsv1beta1.SidecarSetList {
 				newSidecarList := sidecarsetList.DeepCopy()
 				newSidecarList.Items[0].Spec.Volumes = []corev1.Volume{
 					{

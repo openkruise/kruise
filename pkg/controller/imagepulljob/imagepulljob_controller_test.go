@@ -1,6 +1,9 @@
 package imagepulljob
 
 import (
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"testing"
 	"time"
 
@@ -706,6 +709,394 @@ func TestReconcileImagePullJob_calculateStatus_CompletionPolicy(t *testing.T) {
 					// All nodes completed - should have completion time
 					assert.NotNil(t, status.CompletionTime)
 				}
+			}
+		})
+	}
+}
+
+// TestGetTargetSecretMap tests the getTargetSecretMap function using only fake client
+func TestGetTargetSecretMap(t *testing.T) {
+	now := metav1.NewTime(time.Now())
+
+	// Define test cases
+	tests := []struct {
+		name              string
+		job               *appsv1beta1.ImagePullJob
+		existingSecrets   []v1.Secret
+		expectedTargetLen int
+		expectedDeleteLen int
+		expectError       bool
+	}{
+		{
+			name: "Normal case - successfully categorize secrets",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job",
+					Namespace: "default",
+					UID:       types.UID("job-uid-1"),
+				},
+				Spec: appsv1beta1.ImagePullJobSpec{
+					ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+						PullSecrets: []string{"source-secret-1"},
+					},
+				},
+			},
+			existingSecrets: []v1.Secret{
+				// Secret that should be in targetMap (referenced by job)
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "target-secret-1",
+						Namespace: "kruise-daemon-config",
+						Labels: map[string]string{
+							SourceSecretUIDLabelKey: "source-uid-1",
+						},
+						Annotations: map[string]string{
+							SourceSecretKeyAnno:       "default/source-secret-1",
+							TargetOwnerReferencesAnno: "default/test-job",
+						},
+					},
+				},
+				// Secret that should be in deleteMap (not referenced by job)
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "delete-secret-1",
+						Namespace: "kruise-daemon-config",
+						Labels: map[string]string{
+							SourceSecretUIDLabelKey: "source-uid-2",
+						},
+						Annotations: map[string]string{
+							SourceSecretKeyAnno:       "default/source-secret-2",
+							TargetOwnerReferencesAnno: "default/test-job",
+						},
+					},
+				},
+			},
+			expectedTargetLen: 1,
+			expectedDeleteLen: 1,
+			expectError:       false,
+		},
+		{
+			name: "Empty secrets list",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job",
+					Namespace: "default",
+					UID:       types.UID("job-uid-1"),
+				},
+			},
+			existingSecrets:   []v1.Secret{},
+			expectedTargetLen: 0,
+			expectedDeleteLen: 0,
+			expectError:       false,
+		},
+		{
+			name: "All secrets being deleted should be ignored",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job",
+					Namespace: "default",
+					UID:       types.UID("job-uid-1"),
+				},
+			},
+			existingSecrets: []v1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "deleting-secret",
+						Namespace:         "kruise-daemon-config",
+						DeletionTimestamp: &now,
+						Finalizers:        []string{"test-finalizer"},
+						Labels: map[string]string{
+							SourceSecretUIDLabelKey: "source-uid-1",
+						},
+						Annotations: map[string]string{
+							SourceSecretKeyAnno:       "default/source-secret-1",
+							TargetOwnerReferencesAnno: "default/test-job",
+						},
+					},
+				},
+			},
+			expectedTargetLen: 0,
+			expectedDeleteLen: 0,
+			expectError:       false,
+		},
+		{
+			name: "Secrets not associated with job should be ignored",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job",
+					Namespace: "default",
+					UID:       types.UID("job-uid-1"),
+				},
+			},
+			existingSecrets: []v1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "unrelated-secret",
+						Namespace: "kruise-daemon-config",
+						Labels: map[string]string{
+							SourceSecretUIDLabelKey: "source-uid-1",
+						},
+						Annotations: map[string]string{
+							SourceSecretKeyAnno:       "default/source-secret-1/other",
+							TargetOwnerReferencesAnno: "default/other-job",
+						},
+					},
+				},
+			},
+			expectedTargetLen: 0,
+			expectedDeleteLen: 0,
+			expectError:       false,
+		},
+		{
+			name: "Secrets with invalid annotation should be ignored",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job",
+					Namespace: "default",
+					UID:       types.UID("job-uid-1"),
+				},
+			},
+			existingSecrets: []v1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "unrelated-secret",
+						Namespace: "kruise-daemon-config",
+						Labels: map[string]string{
+							SourceSecretUIDLabelKey: "source-uid-1",
+						},
+						Annotations: map[string]string{
+							SourceSecretKeyAnno:       "default/source-secret-1",
+							TargetOwnerReferencesAnno: "default/other-job",
+						},
+					},
+				},
+			},
+			expectedTargetLen: 0,
+			expectedDeleteLen: 0,
+			expectError:       false,
+		},
+	}
+
+	// Run test cases
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create fake client with existing secrets
+			objs := make([]client.Object, len(tt.existingSecrets))
+			for i := range tt.existingSecrets {
+				objs[i] = &tt.existingSecrets[i]
+			}
+
+			// Create a fake client
+			cl := fake.NewClientBuilder().WithObjects(objs...).Build()
+
+			// Create reconciler with fake client
+			r := &ReconcileImagePullJob{
+				Client: cl,
+			}
+
+			// Execute the function
+			targetMap, deleteMap, err := r.getTargetSecretMap(tt.job)
+
+			// Verify results
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Nil(t, targetMap)
+				assert.Nil(t, deleteMap)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, targetMap, tt.expectedTargetLen)
+				assert.Len(t, deleteMap, tt.expectedDeleteLen)
+			}
+		})
+	}
+}
+
+// TestReleaseTargetSecrets tests the releaseTargetSecrets function
+func TestReleaseTargetSecrets(t *testing.T) {
+	// Define test cases
+	tests := []struct {
+		name            string
+		targetMap       map[string]*v1.Secret
+		job             *appsv1beta1.ImagePullJob
+		existingObjects []client.Object
+		expectError     bool
+		expectedUpdates int
+	}{
+		{
+			name:      "Empty targetMap should return nil",
+			targetMap: map[string]*v1.Secret{},
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job",
+					Namespace: "default",
+				},
+			},
+		},
+		{
+			name: "Nil secret in targetMap should be skipped",
+			targetMap: map[string]*v1.Secret{
+				"secret-1": nil,
+				"secret-2": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "secret-2",
+						Namespace: "kruise-daemon-config",
+						UID:       types.UID("secret-2-uid"),
+						Annotations: map[string]string{
+							TargetOwnerReferencesAnno: "default/test-job",
+						},
+					},
+				},
+			},
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job",
+					Namespace: "default",
+				},
+			},
+			existingObjects: []client.Object{
+				&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "secret-2",
+						Namespace: "kruise-daemon-config",
+						UID:       types.UID("secret-2-uid"),
+						Annotations: map[string]string{
+							TargetOwnerReferencesAnno: "default/test-job",
+						},
+					},
+				},
+			},
+			expectError:     false,
+			expectedUpdates: 1,
+		},
+		{
+			name: "Secret not referenced by current job should not be updated",
+			targetMap: map[string]*v1.Secret{
+				"secret-1": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "secret-1",
+						Namespace: "kruise-daemon-config",
+						UID:       types.UID("secret-1-uid"),
+						Annotations: map[string]string{
+							TargetOwnerReferencesAnno: "default/other-job",
+						},
+					},
+				},
+			},
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job",
+					Namespace: "default",
+				},
+			},
+			existingObjects: []client.Object{
+				&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "secret-1",
+						Namespace: "kruise-daemon-config",
+						UID:       types.UID("secret-1-uid"),
+						Annotations: map[string]string{
+							TargetOwnerReferencesAnno: "default/other-job",
+						},
+					},
+				},
+			},
+			expectError:     false,
+			expectedUpdates: 0,
+		},
+		{
+			name: "Secret referenced by current job but also by others should only be updated",
+			targetMap: map[string]*v1.Secret{
+				"secret-1": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "secret-1",
+						Namespace: "kruise-daemon-config",
+						UID:       types.UID("secret-1-uid"),
+						Annotations: map[string]string{
+							TargetOwnerReferencesAnno: "default/test-job,default/other-job",
+						},
+					},
+				},
+			},
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job",
+					Namespace: "default",
+				},
+			},
+			existingObjects: []client.Object{
+				&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "secret-1",
+						Namespace: "kruise-daemon-config",
+						UID:       types.UID("secret-1-uid"),
+						Annotations: map[string]string{
+							TargetOwnerReferencesAnno: "default/test-job,default/other-job",
+						},
+					},
+				},
+			},
+			expectError:     false,
+			expectedUpdates: 1, // Updated to remove reference
+		},
+		{
+			name: "Secret only referenced by current job should be deleted",
+			targetMap: map[string]*v1.Secret{
+				"secret-1": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "secret-1",
+						Namespace: "kruise-daemon-config",
+						UID:       types.UID("secret-1-uid"),
+						Annotations: map[string]string{
+							TargetOwnerReferencesAnno: "default/test-job",
+						},
+					},
+				},
+			},
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job",
+					Namespace: "default",
+				},
+			},
+			existingObjects: []client.Object{
+				&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "secret-1",
+						Namespace: "kruise-daemon-config",
+						UID:       types.UID("secret-1-uid"),
+						Annotations: map[string]string{
+							TargetOwnerReferencesAnno: "default/test-job",
+						},
+					},
+				},
+			},
+			expectError:     false,
+			expectedUpdates: 1,
+		},
+	}
+
+	// Run test cases
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create fake client with existing objects
+			clientBuilder := fake.NewClientBuilder()
+			if tt.existingObjects != nil {
+				clientBuilder.WithObjects(tt.existingObjects...)
+			}
+
+			// Create reconciler with fake client
+			r := &ReconcileImagePullJob{
+				Client: clientBuilder.Build(),
+			}
+
+			// Call function under test
+			err := r.releaseTargetSecrets(tt.targetMap, tt.job)
+
+			// Check error expectation
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}

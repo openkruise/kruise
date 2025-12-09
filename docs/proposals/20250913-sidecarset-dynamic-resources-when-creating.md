@@ -6,7 +6,7 @@ reviewers:
   - "@zmberg"
   - "@furykerry"
 creation-date: 2025-09-13
-last-updated: 2025-09-24
+last-updated: 2025-11-21
 status: implementable
 ---
 
@@ -33,7 +33,7 @@ status: implementable
     - [Implementation Details/Notes/Constraints](#implementation-detailsnotesconstraints)
     - [Risks and Mitigations](#risks-and-mitigations)
   - [Design Details](#design-details)
-    - [ResourceExpr Calculator](#resourceexpr-calculator)
+    - [ResourcesExpr Calculator](#resourcesexpr-calculator)
     - [Test Plan \[optional\]](#test-plan-optional)
       - [Unit Test](#unit-test)
       - [E2E Test](#e2e-test)
@@ -73,15 +73,15 @@ spec:
     - name: sidecar1
       image: centos:6.7
       resourcesPolicy: <optional, default: nil> Validation webhook will reject pod creation request if both resourcesPolicy and resources are configured.
-        targetContainerMode: sum|max # <required, enum, validated by CRD>
+        targetContainersMode: sum|max # <required, enum, validated by CRD>
         targetContainersNameRegex: ^large-engine-v.*$ # <optional,default=.*, validated by webhook>. If no container names match this regex, the pod creation request will be rejected by the webhook. Target containers include native sidecar containers and plain containers, excluding Kruise sidecar containers.
-        resourceExpr: # <Required, validated by webhook, should not contain scalar resources, only support cpu and memory>, If calculate result is negative, this pod creating request will be rejected by webhook.
+        resourcesExpr: # <Required, validated by webhook, should not contain scalar resources, only support cpu and memory>, If calculate result is negative, this pod creating request will be rejected by webhook.
           limits: # If one of matched containers don't have resources.limits configured, this field will be treated as unlimited. If the expression result is unlimited, sidecar container resources.limits won't be configured, meaning it's unlimited.
-            cpu: max(cpu*50%, 50m) # <optional, default: "", mean unlimited>, support `+,-,*,/,max,min,(,)` and variable `cpu`. Variable `cpu` represents the sum or max of resources.limits.cpu of all matched containers by `targetContainersNameRegex` and `targetContainerMode`.
-            memory: max(memory*50%, 100Mi) # <optional, default: "", mean unlimited>, support `+,-,*,/,max,min,(,)` and variable `memory`. Variable `memory` represents the sum or max of resources.limits.memory of all matched containers by `targetContainersNameRegex` and `targetContainerMode`.
+            cpu: max(cpu*50%, 50m) # <optional, default: "", mean unlimited>, support `+,-,*,/,max,min,(,)` and variable `cpu`. Variable `cpu` represents the sum or max of resources.limits.cpu of all matched containers by `targetContainersNameRegex` and `targetContainersMode`.
+            memory: max(memory*50%, 100Mi) # <optional, default: "", mean unlimited>, support `+,-,*,/,max,min,(,)` and variable `memory`. Variable `memory` represents the sum or max of resources.limits.memory of all matched containers by `targetContainersNameRegex` and `targetContainersMode`.
           requests: # If matched containers don't have resources.requests configured, the corresponding resource value will be treated as 0.
-            cpu: max(cpu*50%, 50m) # <optional, default: "", mean 0>, support `+,-,*,/,max,min,(,)` and variable `cpu`. Variable `cpu` represents the sum or max of resources.limits.cpu of all matched containers by `targetContainersNameRegex` and `targetContainerMode`.  
-            memory: 100Mi # <optional, default: "", mean 0>, support `+,-,*,/,max,min,(,)` and variable `memory`. Variable `memory` represents the sum or max of resources.limits.memory of all matched containers by `targetContainersNameRegex` and `targetContainerMode`.
+            cpu: max(cpu*50%, 50m) # <optional, default: "", mean 0>, support `+,-,*,/,max,min,(,)` and variable `cpu`. Variable `cpu` represents the sum or max of resources.limits.cpu of all matched containers by `targetContainersNameRegex` and `targetContainersMode`.  
+            memory: 100Mi # <optional, default: "", mean 0>, support `+,-,*,/,max,min,(,)` and variable `memory`. Variable `memory` represents the sum or max of resources.limits.memory of all matched containers by `targetContainersNameRegex` and `targetContainersMode`.
 ```
 ### User Stories
 #### Story 1 - By specific container name 
@@ -93,9 +93,9 @@ spec:
     - name: sidecar1
       image: centos:6.7
       resourcesPolicy:
-        targetContainerMode: sum
+        targetContainersMode: sum
         targetContainersNameRegex: ^large-engine-v4$ # only apply to container large-engine-v4
-        resourceExpr:
+        resourcesExpr:
           limits:
             cpu: max(cpu*50%, 50m)
             memory: 200Mi
@@ -144,9 +144,9 @@ spec:
     - name: sidecar1
       image: centos:6.7
       resourcesPolicy:
-        targetContainerMode: sum
+        targetContainersMode: sum
         targetContainersNameRegex: ^large-engine-v.*$
-        resourceExpr:
+        resourcesExpr:
           limits:
             cpu: max(cpu*50%, 50m)
             memory: 200Mi
@@ -196,9 +196,9 @@ spec:
     - name: sidecar1
       image: centos:6.7
       resourcesPolicy:
-        targetContainerMode: max
+        targetContainersMode: max
         targetContainersNameRegex: ^large-engine-v.*$
-        resourceExpr:
+        resourcesExpr:
           limits:
             cpu: max(cpu*50%, 50m)
             memory: 200Mi
@@ -248,9 +248,9 @@ spec:
     - name: sidecar1
       image: centos:6.7
       resourcesPolicy:
-        targetContainerMode: max
+        targetContainersMode: max
         targetContainersNameRegex: ^large-engine-v.*$
-        resourceExpr:
+        resourcesExpr:
           limits:
             cpu: max(cpu*50%, 50m)
             memory: 200Mi
@@ -311,9 +311,9 @@ spec:
       image: busybox:latest
       restartPolicy: Always  # Native sidecar container
       resourcesPolicy:
-        targetContainerMode: sum
+        targetContainersMode: sum
         targetContainersNameRegex: ^app.*$
-        resourceExpr:
+        resourcesExpr:
           limits:
             cpu: max(cpu*30%, 50m)
             memory: max(memory*25%, 100Mi)
@@ -376,7 +376,7 @@ requests:
 - InitContainers with ResourcesPolicy will be rejected by validating webhook to prevent misuse.
 
 ## Design Details
-### ResourceExpr Calculator
+### ResourcesExpr Calculator
 - Calculator: +, -, *, /, max(), min()
 - Number: int, float, percent
 - Unconfigued limits resources will be treated as unlimited.  

@@ -13,7 +13,7 @@ var (
 
 	defaultGenericClient *GenericClientset
 
-	curVersion *version.Info = &version.Info{Major: "1", Minor: "30"}
+	curVersion = &version.Info{Major: "1", Minor: "30"}
 )
 
 // NewRegistry creates clientset by client-go

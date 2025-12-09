@@ -29,4 +29,6 @@ type ImagePullJobExpansion interface{}
 
 type NodeImageExpansion interface{}
 
+type SidecarSetExpansion interface{}
+
 type StatefulSetExpansion interface{}

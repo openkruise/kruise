@@ -121,6 +121,12 @@ func RegisterFieldIndexes(c cache.Cache) error {
 				return
 			}
 		}
+		// sidecar spec namespaces for v1beta1
+		if utildiscovery.DiscoverObject(&appsv1beta1.SidecarSet{}) {
+			if err = indexSidecarSetV1Beta1(c); err != nil {
+				return
+			}
+		}
 	})
 	return err
 }
@@ -267,5 +273,32 @@ func IndexSidecarSet(rawObj client.Object) []string {
 func indexSidecarSet(c cache.Cache) error {
 	return c.IndexField(context.TODO(), &appsv1alpha1.SidecarSet{}, IndexNameForSidecarSetNamespace, func(rawObj client.Object) []string {
 		return IndexSidecarSet(rawObj)
+	})
+}
+
+func IndexSidecarSetV1Beta1(rawObj client.Object) []string {
+	obj := rawObj.(*appsv1beta1.SidecarSet)
+	if obj == nil {
+		return nil
+	}
+	// v1beta1 uses NamespaceSelector
+	if obj.Spec.NamespaceSelector != nil {
+		if obj.Spec.NamespaceSelector.MatchLabels != nil {
+			if v, ok := obj.Spec.NamespaceSelector.MatchLabels[LabelMetadataName]; ok {
+				return []string{v}
+			}
+		}
+		for _, item := range obj.Spec.NamespaceSelector.MatchExpressions {
+			if item.Key == LabelMetadataName && item.Operator == metav1.LabelSelectorOpIn {
+				return item.Values
+			}
+		}
+	}
+	return []string{IndexValueSidecarSetClusterScope}
+}
+
+func indexSidecarSetV1Beta1(c cache.Cache) error {
+	return c.IndexField(context.TODO(), &appsv1beta1.SidecarSet{}, IndexNameForSidecarSetNamespace, func(rawObj client.Object) []string {
+		return IndexSidecarSetV1Beta1(rawObj)
 	})
 }

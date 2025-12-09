@@ -62,6 +62,8 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 			// create sidecarSet
 			sidecarSetIn := tester.NewBaseSidecarSet(ns)
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
+			// Get the dynamically generated container name
+			sidecarContainerName := sidecarSetIn.Spec.Containers[0].Name
 			sidecarSetIn.Spec.Containers[0].UpgradeStrategy = appsv1alpha1.SidecarContainerUpgradeStrategy{
 				UpgradeType:          appsv1alpha1.SidecarContainerHotUpgrade,
 				HotUpgradeEmptyImage: common.BusyboxImage,
@@ -78,16 +80,18 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 			pods, err := tester.GetSelectorPods(deploymentIn.Namespace, deploymentIn.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods[0].Spec.Containers).To(gomega.HaveLen(len(sidecarSetIn.Spec.Containers) + len(deploymentIn.Spec.Template.Spec.Containers) + 1))
-			// check pod sidecarSet version in annotations
-			gomega.Expect(pods[0].Annotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation("nginx-sidecar-1")]).To(gomega.Equal("1"))
-			gomega.Expect(pods[0].Annotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation("nginx-sidecar-1")]).To(gomega.Equal("0"))
-			gomega.Expect(pods[0].Annotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation("nginx-sidecar-2")]).To(gomega.Equal("0"))
-			gomega.Expect(pods[0].Annotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation("nginx-sidecar-2")]).To(gomega.Equal("1"))
+			// check pod sidecarSet version in annotations (hot upgrade containers have -1 and -2 suffixes)
+			hotUpgradeContainer1 := sidecarContainerName + "-1"
+			hotUpgradeContainer2 := sidecarContainerName + "-2"
+			gomega.Expect(pods[0].Annotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation(hotUpgradeContainer1)]).To(gomega.Equal("1"))
+			gomega.Expect(pods[0].Annotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation(hotUpgradeContainer1)]).To(gomega.Equal("0"))
+			gomega.Expect(pods[0].Annotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation(hotUpgradeContainer2)]).To(gomega.Equal("0"))
+			gomega.Expect(pods[0].Annotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation(hotUpgradeContainer2)]).To(gomega.Equal("1"))
 
 			// except sidecar container -> image
 			exceptContainer := map[string]string{
-				"nginx-sidecar-1": common.NginxImage,
-				"nginx-sidecar-2": common.BusyboxImage,
+				hotUpgradeContainer1: common.NginxImage,
+				hotUpgradeContainer2: common.BusyboxImage,
 			}
 			for sidecar, image := range exceptContainer {
 				sidecarContainer := util.GetContainer(sidecar, pods[0])
@@ -104,6 +108,10 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
+			// Get the dynamically generated container name
+			sidecarContainerName := sidecarSetIn.Spec.Containers[0].Name
+			hotUpgradeContainer1 := sidecarContainerName + "-1"
+			hotUpgradeContainer2 := sidecarContainerName + "-2"
 			sidecarSetIn.Spec.Containers[0].Image = common.NginxImage
 			sidecarSetIn.Spec.Containers[0].UpgradeStrategy = appsv1alpha1.SidecarContainerUpgradeStrategy{
 				UpgradeType:          appsv1alpha1.SidecarContainerHotUpgrade,
@@ -123,18 +131,18 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*deploymentIn.Spec.Replicas)))
 			podIn := pods[0]
-			workSidecarContainer := util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn)["nginx-sidecar"], podIn)
-			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal("nginx-sidecar-1"))
+			workSidecarContainer := util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn)[sidecarContainerName], podIn)
+			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal(hotUpgradeContainer1))
 			gomega.Expect(workSidecarContainer.Image).To(gomega.Equal(common.NginxImage))
-			_, emptyContainer := sidecarcontrol.GetPodHotUpgradeContainers("nginx-sidecar", podIn)
+			_, emptyContainer := sidecarcontrol.GetPodHotUpgradeContainers(sidecarContainerName, podIn)
 			emptySidecarContainer := util.GetContainer(emptyContainer, podIn)
-			gomega.Expect(emptySidecarContainer.Name).To(gomega.Equal("nginx-sidecar-2"))
+			gomega.Expect(emptySidecarContainer.Name).To(gomega.Equal(hotUpgradeContainer2))
 			gomega.Expect(emptySidecarContainer.Image).To(gomega.Equal(common.BusyboxImage))
 			// check pod sidecarSet version in annotations
-			gomega.Expect(podIn.Annotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation("nginx-sidecar-1")]).To(gomega.Equal("1"))
-			gomega.Expect(podIn.Annotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation("nginx-sidecar-1")]).To(gomega.Equal("0"))
-			gomega.Expect(podIn.Annotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation("nginx-sidecar-2")]).To(gomega.Equal("0"))
-			gomega.Expect(podIn.Annotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation("nginx-sidecar-2")]).To(gomega.Equal("1"))
+			gomega.Expect(podIn.Annotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation(hotUpgradeContainer1)]).To(gomega.Equal("1"))
+			gomega.Expect(podIn.Annotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation(hotUpgradeContainer1)]).To(gomega.Equal("0"))
+			gomega.Expect(podIn.Annotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation(hotUpgradeContainer2)]).To(gomega.Equal("0"))
+			gomega.Expect(podIn.Annotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation(hotUpgradeContainer2)]).To(gomega.Equal("1"))
 
 			// update sidecarSet sidecar container
 			ginkgo.By(fmt.Sprintf("update sidecarSet(%s) sidecar container image to new nginx", sidecarSetIn.Name))
@@ -153,15 +161,15 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*deploymentIn.Spec.Replicas)))
 			podIn = pods[0]
-			workSidecarContainer = util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn)["nginx-sidecar"], podIn)
-			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal("nginx-sidecar-2"))
+			workSidecarContainer = util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn)[sidecarContainerName], podIn)
+			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal(hotUpgradeContainer2))
 			gomega.Expect(workSidecarContainer.Image).To(gomega.Equal(common.NewNginxImage))
-			_, emptyContainer = sidecarcontrol.GetPodHotUpgradeContainers("nginx-sidecar", podIn)
+			_, emptyContainer = sidecarcontrol.GetPodHotUpgradeContainers(sidecarContainerName, podIn)
 			emptySidecarContainer = util.GetContainer(emptyContainer, podIn)
-			gomega.Expect(emptySidecarContainer.Name).To(gomega.Equal("nginx-sidecar-1"))
+			gomega.Expect(emptySidecarContainer.Name).To(gomega.Equal(hotUpgradeContainer1))
 			gomega.Expect(emptySidecarContainer.Image).To(gomega.Equal(common.BusyboxImage))
 
-			//update sidecarSet sidecar container again
+			// update sidecarSet sidecar container again
 			ginkgo.By(fmt.Sprintf("update sidecarSet(%s) sidecar container image to nginx", sidecarSetIn.Name))
 			sidecarSetIn.Spec.Containers[0].Image = common.NginxImage
 			tester.UpdateSidecarSet(sidecarSetIn)
@@ -178,16 +186,16 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*deploymentIn.Spec.Replicas)))
 			podIn = pods[0]
-			workSidecarContainer = util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn)["nginx-sidecar"], podIn)
-			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal("nginx-sidecar-1"))
+			workSidecarContainer = util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn)[sidecarContainerName], podIn)
+			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal(hotUpgradeContainer1))
 			gomega.Expect(workSidecarContainer.Image).To(gomega.Equal(common.NginxImage))
-			_, emptyContainer = sidecarcontrol.GetPodHotUpgradeContainers("nginx-sidecar", podIn)
+			_, emptyContainer = sidecarcontrol.GetPodHotUpgradeContainers(sidecarContainerName, podIn)
 			emptySidecarContainer = util.GetContainer(emptyContainer, podIn)
-			gomega.Expect(emptySidecarContainer.Name).To(gomega.Equal("nginx-sidecar-2"))
+			gomega.Expect(emptySidecarContainer.Name).To(gomega.Equal(hotUpgradeContainer2))
 			gomega.Expect(emptySidecarContainer.Image).To(gomega.Equal(common.BusyboxImage))
 
-			//update sidecarSet sidecar container others parameters, then don't upgrade
-			//sidecarSetIn.Spec.Containers[0].Image = BusyboxImage
+			// update sidecarSet sidecar container others parameters, then don't upgrade
+			// sidecarSetIn.Spec.Containers[0].Image = BusyboxImage
 			ginkgo.By(fmt.Sprintf("update sidecarSet(%s) others parameters, then don't upgrade", sidecarSetIn.Name))
 			sidecarSetIn.Spec.Containers[0].Env = []corev1.EnvVar{
 				{
@@ -215,6 +223,10 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 				Type: appsv1alpha1.RollingUpdateSidecarSetStrategyType,
 			}
 			sidecarSetIn.Spec.Containers = sidecarSetIn.Spec.Containers[:1]
+			// Get the dynamically generated container name
+			sidecarContainerName := sidecarSetIn.Spec.Containers[0].Name
+			hotUpgradeContainer1 := sidecarContainerName + "-1"
+			hotUpgradeContainer2 := sidecarContainerName + "-2"
 			sidecarSetIn.Spec.Containers[0].Image = common.NginxImage
 			sidecarSetIn.Spec.Containers[0].UpgradeStrategy = appsv1alpha1.SidecarContainerUpgradeStrategy{
 				UpgradeType:          appsv1alpha1.SidecarContainerHotUpgrade,
@@ -234,12 +246,12 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(int(*deploymentIn.Spec.Replicas)))
 			podIn := pods[0]
-			workSidecarContainer := util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn)["nginx-sidecar"], podIn)
-			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal("nginx-sidecar-1"))
+			workSidecarContainer := util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn)[sidecarContainerName], podIn)
+			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal(hotUpgradeContainer1))
 			gomega.Expect(workSidecarContainer.Image).To(gomega.Equal(common.NginxImage))
-			_, emptyContainer := sidecarcontrol.GetPodHotUpgradeContainers("nginx-sidecar", podIn)
+			_, emptyContainer := sidecarcontrol.GetPodHotUpgradeContainers(sidecarContainerName, podIn)
 			emptySidecarContainer := util.GetContainer(emptyContainer, podIn)
-			gomega.Expect(emptySidecarContainer.Name).To(gomega.Equal("nginx-sidecar-2"))
+			gomega.Expect(emptySidecarContainer.Name).To(gomega.Equal(hotUpgradeContainer2))
 			gomega.Expect(emptySidecarContainer.Image).To(gomega.Equal(common.BusyboxImage))
 
 			ginkgo.By(fmt.Sprintf("Update SidecarSet(%s) with failed image", sidecarSetIn.Name))
@@ -256,7 +268,7 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 			tester.WaitForSidecarSetUpgradeComplete(sidecarSetIn, except)
 
 			ginkgo.By(fmt.Sprintf("Update SidecarSet(%s) with success image", sidecarSetIn.Name))
-			//update sidecarSet sidecar container again, and success image
+			// update sidecarSet sidecar container again, and success image
 			sidecarSetIn.Spec.Containers[0].Image = common.NewNginxImage
 			tester.UpdateSidecarSet(sidecarSetIn)
 			except = &appsv1alpha1.SidecarSetStatus{
@@ -273,21 +285,21 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 			gomega.Expect(pods).To(gomega.HaveLen(int(*deploymentIn.Spec.Replicas)))
 			// pod[0]
 			podIn1 := pods[0]
-			workSidecarContainer = util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn1)["nginx-sidecar"], podIn1)
-			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal("nginx-sidecar-2"))
+			workSidecarContainer = util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn1)[sidecarContainerName], podIn1)
+			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal(hotUpgradeContainer2))
 			gomega.Expect(workSidecarContainer.Image).To(gomega.Equal(common.NewNginxImage))
-			_, emptyContainer = sidecarcontrol.GetPodHotUpgradeContainers("nginx-sidecar", podIn1)
+			_, emptyContainer = sidecarcontrol.GetPodHotUpgradeContainers(sidecarContainerName, podIn1)
 			emptySidecarContainer = util.GetContainer(emptyContainer, podIn1)
-			gomega.Expect(emptySidecarContainer.Name).To(gomega.Equal("nginx-sidecar-1"))
+			gomega.Expect(emptySidecarContainer.Name).To(gomega.Equal(hotUpgradeContainer1))
 			gomega.Expect(emptySidecarContainer.Image).To(gomega.Equal(common.BusyboxImage))
 			// pod[1]
 			podIn2 := pods[1]
-			workSidecarContainer = util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn2)["nginx-sidecar"], podIn2)
-			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal("nginx-sidecar-2"))
+			workSidecarContainer = util.GetContainer(sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(podIn2)[sidecarContainerName], podIn2)
+			gomega.Expect(workSidecarContainer.Name).To(gomega.Equal(hotUpgradeContainer2))
 			gomega.Expect(workSidecarContainer.Image).To(gomega.Equal(common.NewNginxImage))
-			_, emptyContainer = sidecarcontrol.GetPodHotUpgradeContainers("nginx-sidecar", podIn2)
+			_, emptyContainer = sidecarcontrol.GetPodHotUpgradeContainers(sidecarContainerName, podIn2)
 			emptySidecarContainer = util.GetContainer(emptyContainer, podIn2)
-			gomega.Expect(emptySidecarContainer.Name).To(gomega.Equal("nginx-sidecar-1"))
+			gomega.Expect(emptySidecarContainer.Name).To(gomega.Equal(hotUpgradeContainer1))
 			gomega.Expect(emptySidecarContainer.Image).To(gomega.Equal(common.BusyboxImage))
 
 			ginkgo.By("sidecarSet upgrade hot sidecar container failed image done")

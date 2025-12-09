@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
@@ -54,6 +55,7 @@ func NewSidecarSetTester(c clientset.Interface, kc kruiseclientset.Interface) *S
 }
 
 func (s *SidecarSetTester) NewBaseSidecarSet(ns string) *appsv1alpha1.SidecarSet {
+	randStr := rand.String(5)
 	return &appsv1alpha1.SidecarSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "SidecarSet",
@@ -61,7 +63,7 @@ func (s *SidecarSetTester) NewBaseSidecarSet(ns string) *appsv1alpha1.SidecarSet
 		},
 		ObjectMeta: metav1.ObjectMeta{
 
-			Name: fmt.Sprintf("test-sidecarset-%s", ns),
+			Name: fmt.Sprintf("test-sidecarset-%s-%s", ns, randStr),
 			Labels: map[string]string{
 				"app": "sidecar",
 			},
@@ -70,7 +72,7 @@ func (s *SidecarSetTester) NewBaseSidecarSet(ns string) *appsv1alpha1.SidecarSet
 			InitContainers: []appsv1alpha1.SidecarContainer{
 				{
 					Container: corev1.Container{
-						Name:    "init-sidecar",
+						Name:    fmt.Sprintf("init-sidecar-%s", randStr),
 						Command: []string{"/bin/sh", "-c", "sleep 1"},
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					},
@@ -79,7 +81,7 @@ func (s *SidecarSetTester) NewBaseSidecarSet(ns string) *appsv1alpha1.SidecarSet
 			Containers: []appsv1alpha1.SidecarContainer{
 				{
 					Container: corev1.Container{
-						Name:            "nginx-sidecar",
+						Name:            fmt.Sprintf("nginx-sidecar-%s", randStr),
 						Image:           imageutils.GetE2EImage(imageutils.Nginx),
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						Command:         []string{"tail", "-f", "/dev/null"},
@@ -91,7 +93,7 @@ func (s *SidecarSetTester) NewBaseSidecarSet(ns string) *appsv1alpha1.SidecarSet
 				},
 				{
 					Container: corev1.Container{
-						Name:    "busybox-sidecar",
+						Name:    fmt.Sprintf("busybox-sidecar-%s", randStr),
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 					},
@@ -153,8 +155,9 @@ func (s *SidecarSetTester) CreateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet)
 
 func (s *SidecarSetTester) UpdateSidecarSet(sidecarSet *appsv1alpha1.SidecarSet) {
 	common.Logf("update sidecarSet(%s)", sidecarSet.Name)
-	sidecarSetClone, _ := s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSet.Name, metav1.GetOptions{})
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	sidecarSetClone, err := s.kc.AppsV1alpha1().SidecarSets().Get(context.TODO(), sidecarSet.Name, metav1.GetOptions{})
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		sidecarSetClone.Spec = sidecarSet.Spec
 		sidecarSetClone.Annotations = sidecarSet.Annotations
 		sidecarSetClone.Labels = sidecarSet.Labels
@@ -230,17 +233,20 @@ func (s *SidecarSetTester) CreateDeployment(deployment *apps.Deployment) {
 }
 
 func (s *SidecarSetTester) DeleteSidecarSets(ns string) {
+	// SidecarSet is cluster-scoped resource, so sidecarSet.Namespace is always ""
+	// Match by name prefix instead: test-sidecarset-{ns}-{rand}
 	sidecarSetList, err := s.kc.AppsV1alpha1().SidecarSets().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		common.Logf("List sidecarSets failed: %s", err.Error())
 		return
 	}
 
+	expectedPrefix := fmt.Sprintf("test-sidecarset-%s-", ns)
 	for _, sidecarSet := range sidecarSetList.Items {
-		if sidecarSet.Namespace != ns {
-			continue
+		if len(sidecarSet.Name) >= len(expectedPrefix) &&
+			sidecarSet.Name[:len(expectedPrefix)] == expectedPrefix {
+			s.DeleteSidecarSet(&sidecarSet)
 		}
-		s.DeleteSidecarSet(&sidecarSet)
 	}
 }
 
