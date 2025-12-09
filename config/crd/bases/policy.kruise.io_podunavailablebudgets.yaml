@@ -192,6 +192,209 @@ spec:
             type: object
         type: object
     served: true
+    storage: false
+    subresources:
+      status: {}
+  - additionalPrinterColumns:
+    - description: UnavailableAllowed number of pod unavailable that are currently
+        allowed
+      jsonPath: .status.unavailableAllowed
+      name: Allowed
+      type: integer
+    - description: CurrentAvailable current number of available pods
+      jsonPath: .status.currentAvailable
+      name: Current
+      type: integer
+    - description: DesiredAvailable minimum desired number of available pods
+      jsonPath: .status.desiredAvailable
+      name: Desired
+      type: integer
+    - description: TotalReplicas total number of pods counted by this budget
+      jsonPath: .status.totalReplicas
+      name: Total
+      type: integer
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: PodUnavailableBudget is the Schema for the podunavailablebudgets
+          API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PodUnavailableBudgetSpec defines the desired state of PodUnavailableBudget
+            properties:
+              maxUnavailable:
+                anyOf:
+                - type: integer
+                - type: string
+                description: |-
+                  Delete pod, evict pod or update pod specification is allowed if at most "maxUnavailable" pods selected by
+                  "selector" or "targetRef"  are unavailable after the above operation for pod.
+                  MaxUnavailable and MinAvailable are mutually exclusive, MaxUnavailable is priority to take effect
+                x-kubernetes-int-or-string: true
+              minAvailable:
+                anyOf:
+                - type: integer
+                - type: string
+                description: |-
+                  Delete pod, evict pod or update pod specification is allowed if at least "minAvailable" pods selected by
+                  "selector" or "targetRef" will still be available after the above operation for pod.
+                x-kubernetes-int-or-string: true
+              protectOperations:
+                description: |-
+                  ProtectOperations indicates the pub protected operations[DELETE,UPDATE,EVICT].
+                  If set, only specified operations are protected.
+                  If not set, the default DELETE,EVICT,UPDATE are protected.
+                  RESIZE: Pod vertical scaling action. If it's enabled, all resize action will be protected. RESIZE
+                  is an extension of UPDATE, if RESIZE is disabled and UPDATE is enabled, any UPDATE operation will
+                  be protected only as it will definitely cause container restarts.
+                  UPDATE: Kruise will carefully differentiate whether this update will cause interruptions. When
+                  the FeatureGate InPlacePodVerticalScaling is enabled, pod inplace vertical scaling will be
+                  considered non-disruption only when allowedResources(cpu、memory) changes、restartPolicy
+                  is not restartContainer、is not static pod and QoS not changed. But if featureGate
+                  InPlacePodVerticalScaling is disabled, all resize action will be considered as disruption.
+                items:
+                  type: string
+                type: array
+              protectTotalReplicas:
+                description: |-
+                  ProtectTotalReplicas is the target replicas.
+                  By default, PUB will get the target replicas through workload.spec.replicas. but there are some scenarios that may workload doesn't
+                  implement scale subresources or Pod doesn't have workload management. In this scenario, you can set protectTotalReplicas
+                  to get the target replicas to realize the same effect of protection ability.
+                format: int32
+                type: integer
+              selector:
+                description: Selector label query over pods managed by the budget
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
+              targetRef:
+                description: |-
+                  TargetReference contains enough information to let you identify an workload for PodUnavailableBudget
+                  Selector and TargetReference are mutually exclusive, TargetReference is priority to take effect
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  kind:
+                    description: Kind of the referent.
+                    type: string
+                  name:
+                    description: Name of the referent.
+                    type: string
+                type: object
+            type: object
+          status:
+            description: PodUnavailableBudgetStatus defines the observed state of
+              PodUnavailableBudget
+            properties:
+              currentAvailable:
+                description: CurrentAvailable current number of available pods
+                format: int32
+                type: integer
+              desiredAvailable:
+                description: DesiredAvailable minimum desired number of available
+                  pods
+                format: int32
+                type: integer
+              disruptedPods:
+                additionalProperties:
+                  format: date-time
+                  type: string
+                description: |-
+                  DisruptedPods contains information about pods whose eviction or deletion was
+                  processed by the API handler but has not yet been observed by the PodUnavailableBudget.
+                type: object
+              observedGeneration:
+                description: |-
+                  Most recent generation observed when updating this PUB status. UnavailableAllowed and other
+                  status information is valid only if observedGeneration equals to PUB's object generation.
+                format: int64
+                type: integer
+              totalReplicas:
+                description: TotalReplicas total number of pods counted by this unavailable
+                  budget
+                format: int32
+                type: integer
+              unavailableAllowed:
+                description: UnavailableAllowed number of pod unavailable that are
+                  currently allowed
+                format: int32
+                type: integer
+              unavailablePods:
+                additionalProperties:
+                  format: date-time
+                  type: string
+                description: |-
+                  UnavailablePods contains information about pods whose specification changed(inplace-update pod),
+                  once pod is available(consistent and ready) again, it will be removed from the list.
+                type: object
+            required:
+            - currentAvailable
+            - desiredAvailable
+            - totalReplicas
+            - unavailableAllowed
+            type: object
+        type: object
+    served: true
     storage: true
     subresources:
       status: {}
