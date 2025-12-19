@@ -144,6 +144,7 @@ func Ensure(kubeClient clientset.Interface, handlers map[string]types.HandlerGet
 	}
 	validatingConfig.Webhooks = validatingWHs
 
+	// TODO: Should not update if only order of webhooks changed or order of namespaceSelector's MatchExpressions changed.
 	if !reflect.DeepEqual(mutatingConfig, oldMutatingConfig) {
 		if _, err := kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(context.TODO(), mutatingConfig, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("failed to update %s: %v", mutatingWebhookConfigurationName, err)
@@ -151,6 +152,7 @@ func Ensure(kubeClient clientset.Interface, handlers map[string]types.HandlerGet
 		klog.InfoS("Update caBundle success", "MutatingWebhookConfigurations", klog.KObj(mutatingConfig))
 	}
 
+		// TODO: Should not update if only order of webhooks changed or order of namespaceSelector's MatchExpressions changed.
 	if !reflect.DeepEqual(validatingConfig, oldValidatingConfig) {
 		if _, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(context.TODO(), validatingConfig, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("failed to update %s: %v", validatingWebhookConfigurationName, err)
