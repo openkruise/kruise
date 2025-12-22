@@ -318,11 +318,6 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1beta1.NodeImage,
 					klog.InfoS("When check owners for image in NodeImage, found job UID not equal", "imageName", fullName, "nodeImageName", name, "job", util.DumpJSON(ref), "jobUID", job.UID)
 					continue
 				}
-
-				if job.Status.CompletionTime != nil {
-					klog.InfoS("job has completed", "imageName", fullName, "nodeImageName", name, "job", util.DumpJSON(ref))
-					continue
-				}
 				activeRefs = append(activeRefs, ref)
 			}
 			if len(activeRefs) != len(tagSpec.OwnerReferences) {

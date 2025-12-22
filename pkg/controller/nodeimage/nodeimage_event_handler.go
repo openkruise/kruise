@@ -130,16 +130,6 @@ func (e *imagePullJobHandler) Generic(ctx context.Context, evt event.TypedGeneri
 }
 
 func (e *imagePullJobHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1beta1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	jobOld := evt.ObjectOld
-	jobNew := evt.ObjectNew
-	if jobOld.Status.CompletionTime != nil || jobNew.Status.CompletionTime == nil {
-		return
-	}
-
-	nodeImageNames := utilimagejob.PopCachedNodeImagesForJob(jobNew)
-	for _, name := range nodeImageNames {
-		q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: name}})
-	}
 }
 
 func (e *imagePullJobHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1beta1.ImagePullJob], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
