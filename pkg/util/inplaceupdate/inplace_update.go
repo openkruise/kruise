@@ -169,28 +169,26 @@ func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 		Status:             v1.ConditionTrue,
 		LastTransitionTime: metav1.NewTime(Clock.Now()),
 	}
+	// Do not retry on conflict; only update the condition for the checked Pod version.
+	// see https://github.com/openkruise/kruise/pull/2274
 	err := c.updateCondition(pod, newCondition)
 	return RefreshResult{RefreshErr: err}
 }
 
+// updateCondition update the given Pod's condition by updating status on a copy with the same ResourceVersion;
+// no conflict retry or refetch is performed, so it only applies to this specific Pod version.
 func (c *realControl) updateCondition(pod *v1.Pod, condition v1.PodCondition) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		clone, err := c.podAdapter.GetPod(pod.Namespace, pod.Name)
-		if err != nil {
-			return err
-		}
+	clone := pod.DeepCopy()
+	if hasEqualCondition(clone, &condition) {
+		return nil
+	}
 
-		if hasEqualCondition(clone, &condition) {
-			return nil
-		}
-
-		util.SetPodCondition(clone, condition)
-		// We only update the ready condition to False, and let Kubelet update it to True
-		if condition.Status == v1.ConditionFalse {
-			util.SetPodReadyCondition(clone)
-		}
-		return c.podAdapter.UpdatePodStatus(clone)
-	})
+	util.SetPodCondition(clone, condition)
+	// We only update the ready condition to False, and let Kubelet update it to True
+	if condition.Status == v1.ConditionFalse {
+		util.SetPodReadyCondition(clone)
+	}
+	return c.podAdapter.UpdatePodStatus(clone)
 }
 
 func (c *realControl) finishGracePeriod(pod *v1.Pod, opts *UpdateOptions) (time.Duration, error) {
@@ -332,7 +330,15 @@ func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.Control
 			Status:             v1.ConditionFalse,
 			Reason:             "StartInPlaceUpdate",
 		}
-		if err := c.updateCondition(pod, newCondition); err != nil {
+		// ensure the condition is updated with conflict retry
+		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			clone, err := c.podAdapter.GetPod(pod.Namespace, pod.Name)
+			if err != nil {
+				return err
+			}
+			return c.updateCondition(clone, newCondition)
+		})
+		if err != nil {
 			return UpdateResult{InPlaceUpdate: true, UpdateErr: err}
 		}
 	}
