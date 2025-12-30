@@ -169,6 +169,10 @@ func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 		Status:             v1.ConditionTrue,
 		LastTransitionTime: metav1.NewTime(Clock.Now()),
 	}
+	if hasEqualCondition(pod, &newCondition) {
+		return RefreshResult{}
+	}
+
 	// Do not retry on conflict; only update the condition for the checked Pod version.
 	// see https://github.com/openkruise/kruise/pull/2274
 	err := c.updateCondition(pod, newCondition)
@@ -179,10 +183,6 @@ func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 // no conflict retry or refetch is performed, so it only applies to this specific Pod version.
 func (c *realControl) updateCondition(pod *v1.Pod, condition v1.PodCondition) error {
 	clone := pod.DeepCopy()
-	if hasEqualCondition(clone, &condition) {
-		return nil
-	}
-
 	util.SetPodCondition(clone, condition)
 	// We only update the ready condition to False, and let Kubelet update it to True
 	if condition.Status == v1.ConditionFalse {
@@ -336,6 +336,9 @@ func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.Control
 			if err != nil {
 				return err
 			}
+			// The Pod from informer cache may be not synced as the latest, so we
+			// can't use hasEqualCondition() to compare with the newCondition here.
+			// More details: https://github.com/openkruise/kruise/issues/2276
 			return c.updateCondition(clone, newCondition)
 		})
 		if err != nil {
