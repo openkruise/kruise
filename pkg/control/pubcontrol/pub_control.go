@@ -239,7 +239,7 @@ func hash(data string) string {
 // return two parameters
 // 1. podList
 // 2. expectedCount, the default is workload.Replicas
-func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) ([]*corev1.Pod, int32, error) {
+func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) (map[string][]*corev1.Pod, int32, error) {
 	// if targetReference isn't nil, priority to take effect
 	var listOptions *client.ListOptions
 	if pub.Spec.TargetReference != nil {
@@ -249,7 +249,7 @@ func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) 
 			count, _ := strconv.ParseInt(value, 10, 32)
 			expectedCount = int32(count)
 		}
-		return matchedPods, expectedCount, err
+		return groupPubPods(pub, matchedPods), expectedCount, err
 	} else if pub.Spec.Selector == nil {
 		klog.InfoS("Pub spec.Selector could not be empty", "pub", klog.KObj(pub))
 		return nil, 0, nil
@@ -274,13 +274,13 @@ func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) 
 	}
 	if value, _ := pub.Annotations[policyv1alpha1.PubProtectTotalReplicasAnnotation]; value != "" {
 		expectedCount, _ := strconv.ParseInt(value, 10, 32)
-		return matchedPods, int32(expectedCount), nil
+		return groupPubPods(pub, matchedPods), int32(expectedCount), nil
 	}
 	expectedCount, err := c.controllerFinder.GetExpectedScaleForPods(matchedPods)
 	if err != nil {
 		return nil, 0, err
 	}
-	return matchedPods, expectedCount, nil
+	return groupPubPods(pub, matchedPods), expectedCount, nil
 }
 
 func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
@@ -342,6 +342,32 @@ func (c *commonControl) GetPubForPod(pod *corev1.Pod) (*policyv1alpha1.PodUnavai
 
 func (c *commonControl) GetPodControllerOf(pod *corev1.Pod) *metav1.OwnerReference {
 	return metav1.GetControllerOf(pod)
+}
+
+func (c *commonControl) IsPodGroupConsistentAndReady(pods []*corev1.Pod, size int32) bool {
+	if len(pods) < int(size) {
+		return false
+	}
+	readyCount := int32(0)
+	for _, pod := range pods {
+		if c.IsPodStateConsistent(pod) && c.IsPodReady(pod) {
+			readyCount++
+		}
+	}
+	return readyCount >= size
+}
+
+func groupPubPods(pub *policyv1alpha1.PodUnavailableBudget, pods []*corev1.Pod) map[string][]*corev1.Pod {
+	groupedPods := make(map[string][]*corev1.Pod)
+	for _, pod := range pods {
+		if pub.Spec.PodGroupPolicy == nil || pub.Spec.PodGroupPolicy.GroupLabelKey == "" {
+			groupedPods[pod.Name] = []*corev1.Pod{pod}
+			continue
+		}
+		groupName := pod.Labels[pub.Spec.PodGroupPolicy.GroupLabelKey]
+		groupedPods[groupName] = append(groupedPods[groupName], pod)
+	}
+	return groupedPods
 }
 
 func getSidecarSetsInPod(pod *corev1.Pod) (sidecarSets, containers sets.String) {
