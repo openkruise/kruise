@@ -29,8 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
@@ -41,8 +41,8 @@ func TestPubMutatingPod(t *testing.T) {
 	cases := []struct {
 		name                string
 		getPod              func() *v1.Pod
-		getPub              func() *policyv1alpha1.PodUnavailableBudget
-		getWorkload         func() *appsv1alpha1.CloneSet
+		getPub              func() *policyv1beta1.PodUnavailableBudget
+		getWorkload         func() *appsv1beta1.CloneSet
 		expectedAnnotations map[string]string
 	}{
 		{
@@ -61,13 +61,13 @@ func TestPubMutatingPod(t *testing.T) {
 					},
 				}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				obj := &policyv1alpha1.PodUnavailableBudget{
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
+				obj := &policyv1beta1.PodUnavailableBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pub-1",
 						Namespace: "test",
 					},
-					Spec: policyv1alpha1.PodUnavailableBudgetSpec{
+					Spec: policyv1beta1.PodUnavailableBudgetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"app": "web",
@@ -99,13 +99,13 @@ func TestPubMutatingPod(t *testing.T) {
 					},
 				}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				obj := &policyv1alpha1.PodUnavailableBudget{
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
+				obj := &policyv1beta1.PodUnavailableBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pub-1",
 						Namespace: "test",
 					},
-					Spec: policyv1alpha1.PodUnavailableBudgetSpec{
+					Spec: policyv1beta1.PodUnavailableBudgetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"app": "nginx",
@@ -135,7 +135,7 @@ func TestPubMutatingPod(t *testing.T) {
 						Name:      "pod-1",
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "CloneSet",
 								Name:       "cs02",
 								UID:        "002",
@@ -145,15 +145,15 @@ func TestPubMutatingPod(t *testing.T) {
 					},
 				}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				obj := &policyv1alpha1.PodUnavailableBudget{
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
+				obj := &policyv1beta1.PodUnavailableBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pub-1",
 						Namespace: "test",
 					},
-					Spec: policyv1alpha1.PodUnavailableBudgetSpec{
-						TargetReference: &policyv1alpha1.TargetReference{
-							APIVersion: "apps.kruise.io/v1alpha1",
+					Spec: policyv1beta1.PodUnavailableBudgetSpec{
+						TargetReference: &policyv1beta1.TargetReference{
+							APIVersion: "apps.kruise.io/v1beta1",
 							Kind:       "CloneSet",
 							Name:       "cs02",
 						},
@@ -162,18 +162,18 @@ func TestPubMutatingPod(t *testing.T) {
 
 				return obj
 			},
-			getWorkload: func() *appsv1alpha1.CloneSet {
+			getWorkload: func() *appsv1beta1.CloneSet {
 				var replicas int32 = 1
-				obj := &appsv1alpha1.CloneSet{
+				obj := &appsv1beta1.CloneSet{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "CloneSet",
-						APIVersion: "apps.kruise.io/v1alpha1",
+						APIVersion: "apps.kruise.io/v1beta1",
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "cs02",
 						Namespace: "test",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"app": "web",
@@ -204,7 +204,7 @@ func TestPubMutatingPod(t *testing.T) {
 						Name:      "pod-1",
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "CloneSet",
 								Name:       "cs02",
 								UID:        "002",
@@ -214,15 +214,15 @@ func TestPubMutatingPod(t *testing.T) {
 					},
 				}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				obj := &policyv1alpha1.PodUnavailableBudget{
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
+				obj := &policyv1beta1.PodUnavailableBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pub-1",
 						Namespace: "test",
 					},
-					Spec: policyv1alpha1.PodUnavailableBudgetSpec{
-						TargetReference: &policyv1alpha1.TargetReference{
-							APIVersion: "apps.kruise.io/v1alpha1",
+					Spec: policyv1beta1.PodUnavailableBudgetSpec{
+						TargetReference: &policyv1beta1.TargetReference{
+							APIVersion: "apps.kruise.io/v1beta1",
 							Kind:       "CloneSet",
 							Name:       "cs01",
 						},
@@ -231,14 +231,18 @@ func TestPubMutatingPod(t *testing.T) {
 
 				return obj
 			},
-			getWorkload: func() *appsv1alpha1.CloneSet {
+			getWorkload: func() *appsv1beta1.CloneSet {
 				var replicas int32 = 1
-				obj := &appsv1alpha1.CloneSet{
+				obj := &appsv1beta1.CloneSet{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "CloneSet",
+						APIVersion: "apps.kruise.io/v1beta1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "cs02",
 						Namespace: "test",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"app": "web",
