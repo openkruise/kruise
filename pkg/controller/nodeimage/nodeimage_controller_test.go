@@ -239,17 +239,14 @@ func TestDoUpdateNodeImage(t *testing.T) {
 			},
 		},
 		{
-			name: "completed ImagePullJob should remove owner reference",
+			name: "completed ImagePullJob should keep owner reference",
 			args: args{
 				nodeImage: baseNodeImage.DeepCopy(),
 				node:      baseNode.DeepCopy(),
 			},
-			wantModified: true,
-			wantMessages: []string{
-				"image nginx:latest owners is cleared",
-				"no longer has nginx image spec",
-			},
-			wantTagCounts: map[string]int{}, // Tag should be removed
+			wantModified:  false,
+			wantMessages:  []string{},
+			wantTagCounts: map[string]int{"nginx": 1},
 			objs: []client.Object{
 				&appsv1beta1.ImagePullJob{
 					ObjectMeta: metav1.ObjectMeta{

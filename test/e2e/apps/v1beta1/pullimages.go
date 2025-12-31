@@ -269,12 +269,12 @@ var _ = ginkgo.Describe("PullImage", ginkgo.Label("PullImage", "operation"), gin
 			}, 180*time.Second, 3*time.Second).Should(gomega.Equal(true))
 			gomega.Expect(job.Status.Succeeded).To(gomega.Equal(int32(len(nodes))))
 
-			ginkgo.By("Check image should be cleaned in NodeImage")
-			gomega.Eventually(func() bool {
+			ginkgo.By("Check image should be kept in NodeImage")
+			gomega.Consistently(func() bool {
 				found, err := testerForNodeImage.IsImageInSpec(job.Spec.Image, nodes[0].Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return found
-			}, 25*time.Second, time.Second).Should(gomega.Equal(false))
+			}, 25*time.Second, time.Second).Should(gomega.Equal(true))
 
 			ginkgo.By("Check secrets should be cleaned in kruise-daemon-config")
 			gomega.Eventually(func() bool {
