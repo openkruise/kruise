@@ -112,6 +112,16 @@ type RollingUpdateDaemonSet struct {
 	// daemon set controller.
 	// +optional
 	Paused *bool `json:"paused,omitempty"`
+
+	// ExemptNodesFromMaxUnavailable is a label selector that identifies nodes which should be
+	// excluded from the maxUnavailable calculation during DaemonSet rolling updates.
+	// Pods running on selected nodes are not counted toward the unavailable pod total,
+	// allowing updates to proceed even if those pods are not ready, terminating, or on
+	// unreachable nodes. This is useful for nodes undergoing maintenance, known to be
+	// unreliable, or otherwise intended to not block the DaemonSet update progress.
+	// If unspecified, no nodes are exempted.
+	// +optional
+	ExemptNodesFromMaxUnavailable *metav1.LabelSelector `json:"exemptNodesFromMaxUnavailable,omitempty"`
 }
 
 // DaemonSetSpec defines the desired state of DaemonSet
