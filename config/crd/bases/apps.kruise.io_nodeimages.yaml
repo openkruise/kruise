@@ -378,10 +378,8 @@ spec:
                   description: ImageSpec defines the pulling spec of an image
                   properties:
                     pullSecrets:
-                      description: |-
-                        PullSecrets is an optional list of references to secrets in the same namespace to use for pulling the image.
-                        If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
-                        in the case of docker, only DockerConfig type secrets are honored.
+                      description: 'Deprecated: Field moved to ReferenceObject, temporarily
+                        retained for backward compatibility'
                       items:
                         description: |-
                           ReferenceObject comprises a resource name, with a mandatory namespace,
@@ -503,6 +501,22 @@ spec:
                                 format: int32
                                 type: integer
                             type: object
+                          pullSecrets:
+                            description: |-
+                              PullSecrets is an optional list of references to secrets in the same namespace to use for pulling the image.
+                              If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
+                              in the case of docker, only DockerConfig type secrets are honored.
+                            items:
+                              description: |-
+                                ReferenceObject comprises a resource name, with a mandatory namespace,
+                                rendered as "<namespace>/<name>".
+                              properties:
+                                name:
+                                  type: string
+                                namespace:
+                                  type: string
+                              type: object
+                            type: array
                           tag:
                             description: Specifies the image tag
                             type: string

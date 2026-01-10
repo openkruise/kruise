@@ -324,6 +324,11 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1beta1.ImagePullJob, ne
 		parallelism = len(notSyncedNodeImages)
 	}
 
+	// sort secrets
+	sort.Slice(secrets, func(i, j int) bool {
+		return secrets[i].Name <= secrets[j].Name
+	})
+
 	ownerRef := getOwnerRef(job)
 	pullPolicy := getImagePullPolicy(job)
 	now := metav1.NewTime(r.clock.Now())
@@ -339,8 +344,10 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1beta1.ImagePullJob, ne
 				nodeImage.Spec.Images = make(map[string]appsv1beta1.ImageSpec, 1)
 			}
 			imageSpec := nodeImage.Spec.Images[imageName]
+			oldImageSpec := imageSpec.DeepCopy()
 			imageSpec.SandboxConfig = job.Spec.SandboxConfig
 
+			// TODO, considering the issue of legacy upgrade, this logic is temporarily retained
 			for _, secret := range secrets {
 				if !containsObject(imageSpec.PullSecrets, secret) {
 					imageSpec.PullSecrets = append(imageSpec.PullSecrets, secret)
@@ -353,6 +360,16 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1beta1.ImagePullJob, ne
 				if tagSpec.Tag != imageTag {
 					continue
 				}
+
+				// sync secrets to nodeImage imageSpec
+				originPullSecrets := tagSpec.PullSecrets
+				for _, secret := range secrets {
+					if !containsObject(originPullSecrets, secret) {
+						originPullSecrets = append(originPullSecrets, secret)
+					}
+				}
+				tagSpec.PullSecrets = originPullSecrets
+
 				if util.ContainsObjectRef(tagSpec.OwnerReferences, *ownerRef) {
 					skip = true
 					return nil
@@ -384,11 +401,15 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1beta1.ImagePullJob, ne
 					OwnerReferences: []v1.ObjectReference{*ownerRef},
 					CreatedAt:       &now,
 					ImagePullPolicy: job.Spec.ImagePullPolicy,
+					PullSecrets:     secrets,
 				})
 			}
 			utilimagejob.SortSpecImageTagsV1beta1(&imageSpec)
-			nodeImage.Spec.Images[imageName] = imageSpec
+			if util.IsJSONObjectEqual(oldImageSpec, imageSpec) {
+				return nil
+			}
 
+			nodeImage.Spec.Images[imageName] = imageSpec
 			oldResourceVersion := nodeImage.ResourceVersion
 			err := r.Update(context.TODO(), &nodeImage)
 			if err != nil {

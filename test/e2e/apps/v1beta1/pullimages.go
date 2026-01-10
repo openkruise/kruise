@@ -189,7 +189,7 @@ var _ = ginkgo.Describe("PullImage", ginkgo.Label("PullImage", "operation"), gin
 
 			ginkgo.By("Check image should be cleaned in NodeImage")
 			gomega.Eventually(func() bool {
-				found, err := testerForNodeImage.IsImageInSpec(job.Spec.Image, nodes[0].Name)
+				found, err := testerForNodeImage.IsImageInSpec(job.Spec.Image, nodes[0].Name, job.Spec.PullSecrets)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return found
 			}, 25*time.Second, time.Second).Should(gomega.Equal(false))
@@ -271,7 +271,7 @@ var _ = ginkgo.Describe("PullImage", ginkgo.Label("PullImage", "operation"), gin
 
 			ginkgo.By("Check image should be kept in NodeImage")
 			gomega.Consistently(func() bool {
-				found, err := testerForNodeImage.IsImageInSpec(job.Spec.Image, nodes[0].Name)
+				found, err := testerForNodeImage.IsImageInSpec(job.Spec.Image, nodes[0].Name, job.Spec.PullSecrets)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return found
 			}, 25*time.Second, time.Second).Should(gomega.Equal(true))
@@ -375,7 +375,7 @@ var _ = ginkgo.Describe("PullImage", ginkgo.Label("PullImage", "operation"), gin
 
 			ginkgo.By("Check image should be cleaned in NodeImage")
 			gomega.Eventually(func() bool {
-				found, err := testerForNodeImage.IsImageInSpec(job.Spec.Image, nodes[0].Name)
+				found, err := testerForNodeImage.IsImageInSpec(job.Spec.Image, nodes[0].Name, job.Spec.PullSecrets)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return found
 			}, 25*time.Second, time.Second).Should(gomega.Equal(false))
@@ -445,7 +445,7 @@ var _ = ginkgo.Describe("PullImage", ginkgo.Label("PullImage", "operation"), gin
 
 			ginkgo.By("Check image should be cleaned in NodeImage")
 			gomega.Eventually(func() bool {
-				found, err := testerForNodeImage.IsImageInSpec(job.Spec.Image, nodes[0].Name)
+				found, err := testerForNodeImage.IsImageInSpec(job.Spec.Image, nodes[0].Name, job.Spec.PullSecrets)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return found
 			}, 10*time.Second, time.Second).Should(gomega.Equal(false))
@@ -491,7 +491,7 @@ var _ = ginkgo.Describe("PullImage", ginkgo.Label("PullImage", "operation"), gin
 
 			ginkgo.By("Check image should be cleaned in NodeImage")
 			gomega.Eventually(func() bool {
-				found, err := testerForNodeImage.IsImageInSpec(job.Spec.Image, nodes[0].Name)
+				found, err := testerForNodeImage.IsImageInSpec(job.Spec.Image, nodes[0].Name, job.Spec.PullSecrets)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return found
 			}, 10*time.Second, time.Second).Should(gomega.Equal(false))
