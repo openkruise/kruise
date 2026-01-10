@@ -124,7 +124,6 @@ func (r *realStatusUpdater) calculateStatus(cs *appsv1beta1.CloneSet, newStatus 
 	} else {
 		newStatus.ExpectedUpdatedReplicas = *cs.Spec.Replicas
 	}
-
 	duration := r.calculateProgressingStatus(cs, newStatus)
 	clonesetutils.DurationStore.Push(clonesetutils.GetControllerKey(cs), duration)
 }

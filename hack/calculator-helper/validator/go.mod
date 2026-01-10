@@ -5,7 +5,7 @@ go 1.23.0
 require (
 	github.com/openkruise/kruise v0.0.0
 	golang.org/x/image v0.18.0
-	k8s.io/apimachinery v0.32.6
+	k8s.io/apimachinery v0.32.10
 )
 
 require (
