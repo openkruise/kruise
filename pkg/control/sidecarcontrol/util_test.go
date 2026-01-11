@@ -1409,3 +1409,138 @@ func TestGetInjectedVolumeDevices(t *testing.T) {
 		})
 	}
 }
+
+func TestIsCanarySidecarSet(t *testing.T) {
+	type testCase struct {
+		name         string
+		sidecarSet   *appsv1beta1.SidecarSet
+		expectedBool bool
+		expectedStr  string
+	}
+
+	testCases := []testCase{
+		{
+			name: "canary sidecar set with valid base annotation",
+			sidecarSet: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetCanaryAnnotation: "true",
+						appsv1beta1.SidecarSetBaseAnnotation:   "base-sidecarset-123",
+					},
+				},
+			},
+			expectedBool: true,
+			expectedStr:  "base-sidecarset-123",
+		},
+		{
+			name: "canary annotation is true but base annotation is empty",
+			sidecarSet: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetCanaryAnnotation: "true",
+						appsv1beta1.SidecarSetBaseAnnotation:   "",
+					},
+				},
+			},
+			expectedBool: false,
+			expectedStr:  "",
+		},
+		{
+			name: "canary annotation is not true but base annotation exists",
+			sidecarSet: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetCanaryAnnotation: "false",
+						appsv1beta1.SidecarSetBaseAnnotation:   "base-sidecarset-123",
+					},
+				},
+			},
+			expectedBool: false,
+			expectedStr:  "base-sidecarset-123",
+		},
+		{
+			name: "neither annotation exists",
+			sidecarSet: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+			},
+			expectedBool: false,
+			expectedStr:  "",
+		},
+		{
+			name: "only canary annotation exists",
+			sidecarSet: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetCanaryAnnotation: "true",
+					},
+				},
+			},
+			expectedBool: false,
+			expectedStr:  "",
+		},
+		{
+			name: "only base annotation exists",
+			sidecarSet: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetBaseAnnotation: "base-sidecarset-123",
+					},
+				},
+			},
+			expectedBool: false,
+			expectedStr:  "base-sidecarset-123",
+		},
+		{
+			name: "canary annotation is '1' (not 'true') but base annotation exists",
+			sidecarSet: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetCanaryAnnotation: "1",
+						appsv1beta1.SidecarSetBaseAnnotation:   "base-sidecarset-123",
+					},
+				},
+			},
+			expectedBool: false,
+			expectedStr:  "base-sidecarset-123",
+		},
+		{
+			name: "annotations is nil",
+			sidecarSet: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: nil,
+				},
+			},
+			expectedBool: false,
+			expectedStr:  "",
+		},
+		{
+			name: "canary annotation is 'TRUE' (case sensitive)",
+			sidecarSet: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetCanaryAnnotation: "TRUE",
+						appsv1beta1.SidecarSetBaseAnnotation:   "base-sidecarset-123",
+					},
+				},
+			},
+			expectedBool: false,
+			expectedStr:  "base-sidecarset-123",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			isCanary, baseAnnotation := IsCanarySidecarSet(tc.sidecarSet)
+
+			if isCanary != tc.expectedBool {
+				t.Errorf("Expected boolean result to be %v, but got %v", tc.expectedBool, isCanary)
+			}
+
+			if baseAnnotation != tc.expectedStr {
+				t.Errorf("Expected string result to be %q, but got %q", tc.expectedStr, baseAnnotation)
+			}
+		})
+	}
+}
