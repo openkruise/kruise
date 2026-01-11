@@ -623,3 +623,10 @@ func listSidecarNameInSidecarSet(sidecarSet *appsv1beta1.SidecarSet) sets.String
 	}
 	return sidecarList
 }
+
+func IsCanarySidecarSet(sidecarSet *appsv1beta1.SidecarSet) (bool, string) {
+	isCanary := sidecarSet.Annotations[appsv1beta1.SidecarSetCanaryAnnotation] == "true" &&
+		sidecarSet.Annotations[appsv1beta1.SidecarSetBaseAnnotation] != ""
+
+	return isCanary, sidecarSet.Annotations[appsv1beta1.SidecarSetBaseAnnotation]
+}

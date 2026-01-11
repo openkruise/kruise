@@ -84,6 +84,8 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 	if err := h.Client.List(ctx, sidecarSetList2, client.MatchingFields{fieldindex.IndexNameForSidecarSetNamespace: fieldindex.IndexValueSidecarSetClusterScope}, utilclient.DisableDeepCopy); err != nil {
 		return false, err
 	}
+
+	baseSidecarSet := sets.NewString()
 	matchedSidecarSets := make([]sidecarcontrol.SidecarControl, 0)
 	for _, sidecarSet := range append(sidecarSetList.Items, sidecarSetList2.Items...) {
 		if sidecarSet.Spec.InjectionStrategy.Paused {
@@ -105,15 +107,27 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 		if !control.IsActiveSidecarSet() {
 			continue
 		}
+		if isCanary, base := sidecarcontrol.IsCanarySidecarSet(suitableSidecarSet); isCanary {
+			baseSidecarSet.Insert(base)
+		}
 		matchedSidecarSets = append(matchedSidecarSets, control)
 	}
 	if len(matchedSidecarSets) == 0 {
 		return true, nil
 	}
 
+	sidecarSets := make([]sidecarcontrol.SidecarControl, 0)
+	for i := range matchedSidecarSets {
+		control := matchedSidecarSets[i]
+		if baseSidecarSet.Has(control.GetSidecarset().Name) {
+			continue
+		}
+		sidecarSets = append(sidecarSets, control)
+	}
+
 	// check pod
 	if isUpdated {
-		if !matchedSidecarSets[0].IsPodAvailabilityChanged(pod, oldPod) {
+		if !sidecarSets[0].IsPodAvailabilityChanged(pod, oldPod) {
 			klog.V(3).InfoS("pod availability unchanged for sidecarSet, and ignore", "namespace", pod.Namespace, "name", pod.Name)
 			return true, nil
 		}
@@ -128,7 +142,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 		pod.Annotations = make(map[string]string)
 	}
 	skip = true
-	for _, control := range matchedSidecarSets {
+	for _, control := range sidecarSets {
 		sidecarSet := control.GetSidecarset()
 		sk, err := sidecarcontrol.PatchPodMetadata(&pod.ObjectMeta, sidecarSet.Spec.PatchPodMetadata)
 		if err != nil {
@@ -140,7 +154,7 @@ func (h *PodCreateHandler) sidecarsetMutatingPod(ctx context.Context, req admiss
 		}
 	}
 	// build sidecar containers, sidecar initContainers, sidecar volumes, annotations to inject into pod object
-	sidecarContainers, sidecarInitContainers, sidecarSecrets, volumesInSidecar, injectedAnnotations, err := buildSidecars(isUpdated, pod, oldPod, matchedSidecarSets)
+	sidecarContainers, sidecarInitContainers, sidecarSecrets, volumesInSidecar, injectedAnnotations, err := buildSidecars(isUpdated, pod, oldPod, sidecarSets)
 	if err != nil {
 		return false, err
 	} else if len(sidecarContainers) == 0 && len(sidecarInitContainers) == 0 {

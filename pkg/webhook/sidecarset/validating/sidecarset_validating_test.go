@@ -1,7 +1,9 @@
 package validating
 
 import (
+	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
@@ -1414,6 +1416,307 @@ func TestSidecarSetVolumeConflict(t *testing.T) {
 			errs := validateSidecarConflict(nil, list, sidecar, field.NewPath("spec"))
 			if len(errs) != cs.expectErrLen {
 				t.Fatalf("except ErrLen(%d), but get errs(%d)", cs.expectErrLen, len(errs))
+			}
+		})
+	}
+}
+
+func TestValidateSidecarSetCanaryAnnotations(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1beta1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	tests := []struct {
+		name           string
+		obj            *appsv1beta1.SidecarSet
+		older          *appsv1beta1.SidecarSet
+		setupClient    func()
+		expectedErrors field.ErrorList
+	}{
+		{
+			name: "non-canary sidecarset",
+			obj: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-sidecarset",
+					Annotations: map[string]string{},
+				},
+			},
+			older:          nil,
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "canary sidecarset with base set to itself",
+			obj: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-sidecarset",
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetCanaryAnnotation: "true",
+						appsv1beta1.SidecarSetBaseAnnotation:   "test-sidecarset",
+					},
+				},
+				Spec: appsv1beta1.SidecarSetSpec{
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
+					},
+				},
+			},
+			older: nil,
+			expectedErrors: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "metadata",
+					BadValue: map[string]string{},
+					Detail:   "base sidecarSet cannot be itself",
+				},
+			},
+			setupClient: func() {
+				_ = fakeClient.Create(context.TODO(), &appsv1beta1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-sidecarset",
+					},
+				})
+			},
+		},
+		{
+			name: "canary sidecarset with valid base that exists",
+			obj: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-sidecarset",
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetCanaryAnnotation: "true",
+						appsv1beta1.SidecarSetBaseAnnotation:   "base-sidecarset",
+					},
+				},
+				Spec: appsv1beta1.SidecarSetSpec{
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
+					},
+				},
+			},
+			older: nil,
+			setupClient: func() {
+				_ = fakeClient.Create(context.TODO(), &appsv1beta1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "base-sidecarset",
+					},
+				})
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "canary sidecarset with valid base that exists, but base is canary",
+			obj: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-sidecarset",
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetCanaryAnnotation: "true",
+						appsv1beta1.SidecarSetBaseAnnotation:   "base1-sidecarset",
+					},
+				},
+				Spec: appsv1beta1.SidecarSetSpec{
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
+					},
+				},
+			},
+			older: nil,
+			setupClient: func() {
+				_ = fakeClient.Create(context.TODO(), &appsv1beta1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "base1-sidecarset",
+						Annotations: map[string]string{
+							appsv1beta1.SidecarSetCanaryAnnotation: "true",
+							appsv1beta1.SidecarSetBaseAnnotation:   "other-base-sidecarset",
+						},
+					},
+				})
+			},
+			expectedErrors: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "metadata",
+					BadValue: map[string]string{},
+					Detail:   "base sidecarSet cannot be canary",
+				},
+			},
+		},
+		{
+			name: "canary sidecarset with base that does not exist",
+			obj: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-sidecarset",
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetCanaryAnnotation: "true",
+						appsv1beta1.SidecarSetBaseAnnotation:   "nonexistent-sidecarset",
+					},
+				},
+				Spec: appsv1beta1.SidecarSetSpec{
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
+					},
+				},
+			},
+			older: nil,
+			expectedErrors: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "metadata",
+					BadValue: map[string]string{},
+					Detail:   "fetch base sidecarSet[nonexistent-sidecarset] failed: sidecarsets.apps.kruise.io \"nonexistent-sidecarset\" not found",
+				},
+			},
+		},
+		{
+			name: "updating canary sidecarset with unchanged base",
+			obj: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-sidecarset",
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetCanaryAnnotation: "true",
+						appsv1beta1.SidecarSetBaseAnnotation:   "base-sidecarset",
+					},
+				},
+				Spec: appsv1beta1.SidecarSetSpec{
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
+					},
+				},
+			},
+			older: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-sidecarset",
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetCanaryAnnotation: "true",
+						appsv1beta1.SidecarSetBaseAnnotation:   "base-sidecarset",
+					},
+				},
+				Spec: appsv1beta1.SidecarSetSpec{
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
+					},
+				},
+			},
+			setupClient: func() {
+				_ = fakeClient.Create(context.TODO(), &appsv1beta1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "base-sidecarset",
+					},
+				})
+			},
+			expectedErrors: field.ErrorList{},
+		},
+		{
+			name: "updating canary sidecarset with changed base",
+			obj: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-sidecarset",
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetCanaryAnnotation: "true",
+						appsv1beta1.SidecarSetBaseAnnotation:   "new-base-sidecarset",
+					},
+				},
+				Spec: appsv1beta1.SidecarSetSpec{
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
+					},
+				},
+			},
+			older: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-sidecarset",
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetCanaryAnnotation: "true",
+						appsv1beta1.SidecarSetBaseAnnotation:   "old-base-sidecarset",
+					},
+				},
+				Spec: appsv1beta1.SidecarSetSpec{
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.NotUpdateSidecarSetStrategyType,
+					},
+				},
+			},
+			setupClient: func() {
+				_ = fakeClient.Create(context.TODO(), &appsv1beta1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "new-base-sidecarset",
+					},
+				})
+				_ = fakeClient.Create(context.TODO(), &appsv1beta1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "old-base-sidecarset",
+					},
+				})
+			},
+			expectedErrors: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "metadata",
+					BadValue: map[string]string{},
+					Detail:   "annotations[apps.kruise.io/sidecarset-base] is immutable",
+				},
+			},
+		},
+		{
+			name: "canary sidecarset with RollingUpdate strategy",
+			obj: &appsv1beta1.SidecarSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-sidecarset",
+					Annotations: map[string]string{
+						appsv1beta1.SidecarSetCanaryAnnotation: "true",
+						appsv1beta1.SidecarSetBaseAnnotation:   "base-sidecarset",
+					},
+				},
+				Spec: appsv1beta1.SidecarSetSpec{
+					UpdateStrategy: appsv1beta1.SidecarSetUpdateStrategy{
+						Type: appsv1beta1.RollingUpdateSidecarSetStrategyType,
+					},
+				},
+			},
+			older: nil,
+			setupClient: func() {
+				_ = fakeClient.Create(context.TODO(), &appsv1beta1.SidecarSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "base-sidecarset",
+					},
+				})
+			},
+			expectedErrors: field.ErrorList{
+				&field.Error{
+					Type:     field.ErrorTypeInvalid,
+					Field:    "metadata",
+					BadValue: map[string]string{},
+					Detail:   "RollingUpdate is not supported for canary sidecarSet",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupClient != nil {
+				tt.setupClient()
+			}
+
+			result := validateSidecarSetCanaryAnnotations(fakeClient, tt.obj, tt.older)
+
+			if len(result) != len(tt.expectedErrors) {
+				t.Errorf("Expected %d errors, got %d", len(tt.expectedErrors), len(result))
+				t.Logf("Expected: %v", tt.expectedErrors)
+				t.Logf("Got: %v", result)
+				return
+			}
+
+			for i, expectedErr := range tt.expectedErrors {
+				if result[i].Type != expectedErr.Type {
+					t.Errorf("Error[%d]: expected type %v, got %v", i, expectedErr.Type, result[i].Type)
+				}
+				if result[i].Field != expectedErr.Field {
+					t.Errorf("Error[%d]: expected field %s, got %s", i, expectedErr.Field, result[i].Field)
+				}
+				if !strings.Contains(result[i].Detail, expectedErr.Detail) {
+					t.Errorf("Error[%d]: expected detail %s, got %s", i, expectedErr.Detail, result[i].Detail)
+				}
 			}
 		})
 	}

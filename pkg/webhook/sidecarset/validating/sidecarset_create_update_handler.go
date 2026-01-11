@@ -87,6 +87,10 @@ func (h *SidecarSetCreateUpdateHandler) validatingSidecarSetFn(_ context.Context
 func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1beta1.SidecarSet, older *appsv1beta1.SidecarSet) field.ErrorList {
 	// validating ObjectMeta
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, validateSidecarSetName, field.NewPath("metadata"))
+
+	// validate canary annotations
+	allErrs = append(allErrs, validateSidecarSetCanaryAnnotations(h.Client, obj, older)...)
+
 	// validating spec
 	allErrs = append(allErrs, h.validateSidecarSetSpec(obj, field.NewPath("spec"))...)
 	// when operation is update, older isn't empty, and validating whether old and new containers conflict
@@ -102,6 +106,43 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1beta1.Side
 		allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("query other sidecarsets failed, err: %v", err)))
 	}
 	allErrs = append(allErrs, validateSidecarConflict(h.Client, sidecarSets, obj, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func validateSidecarSetCanaryAnnotations(c client.Client, obj *appsv1beta1.SidecarSet, older *appsv1beta1.SidecarSet) field.ErrorList {
+	allErrs := field.ErrorList{}
+	isCanary, baseSidecarSet := sidecarcontrol.IsCanarySidecarSet(obj)
+	if !isCanary {
+		return allErrs
+	}
+	// base sidecarSet cannot be itself
+	if baseSidecarSet == obj.Name {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), obj.Annotations, "base sidecarSet cannot be itself"))
+	}
+	// If it's updating scenario, the base sidecarSet cannot be changed
+	if older != nil && isCanary {
+		if older.Annotations[appsv1beta1.SidecarSetBaseAnnotation] != baseSidecarSet {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), obj.Annotations, fmt.Sprintf(
+				"annotations[%s] is immutable", appsv1beta1.SidecarSetBaseAnnotation)))
+		}
+	}
+
+	// check if baseSidecarSet exists
+	sidecarSet := &appsv1beta1.SidecarSet{}
+	err := c.Get(context.TODO(), client.ObjectKey{Name: baseSidecarSet}, sidecarSet)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), obj.Annotations, fmt.Sprintf(
+			"fetch base sidecarSet[%s] failed: %s", baseSidecarSet, err.Error())))
+	} else {
+		if isCanary, _ = sidecarcontrol.IsCanarySidecarSet(sidecarSet); isCanary {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), obj.Annotations, "base sidecarSet cannot be canary"))
+		}
+	}
+
+	// RollingUpdate is not supported for canary sidecarSet
+	if obj.Spec.UpdateStrategy.Type != appsv1beta1.NotUpdateSidecarSetStrategyType {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), obj.Annotations, "RollingUpdate is not supported for canary sidecarSet"))
+	}
 	return allErrs
 }
 
@@ -374,9 +415,14 @@ func validateSidecarConflict(c client.Client, sidecarSets *appsv1beta1.SidecarSe
 	// patch pod annotation key -> sidecarset.Name#patchPolicy
 	annotationsInOthers := make(map[string]string)
 
+	isCanary, baseSidecarSet := sidecarcontrol.IsCanarySidecarSet(sidecarSet)
 	matchedList := make([]*appsv1beta1.SidecarSet, 0)
 	for i := range sidecarSets.Items {
 		obj := &sidecarSets.Items[i]
+		// ignore base sidecarset
+		if isCanary && baseSidecarSet == obj.Name {
+			continue
+		}
 		if isSidecarSetNamespaceOverlapping(c, sidecarSet, obj) && util.IsSelectorOverlapping(sidecarSet.Spec.Selector, obj.Spec.Selector) {
 			matchedList = append(matchedList, obj)
 		}
