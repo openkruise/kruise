@@ -364,9 +364,10 @@ func (c *Controller) manageContainerMetaSet(pod *v1.Pod, kubePodStatus *kubeletc
 				}
 			}
 
+			// Trigger restarting only if image has not been changed, else kubelet will restart container
 			// Trigger restarting only if it is in-place updating
 			_, condition := podutil.GetPodCondition(&pod.Status, appspub.InPlaceUpdateReady)
-			if condition != nil && condition.Status == v1.ConditionFalse {
+			if condition != nil && condition.Status == v1.ConditionFalse && status.Image == containerSpec.Image {
 				// Trigger restarting when expected env hash is not equal to current hash
 				if containerMeta.Hashes.ExtractedEnvFromMetadataHash > 0 && containerMeta.Hashes.ExtractedEnvFromMetadataHash != envHasher.GetExpectHash(containerSpec, pod) {
 					// Maybe checking PlainHash inconsistent here can skip to trigger restart. But it is not a good idea for some special scenarios.
