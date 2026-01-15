@@ -356,6 +356,29 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1beta1.NodeImage,
 			}
 			newTags = append(newTags, *tagSpec)
 		}
+
+		// Clean up secrets, remove if not found
+		var newSecrets []appsv1beta1.ReferenceObject
+		for _, ref := range imageSpec.PullSecrets {
+			secret := &v1.Secret{}
+			err := r.Get(context.TODO(), client.ObjectKey{Namespace: ref.Namespace, Name: ref.Name}, secret)
+			// err=nil indicates that the secret exists
+			if err == nil {
+				newSecrets = append(newSecrets, ref)
+				continue
+			}
+			// get secret failed
+			if !errors.IsNotFound(err) {
+				klog.ErrorS(err, "get secrets failed", "secret", ref.Name)
+			}
+			// not found
+		}
+		// secrets changed
+		if len(newSecrets) != len(imageSpec.PullSecrets) {
+			modified = true
+			imageSpec.PullSecrets = newSecrets
+		}
+
 		if len(newTags) > 0 {
 			imageSpec.Tags = newTags
 			utilimagejob.SortSpecImageTagsV1beta1(&imageSpec)

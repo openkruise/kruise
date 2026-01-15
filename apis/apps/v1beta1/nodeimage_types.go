@@ -33,6 +33,8 @@ type ImageSpec struct {
 	// PullSecrets is an optional list of references to secrets in the same namespace to use for pulling the image.
 	// If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
 	// in the case of docker, only DockerConfig type secrets are honored.
+
+	// Deprecated: Field moved to ReferenceObject, temporarily retained for backward compatibility
 	// +optional
 	PullSecrets []ReferenceObject `json:"pullSecrets,omitempty"`
 
@@ -85,6 +87,12 @@ type ImageTagSpec struct {
 	// One of Always, IfNotPresent. Defaults to IfNotPresent.
 	// +optional
 	ImagePullPolicy ImagePullPolicy `json:"imagePullPolicy,omitempty"`
+
+	// PullSecrets is an optional list of references to secrets in the same namespace to use for pulling the image.
+	// If specified, these secrets will be passed to individual puller implementations for them to use.  For example,
+	// in the case of docker, only DockerConfig type secrets are honored.
+	// +optional
+	PullSecrets []ReferenceObject `json:"pullSecrets,omitempty"`
 }
 
 // ImageTagPullPolicy defines the policy of the pulling task

@@ -1,16 +1,19 @@
 package imagepulljob
 
 import (
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/clock"
 	k8stesting "k8s.io/utils/clock/testing"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
@@ -1097,6 +1100,239 @@ func TestReleaseTargetSecrets(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestSyncNodeImages(t *testing.T) {
+	tests := []struct {
+		name                string
+		job                 *appsv1beta1.ImagePullJob
+		nodeImages          []*appsv1beta1.NodeImage
+		secrets             []appsv1beta1.ReferenceObject
+		newStatus           *appsv1beta1.ImagePullJobStatus
+		notSyncedNodeImages []string
+		expectedError       bool
+		validateFunc        func(*testing.T, *ReconcileImagePullJob, *appsv1beta1.ImagePullJob)
+	}{
+		{
+			name: "empty notSyncedNodeImages",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job",
+					Namespace: "default",
+					UID:       "12345",
+				},
+				Spec: appsv1beta1.ImagePullJobSpec{
+					Image: "nginx:latest",
+				},
+			},
+			nodeImages:          []*appsv1beta1.NodeImage{},
+			secrets:             []appsv1beta1.ReferenceObject{},
+			newStatus:           &appsv1beta1.ImagePullJobStatus{Active: 0},
+			notSyncedNodeImages: []string{},
+			expectedError:       false,
+		},
+		{
+			name: "parallelism limit reached",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job",
+					Namespace: "default",
+					UID:       "12345",
+				},
+				Spec: appsv1beta1.ImagePullJobSpec{
+					Image: "nginx:latest",
+					ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+						Parallelism: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+					},
+				},
+			},
+			nodeImages: []*appsv1beta1.NodeImage{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-1",
+					},
+					Spec: appsv1beta1.NodeImageSpec{
+						Images: map[string]appsv1beta1.ImageSpec{
+							"nginx": {
+								Tags: []appsv1beta1.ImageTagSpec{
+									{
+										Tag: "latest",
+										OwnerReferences: []v1.ObjectReference{
+											{
+												UID: "12345", // same as job UID
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			secrets:             []appsv1beta1.ReferenceObject{},
+			newStatus:           &appsv1beta1.ImagePullJobStatus{Active: 2}, // active数量超过parallelism
+			notSyncedNodeImages: []string{"node-1"},
+			expectedError:       false,
+		},
+		{
+			name: "sync new image to nodeImage",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job",
+					Namespace: "default",
+					UID:       "12345",
+				},
+				Spec: appsv1beta1.ImagePullJobSpec{
+					Image: "nginx:latest",
+				},
+			},
+			nodeImages: []*appsv1beta1.NodeImage{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-1",
+					},
+					Spec: appsv1beta1.NodeImageSpec{
+						Images: map[string]appsv1beta1.ImageSpec{},
+					},
+				},
+			},
+			secrets:             []appsv1beta1.ReferenceObject{},
+			newStatus:           &appsv1beta1.ImagePullJobStatus{Active: 0},
+			notSyncedNodeImages: []string{"node-1"},
+			expectedError:       false,
+			validateFunc: func(t *testing.T, r *ReconcileImagePullJob, job *appsv1beta1.ImagePullJob) {
+				// 验证 NodeImage 是否被正确更新
+				nodeImage := &appsv1beta1.NodeImage{}
+				err := r.Get(context.TODO(), types.NamespacedName{Name: "node-1"}, nodeImage)
+				assert.NoError(t, err)
+
+				imageSpec, exists := nodeImage.Spec.Images["nginx"]
+				assert.True(t, exists)
+				assert.Equal(t, 1, len(imageSpec.Tags))
+				assert.Equal(t, "latest", imageSpec.Tags[0].Tag)
+				assert.Equal(t, job.UID, imageSpec.Tags[0].OwnerReferences[0].UID)
+			},
+		},
+		{
+			name: "sync existing image to nodeImage with secrets",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job",
+					Namespace: "default",
+					UID:       "12345",
+				},
+				Spec: appsv1beta1.ImagePullJobSpec{
+					Image: "nginx:v2",
+				},
+			},
+			nodeImages: []*appsv1beta1.NodeImage{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-1",
+					},
+					Spec: appsv1beta1.NodeImageSpec{
+						Images: map[string]appsv1beta1.ImageSpec{
+							"nginx": {
+								Tags: []appsv1beta1.ImageTagSpec{
+									{
+										Tag: "v1",
+										OwnerReferences: []v1.ObjectReference{
+											{
+												UID: "different-uid",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			secrets:             []appsv1beta1.ReferenceObject{{Namespace: "default", Name: "reg-secret"}},
+			newStatus:           &appsv1beta1.ImagePullJobStatus{Active: 0},
+			notSyncedNodeImages: []string{"node-1"},
+			expectedError:       false,
+			validateFunc: func(t *testing.T, r *ReconcileImagePullJob, job *appsv1beta1.ImagePullJob) {
+				nodeImage := &appsv1beta1.NodeImage{}
+				err := r.Get(context.TODO(), types.NamespacedName{Name: "node-1"}, nodeImage)
+				assert.NoError(t, err)
+
+				imageSpec, exists := nodeImage.Spec.Images["nginx"]
+				assert.True(t, exists)
+				assert.Equal(t, 2, len(imageSpec.Tags))
+				assert.Equal(t, job.UID, imageSpec.Tags[1].OwnerReferences[0].UID)
+				assert.Equal(t, "reg-secret", imageSpec.Tags[1].PullSecrets[0].Name)
+			},
+		},
+		{
+			name: "image already synced",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job",
+					Namespace: "default",
+					UID:       "12345",
+				},
+				Spec: appsv1beta1.ImagePullJobSpec{
+					Image: "nginx:latest",
+				},
+			},
+			nodeImages: []*appsv1beta1.NodeImage{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "node-1",
+					},
+					Spec: appsv1beta1.NodeImageSpec{
+						Images: map[string]appsv1beta1.ImageSpec{
+							"nginx": {
+								Tags: []appsv1beta1.ImageTagSpec{
+									{
+										Tag: "latest",
+										OwnerReferences: []v1.ObjectReference{
+											{
+												UID: "12345", // same as job UID
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			secrets:             []appsv1beta1.ReferenceObject{},
+			newStatus:           &appsv1beta1.ImagePullJobStatus{Active: 0},
+			notSyncedNodeImages: []string{"node-1"},
+			expectedError:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			objs := []client.Object{}
+			for _, ni := range tt.nodeImages {
+				objs = append(objs, ni.DeepCopy())
+			}
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(objs...).Build()
+
+			r := &ReconcileImagePullJob{
+				Client: fakeClient,
+				scheme: scheme,
+				clock:  clock.RealClock{},
+			}
+
+			err := r.syncNodeImages(tt.job, tt.newStatus, tt.notSyncedNodeImages, tt.secrets)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			if tt.validateFunc != nil {
+				tt.validateFunc(t, r, tt.job)
 			}
 		})
 	}

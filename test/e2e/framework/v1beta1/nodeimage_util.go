@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -83,17 +84,22 @@ func (tester *NodeImageTester) ExpectNodes() ([]*v1.Node, error) {
 	if len(nodeList.Items) == 0 {
 		return nil, fmt.Errorf("no nodes found")
 	}
+	var nodes []*v1.Node
+	for i := range nodeList.Items {
+		node := &nodeList.Items[i]
+		// ignore vk
+		if node.Labels["type"] == "virtual-kubelet" {
+			continue
+		}
+		nodes = append(nodes, &nodeList.Items[i])
+	}
 	nodeImageList, err := tester.ListNodeImages()
 	if err != nil {
 		return nil, err
 	}
-	if len(nodeList.Items) != len(nodeImageList.Items)-1 {
+	if len(nodes) != len(nodeImageList.Items)-1 {
 		return nil, fmt.Errorf("unexpected nodes number %d and nodeimages number %d, nodes: %v, nodeimages: %v",
-			len(nodeList.Items), len(nodeImageList.Items), util.DumpJSON(nodeList), util.DumpJSON(nodeImageList))
-	}
-	var nodes []*v1.Node
-	for i := range nodeList.Items {
-		nodes = append(nodes, &nodeList.Items[i])
+			len(nodes), len(nodeImageList.Items), util.DumpJSON(nodes), util.DumpJSON(nodeImageList))
 	}
 	return nodes, nil
 }
@@ -102,7 +108,7 @@ func (tester *NodeImageTester) GetNodeImage(name string) (*AppsV1beta1.NodeImage
 	return tester.kc.AppsV1beta1().NodeImages().Get(context.TODO(), name, metav1.GetOptions{})
 }
 
-func (tester *NodeImageTester) IsImageInSpec(image, nodeName string) (bool, error) {
+func (tester *NodeImageTester) IsImageInSpec(image, nodeName string, secrets []string) (bool, error) {
 	nodeImage, err := tester.GetNodeImage(nodeName)
 	if err != nil {
 		return false, err
@@ -116,8 +122,19 @@ func (tester *NodeImageTester) IsImageInSpec(image, nodeName string) (bool, erro
 	if !ok {
 		return false, nil
 	}
+
+	newSecrets := make([]AppsV1beta1.ReferenceObject, 0)
+	sort.Strings(secrets)
+	for _, name := range secrets {
+		obj := AppsV1beta1.ReferenceObject{
+			Namespace: util.GetKruiseDaemonConfigNamespace(),
+			Name:      name,
+		}
+		newSecrets = append(newSecrets, obj)
+	}
+
 	for _, tagSpec := range imageSpec.Tags {
-		if tagSpec.Tag == imageTag {
+		if tagSpec.Tag == imageTag && util.IsJSONObjectEqual(newSecrets, tagSpec.PullSecrets) {
 			return true, nil
 		}
 	}

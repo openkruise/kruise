@@ -165,6 +165,7 @@ func (w *realWorkerPool) Sync(spec *appsv1beta1.ImageSpec, status *appsv1beta1.I
 
 	klog.V(5).InfoS("sync worker pool", "name", w.name)
 
+	// This part of code is for compatibility issues during upgrade process, and can be removed later along with pullSecrets.
 	secrets, err := w.secretManager.GetSecrets(spec.PullSecrets)
 	if err != nil {
 		klog.ErrorS(err, "failed to get secrets", "pullSecrets", spec.PullSecrets)
@@ -218,7 +219,19 @@ func (w *realWorkerPool) Sync(spec *appsv1beta1.ImageSpec, status *appsv1beta1.I
 		_, ok := w.pullWorkers[tagSpec.Tag]
 
 		if !ok {
-			worker := newPullWorker(w.name, tagSpec, spec.SandboxConfig, secrets, w.runtime, w, ref, w.eventRecorder)
+			fetchSecretNames := sets.NewString()
+			for _, obj := range tagSpec.PullSecrets {
+				fetchSecretNames.Insert(obj.Name)
+			}
+			tempSecrets, _ := w.secretManager.GetSecrets(tagSpec.PullSecrets)
+			// This part of code is for compatibility issues during upgrade process, and can be removed later along with pullSecrets.
+			for _, secret := range secrets {
+				if !fetchSecretNames.Has(secret.Name) {
+					tempSecrets = append(tempSecrets, secret)
+				}
+			}
+
+			worker := newPullWorker(w.name, tagSpec, spec.SandboxConfig, tempSecrets, w.runtime, w, ref, w.eventRecorder)
 			w.pullWorkers[tagSpec.Tag] = worker
 		}
 	}
