@@ -77,6 +77,28 @@ spec:
                   Delete pod, evict pod or update pod specification is allowed if at least "minAvailable" pods selected by
                   "selector" or "targetRef" will still be available after the above operation for pod.
                 x-kubernetes-int-or-string: true
+              podGroupPolicy:
+                description: |-
+                  PodGroupPolicy defines the policy for grouping pods and calculating
+                  availability at the group level. When nil, legacy per-pod semantics apply.
+                properties:
+                  groupLabelKey:
+                    description: |-
+                      GroupLabelKey specifies the label key used to group Pods.
+                      Pods with the same value belong to the same group.
+                      Example: "leaderworkerset.sigs.k8s.io/group-index"
+                    type: string
+                  groupSize:
+                    description: |-
+                      GroupSize is the number of pods required for a group.
+                      Currently, a group is ready, which means all pods belonging
+                      to the same group are ready to be considered Available.
+                      Default (when nil) is 2.
+                    format: int32
+                    type: integer
+                required:
+                - groupLabelKey
+                type: object
               selector:
                 description: Selector label query over pods managed by the budget
                 properties:
@@ -176,6 +198,12 @@ spec:
                   currently allowed
                 format: int32
                 type: integer
+              unavailablePodGroups:
+                additionalProperties:
+                  format: date-time
+                  type: string
+                description: UnavailablePodGroups
+                type: object
               unavailablePods:
                 additionalProperties:
                   format: date-time

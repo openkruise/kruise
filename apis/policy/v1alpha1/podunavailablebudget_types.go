@@ -62,6 +62,10 @@ type PodUnavailableBudgetSpec struct {
 	// Selector and TargetReference are mutually exclusive, TargetReference is priority to take effect
 	TargetReference *TargetReference `json:"targetRef,omitempty"`
 
+	// PodGroupPolicy defines the policy for grouping pods and calculating
+	// availability at the group level. When nil, legacy per-pod semantics apply.
+	PodGroupPolicy *PodUnavailableBudgetPodGroupPolicy `json:"podGroupPolicy,omitempty"`
+
 	// Delete pod, evict pod or update pod specification is allowed if at most "maxUnavailable" pods selected by
 	// "selector" or "targetRef"  are unavailable after the above operation for pod.
 	// MaxUnavailable and MinAvailable are mutually exclusive, MaxUnavailable is priority to take effect
@@ -70,6 +74,19 @@ type PodUnavailableBudgetSpec struct {
 	// Delete pod, evict pod or update pod specification is allowed if at least "minAvailable" pods selected by
 	// "selector" or "targetRef" will still be available after the above operation for pod.
 	MinAvailable *intstr.IntOrString `json:"minAvailable,omitempty"`
+}
+
+type PodUnavailableBudgetPodGroupPolicy struct {
+	// GroupLabelKey specifies the label key used to group Pods.
+	// Pods with the same value belong to the same group.
+	// Example: "leaderworkerset.sigs.k8s.io/group-index"
+	GroupLabelKey string `json:"groupLabelKey"`
+
+	// GroupSize is the number of pods required for a group.
+	// Currently, a group is ready, which means all pods belonging
+	// to the same group are ready to be considered Available.
+	// Default (when nil) is 2.
+	GroupSize *int32 `json:"groupSize,omitempty"`
 }
 
 // TargetReference contains enough information to let you identify an workload for PodUnavailableBudget
@@ -98,6 +115,9 @@ type PodUnavailableBudgetStatus struct {
 	// once pod is available(consistent and ready) again, it will be removed from the list.
 	// +optional
 	UnavailablePods map[string]metav1.Time `json:"unavailablePods,omitempty"`
+
+	// UnavailablePodGroups
+	UnavailablePodGroups map[string]metav1.Time `json:"unavailablePodGroups,omitempty"`
 
 	// UnavailableAllowed number of pod unavailable that are currently allowed
 	UnavailableAllowed int32 `json:"unavailableAllowed"`

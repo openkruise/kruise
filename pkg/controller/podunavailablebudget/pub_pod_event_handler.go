@@ -93,6 +93,30 @@ func (p *enqueueRequestForPod) addPod(q workqueue.TypedRateLimitingInterface[rec
 }
 
 func GetPubForPod(c client.Client, pod *corev1.Pod) (*policyv1alpha1.PodUnavailableBudget, error) {
+	pubList := &policyv1alpha1.PodUnavailableBudgetList{}
+	if err := c.List(context.TODO(), pubList, &client.ListOptions{Namespace: pod.Namespace}, utilclient.DisableDeepCopy); err != nil {
+		return nil, err
+	}
+
+	// For customized-multi-layer workload, such as LWS, we cannot find
+	// the relationship between pod and pub when pod creating so we need
+	// a selector to match the pub and pod.
+	for i := range pubList.Items {
+		pub := &pubList.Items[i]
+		if pub.Spec.Selector == nil {
+			continue
+		}
+		selector, err := util.ValidatedLabelSelectorAsSelector(pub.Spec.Selector)
+		if err != nil {
+			continue
+		}
+		// If a PUB with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		return pub, nil
+	}
+
 	var workload *controllerfinder.ScaleAndSelector
 	var err error
 	if ref := metav1.GetControllerOf(pod); ref != nil {
@@ -102,10 +126,6 @@ func GetPubForPod(c client.Client, pod *corev1.Pod) (*policyv1alpha1.PodUnavaila
 		}
 	}
 
-	pubList := &policyv1alpha1.PodUnavailableBudgetList{}
-	if err = c.List(context.TODO(), pubList, &client.ListOptions{Namespace: pod.Namespace}, utilclient.DisableDeepCopy); err != nil {
-		return nil, err
-	}
 	for i := range pubList.Items {
 		pub := &pubList.Items[i]
 		// if targetReference isn't nil, priority to take effect
@@ -279,5 +299,5 @@ func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueu
 		},
 	})
 	klog.V(3).InfoS("Workload changed, and reconcile PodUnavailableBudget",
-		"wordload", klog.KRef(namespace, targetRef.Name), "podUnavailableBudget", klog.KRef(matched.Namespace, matched.Name))
+		"workload", klog.KRef(namespace, targetRef.Name), "podUnavailableBudget", klog.KRef(matched.Namespace, matched.Name))
 }

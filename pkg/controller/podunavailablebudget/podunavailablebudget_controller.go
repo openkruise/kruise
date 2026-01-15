@@ -316,12 +316,12 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 
 		// disruptedPods contains information about pods whose eviction or deletion was processed by the API handler but has not yet been observed by the PodUnavailableBudget.
 		// unavailablePods contains information about pods whose specification changed(in-place update), in case of informer cache latency, after 5 seconds to remove it.
-		var disruptedPods, unavailablePods map[string]metav1.Time
-		disruptedPods, unavailablePods, recheckTime = r.buildDisruptedAndUnavailablePods(pods, pubClone, currentTime)
-		currentAvailable := countAvailablePods(pods, disruptedPods, unavailablePods)
+		var disruptedPods, unavailablePods, unavailablePodGroups map[string]metav1.Time
+		disruptedPods, unavailablePods, unavailablePodGroups, recheckTime = r.buildDisruptedAndUnavailablePodsAndGroups(pods, pubClone, currentTime)
+		currentAvailable := countAvailableReplicas(pub, pods, disruptedPods, unavailablePods, unavailablePodGroups)
 
 		start = time.Now()
-		updateErr := r.updatePubStatus(pubClone, currentAvailable, desiredAvailable, expectedCount, disruptedPods, unavailablePods)
+		updateErr := r.updatePubStatus(pubClone, currentAvailable, desiredAvailable, expectedCount, disruptedPods, unavailablePods, unavailablePodGroups)
 		costOfUpdate += time.Since(start)
 		if updateErr == nil {
 			return nil
@@ -339,11 +339,13 @@ func (r *ReconcilePodUnavailableBudget) syncPodUnavailableBudget(pub *policyv1al
 	return recheckTime, err
 }
 
-func (r *ReconcilePodUnavailableBudget) patchRelatedPubAnnotationInPod(pub *policyv1alpha1.PodUnavailableBudget, pods []*corev1.Pod) error {
+func (r *ReconcilePodUnavailableBudget) patchRelatedPubAnnotationInPod(pub *policyv1alpha1.PodUnavailableBudget, groupPods map[string][]*corev1.Pod) error {
 	var updatedPods []*corev1.Pod
-	for i := range pods {
-		if pods[i].Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {
-			updatedPods = append(updatedPods, pods[i].DeepCopy())
+	for _, pods := range groupPods {
+		for i := range pods {
+			if pods[i].Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {
+				updatedPods = append(updatedPods, pods[i].DeepCopy())
+			}
 		}
 	}
 	if len(updatedPods) == 0 {
@@ -360,7 +362,18 @@ func (r *ReconcilePodUnavailableBudget) patchRelatedPubAnnotationInPod(pub *poli
 	return nil
 }
 
-func countAvailablePods(pods []*corev1.Pod, disruptedPods, unavailablePods map[string]metav1.Time) (currentAvailable int32) {
+func countAvailableReplicas(pub *policyv1alpha1.PodUnavailableBudget, groupPods map[string][]*corev1.Pod, disruptedPods, unavailablePods, unavailablePodGroups map[string]metav1.Time) (currentAvailable int32) {
+	if pub.Spec.PodGroupPolicy != nil && pub.Spec.PodGroupPolicy.GroupLabelKey != "" {
+		return countAvailablePodGroups(groupPods, unavailablePodGroups)
+	}
+	return countAvailablePods(groupPods, disruptedPods, unavailablePods)
+}
+
+func countAvailablePodGroups(groupPods map[string][]*corev1.Pod, unavailablePodGroups map[string]metav1.Time) int32 {
+	return int32(len(groupPods) - len(unavailablePodGroups))
+}
+
+func countAvailablePods(groupPods map[string][]*corev1.Pod, disruptedPods, unavailablePods map[string]metav1.Time) (currentAvailable int32) {
 	recordPods := sets.String{}
 	for pName := range disruptedPods {
 		recordPods.Insert(pName)
@@ -369,17 +382,19 @@ func countAvailablePods(pods []*corev1.Pod, disruptedPods, unavailablePods map[s
 		recordPods.Insert(pName)
 	}
 
-	for _, pod := range pods {
-		if !kubecontroller.IsPodActive(pod) {
-			continue
-		}
-		// ignore disrupted or unavailable pods, where the Pod is considered unavailable
-		if recordPods.Has(pod.Name) {
-			continue
-		}
-		// pod consistent and ready
-		if pubcontrol.PubControl.IsPodStateConsistent(pod) && pubcontrol.PubControl.IsPodReady(pod) {
-			currentAvailable++
+	for _, pods := range groupPods {
+		for _, pod := range pods {
+			if !kubecontroller.IsPodActive(pod) {
+				continue
+			}
+			// ignore disrupted or unavailable pods, where the Pod is considered unavailable
+			if recordPods.Has(pod.Name) {
+				continue
+			}
+			// pod consistent and ready
+			if pubcontrol.PubControl.IsPodStateConsistent(pod) && pubcontrol.PubControl.IsPodReady(pod) {
+				currentAvailable++
+			}
 		}
 	}
 
@@ -413,23 +428,26 @@ func (r *ReconcilePodUnavailableBudget) getDesiredAvailableForPub(pub *policyv1a
 	return
 }
 
-func (r *ReconcilePodUnavailableBudget) buildDisruptedAndUnavailablePods(pods []*corev1.Pod, pub *policyv1alpha1.PodUnavailableBudget, currentTime time.Time) (
-	// disruptedPods, unavailablePods, recheckTime
-	map[string]metav1.Time, map[string]metav1.Time, *time.Time) {
+func (r *ReconcilePodUnavailableBudget) buildDisruptedAndUnavailablePodsAndGroups(groupedPods map[string][]*corev1.Pod, pub *policyv1alpha1.PodUnavailableBudget, currentTime time.Time) (
+	// disruptedPods, unavailablePods, unavailablePodGroups, recheckTime
+	map[string]metav1.Time, map[string]metav1.Time, map[string]metav1.Time, *time.Time) {
 
 	disruptedPods := pub.Status.DisruptedPods
 	unavailablePods := pub.Status.UnavailablePods
+	unavailablePodGroups := pub.Status.UnavailablePodGroups
 
 	resultDisruptedPods := make(map[string]metav1.Time)
 	resultUnavailablePods := make(map[string]metav1.Time)
+	resultUnavailablePodGroups := make(map[string]metav1.Time)
 	var recheckTime *time.Time
 
 	if disruptedPods == nil && unavailablePods == nil {
-		return resultDisruptedPods, resultUnavailablePods, recheckTime
+		return resultDisruptedPods, resultUnavailablePods, resultUnavailablePodGroups, recheckTime
 	}
-	for _, pod := range pods {
+
+	handleSinglePod := func(pod *corev1.Pod) {
 		if !kubecontroller.IsPodActive(pod) {
-			continue
+			return
 		}
 
 		// handle disruption pods which will be eviction or deletion
@@ -453,21 +471,54 @@ func (r *ReconcilePodUnavailableBudget) buildDisruptedAndUnavailablePods(pods []
 			// in case of informer cache latency, after 10 seconds to remove it
 			expectedUpdate := unavailableTime.Time.Add(UpdatedDelayCheckTime)
 			if expectedUpdate.Before(currentTime) {
-				continue
+				return
 			} else {
 				resultUnavailablePods[pod.Name] = unavailableTime
 				if recheckTime == nil || expectedUpdate.Before(*recheckTime) {
 					recheckTime = &expectedUpdate
 				}
 			}
-
 		}
 	}
-	return resultDisruptedPods, resultUnavailablePods, recheckTime
+
+	handlePodGroup := func(groupName string, groupSize int32, pods []*corev1.Pod) {
+		activePods := make([]*corev1.Pod, 0, len(pods))
+		for _, pod := range pods {
+			if !kubecontroller.IsPodActive(pod) {
+				continue
+			}
+			if _, ok := resultUnavailablePods[pod.Name]; ok {
+				continue
+			}
+			if _, ok := resultDisruptedPods[pod.Name]; ok {
+				continue
+			}
+			activePods = append(activePods, pod)
+		}
+		if pubcontrol.PubControl.IsPodGroupConsistentAndReady(activePods, groupSize) {
+			return
+		}
+		if timestamp, ok := unavailablePodGroups[groupName]; ok {
+			resultUnavailablePods[groupName] = timestamp
+		} else {
+			resultUnavailablePods[groupName] = metav1.Time{Time: currentTime}
+		}
+	}
+
+	groupSize := getGroupSize(pub, groupedPods)
+	for groupName, pods := range groupedPods {
+		for _, pod := range pods {
+			handleSinglePod(pod)
+		}
+		if pub.Spec.PodGroupPolicy != nil {
+			handlePodGroup(groupName, groupSize, pods)
+		}
+	}
+	return resultDisruptedPods, resultUnavailablePods, resultUnavailablePodGroups, recheckTime
 }
 
 func (r *ReconcilePodUnavailableBudget) updatePubStatus(pub *policyv1alpha1.PodUnavailableBudget, currentAvailable, desiredAvailable, expectedCount int32,
-	disruptedPods, unavailablePods map[string]metav1.Time) error {
+	disruptedPods, unavailablePods, unavailablePodGroups map[string]metav1.Time) error {
 
 	unavailableAllowed := currentAvailable - desiredAvailable
 	if unavailableAllowed <= 0 {
@@ -480,18 +531,20 @@ func (r *ReconcilePodUnavailableBudget) updatePubStatus(pub *policyv1alpha1.PodU
 		pub.Status.UnavailableAllowed == unavailableAllowed &&
 		pub.Status.ObservedGeneration == pub.Generation &&
 		apiequality.Semantic.DeepEqual(pub.Status.DisruptedPods, disruptedPods) &&
+		apiequality.Semantic.DeepEqual(pub.Status.UnavailablePodGroups, unavailablePodGroups) &&
 		apiequality.Semantic.DeepEqual(pub.Status.UnavailablePods, unavailablePods) {
 		return nil
 	}
 
 	pub.Status = policyv1alpha1.PodUnavailableBudgetStatus{
-		CurrentAvailable:   currentAvailable,
-		DesiredAvailable:   desiredAvailable,
-		TotalReplicas:      expectedCount,
-		UnavailableAllowed: unavailableAllowed,
-		DisruptedPods:      disruptedPods,
-		UnavailablePods:    unavailablePods,
-		ObservedGeneration: pub.Generation,
+		CurrentAvailable:     currentAvailable,
+		DesiredAvailable:     desiredAvailable,
+		TotalReplicas:        expectedCount,
+		UnavailableAllowed:   unavailableAllowed,
+		DisruptedPods:        disruptedPods,
+		UnavailablePods:      unavailablePods,
+		UnavailablePodGroups: unavailablePodGroups,
+		ObservedGeneration:   pub.Generation,
 	}
 	err := r.Client.Status().Update(context.TODO(), pub)
 	if err != nil {
@@ -503,4 +556,15 @@ func (r *ReconcilePodUnavailableBudget) updatePubStatus(pub *policyv1alpha1.PodU
 	klog.V(3).InfoS("PodUnavailableBudget update status", "podUnavailableBudget", klog.KObj(pub), "disruptedPods", len(disruptedPods), "unavailablePods", len(unavailablePods),
 		"expectedCount", expectedCount, "desiredAvailable", desiredAvailable, "currentAvailable", currentAvailable, "unavailableAllowed", unavailableAllowed)
 	return nil
+}
+
+func getGroupSize(pub *policyv1alpha1.PodUnavailableBudget, groupedPods map[string][]*corev1.Pod) int32 {
+	groupSize := int32(2)
+	for _, pods := range groupedPods {
+		groupSize = max(groupSize, int32(len(pods)))
+	}
+	if pub.Spec.PodGroupPolicy.GroupSize != nil {
+		groupSize = *pub.Spec.PodGroupPolicy.GroupSize
+	}
+	return groupSize
 }

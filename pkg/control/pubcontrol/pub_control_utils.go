@@ -90,6 +90,9 @@ func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1alpha1.P
 	} else if isPodRecordedInPub(pod.Name, pub) {
 		klog.V(3).InfoS("Pod was already recorded in pub", "pod", klog.KObj(pod), "pub", klog.KObj(pub))
 		return true, "", nil
+	} else if isPodGroupRecordedInPub(pod, pub) {
+		klog.V(3).InfoS("Pods' group was already recorded in pub", "pod", klog.KObj(pod), "pub", klog.KObj(pub))
+		return true, "", nil
 	}
 	// check and decrement pub quota
 	var conflictTimes int
@@ -138,7 +141,7 @@ func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1alpha1.P
 
 		// Try to verify-and-decrement
 		// If it was false already, or if it becomes false during the course of our retries,
-		err = checkAndDecrement(pod.Name, pubClone, operation)
+		err = checkAndDecrement(pod, pubClone, operation)
 		if err != nil {
 			var kind, namespace, name string
 			if ref := PubControl.GetPodControllerOf(pod); ref != nil {
@@ -201,7 +204,11 @@ func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1alpha1.P
 	return true, "", nil
 }
 
-func checkAndDecrement(podName string, pub *policyv1alpha1.PodUnavailableBudget, operation policyv1alpha1.PubOperation) error {
+func checkAndDecrement(pod *corev1.Pod, pub *policyv1alpha1.PodUnavailableBudget, operation policyv1alpha1.PubOperation) error {
+	if isPodGroupRecordedInPub(pod, pub) {
+		klog.V(3).InfoS("Pod' group was already recorded in pub", "pod", klog.KObj(pod), "pub", klog.KObj(pub))
+		return nil
+	}
 	if pub.Status.UnavailableAllowed <= 0 {
 		return errors.NewForbidden(policyv1alpha1.Resource("podunavailablebudget"), pub.Name, fmt.Errorf("pub unavailable allowed is negative"))
 	}
@@ -217,13 +224,20 @@ func checkAndDecrement(podName string, pub *policyv1alpha1.PodUnavailableBudget,
 	if pub.Status.UnavailablePods == nil {
 		pub.Status.UnavailablePods = make(map[string]metav1.Time)
 	}
+	if pub.Status.UnavailablePodGroups == nil {
+		pub.Status.UnavailablePodGroups = make(map[string]metav1.Time)
+	}
 
 	if operation == policyv1alpha1.PubUpdateOperation {
-		pub.Status.UnavailablePods[podName] = metav1.Time{Time: time.Now()}
-		klog.V(3).InfoS("Pod was recorded in pub unavailablePods", "podName", podName, "pub", klog.KObj(pub))
+		pub.Status.UnavailablePods[pod.Name] = metav1.Time{Time: time.Now()}
+		klog.V(3).InfoS("Pod was recorded in pub unavailablePods", "podName", pod.Name, "pub", klog.KObj(pub))
 	} else {
-		pub.Status.DisruptedPods[podName] = metav1.Time{Time: time.Now()}
-		klog.V(3).InfoS("Pod was recorded in pub disruptedPods", "podName", podName, "pub", klog.KObj(pub))
+		pub.Status.DisruptedPods[pod.Name] = metav1.Time{Time: time.Now()}
+		klog.V(3).InfoS("Pod was recorded in pub disruptedPods", "podName", pod.Name, "pub", klog.KObj(pub))
+	}
+	if groupName := GetPodGroupName(pod, pub); groupName != "" {
+		pub.Status.UnavailablePodGroups[groupName] = metav1.Time{Time: time.Now()}
+		klog.V(3).InfoS("PodGroup was recorded in pub unavailablePods", "podGroupName", groupName, "pub", klog.KObj(pub))
 	}
 	return nil
 }
@@ -238,7 +252,23 @@ func isPodRecordedInPub(podName string, pub *policyv1alpha1.PodUnavailableBudget
 	return false
 }
 
-// check APIVersion, Kind, Name
+func isPodGroupRecordedInPub(pod *corev1.Pod, pub *policyv1alpha1.PodUnavailableBudget) bool {
+	if pub.Spec.PodGroupPolicy == nil || pub.Spec.PodGroupPolicy.GroupLabelKey == "" {
+		return false
+	}
+	grouName := GetPodGroupName(pod, pub)
+	_, exist := pub.Status.UnavailablePodGroups[grouName]
+	return exist
+}
+
+func GetPodGroupName(pod *corev1.Pod, pub *policyv1alpha1.PodUnavailableBudget) string {
+	if pub.Spec.PodGroupPolicy == nil || pub.Spec.PodGroupPolicy.GroupLabelKey == "" {
+		return ""
+	}
+	return pod.Labels[pub.Spec.PodGroupPolicy.GroupLabelKey]
+}
+
+// IsReferenceEqual check APIVersion, Kind, Name
 func IsReferenceEqual(ref1, ref2 *policyv1alpha1.TargetReference) bool {
 	gv1, err := schema.ParseGroupVersion(ref1.APIVersion)
 	if err != nil {
