@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
@@ -52,6 +53,11 @@ var (
 	// preventing the consumption of all available disk IOPS or network bandwidth,
 	// which could otherwise impact the performance of other running pods.
 	maxWorkersForPullImage = flag.Int("max-workers-for-pull-image", -1, "The maximum number of workers for pulling images.")
+
+	// kube-apiserver client rate limiting (rest.Config).
+	// If set to 0, will use client-go/controller-runtime defaults.
+	restConfigQPS   = flag.Int("rest-config-qps", 0, "QPS of rest config.")
+	restConfigBurst = flag.Int("rest-config-burst", 0, "Burst of rest config.")
 )
 
 func main() {
@@ -64,6 +70,7 @@ func main() {
 	ctrl.SetLogger(klogr.New())
 
 	cfg := config.GetConfigOrDie()
+	setRestConfig(cfg)
 	cfg.UserAgent = "kruise-daemon"
 	if err := client.NewRegistry(cfg); err != nil {
 		klog.Fatalf("Failed to init clientset registry: %v", err)
@@ -96,5 +103,14 @@ func main() {
 
 	if err := d.Run(ctx); err != nil {
 		klog.Fatalf("Failed to start daemon: %v", err)
+	}
+}
+
+func setRestConfig(c *rest.Config) {
+	if *restConfigQPS > 0 {
+		c.QPS = float32(*restConfigQPS)
+	}
+	if *restConfigBurst > 0 {
+		c.Burst = *restConfigBurst
 	}
 }
