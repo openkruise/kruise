@@ -35,7 +35,7 @@ import (
 
 	"github.com/openkruise/kruise/apis/apps/pub"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	"github.com/openkruise/kruise/pkg/util/feature"
@@ -43,7 +43,7 @@ import (
 
 func init() {
 	scheme = runtime.NewScheme()
-	utilruntime.Must(policyv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(policyv1beta1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	utilruntime.Must(apps.AddToScheme(scheme))
 }
@@ -51,16 +51,16 @@ func init() {
 var (
 	scheme *runtime.Scheme
 
-	pubDemo = policyv1alpha1.PodUnavailableBudget{
+	pubDemo = policyv1beta1.PodUnavailableBudget{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: policyv1alpha1.GroupVersion.String(),
+			APIVersion: policyv1beta1.GroupVersion.String(),
 			Kind:       "PodUnavailableBudget",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "pub-test",
 		},
-		Spec: policyv1alpha1.PodUnavailableBudgetSpec{
+		Spec: policyv1beta1.PodUnavailableBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"pub-controller": "true",
@@ -71,7 +71,7 @@ var (
 				StrVal: "30%",
 			},
 		},
-		Status: policyv1alpha1.PodUnavailableBudgetStatus{
+		Status: policyv1beta1.PodUnavailableBudgetStatus{
 			UnavailablePods:    map[string]metav1.Time{},
 			DisruptedPods:      map[string]metav1.Time{},
 			UnavailableAllowed: 0,
@@ -181,10 +181,10 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 	cases := []struct {
 		name            string
 		getPod          func() *corev1.Pod
-		getPub          func() *policyv1alpha1.PodUnavailableBudget
-		operation       policyv1alpha1.PubOperation
+		getPub          func() *policyv1beta1.PodUnavailableBudget
+		operation       policyv1beta1.PubOperation
 		expectAllow     bool
-		expectPubStatus func() *policyv1alpha1.PodUnavailableBudgetStatus
+		expectPubStatus func() *policyv1beta1.PodUnavailableBudgetStatus
 	}{
 		{
 			name: "valid update pod, allow",
@@ -192,14 +192,14 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 				pod := podDemo.DeepCopy()
 				return pod
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Status.UnavailableAllowed = 1
 				return pub
 			},
-			operation:   policyv1alpha1.PubUpdateOperation,
+			operation:   policyv1beta1.PubUpdateOperation,
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				pubStatus.UnavailablePods[podDemo.Name] = metav1.Now()
 				pubStatus.UnavailableAllowed = 0
@@ -212,13 +212,13 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 				pod := podDemo.DeepCopy()
 				return pod
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			operation:   policyv1alpha1.PubUpdateOperation,
+			operation:   policyv1beta1.PubUpdateOperation,
 			expectAllow: false,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -230,13 +230,13 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 				pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 				return pod
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			operation:   policyv1alpha1.PubUpdateOperation,
+			operation:   policyv1beta1.PubUpdateOperation,
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -249,13 +249,13 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 				podReadyCondition.Status = corev1.ConditionFalse
 				return pod
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			operation:   policyv1alpha1.PubUpdateOperation,
+			operation:   policyv1beta1.PubUpdateOperation,
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -267,13 +267,13 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 				pod.Labels[fmt.Sprintf("%sdata", appspub.PubUnavailablePodLabelPrefix)] = "true"
 				return pod
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			operation:   policyv1alpha1.PubUpdateOperation,
+			operation:   policyv1beta1.PubUpdateOperation,
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -285,25 +285,25 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 				pod.Annotations[pub.InPlaceUpdateStateKey] = `{"nextContainerImages":{"main":"nginx:v2"}}`
 				return pod
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			operation:   policyv1alpha1.PubDeleteOperation,
+			operation:   policyv1beta1.PubDeleteOperation,
 			expectAllow: true,
 		},
 		{
 			name: "valid delete pod, pod declared no protect , ignore",
 			getPod: func() *corev1.Pod {
 				pod := podDemo.DeepCopy()
-				pod.Annotations[policyv1alpha1.PodPubNoProtectionAnnotation] = "true"
+				pod.Annotations[policyv1beta1.PodPubNoProtectionAnnotation] = "true"
 				return pod
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			operation:   policyv1alpha1.PubDeleteOperation,
+			operation:   policyv1beta1.PubDeleteOperation,
 			expectAllow: true,
 		},
 	}
@@ -311,7 +311,7 @@ func TestPodUnavailableBudgetValidatePod(t *testing.T) {
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getPub()).
-				WithStatusSubresource(&policyv1alpha1.PodUnavailableBudget{}).Build()
+				WithStatusSubresource(&policyv1beta1.PodUnavailableBudget{}).Build()
 			finder := &controllerfinder.ControllerFinder{Client: fakeClient}
 			InitPubControl(fakeClient, finder, record.NewFakeRecorder(10))
 			allow, _, err := PodUnavailableBudgetValidatePod(cs.getPod(), cs.operation, "fake-user", false)
@@ -331,7 +331,7 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 		getPod        func() *corev1.Pod
 		getDeployment func() *apps.Deployment
 		getReplicaSet func() *apps.ReplicaSet
-		getPub        func() *policyv1alpha1.PodUnavailableBudget
+		getPub        func() *policyv1beta1.PodUnavailableBudget
 		matchedPub    bool
 	}{
 		{
@@ -349,10 +349,10 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 				rep := replicaSetDemo.DeepCopy()
 				return rep
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
-				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
+				pub.Spec.TargetReference = &policyv1beta1.TargetReference{
 					Name:       deploymentDemo.Name,
 					Kind:       deploymentDemo.Kind,
 					APIVersion: deploymentDemo.APIVersion,
@@ -376,11 +376,11 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 				rep := replicaSetDemo.DeepCopy()
 				return rep
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Namespace = "no-ns"
 				pub.Spec.Selector = nil
-				pub.Spec.TargetReference = &policyv1alpha1.TargetReference{
+				pub.Spec.TargetReference = &policyv1beta1.TargetReference{
 					Name:       deploymentDemo.Name,
 					Kind:       deploymentDemo.Kind,
 					APIVersion: deploymentDemo.APIVersion,
@@ -404,7 +404,7 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 				rep := replicaSetDemo.DeepCopy()
 				return rep
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = &metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -440,156 +440,156 @@ func TestGetPodUnavailableBudgetForPod(t *testing.T) {
 func TestIsNeedPubProtection(t *testing.T) {
 	cases := []struct {
 		name          string
-		getPub        func() *policyv1alpha1.PodUnavailableBudget
-		operation     policyv1alpha1.PubOperation
+		getPub        func() *policyv1beta1.PodUnavailableBudget
+		operation     policyv1beta1.PubOperation
 		expectProtect bool
 		enableInplace bool
 	}{
 		{
 			name: "pub protect update by default",
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			operation:     policyv1alpha1.PubUpdateOperation,
+			operation:     policyv1beta1.PubUpdateOperation,
 			expectProtect: true,
 		},
 		{
 			name: "pub protect delete by default",
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			operation:     policyv1alpha1.PubDeleteOperation,
+			operation:     policyv1beta1.PubDeleteOperation,
 			expectProtect: true,
 		},
 		{
 			name: "pub protect evict by default",
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			operation:     policyv1alpha1.PubEvictOperation,
+			operation:     policyv1beta1.PubEvictOperation,
 			expectProtect: true,
 		},
 		{
 			name: "pub not protect resize by default when featureGate InPlacePodVerticalScaling is enabled",
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			operation:     policyv1alpha1.PubResizeOperation,
+			operation:     policyv1beta1.PubResizeOperation,
 			enableInplace: true,
 			expectProtect: false,
 		},
 		{
 			name: "pub protect resize by default when featureGate InPlacePodVerticalScaling is disabled",
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
-			operation:     policyv1alpha1.PubResizeOperation,
+			operation:     policyv1beta1.PubResizeOperation,
 			enableInplace: false,
 			expectProtect: true,
 		},
 		{
 			name: "pub protect resize",
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Annotations = map[string]string{
-					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubResizeOperation),
+					policyv1beta1.PubProtectOperationAnnotation: string(policyv1beta1.PubResizeOperation),
 				}
 				return pub
 			},
-			operation:     policyv1alpha1.PubResizeOperation,
+			operation:     policyv1beta1.PubResizeOperation,
 			expectProtect: true,
 		},
 		{
 			name: "pub protect update",
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Annotations = map[string]string{
-					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubResizeOperation) + "," + string(policyv1alpha1.PubUpdateOperation),
+					policyv1beta1.PubProtectOperationAnnotation: string(policyv1beta1.PubResizeOperation) + "," + string(policyv1beta1.PubUpdateOperation),
 				}
 				return pub
 			},
-			operation:     policyv1alpha1.PubUpdateOperation,
+			operation:     policyv1beta1.PubUpdateOperation,
 			expectProtect: true,
 		},
 		{
 			name: "pub won't protect update when resize set",
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Annotations = map[string]string{
-					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubResizeOperation) + "," + string(policyv1alpha1.PubDeleteOperation),
+					policyv1beta1.PubProtectOperationAnnotation: string(policyv1beta1.PubResizeOperation) + "," + string(policyv1beta1.PubDeleteOperation),
 				}
 				return pub
 			},
-			operation:     policyv1alpha1.PubUpdateOperation,
+			operation:     policyv1beta1.PubUpdateOperation,
 			expectProtect: false,
 		},
 		{
 			name: "pub not protect update when resize not set",
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Annotations = map[string]string{
-					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubEvictOperation) + "," + string(policyv1alpha1.PubDeleteOperation),
+					policyv1beta1.PubProtectOperationAnnotation: string(policyv1beta1.PubEvictOperation) + "," + string(policyv1beta1.PubDeleteOperation),
 				}
 				return pub
 			},
-			operation:     policyv1alpha1.PubUpdateOperation,
+			operation:     policyv1beta1.PubUpdateOperation,
 			expectProtect: false,
 		},
 		{
 			name: "pub protect resize when update set and featureGate InPlacePodVerticalScaling is disabled",
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Annotations = map[string]string{
-					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubEvictOperation) + "," + string(policyv1alpha1.PubUpdateOperation),
+					policyv1beta1.PubProtectOperationAnnotation: string(policyv1beta1.PubEvictOperation) + "," + string(policyv1beta1.PubUpdateOperation),
 				}
 				return pub
 			},
 			enableInplace: false,
-			operation:     policyv1alpha1.PubResizeOperation,
+			operation:     policyv1beta1.PubResizeOperation,
 			expectProtect: true,
 		},
 		{
 			name: "pub not protect resize when update set and featureGate InPlacePodVerticalScaling enabled",
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Annotations = map[string]string{
-					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubEvictOperation) + "," + string(policyv1alpha1.PubUpdateOperation),
+					policyv1beta1.PubProtectOperationAnnotation: string(policyv1beta1.PubEvictOperation) + "," + string(policyv1beta1.PubUpdateOperation),
 				}
 				return pub
 			},
 			enableInplace: true,
-			operation:     policyv1alpha1.PubResizeOperation,
+			operation:     policyv1beta1.PubResizeOperation,
 			expectProtect: false,
 		},
 		{
 			name: "pub not protect resize when featureGate InPlacePodVerticalScaling enabled",
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Annotations = map[string]string{
-					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubEvictOperation),
+					policyv1beta1.PubProtectOperationAnnotation: string(policyv1beta1.PubEvictOperation),
 				}
 				return pub
 			},
 			enableInplace: true,
-			operation:     policyv1alpha1.PubResizeOperation,
+			operation:     policyv1beta1.PubResizeOperation,
 			expectProtect: false,
 		},
 		{
 			name: "pub not protect resize when featureGate InPlacePodVerticalScaling disabled",
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Annotations = map[string]string{
-					policyv1alpha1.PubProtectOperationAnnotation: string(policyv1alpha1.PubEvictOperation),
+					policyv1beta1.PubProtectOperationAnnotation: string(policyv1beta1.PubEvictOperation),
 				}
 				return pub
 			},
 			enableInplace: false,
-			operation:     policyv1alpha1.PubResizeOperation,
+			operation:     policyv1beta1.PubResizeOperation,
 			expectProtect: false,
 		},
 	}

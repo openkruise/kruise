@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 )
 
@@ -39,12 +39,12 @@ import (
 func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context, req admission.Request) (bool, string, error) {
 	var checkPod *corev1.Pod
 	var dryRun bool
-	var operation policyv1alpha1.PubOperation
+	var operation policyv1beta1.PubOperation
 	switch req.AdmissionRequest.Operation {
 	// filter out invalid Update operation, we only validate update Pod.MetaData, Pod.Spec
 	case admissionv1.Update:
 		newPod := &corev1.Pod{}
-		//decode new pod
+		// decode new pod
 		err := p.Decoder.Decode(req, newPod)
 		if err != nil {
 			return false, "", err
@@ -75,9 +75,9 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		// if dry run
 		dryRun = dryrun.IsDryRun(options.DryRun)
 		if canResizeInplace {
-			operation = policyv1alpha1.PubResizeOperation
+			operation = policyv1beta1.PubResizeOperation
 		} else {
-			operation = policyv1alpha1.PubUpdateOperation
+			operation = policyv1beta1.PubUpdateOperation
 		}
 
 	// filter out invalid Delete operation, only validate delete pods resources
@@ -97,7 +97,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		}
 		// if dry run
 		dryRun = dryrun.IsDryRun(deletion.DryRun)
-		operation = policyv1alpha1.PubDeleteOperation
+		operation = policyv1beta1.PubDeleteOperation
 
 	// filter out invalid Create operation, only validate create pod eviction subresource
 	case admissionv1.Create:
@@ -107,7 +107,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 			return true, "", nil
 		}
 		eviction := &policy.Eviction{}
-		//decode eviction
+		// decode eviction
 		err := p.Decoder.Decode(req, eviction)
 		if err != nil {
 			return false, "", err
@@ -124,7 +124,7 @@ func (p *PodCreateHandler) podUnavailableBudgetValidatingPod(ctx context.Context
 		if err = p.Client.Get(ctx, key, checkPod); err != nil {
 			return false, "", err
 		}
-		operation = policyv1alpha1.PubEvictOperation
+		operation = policyv1beta1.PubEvictOperation
 	}
 
 	if checkPod.Annotations[pubcontrol.PodRelatedPubAnnotation] == "" {

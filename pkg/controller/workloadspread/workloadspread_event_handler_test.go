@@ -234,13 +234,13 @@ func TestPodEventHandler(t *testing.T) {
 func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 	cases := []struct {
 		name                 string
-		getCloneSet          func() *appsv1alpha1.CloneSet
+		getCloneSet          func() *appsv1beta1.CloneSet
 		getWorkloadSpreads   func() []*appsv1alpha1.WorkloadSpread
 		expectWorkloadSpread func() *appsv1alpha1.WorkloadSpread
 	}{
 		{
 			name: "no matched WorkloadSpread",
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
@@ -268,7 +268,7 @@ func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 		},
 		{
 			name: "deletionTimestamp is not nil, no matched WorkloadSpread",
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
@@ -293,7 +293,7 @@ func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 		},
 		{
 			name: "matched WorkloadSpread ws-1",
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
@@ -318,7 +318,7 @@ func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 		},
 		{
 			name: "different version, matched WorkloadSpread ws-1",
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {
@@ -344,7 +344,7 @@ func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 		},
 		{
 			name: "matched WorkloadSpread ws-3",
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			getWorkloadSpreads: func() []*appsv1alpha1.WorkloadSpread {

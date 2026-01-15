@@ -38,7 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
@@ -47,16 +47,16 @@ import (
 
 func init() {
 	scheme = runtime.NewScheme()
-	utilruntime.Must(policyv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(policyv1beta1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 }
 
 var (
 	scheme *runtime.Scheme
 
-	pubDemo = policyv1alpha1.PodUnavailableBudget{
+	pubDemo = policyv1beta1.PodUnavailableBudget{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: policyv1alpha1.GroupVersion.String(),
+			APIVersion: policyv1beta1.GroupVersion.String(),
 			Kind:       "PodUnavailableBudget",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -64,7 +64,7 @@ var (
 			Name:        "pub-test",
 			Annotations: map[string]string{},
 		},
-		Spec: policyv1alpha1.PodUnavailableBudgetSpec{
+		Spec: policyv1beta1.PodUnavailableBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": "pub-controller",
@@ -75,7 +75,7 @@ var (
 				StrVal: "30%",
 			},
 		},
-		Status: policyv1alpha1.PodUnavailableBudgetStatus{
+		Status: policyv1beta1.PodUnavailableBudgetStatus{
 			DisruptedPods: map[string]metav1.Time{
 				"test-pod-9": metav1.Now(),
 			},
@@ -131,10 +131,10 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 		name            string
 		oldPod          func() *corev1.Pod
 		newPod          func() *corev1.Pod
-		pub             func() *policyv1alpha1.PodUnavailableBudget
+		pub             func() *policyv1beta1.PodUnavailableBudget
 		subresource     string
 		expectAllow     bool
-		expectPubStatus func() *policyv1alpha1.PodUnavailableBudgetStatus
+		expectPubStatus func() *policyv1beta1.PodUnavailableBudgetStatus
 	}{
 		{
 			name: "valid update pod, allow",
@@ -147,14 +147,14 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 				pod.Spec.Containers[0].Image = "nginx:1.18"
 				return pod
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Status.CurrentAvailable = 8
 				pub.Status.UnavailableAllowed = 1
 				return pub
 			},
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				pubStatus.UnavailablePods["test-pod-0"] = metav1.Now()
 				pubStatus.CurrentAvailable = 8
@@ -173,12 +173,12 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 				pod.Spec.Containers[0].Image = "nginx:1.18"
 				return pod
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
 			expectAllow: false,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -196,12 +196,12 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 				pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 				return pod
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -218,13 +218,13 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 				podReadyCondition.Status = corev1.ConditionFalse
 				return pod
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
 			subresource: "status",
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -244,12 +244,12 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 				pod.Spec.Containers[0].Image = "nginx:1.18"
 				return pod
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -266,12 +266,12 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 				pod.Annotations["ab"] = "annob"
 				return pod
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -320,12 +320,12 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 				pod.Annotations[sidecarcontrol.SidecarsetInplaceUpdateStateKey] = `{"test-sidecarset": {"revision":"new-revision","lastContainerStatuses":{"sidecar-mesh":{"imageID":"envoy@sha256:1ba0da74b20aad52b091877b0e0ece503c563f39e37aa6b0e46777c4d820a2ae"}}}}`
 				return pod
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
 			expectAllow: false,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -345,12 +345,12 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 				pod.Annotations[appspub.InPlaceUpdateStateKey] = `{"revision":"new-revision","lastContainerStatuses":{"nginx":{"imageID":"nginx@sha256:53f029ad8b1058e966d6714a30d2582943c6e936f4b3c3b344a302c4567f471d"}}}`
 				return pod
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
 			expectAllow: false,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -369,12 +369,12 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 				pod.Spec.Containers[0].Image = "nginx:1.18"
 				return pod
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -390,13 +390,13 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 				pod.Spec.Containers[0].Image = "nginx:1.18"
 				return pod
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Status.UnavailablePods["test-pod-0"] = metav1.Now()
 				return pub
 			},
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				pubStatus.UnavailablePods["test-pod-0"] = metav1.Now()
 				return pubStatus
@@ -416,12 +416,12 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 				pod.Spec.Containers[0].Image = "sha256:04f32c9b5a29a3eb09cab973b72de4c3297bcf0b1834e05faa47d18bcc15f5f1"
 				return pod
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
 			expectAllow: false,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -437,13 +437,13 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 				pod.Spec.Containers[0].Image = "nginx:1.18"
 				return pod
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
-				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = "DELETE"
+				pub.Annotations[policyv1beta1.PubProtectOperationAnnotation] = "DELETE"
 				return pub
 			},
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -459,13 +459,13 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 				pod.Spec.Containers[0].Image = "nginx:1.18"
 				return pod
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
-				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = "UPDATE"
+				pub.Annotations[policyv1beta1.PubProtectOperationAnnotation] = "UPDATE"
 				return pub
 			},
 			expectAllow: false,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -476,7 +476,7 @@ func TestValidateUpdatePodForPub(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			decoder := admission.NewDecoder(scheme)
 			fClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.pub()).
-				WithStatusSubresource(&policyv1alpha1.PodUnavailableBudget{}).Build()
+				WithStatusSubresource(&policyv1beta1.PodUnavailableBudget{}).Build()
 			podHandler := PodCreateHandler{
 				Client:  fClient,
 				Decoder: decoder,
@@ -517,10 +517,10 @@ func TestValidateEvictPodForPub(t *testing.T) {
 		name            string
 		eviction        func() *policy.Eviction
 		newPod          func() *corev1.Pod
-		pub             func() *policyv1alpha1.PodUnavailableBudget
+		pub             func() *policyv1beta1.PodUnavailableBudget
 		subresource     string
 		expectAllow     bool
-		expectPubStatus func() *policyv1alpha1.PodUnavailableBudgetStatus
+		expectPubStatus func() *policyv1beta1.PodUnavailableBudgetStatus
 	}{
 		{
 			name: "evict pod, reject",
@@ -537,13 +537,13 @@ func TestValidateEvictPodForPub(t *testing.T) {
 				podIn := podDemo.DeepCopy()
 				return podIn
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
 			subresource: "eviction",
 			expectAllow: false,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -563,7 +563,7 @@ func TestValidateEvictPodForPub(t *testing.T) {
 				podIn := podDemo.DeepCopy()
 				return podIn
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Status.CurrentAvailable = 8
 				pub.Status.UnavailableAllowed = 1
@@ -571,7 +571,7 @@ func TestValidateEvictPodForPub(t *testing.T) {
 			},
 			subresource: "eviction",
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				pubStatus.DisruptedPods["test-pod-0"] = metav1.Now()
 				pubStatus.CurrentAvailable = 8
@@ -596,7 +596,7 @@ func TestValidateEvictPodForPub(t *testing.T) {
 				podIn := podDemo.DeepCopy()
 				return podIn
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Status.CurrentAvailable = 8
 				pub.Status.UnavailableAllowed = 1
@@ -604,7 +604,7 @@ func TestValidateEvictPodForPub(t *testing.T) {
 			},
 			subresource: "eviction",
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				pubStatus.CurrentAvailable = 8
 				pubStatus.UnavailableAllowed = 1
@@ -620,12 +620,12 @@ func TestValidateEvictPodForPub(t *testing.T) {
 			eviction: func() *policy.Eviction {
 				return nil
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -645,9 +645,9 @@ func TestValidateEvictPodForPub(t *testing.T) {
 				podIn := podDemo.DeepCopy()
 				return podIn
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
-				pub.Status = policyv1alpha1.PodUnavailableBudgetStatus{
+				pub.Status = policyv1beta1.PodUnavailableBudgetStatus{
 					TotalReplicas:      0,
 					DesiredAvailable:   0,
 					CurrentAvailable:   10,
@@ -657,8 +657,8 @@ func TestValidateEvictPodForPub(t *testing.T) {
 			},
 			subresource: "eviction",
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
-				pubStatus := &policyv1alpha1.PodUnavailableBudgetStatus{
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
+				pubStatus := &policyv1beta1.PodUnavailableBudgetStatus{
 					TotalReplicas:      0,
 					DesiredAvailable:   0,
 					CurrentAvailable:   10,
@@ -673,7 +673,7 @@ func TestValidateEvictPodForPub(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			decoder := admission.NewDecoder(scheme)
 			fClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.pub(), cs.newPod()).
-				WithStatusSubresource(&policyv1alpha1.PodUnavailableBudget{}).Build()
+				WithStatusSubresource(&policyv1beta1.PodUnavailableBudget{}).Build()
 			podHandler := PodCreateHandler{
 				Client:  fClient,
 				Decoder: decoder,
@@ -708,10 +708,10 @@ func TestValidateDeletePodForPub(t *testing.T) {
 		name            string
 		deletion        func() *metav1.DeleteOptions
 		newPod          func() *corev1.Pod
-		pub             func() *policyv1alpha1.PodUnavailableBudget
+		pub             func() *policyv1beta1.PodUnavailableBudget
 		subresource     string
 		expectAllow     bool
-		expectPubStatus func() *policyv1alpha1.PodUnavailableBudgetStatus
+		expectPubStatus func() *policyv1beta1.PodUnavailableBudgetStatus
 	}{
 		{
 			name: "delete pod, subresource ignore",
@@ -722,13 +722,13 @@ func TestValidateDeletePodForPub(t *testing.T) {
 				podIn := podDemo.DeepCopy()
 				return podIn
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
 			subresource: "status",
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -742,13 +742,13 @@ func TestValidateDeletePodForPub(t *testing.T) {
 				podIn := podDemo.DeepCopy()
 				return podIn
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
 			subresource: "",
 			expectAllow: false,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -762,14 +762,14 @@ func TestValidateDeletePodForPub(t *testing.T) {
 				podIn := podDemo.DeepCopy()
 				return podIn
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
-				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = "UPDATE"
+				pub.Annotations[policyv1beta1.PubProtectOperationAnnotation] = "UPDATE"
 				return pub
 			},
 			subresource: "",
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				return pubStatus
 			},
@@ -783,7 +783,7 @@ func TestValidateDeletePodForPub(t *testing.T) {
 			deletion: func() *metav1.DeleteOptions {
 				return &metav1.DeleteOptions{}
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Status.CurrentAvailable = 8
 				pub.Status.UnavailableAllowed = 1
@@ -791,7 +791,7 @@ func TestValidateDeletePodForPub(t *testing.T) {
 			},
 			subresource: "",
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				pubStatus.DisruptedPods["test-pod-0"] = metav1.Now()
 				pubStatus.CurrentAvailable = 8
@@ -810,7 +810,7 @@ func TestValidateDeletePodForPub(t *testing.T) {
 					DryRun: []string{"All"},
 				}
 			},
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
+			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Status.CurrentAvailable = 8
 				pub.Status.UnavailableAllowed = 1
@@ -818,7 +818,7 @@ func TestValidateDeletePodForPub(t *testing.T) {
 			},
 			subresource: "",
 			expectAllow: true,
-			expectPubStatus: func() *policyv1alpha1.PodUnavailableBudgetStatus {
+			expectPubStatus: func() *policyv1beta1.PodUnavailableBudgetStatus {
 				pubStatus := pubDemo.Status.DeepCopy()
 				pubStatus.CurrentAvailable = 8
 				pubStatus.UnavailableAllowed = 1
@@ -831,7 +831,7 @@ func TestValidateDeletePodForPub(t *testing.T) {
 		t.Run(cs.name, func(t *testing.T) {
 			decoder := admission.NewDecoder(scheme)
 			fClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.pub(), cs.newPod()).
-				WithStatusSubresource(&policyv1alpha1.PodUnavailableBudget{}).Build()
+				WithStatusSubresource(&policyv1beta1.PodUnavailableBudget{}).Build()
 			podHandler := PodCreateHandler{
 				Client:  fClient,
 				Decoder: decoder,
@@ -879,7 +879,7 @@ func newAdmission(ns, name string, op admissionv1.Operation, object, oldObject r
 	}
 }
 
-func isPubStatusEqual(expectStatus, nowStatus *policyv1alpha1.PodUnavailableBudgetStatus) bool {
+func isPubStatusEqual(expectStatus, nowStatus *policyv1beta1.PodUnavailableBudgetStatus) bool {
 	nTime := metav1.Now()
 	for i := range expectStatus.UnavailablePods {
 		expectStatus.UnavailablePods[i] = nTime
@@ -897,8 +897,8 @@ func isPubStatusEqual(expectStatus, nowStatus *policyv1alpha1.PodUnavailableBudg
 	return reflect.DeepEqual(expectStatus, nowStatus)
 }
 
-func getLatestPub(client client.Client, pub *policyv1alpha1.PodUnavailableBudget) (*policyv1alpha1.PodUnavailableBudget, error) {
-	newPub := &policyv1alpha1.PodUnavailableBudget{}
+func getLatestPub(client client.Client, pub *policyv1beta1.PodUnavailableBudget) (*policyv1beta1.PodUnavailableBudget, error) {
+	newPub := &policyv1beta1.PodUnavailableBudget{}
 	key := types.NamespacedName{
 		Namespace: pub.Namespace,
 		Name:      pub.Name,

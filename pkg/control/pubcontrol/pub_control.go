@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -239,13 +239,18 @@ func hash(data string) string {
 // return two parameters
 // 1. podList
 // 2. expectedCount, the default is workload.Replicas
-func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) ([]*corev1.Pod, int32, error) {
+func (c *commonControl) GetPodsForPub(pub *policyv1beta1.PodUnavailableBudget) ([]*corev1.Pod, int32, error) {
+	return c.getPodsForPubV1alpha1(pub)
+}
+
+func (c *commonControl) getPodsForPubV1alpha1(pub *policyv1beta1.PodUnavailableBudget) ([]*corev1.Pod, int32, error) {
 	// if targetReference isn't nil, priority to take effect
 	var listOptions *client.ListOptions
 	if pub.Spec.TargetReference != nil {
 		ref := pub.Spec.TargetReference
 		matchedPods, expectedCount, err := c.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, pub.Namespace, ref.Name, true)
-		if value, _ := pub.Annotations[policyv1alpha1.PubProtectTotalReplicasAnnotation]; value != "" {
+		// For v1alpha1, check annotation first for backward compatibility
+		if value, _ := pub.Annotations[policyv1beta1.PubProtectTotalReplicasAnnotation]; value != "" {
 			count, _ := strconv.ParseInt(value, 10, 32)
 			expectedCount = int32(count)
 		}
@@ -272,9 +277,55 @@ func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) 
 			matchedPods = append(matchedPods, pod)
 		}
 	}
-	if value, _ := pub.Annotations[policyv1alpha1.PubProtectTotalReplicasAnnotation]; value != "" {
+	// For v1alpha1, check annotation first for backward compatibility
+	if value, _ := pub.Annotations[policyv1beta1.PubProtectTotalReplicasAnnotation]; value != "" {
 		expectedCount, _ := strconv.ParseInt(value, 10, 32)
 		return matchedPods, int32(expectedCount), nil
+	}
+	expectedCount, err := c.controllerFinder.GetExpectedScaleForPods(matchedPods)
+	if err != nil {
+		return nil, 0, err
+	}
+	return matchedPods, expectedCount, nil
+}
+
+// GetPodsForPubV1beta1 returns Pods protected by the pub v1beta1 object.
+func (c *commonControl) GetPodsForPubV1beta1(pub *policyv1beta1.PodUnavailableBudget) ([]*corev1.Pod, int32, error) {
+	// if targetReference isn't nil, priority to take effect
+	var listOptions *client.ListOptions
+	if pub.Spec.TargetReference != nil {
+		ref := pub.Spec.TargetReference
+		matchedPods, expectedCount, err := c.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, pub.Namespace, ref.Name, true)
+		// For v1beta1, use field instead of annotation
+		if pub.Spec.ProtectTotalReplicas != nil {
+			expectedCount = *pub.Spec.ProtectTotalReplicas
+		}
+		return matchedPods, expectedCount, err
+	} else if pub.Spec.Selector == nil {
+		klog.InfoS("Pub spec.Selector could not be empty", "pub", klog.KObj(pub))
+		return nil, 0, nil
+	}
+	// get pods for selector
+	labelSelector, err := util.ValidatedLabelSelectorAsSelector(pub.Spec.Selector)
+	if err != nil {
+		klog.InfoS("Pub ValidatedLabelSelectorAsSelector failed", "pub", klog.KObj(pub), "error", err)
+		return nil, 0, nil
+	}
+	listOptions = &client.ListOptions{Namespace: pub.Namespace, LabelSelector: labelSelector}
+	podList := &corev1.PodList{}
+	if err = c.List(context.TODO(), podList, listOptions, utilclient.DisableDeepCopy); err != nil {
+		return nil, 0, err
+	}
+	matchedPods := make([]*corev1.Pod, 0, len(podList.Items))
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if kubecontroller.IsPodActive(pod) {
+			matchedPods = append(matchedPods, pod)
+		}
+	}
+	// For v1beta1, use field instead of annotation
+	if pub.Spec.ProtectTotalReplicas != nil {
+		return matchedPods, *pub.Spec.ProtectTotalReplicas, nil
 	}
 	expectedCount, err := c.controllerFinder.GetExpectedScaleForPods(matchedPods)
 	if err != nil {
@@ -288,8 +339,8 @@ func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
 	// by comparing status.containers[x].ImageID with spec.container[x].Image can determine whether pod is consistent
 	allDigestImage := true
 	for _, container := range pod.Spec.Containers {
-		//whether image is digest format,
-		//for example: docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d
+		// whether image is digest format,
+		// for example: docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d
 		if !util.IsImageDigest(container.Image) {
 			allDigestImage = false
 			continue
@@ -323,12 +374,12 @@ func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
 	return true
 }
 
-func (c *commonControl) GetPubForPod(pod *corev1.Pod) (*policyv1alpha1.PodUnavailableBudget, error) {
+func (c *commonControl) GetPubForPod(pod *corev1.Pod) (*policyv1beta1.PodUnavailableBudget, error) {
 	if len(pod.Annotations) == 0 || pod.Annotations[PodRelatedPubAnnotation] == "" {
 		return nil, nil
 	}
 	pubName := pod.Annotations[PodRelatedPubAnnotation]
-	pub := &policyv1alpha1.PodUnavailableBudget{}
+	pub := &policyv1beta1.PodUnavailableBudget{}
 	err := c.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: pubName}, pub)
 	if err != nil {
 		if errors.IsNotFound(err) {

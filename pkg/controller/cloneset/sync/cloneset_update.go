@@ -31,7 +31,7 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
@@ -140,7 +140,7 @@ func (c *realControl) Update(cs *appsv1beta1.CloneSet,
 		pod := pods[idx]
 		// Determine the pub before updating the pod
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodUnavailableBudgetUpdateGate) {
-			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(pod, policyv1alpha1.PubUpdateOperation, "kruise-manager", false)
+			allowed, _, err := pubcontrol.PodUnavailableBudgetValidatePod(pod, policyv1beta1.PubUpdateOperation, "kruise-manager", false)
 			if err != nil {
 				return err
 				// pub check does not pass, try again in seconds
