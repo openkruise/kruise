@@ -371,3 +371,28 @@ func podAvailableWaitingTime(pod *corev1.Pod, minReadySeconds int32, now time.Ti
 	}
 	return minReadySecondsDuration - now.Sub(c.LastTransitionTime.Time)
 }
+
+// isNodeExemptFromMaxUnavailable checks whether the given node matches the exemptNodesFromMaxUnavailable selector.
+// If the selector is nil or empty, it returns false (i.e., no nodes are exempt).
+func isNodeExemptFromMaxUnavailable(node *corev1.Node, exemptSelector *metav1.LabelSelector) (bool, error) {
+	if exemptSelector == nil {
+		return false, nil
+	}
+
+	// Convert LabelSelector to a labels.Selector
+	selector, err := metav1.LabelSelectorAsSelector(exemptSelector)
+	if err != nil {
+		return false, err
+	}
+
+	// An empty selector (e.g., {}) matches all nodes, but in our context,
+	// we probably want to treat empty as "no exemption".
+	// However, LabelSelectorAsSelector returns Everything() for nil/empty MatchLabels and MatchExpressions.
+	// To align with user intent, we explicitly check if the original selector is effectively empty.
+	if len(exemptSelector.MatchLabels) == 0 && len(exemptSelector.MatchExpressions) == 0 {
+		return false, nil
+	}
+
+	// Check if the node's labels satisfy the selector
+	return selector.Matches(labels.Set(node.Labels)), nil
+}

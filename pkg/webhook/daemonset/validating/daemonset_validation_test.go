@@ -293,6 +293,25 @@ func TestValidateDaemonSetUpdateStrategy(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			name: "Invalid rollingUpdate selector",
+			strategy: &appsv1alpha1.DaemonSetUpdateStrategy{
+				Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+					MaxSurge: &maxSurge,
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"value1"},
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -873,6 +892,44 @@ func TestValidateDaemonSetUpdateStrategyV1beta1(t *testing.T) {
 			name: "Invalid strategy type",
 			strategy: &appsv1beta1.DaemonSetUpdateStrategy{
 				Type: "InvalidType",
+			},
+			expectErr: true,
+		},
+		{
+			name: "Invalid rollingUpdate selector",
+			strategy: &appsv1beta1.DaemonSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+					MaxSurge: &maxSurge,
+					Selector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"value1"},
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "Invalid rollingUpdate ExemptNodesFromMaxUnavailable",
+			strategy: &appsv1beta1.DaemonSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+					MaxSurge: &maxSurge,
+					ExemptNodesFromMaxUnavailable: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"value1"},
+							},
+						},
+					},
+				},
 			},
 			expectErr: true,
 		},
