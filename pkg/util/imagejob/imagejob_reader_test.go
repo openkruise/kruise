@@ -165,6 +165,14 @@ var (
 			ObjectMeta: metav1.ObjectMeta{Name: "job6", Finalizers: []string{"apps.kruise.io/fake-block"}},
 			Spec:       appsv1beta1.ImagePullJobSpec{},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "job7"},
+			Spec: appsv1beta1.ImagePullJobSpec{
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					Selector: &appsv1beta1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{}},
+				},
+			},
+		},
 	}
 )
 
@@ -239,6 +247,7 @@ func testGetNodeImagesForJob(g *gomega.GomegaWithT) {
 	g.Expect(getNodeImagesForJob(initialJobs[2])).Should(gomega.Equal([]string{"node3", "node5"}))
 	g.Expect(getNodeImagesForJob(initialJobs[3])).Should(gomega.Equal([]string{"node1", "node4"}))
 	g.Expect(getNodeImagesForJob(initialJobs[4])).Should(gomega.Equal([]string{"node2"}))
+	g.Expect(getNodeImagesForJob(initialJobs[6])).Should(gomega.Equal([]string{"node1", "node2", "node3", "node4", "node5"}))
 	// g.Expect(getNodeImagesForJob(initialJobs[5])).Should(gomega.Equal([]string{"node2"}))
 }
 
@@ -273,9 +282,9 @@ func testGetActiveJobsForNodeImage(g *gomega.GomegaWithT) {
 		return names.List()
 	}
 
-	g.Expect(getActiveJobsForNodeImage(initialNodeImages[0])).Should(gomega.Equal([]string{"job1", "job4"}))
-	g.Expect(getActiveJobsForNodeImage(initialNodeImages[1])).Should(gomega.Equal([]string{"job1", "job2", "job5"}))
-	g.Expect(getActiveJobsForNodeImage(initialNodeImages[2])).Should(gomega.Equal([]string{"job1", "job3"}))
-	g.Expect(getActiveJobsForNodeImage(initialNodeImages[3])).Should(gomega.Equal([]string{"job1", "job2", "job4"}))
-	g.Expect(getActiveJobsForNodeImage(initialNodeImages[4])).Should(gomega.Equal([]string{"job1", "job3", "job5"}))
+	g.Expect(getActiveJobsForNodeImage(initialNodeImages[0])).Should(gomega.Equal([]string{"job1", "job4", "job7"}))
+	g.Expect(getActiveJobsForNodeImage(initialNodeImages[1])).Should(gomega.Equal([]string{"job1", "job2", "job5", "job7"}))
+	g.Expect(getActiveJobsForNodeImage(initialNodeImages[2])).Should(gomega.Equal([]string{"job1", "job3", "job7"}))
+	g.Expect(getActiveJobsForNodeImage(initialNodeImages[3])).Should(gomega.Equal([]string{"job1", "job2", "job4", "job7"}))
+	g.Expect(getActiveJobsForNodeImage(initialNodeImages[4])).Should(gomega.Equal([]string{"job1", "job3", "job5", "job7"}))
 }
