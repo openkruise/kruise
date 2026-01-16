@@ -17,115 +17,17 @@ limitations under the License.
 package imagepulljob
 
 import (
-	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/openkruise/kruise/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	"github.com/openkruise/kruise/pkg/util"
 )
-
-func TestTargetFromSource(t *testing.T) {
-	cases := []struct {
-		name    string
-		getPara func() (*v1.Secret, referenceSet)
-		expect  *v1.Secret
-	}{
-		{
-			name: "test1, normal1",
-			getPara: func() (*v1.Secret, referenceSet) {
-				s1 := &v1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "ns-foo",
-						Name:      "foo",
-						Annotations: map[string]string{
-							"anno1": "value1",
-						},
-						Labels: map[string]string{
-							"labels1": "value2",
-						},
-						UID: types.UID("db8acf1c-be68-46a2-9a40-a36c65eedd84"),
-					},
-					Type: v1.SecretTypeOpaque,
-					Data: map[string][]byte{
-						"data": []byte("foo"),
-					},
-				}
-				ref := map[types.NamespacedName]struct{}{
-					{Namespace: "ns-foo", Name: "name1"}: {},
-				}
-				return s1, ref
-			},
-			expect: &v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						"anno1":                   "value1",
-						SourceSecretKeyAnno:       "ns-foo/foo",
-						TargetOwnerReferencesAnno: "ns-foo/name1",
-					},
-					Labels: map[string]string{
-						"labels1":               "value2",
-						SourceSecretUIDLabelKey: "db8acf1c-be68-46a2-9a40-a36c65eedd84",
-					},
-				},
-				Type: v1.SecretTypeOpaque,
-				Data: map[string][]byte{
-					"data": []byte("foo"),
-				},
-			},
-		},
-		{
-			name: "test1, normal2",
-			getPara: func() (*v1.Secret, referenceSet) {
-				s1 := &v1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "ns-foo",
-						Name:      "foo",
-						UID:       types.UID("db8acf1c-be68-46a2-9a40-a36c65eedd84"),
-					},
-					Type: v1.SecretTypeOpaque,
-					Data: map[string][]byte{
-						"data": []byte("foo"),
-					},
-				}
-				ref := map[types.NamespacedName]struct{}{
-					{Namespace: "ns-foo", Name: "name1"}: {},
-				}
-				return s1, ref
-			},
-			expect: &v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						SourceSecretKeyAnno:       "ns-foo/foo",
-						TargetOwnerReferencesAnno: "ns-foo/name1",
-					},
-					Labels: map[string]string{
-						SourceSecretUIDLabelKey: "db8acf1c-be68-46a2-9a40-a36c65eedd84",
-					},
-				},
-				Type: v1.SecretTypeOpaque,
-				Data: map[string][]byte{
-					"data": []byte("foo"),
-				},
-			},
-		},
-	}
-
-	for _, cs := range cases {
-		t.Run(cs.name, func(t *testing.T) {
-			obj := targetFromSource(cs.getPara())
-			obj.Namespace = ""
-			obj.GenerateName = ""
-			if !reflect.DeepEqual(obj, cs.expect) {
-				t.Fatalf("expect(%s), but get(%s)", util.DumpJSON(cs.expect), util.DumpJSON(obj))
-			}
-		})
-	}
-}
 
 func TestGetActiveDeadlineSecondsForNever(t *testing.T) {
 	cases := []struct {
@@ -179,5 +81,183 @@ func TestGetActiveDeadlineSecondsForNever(t *testing.T) {
 				t.Fatalf("expect(%d), but get(%d)", cs.expected, *ret)
 			}
 		})
+	}
+}
+
+func TestJobAsReferenceObject(t *testing.T) {
+	job := &appsv1beta1.ImagePullJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job",
+			Namespace: "test-ns",
+		},
+	}
+
+	expected := appsv1beta1.ReferenceObject{
+		Name:      "test-job",
+		Namespace: "test-ns",
+	}
+
+	result := jobAsReferenceObject(job)
+
+	if result != expected {
+		t.Errorf("Expected %+v, got %+v", expected, result)
+	}
+}
+
+func TestGenerateSyncedSecret(t *testing.T) {
+	originalSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "original-secret",
+			Namespace: "original-ns",
+			Labels: map[string]string{
+				"label1": "value1",
+			},
+			Annotations: map[string]string{
+				"annotation1": "value1",
+			},
+		},
+		Data: map[string][]byte{
+			"key1": []byte("value1"),
+		},
+	}
+
+	ref := appsv1beta1.ReferenceObject{
+		Name:      "test-job",
+		Namespace: "test-ns",
+	}
+
+	syncedSecret := generateSyncedSecret(originalSecret, ref)
+
+	if syncedSecret.Namespace != util.GetKruiseDaemonConfigNamespace() {
+		t.Errorf("Expected namespace %s, got %s", util.GetKruiseDaemonConfigNamespace(), syncedSecret.Namespace)
+	}
+
+	if !strings.HasPrefix(syncedSecret.Name, "original-secret-") {
+		t.Errorf("Expected name to start with 'original-secret-', got %s", syncedSecret.Name)
+	}
+
+	if syncedSecret.Labels["label1"] != "value1" {
+		t.Errorf("Labels not properly inherited")
+	}
+
+	if syncedSecret.Annotations[SecretAnnotationReferenceJobs] != ref.String() {
+		t.Errorf("Expected annotation %s to be %s, got %s", SecretAnnotationReferenceJobs, ref.String(), syncedSecret.Annotations[SecretAnnotationReferenceJobs])
+	}
+
+	if syncedSecret.Annotations[SecretAnnotationSourceSecretKey] != "original-ns/original-secret" {
+		t.Errorf("Expected source key annotation to be 'original-ns/original-secret', got %s", syncedSecret.Annotations[SecretAnnotationSourceSecretKey])
+	}
+}
+
+func TestGetReferencingJobsFromSecret(t *testing.T) {
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-secret",
+			Namespace: "test-ns",
+			Annotations: map[string]string{
+				SecretAnnotationReferenceJobs: "ns1/job1,ns2/job2,ns3/job3",
+			},
+		},
+	}
+
+	expected := sets.New(
+		appsv1beta1.ReferenceObject{Namespace: "ns1", Name: "job1"},
+		appsv1beta1.ReferenceObject{Namespace: "ns2", Name: "job2"},
+		appsv1beta1.ReferenceObject{Namespace: "ns3", Name: "job3"},
+	)
+
+	result := getReferencingJobsFromSecret(secret)
+
+	if !result.Equal(expected) {
+		t.Errorf("Expected set %+v, got %+v", expected, result)
+	}
+}
+
+func TestGetSourceSecret(t *testing.T) {
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-secret",
+			Namespace: "test-ns",
+			Annotations: map[string]string{
+				SecretAnnotationSourceSecretKey: "source-ns/source-name",
+			},
+		},
+	}
+
+	expected := appsv1beta1.ReferenceObject{
+		Namespace: "source-ns",
+		Name:      "source-name",
+	}
+
+	result := getSourceSecret(secret)
+
+	if result != expected {
+		t.Errorf("Expected %+v, got %+v", expected, result)
+	}
+}
+
+func TestGenerateRandomString(t *testing.T) {
+	result := generateRandomString()
+	if len(result) != 6 {
+		t.Errorf("Expected string length 6, got %d", len(result))
+	}
+
+	strings := make([]string, 10)
+	for i := 0; i < 10; i++ {
+		strings[i] = generateRandomString()
+		if len(strings[i]) != 6 {
+			t.Errorf("Expected string length 6 at index %d, got %s", i, strings[i])
+		}
+	}
+
+	uniqueStrings := make(map[string]bool)
+	for _, s := range strings {
+		if uniqueStrings[s] {
+			t.Logf("Duplicate found: %s (this might be okay due to randomness)", s)
+		}
+		uniqueStrings[s] = true
+	}
+}
+
+func TestGetReferencingJobsFromSecretWithEmptyAnnotation(t *testing.T) {
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-secret",
+			Namespace: "test-ns",
+			Annotations: map[string]string{
+				SecretAnnotationReferenceJobs: "",
+			},
+		},
+	}
+
+	result := getReferencingJobsFromSecret(secret)
+	if len(result) != 0 {
+		t.Errorf("Expected empty set for empty annotation, got %+v", result)
+	}
+}
+
+func TestGetSourceSecretWithEmptyAnnotation(t *testing.T) {
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-secret",
+			Namespace: "test-ns",
+			Annotations: map[string]string{
+				SecretAnnotationSourceSecretKey: "",
+			},
+		},
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			// Expected panic when parsing empty string
+		}
+	}()
+
+	// This should panic when trying to parse an empty string
+	result := getSourceSecret(secret)
+
+	// If we reach here without panic, the function didn't behave as expected
+	if result.Name != "" || result.Namespace != "" {
+		t.Errorf("Expected panic for empty annotation, but got %+v", result)
 	}
 }

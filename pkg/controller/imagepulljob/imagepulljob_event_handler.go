@@ -217,10 +217,10 @@ func (e *secretEventHandler) Generic(ctx context.Context, evt event.TypedGeneric
 
 func (e *secretEventHandler) handle(secret *v1.Secret, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	if secret != nil && secret.Namespace == kruiseutil.GetKruiseDaemonConfigNamespace() {
-		jobKeySet := referenceSetFromTarget(secret)
-		klog.V(4).InfoS("Observed Secret created", "secret", klog.KObj(secret), "secretUID", secret.UID, "jobRefs", jobKeySet)
+		jobKeySet := getReferencingJobsFromSecret(secret)
+		klog.V(5).InfoS("Observed Secret created", "secret", klog.KObj(secret), "secretUID", secret.UID, "jobRefs", jobKeySet)
 		for key := range jobKeySet {
-			scaleExpectations.ObserveScale(key.String(), expectations.Create, secret.Labels[SourceSecretUIDLabelKey])
+			scaleExpectations.ObserveScale(key.String(), expectations.Create, secret.Name)
 		}
 		return
 	}
@@ -240,9 +240,9 @@ func (e *secretEventHandler) handle(secret *v1.Secret, q workqueue.TypedRateLimi
 
 func (e *secretEventHandler) handleUpdate(secretNew, secretOld *v1.Secret, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	if secretNew != nil && secretNew.Namespace == kruiseutil.GetKruiseDaemonConfigNamespace() {
-		jobKeySet := referenceSetFromTarget(secretNew)
+		jobKeySet := getReferencingJobsFromSecret(secretNew)
 		for key := range jobKeySet {
-			scaleExpectations.ObserveScale(key.String(), expectations.Create, secretNew.Labels[SourceSecretUIDLabelKey])
+			scaleExpectations.ObserveScale(key.String(), expectations.Create, secretNew.Name)
 		}
 		return
 	}
@@ -273,7 +273,7 @@ func (e *secretEventHandler) getActiveJobKeysForSecret(secret *v1.Secret) ([]typ
 			continue
 		}
 		if jobContainsSecret(job, secret.Name) {
-			jobKeys = append(jobKeys, keyFromObject(job))
+			jobKeys = append(jobKeys, types.NamespacedName{Namespace: job.Namespace, Name: job.Name})
 		}
 	}
 	return jobKeys, nil

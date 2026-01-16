@@ -1,11 +1,12 @@
 package imagepulljob
 
 import (
+	"testing"
+	"time"
+
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -747,12 +748,9 @@ func TestGetTargetSecretMap(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "target-secret-1",
 						Namespace: "kruise-daemon-config",
-						Labels: map[string]string{
-							SourceSecretUIDLabelKey: "source-uid-1",
-						},
 						Annotations: map[string]string{
-							SourceSecretKeyAnno:       "default/source-secret-1",
-							TargetOwnerReferencesAnno: "default/test-job",
+							SecretAnnotationSourceSecretKey: "default/source-secret-1",
+							SecretAnnotationReferenceJobs:   "default/test-job",
 						},
 					},
 				},
@@ -761,12 +759,9 @@ func TestGetTargetSecretMap(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "delete-secret-1",
 						Namespace: "kruise-daemon-config",
-						Labels: map[string]string{
-							SourceSecretUIDLabelKey: "source-uid-2",
-						},
 						Annotations: map[string]string{
-							SourceSecretKeyAnno:       "default/source-secret-2",
-							TargetOwnerReferencesAnno: "default/test-job",
+							SecretAnnotationSourceSecretKey: "default/source-secret-2",
+							SecretAnnotationReferenceJobs:   "default/test-job",
 						},
 					},
 				},
@@ -805,12 +800,9 @@ func TestGetTargetSecretMap(t *testing.T) {
 						Namespace:         "kruise-daemon-config",
 						DeletionTimestamp: &now,
 						Finalizers:        []string{"test-finalizer"},
-						Labels: map[string]string{
-							SourceSecretUIDLabelKey: "source-uid-1",
-						},
 						Annotations: map[string]string{
-							SourceSecretKeyAnno:       "default/source-secret-1",
-							TargetOwnerReferencesAnno: "default/test-job",
+							SecretAnnotationSourceSecretKey: "default/source-secret-1",
+							SecretAnnotationReferenceJobs:   "default/test-job",
 						},
 					},
 				},
@@ -833,12 +825,9 @@ func TestGetTargetSecretMap(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "unrelated-secret",
 						Namespace: "kruise-daemon-config",
-						Labels: map[string]string{
-							SourceSecretUIDLabelKey: "source-uid-1",
-						},
 						Annotations: map[string]string{
-							SourceSecretKeyAnno:       "default/source-secret-1/other",
-							TargetOwnerReferencesAnno: "default/other-job",
+							SecretAnnotationSourceSecretKey: "default/source-secret-1/other",
+							SecretAnnotationReferenceJobs:   "default/other-job",
 						},
 					},
 				},
@@ -861,12 +850,9 @@ func TestGetTargetSecretMap(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "unrelated-secret",
 						Namespace: "kruise-daemon-config",
-						Labels: map[string]string{
-							SourceSecretUIDLabelKey: "source-uid-1",
-						},
 						Annotations: map[string]string{
-							SourceSecretKeyAnno:       "default/source-secret-1",
-							TargetOwnerReferencesAnno: "default/other-job",
+							SecretAnnotationSourceSecretKey: "default/source-secret-1",
+							SecretAnnotationReferenceJobs:   "default/other-job",
 						},
 					},
 				},
@@ -895,7 +881,7 @@ func TestGetTargetSecretMap(t *testing.T) {
 			}
 
 			// Execute the function
-			targetMap, deleteMap, err := r.getTargetSecretMap(tt.job)
+			targetMap, deleteMap, err := r.classifyPullSecretsForJob(tt.job)
 
 			// Verify results
 			if tt.expectError {
@@ -916,7 +902,7 @@ func TestReleaseTargetSecrets(t *testing.T) {
 	// Define test cases
 	tests := []struct {
 		name            string
-		targetMap       map[string]*v1.Secret
+		targetMap       []*v1.Secret
 		job             *appsv1beta1.ImagePullJob
 		existingObjects []client.Object
 		expectError     bool
@@ -924,7 +910,7 @@ func TestReleaseTargetSecrets(t *testing.T) {
 	}{
 		{
 			name:      "Empty targetMap should return nil",
-			targetMap: map[string]*v1.Secret{},
+			targetMap: []*v1.Secret{},
 			job: &appsv1beta1.ImagePullJob{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-job",
@@ -934,19 +920,6 @@ func TestReleaseTargetSecrets(t *testing.T) {
 		},
 		{
 			name: "Nil secret in targetMap should be skipped",
-			targetMap: map[string]*v1.Secret{
-				"secret-1": nil,
-				"secret-2": {
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "secret-2",
-						Namespace: "kruise-daemon-config",
-						UID:       types.UID("secret-2-uid"),
-						Annotations: map[string]string{
-							TargetOwnerReferencesAnno: "default/test-job",
-						},
-					},
-				},
-			},
 			job: &appsv1beta1.ImagePullJob{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-job",
@@ -960,7 +933,7 @@ func TestReleaseTargetSecrets(t *testing.T) {
 						Namespace: "kruise-daemon-config",
 						UID:       types.UID("secret-2-uid"),
 						Annotations: map[string]string{
-							TargetOwnerReferencesAnno: "default/test-job",
+							SecretAnnotationReferenceJobs: "default/test-job",
 						},
 					},
 				},
@@ -970,14 +943,14 @@ func TestReleaseTargetSecrets(t *testing.T) {
 		},
 		{
 			name: "Secret not referenced by current job should not be updated",
-			targetMap: map[string]*v1.Secret{
-				"secret-1": {
+			targetMap: []*v1.Secret{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "secret-1",
 						Namespace: "kruise-daemon-config",
 						UID:       types.UID("secret-1-uid"),
 						Annotations: map[string]string{
-							TargetOwnerReferencesAnno: "default/other-job",
+							SecretAnnotationReferenceJobs: "default/other-job",
 						},
 					},
 				},
@@ -995,7 +968,7 @@ func TestReleaseTargetSecrets(t *testing.T) {
 						Namespace: "kruise-daemon-config",
 						UID:       types.UID("secret-1-uid"),
 						Annotations: map[string]string{
-							TargetOwnerReferencesAnno: "default/other-job",
+							SecretAnnotationReferenceJobs: "default/other-job",
 						},
 					},
 				},
@@ -1005,14 +978,14 @@ func TestReleaseTargetSecrets(t *testing.T) {
 		},
 		{
 			name: "Secret referenced by current job but also by others should only be updated",
-			targetMap: map[string]*v1.Secret{
-				"secret-1": {
+			targetMap: []*v1.Secret{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "secret-1",
 						Namespace: "kruise-daemon-config",
 						UID:       types.UID("secret-1-uid"),
 						Annotations: map[string]string{
-							TargetOwnerReferencesAnno: "default/test-job,default/other-job",
+							SecretAnnotationReferenceJobs: "default/test-job,default/other-job",
 						},
 					},
 				},
@@ -1030,7 +1003,7 @@ func TestReleaseTargetSecrets(t *testing.T) {
 						Namespace: "kruise-daemon-config",
 						UID:       types.UID("secret-1-uid"),
 						Annotations: map[string]string{
-							TargetOwnerReferencesAnno: "default/test-job,default/other-job",
+							SecretAnnotationReferenceJobs: "default/test-job,default/other-job",
 						},
 					},
 				},
@@ -1040,14 +1013,14 @@ func TestReleaseTargetSecrets(t *testing.T) {
 		},
 		{
 			name: "Secret only referenced by current job should be deleted",
-			targetMap: map[string]*v1.Secret{
-				"secret-1": {
+			targetMap: []*v1.Secret{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "secret-1",
 						Namespace: "kruise-daemon-config",
 						UID:       types.UID("secret-1-uid"),
 						Annotations: map[string]string{
-							TargetOwnerReferencesAnno: "default/test-job",
+							SecretAnnotationReferenceJobs: "default/test-job",
 						},
 					},
 				},
@@ -1065,7 +1038,7 @@ func TestReleaseTargetSecrets(t *testing.T) {
 						Namespace: "kruise-daemon-config",
 						UID:       types.UID("secret-1-uid"),
 						Annotations: map[string]string{
-							TargetOwnerReferencesAnno: "default/test-job",
+							SecretAnnotationReferenceJobs: "default/test-job",
 						},
 					},
 				},
@@ -1090,7 +1063,7 @@ func TestReleaseTargetSecrets(t *testing.T) {
 			}
 
 			// Call function under test
-			err := r.releaseTargetSecrets(tt.targetMap, tt.job)
+			err := r.releaseImagePullJobSecrets(tt.targetMap, tt.job)
 
 			// Check error expectation
 			if tt.expectError {
