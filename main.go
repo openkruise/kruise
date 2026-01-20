@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	ctrlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -247,6 +248,11 @@ func main() {
 
 	if err := mgr.AddReadyzCheck("webhook-ready", webhook.Checker); err != nil {
 		setupLog.Error(err, "unable to add readyz check")
+		os.Exit(1)
+	}
+
+	if err := mgr.AddHealthzCheck("ping", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to add healthz check")
 		os.Exit(1)
 	}
 
