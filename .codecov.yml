@@ -2,5 +2,6 @@ ignore:
 - "pkg/client/.*"
 - "test/fuzz/.*"
 - "test/e2e/.*"
+- "main.go"
 
 
