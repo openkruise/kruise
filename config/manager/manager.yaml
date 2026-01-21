@@ -58,6 +58,12 @@ spec:
           httpGet:
             path: readyz
             port: 8000
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 20
         resources:
           limits:
             cpu: 2
