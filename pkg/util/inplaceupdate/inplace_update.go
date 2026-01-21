@@ -264,7 +264,7 @@ func (c *realControl) updateNextBatch(pod *v1.Pod, opts *UpdateOptions) (bool, e
 		}
 
 		state := appspub.InPlaceUpdateState{}
-		if stateStr, ok := appspub.GetInPlaceUpdateState(pod); !ok {
+		if stateStr, ok := appspub.GetInPlaceUpdateState(clone); !ok {
 			return nil
 		} else if err := json.Unmarshal([]byte(stateStr), &state); err != nil {
 			return err
