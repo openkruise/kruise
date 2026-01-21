@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
@@ -73,7 +74,7 @@ var (
 			Annotations: map[string]string{},
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "apps.kruise.io/v1alpha1",
+					APIVersion:         "apps.kruise.io/v1beta1",
 					Kind:               "CloneSet",
 					Name:               "cloneset-test",
 					Controller:         ptr.To(true),
@@ -93,10 +94,10 @@ var (
 		},
 	}
 
-	cloneSetDemo = &appsv1alpha1.CloneSet{
+	cloneSetDemo = &appsv1beta1.CloneSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "CloneSet",
-			APIVersion: "apps.kruise.io/v1alpha1",
+			APIVersion: "apps.kruise.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "cloneset-test",
@@ -104,7 +105,7 @@ var (
 			Generation: 10,
 			UID:        types.UID("a03eb001-27eb-4713-b634-7c46f6861758"),
 		},
-		Spec: appsv1alpha1.CloneSetSpec{
+		Spec: appsv1beta1.CloneSetSpec{
 			Replicas: ptr.To(int32(10)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -112,7 +113,7 @@ var (
 				},
 			},
 		},
-		Status: appsv1alpha1.CloneSetStatus{
+		Status: appsv1beta1.CloneSetStatus{
 			ObservedGeneration: 10,
 			UpdateRevision:     wsutil.VersionIgnored,
 		},
@@ -120,7 +121,7 @@ var (
 
 	workloadSpreadDemo = &appsv1alpha1.WorkloadSpread{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "apps.kruise.io/v1alpha1",
+			APIVersion: "apps.kruise.io/v1beta1",
 			Kind:       "WorkloadSpread",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -130,7 +131,7 @@ var (
 		},
 		Spec: appsv1alpha1.WorkloadSpreadSpec{
 			TargetReference: &appsv1alpha1.TargetReference{
-				APIVersion: "apps.kruise.io/v1alpha1",
+				APIVersion: "apps.kruise.io/v1beta1",
 				Kind:       "CloneSet",
 				Name:       "cloneset-test",
 			},
@@ -179,6 +180,7 @@ func init() {
 	scheme = runtime.NewScheme()
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 }
 
 func TestSubsetPodDeletionCost(t *testing.T) {
@@ -815,7 +817,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 		name                 string
 		getPods              func() []*corev1.Pod
 		getWorkloadSpread    func() *appsv1alpha1.WorkloadSpread
-		getCloneSet          func() *appsv1alpha1.CloneSet
+		getCloneSet          func() *appsv1beta1.CloneSet
 		getWorkloads         func() []client.Object
 		getWhiteList         func() configuration.WSCustomWorkloadWhiteList
 		expectPods           func() []*corev1.Pod
@@ -854,7 +856,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				workloadSpread.Spec.Subsets = []appsv1alpha1.WorkloadSpreadSubset{*subset1, *subset2}
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -863,7 +865,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.ObservedGeneration = 10
-				//workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
+				// workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
 				workloadSpread.Status.SubsetStatuses = make([]appsv1alpha1.WorkloadSpreadSubsetStatus, 2)
 				workloadSpread.Status.SubsetStatuses[0].Name = "subset-a"
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 5
@@ -899,7 +901,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				workloadSpread.Spec.Subsets = []appsv1alpha1.WorkloadSpreadSubset{*subset1, *subset2}
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -920,7 +922,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
 				workloadSpread.Status.ObservedGeneration = 10
-				//workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
+				// workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
 				workloadSpread.Status.SubsetStatuses = make([]appsv1alpha1.WorkloadSpreadSubsetStatus, 2)
 				workloadSpread.Status.SubsetStatuses[0].Name = "subset-a"
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
@@ -947,7 +949,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				return workloadSpreadDemo.DeepCopy()
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -960,7 +962,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				//workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
+				// workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
 				workloadSpread.Status.SubsetStatuses[0].Replicas = 1
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
@@ -982,7 +984,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				workloadSpread.Spec.Subsets[0].MaxReplicas = &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				cloneSet := cloneSetDemo.DeepCopy()
 				cloneSet.Spec.Replicas = ptr.To(int32(5))
 				return cloneSet
@@ -997,7 +999,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				//workloadSpread.Status.ObservedWorkloadReplicas = int32(5)
+				// workloadSpread.Status.ObservedWorkloadReplicas = int32(5)
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
 				workloadSpread.Status.SubsetStatuses[0].Replicas = 1
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
@@ -1019,7 +1021,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				workloadSpread.Spec.Subsets[0].MaxReplicas = &intstr.IntOrString{Type: intstr.String, StrVal: "80%"}
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				cloneSet := cloneSetDemo.DeepCopy()
 				cloneSet.Spec.Replicas = ptr.To(int32(5))
 				return cloneSet
@@ -1034,7 +1036,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				//workloadSpread.Status.ObservedWorkloadReplicas = int32(5)
+				// workloadSpread.Status.ObservedWorkloadReplicas = int32(5)
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 3
 				workloadSpread.Status.SubsetStatuses[0].Replicas = 1
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
@@ -1060,7 +1062,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				workloadSpread.Status.SubsetStatuses[0].Name = "subset-a"
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -1076,7 +1078,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				currentTime, _ = time.ParseInLocation(timeFormat, formatTime, time.Local)
 
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				//workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
+				// workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 3
 				workloadSpread.Status.SubsetStatuses[0].Replicas = 1
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{
@@ -1104,7 +1106,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				workloadSpread.Status.SubsetStatuses[0].Name = "subset-a"
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -1117,7 +1119,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				//workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
+				// workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 4
 				workloadSpread.Status.SubsetStatuses[0].Replicas = 1
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
@@ -1147,7 +1149,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				}
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -1164,7 +1166,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				//workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
+				// workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 3
 				workloadSpread.Status.SubsetStatuses[0].Replicas = 2
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
@@ -1196,7 +1198,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				}
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -1214,7 +1216,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				//workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
+				// workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 3
 				workloadSpread.Status.SubsetStatuses[0].Replicas = 2
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
@@ -1243,7 +1245,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				}
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -1260,7 +1262,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				//workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
+				// workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 0
 				workloadSpread.Status.SubsetStatuses[0].Replicas = 5
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
@@ -1295,7 +1297,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				}
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -1315,7 +1317,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				//workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
+				// workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 1
 				workloadSpread.Status.SubsetStatuses[0].Replicas = 4
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
@@ -1347,7 +1349,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				}
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -1364,7 +1366,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				//workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
+				// workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 1
 				workloadSpread.Status.SubsetStatuses[0].Replicas = 5
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
@@ -1401,7 +1403,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				}
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -1418,7 +1420,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				//workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
+				// workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 0
 				workloadSpread.Status.SubsetStatuses[0].Replicas = 5
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
@@ -1469,7 +1471,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				}
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				clone := cloneSetDemo.DeepCopy()
 				clone.Status.UpdateRevision = "newVersion"
 				return clone
@@ -1575,7 +1577,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 				workloadSpread.Status.SubsetStatuses[0].DeletingPods = map[string]metav1.Time{}
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -1594,7 +1596,7 @@ func TestWorkloadSpreadReconcile(t *testing.T) {
 			},
 			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				workloadSpread := workloadSpreadDemo.DeepCopy()
-				//workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
+				// workloadSpread.Status.ObservedWorkloadReplicas = int32(10)
 				workloadSpread.Status.SubsetStatuses[0].MissingReplicas = 0
 				workloadSpread.Status.SubsetStatuses[0].Replicas = 5
 				workloadSpread.Status.SubsetStatuses[0].CreatingPods = map[string]metav1.Time{}
@@ -1886,7 +1888,7 @@ func TestDelayReconcile(t *testing.T) {
 		name                 string
 		getPods              func() []*corev1.Pod
 		getWorkloadSpread    func() *appsv1alpha1.WorkloadSpread
-		getCloneSet          func() *appsv1alpha1.CloneSet
+		getCloneSet          func() *appsv1beta1.CloneSet
 		expectWorkloadSpread func() *appsv1alpha1.WorkloadSpread
 		expectRequeueAfter   time.Duration
 	}{
@@ -1904,7 +1906,7 @@ func TestDelayReconcile(t *testing.T) {
 				workloadSpread.Status.SubsetStatuses[0].Name = "subset-a"
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectRequeueAfter: 27 * time.Second,
@@ -1932,7 +1934,7 @@ func TestDelayReconcile(t *testing.T) {
 				workloadSpread.Status.SubsetStatuses[0].Name = "subset-a"
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectRequeueAfter: 12 * time.Second,
@@ -1961,7 +1963,7 @@ func TestDelayReconcile(t *testing.T) {
 				workloadSpread.Status.SubsetStatuses[0].Name = "subset-a"
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectRequeueAfter: 12 * time.Second,
@@ -2012,7 +2014,7 @@ func TestManagerExistingPods(t *testing.T) {
 		name              string
 		getPods           func() []*corev1.Pod
 		getNodes          func() []*corev1.Node
-		getCloneSet       func() *appsv1alpha1.CloneSet
+		getCloneSet       func() *appsv1beta1.CloneSet
 		getWorkloadSpread func() *appsv1alpha1.WorkloadSpread
 		getExpectedResult func() (map[string]int32, int, int, int)
 	}{
@@ -2148,7 +2150,7 @@ func TestManagerExistingPods(t *testing.T) {
 				})
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				cloneSet := cloneSetDemo.DeepCopy()
 				cloneSet.Spec.Replicas = ptr.To(int32(10))
 				return cloneSet
@@ -2321,7 +2323,7 @@ func TestManagerExistingPods(t *testing.T) {
 				}
 				return workloadSpread
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				cloneSet := cloneSetDemo.DeepCopy()
 				cloneSet.Spec.Replicas = ptr.To(int32(3))
 				return cloneSet

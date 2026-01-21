@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -93,7 +94,7 @@ func TestRescheduleSubset(t *testing.T) {
 		name                 string
 		getPods              func() []*corev1.Pod
 		getWorkloadSpread    func() *appsv1alpha1.WorkloadSpread
-		getCloneSet          func() *appsv1alpha1.CloneSet
+		getCloneSet          func() *appsv1beta1.CloneSet
 		expectPods           func() []*corev1.Pod
 		expectWorkloadSpread func() *appsv1alpha1.WorkloadSpread
 	}{
@@ -109,7 +110,7 @@ func TestRescheduleSubset(t *testing.T) {
 				ws.Status.SubsetStatuses[1].Conditions = nil
 				return ws
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -133,7 +134,7 @@ func TestRescheduleSubset(t *testing.T) {
 				ws.Status.SubsetStatuses[1].Conditions = nil
 				return ws
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -167,7 +168,7 @@ func TestRescheduleSubset(t *testing.T) {
 				ws := wsDemo.DeepCopy()
 				return ws
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -201,7 +202,7 @@ func TestRescheduleSubset(t *testing.T) {
 				}
 				return ws
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
@@ -236,7 +237,7 @@ func TestRescheduleSubset(t *testing.T) {
 				}
 				return ws
 			},
-			getCloneSet: func() *appsv1alpha1.CloneSet {
+			getCloneSet: func() *appsv1beta1.CloneSet {
 				return cloneSetDemo.DeepCopy()
 			},
 			expectPods: func() []*corev1.Pod {
