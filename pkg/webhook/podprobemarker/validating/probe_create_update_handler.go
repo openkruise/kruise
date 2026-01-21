@@ -24,16 +24,12 @@ import (
 	"regexp"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/util/intstr"
-
-	"github.com/openkruise/kruise/pkg/features"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -42,6 +38,8 @@ import (
 
 	"github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 const (
@@ -242,7 +240,14 @@ func validateExecAction(exec *corev1.ExecAction, fldPath *field.Path) field.Erro
 }
 
 func validateTCPSocketAction(tcp *corev1.TCPSocketAction, fldPath *field.Path) field.ErrorList {
-	return ValidatePortNumOrName(tcp.Port, fldPath.Child("port"))
+	allErrors := field.ErrorList{}
+	if len(tcp.Host) > 0 {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("host"), tcp.Host, "host field in probes is not allowed"))
+	}
+
+	allErrors = append(allErrors, ValidatePortNumOrName(tcp.Port, fldPath.Child("port"))...)
+
+	return allErrors
 }
 
 func ValidatePortNumOrName(port intstr.IntOrString, fldPath *field.Path) field.ErrorList {

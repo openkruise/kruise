@@ -1,5 +1,11 @@
 # Change Log
 
+## v1.7.4
+> Change log since v1.7.3
+
+### Bug fixes
+- restrict host field in probe ([#2309](https://github.com/openkruise/kruise/pull/2309), [@furykerry](https://github.com/furykerry))
+
 ## v1.7.3
 > Change log since v1.7.2
 
