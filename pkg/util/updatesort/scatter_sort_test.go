@@ -203,7 +203,7 @@ func TestSort(t *testing.T) {
 		expectedIndexes []int
 	}{
 		{
-			desc:            "a scattered pod + a ordinary pod",
+			desc:            "a scattered pod + an ordinary pod",
 			podLabels:       []map[string]string{{"labelA": "AAA", "labelB": "BBB"}},
 			scatterStrategy: appsv1beta1.UpdateScatterStrategy{{Key: "labelA", Value: "AAA"}},
 			expectedIndexes: []int{0},

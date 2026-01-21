@@ -151,7 +151,7 @@ type UnitedDeploymentUpdateStrategy struct {
 	ManualUpdate *ManualUpdate `json:"manualUpdate,omitempty"`
 }
 
-// ManualUpdate is a update strategy which allows users to control the update progress
+// ManualUpdate is an update strategy which allows users to control the update progress
 // by providing the partition of each subset.
 type ManualUpdate struct {
 	// Indicates number of subset partition.

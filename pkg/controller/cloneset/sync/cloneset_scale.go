@@ -156,7 +156,7 @@ func (r *realControl) Scale(
 
 func (r *realControl) managePreparingDelete(cs *appsv1beta1.CloneSet, pods, podsInPreDelete []*v1.Pod, numToDelete int) (bool, error) {
 	//  We do not allow regret once the pod enter PreparingDelete state if MarkPodNotReady is set.
-	// Actually, there is a bug cased by this transformation from PreparingDelete to Normal,
+	// Actually, there is a bug caused by this transformation from PreparingDelete to Normal,
 	// i.e., Lifecycle Updated Hook may be lost if the pod was transformed from Updating state
 	// to PreparingDelete.
 	if lifecycle.IsLifecycleMarkPodNotReady(cs.Spec.Lifecycle) {

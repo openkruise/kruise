@@ -75,8 +75,8 @@ func (dsc *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1bet
 		Values:   []string{updateRevision.Name, updateRevision.Labels[history.ControllerRevisionHashLabel]},
 	})
 
-	// As deamonset is the job's owner, we have the convention that all resources owned by deamonset
-	// have to match the selector of deamonset, such as pod, pvc and controllerrevision.
+	// As daemonset is the job's owner, we have the convention that all resources owned by daemonset
+	// have to match the selector of daemonset, such as pod, pvc and controllerrevision.
 	// So we had better put the labels into jobs.
 	labelMap := make(map[string]string)
 	for k, v := range ds.Spec.Template.Labels {

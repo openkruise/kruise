@@ -43,7 +43,7 @@ const (
 
 // PersistentPodStateSpec defines the desired state of PersistentPodState
 type PersistentPodStateSpec struct {
-	// TargetReference contains enough information to let you identify an workload for PersistentPodState
+	// TargetReference contains enough information to let you identify a workload for PersistentPodState
 	// Selector and TargetReference are mutually exclusive, TargetReference is priority to take effect
 	// current only support StatefulSet
 	TargetReference TargetReference `json:"targetRef"`
