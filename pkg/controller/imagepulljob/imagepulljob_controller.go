@@ -20,7 +20,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"reflect"
 	"sort"
+
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -354,9 +356,16 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1beta1.ImagePullJob, ne
 					continue
 				}
 				if util.ContainsObjectRef(tagSpec.OwnerReferences, *ownerRef) {
-					skip = true
-					return nil
+					if tagSpec.ImagePullPolicy == job.Spec.ImagePullPolicy && reflect.DeepEqual(tagSpec.PullPolicy, pullPolicy) {
+						skip = true
+						return nil
+					}
+					tagSpec.ImagePullPolicy = job.Spec.ImagePullPolicy
+					tagSpec.PullPolicy = pullPolicy
+					found = true
+					break
 				}
+
 				// increase version to start a new round of image downloads
 				tagSpec.Version++
 				// merge owner reference

@@ -1,11 +1,13 @@
 package imagepulljob
 
 import (
+	"context"
+	"testing"
+	"time"
+
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -1099,5 +1101,85 @@ func TestReleaseTargetSecrets(t *testing.T) {
 				assert.NoError(t, err)
 			}
 		})
+	}
+}
+
+func TestReconcileImagePullJob_syncNodeImages_UpdateTimeout(t *testing.T) {
+	// Create a job with timeout 600
+	timeout := int32(600)
+	job := &appsv1beta1.ImagePullJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-job",
+			Namespace: "default",
+			UID:       types.UID("job-uid"),
+		},
+		Spec: appsv1beta1.ImagePullJobSpec{
+			Image: "nginx:latest",
+			ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+				PullPolicy: &appsv1beta1.PullPolicy{
+					TimeoutSeconds: &timeout,
+				},
+			},
+		},
+	}
+
+	// Create a NodeImage that already has the tag, OwnerReference pointing to the job,
+	// BUT has a DIFFERENT timeout (e.g. 300) in its PullPolicy.
+	// This simulates the state where the Job was updated but NodeImage is not yet.
+	oldTimeout := int32(300)
+	nodeImage := &appsv1beta1.NodeImage{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "node-1",
+			Namespace: "", // Cluster scoped
+		},
+		Spec: appsv1beta1.NodeImageSpec{
+			Images: map[string]appsv1beta1.ImageSpec{
+				"nginx": {
+					Tags: []appsv1beta1.ImageTagSpec{
+						{
+							Tag: "latest",
+							OwnerReferences: []v1.ObjectReference{
+								{
+									APIVersion: appsv1beta1.SchemeGroupVersion.String(),
+									Kind:       "ImagePullJob",
+									Name:       "test-job",
+									UID:        "job-uid",
+								},
+							},
+							ImagePullPolicy: appsv1beta1.ImagePullPolicy(appsv1beta1.PullIfNotPresent),
+							PullPolicy: &appsv1beta1.ImageTagPullPolicy{
+								TimeoutSeconds: &oldTimeout,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// scheme is globally defined in imagepulljob_event_handler_test.go which is in the same package
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(job, nodeImage).Build()
+
+	r := &ReconcileImagePullJob{
+		Client: fakeClient,
+		scheme: scheme,
+		clock:  k8stesting.NewFakeClock(time.Now()),
+	}
+
+	// Call syncNodeImages
+	err := r.syncNodeImages(job, &appsv1beta1.ImagePullJobStatus{Active: 0}, []string{"node-1"}, nil)
+	assert.NoError(t, err)
+
+	// Fetch updated NodeImage
+	updatedNodeImage := &appsv1beta1.NodeImage{}
+	err = fakeClient.Get(context.TODO(), types.NamespacedName{Name: "node-1"}, updatedNodeImage)
+	assert.NoError(t, err)
+
+	// Check if TimeoutSeconds is updated to 600
+	imageSpec := updatedNodeImage.Spec.Images["nginx"]
+	tagSpec := imageSpec.Tags[0]
+
+	if tagSpec.PullPolicy == nil || tagSpec.PullPolicy.TimeoutSeconds == nil || *tagSpec.PullPolicy.TimeoutSeconds != 600 {
+		t.Fatalf("Regression Test Failed: Expected timeout 600, got %v", tagSpec.PullPolicy.TimeoutSeconds)
 	}
 }
