@@ -241,7 +241,14 @@ func validateExecAction(exec *corev1.ExecAction, fldPath *field.Path) field.Erro
 }
 
 func validateTCPSocketAction(tcp *corev1.TCPSocketAction, fldPath *field.Path) field.ErrorList {
-	return ValidatePortNumOrName(tcp.Port, fldPath.Child("port"))
+	allErrors := field.ErrorList{}
+	if len(tcp.Host) > 0 {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("host"), tcp.Host, "host field in probes is not allowed"))
+	}
+
+	allErrors = append(allErrors, ValidatePortNumOrName(tcp.Port, fldPath.Child("port"))...)
+
+	return allErrors
 }
 
 var supportedHTTPSchemes = sets.New(corev1.URISchemeHTTP, corev1.URISchemeHTTPS)
@@ -250,6 +257,10 @@ func validateHTTPGetAction(http *corev1.HTTPGetAction, fldPath *field.Path) fiel
 	allErrors := field.ErrorList{}
 	if len(http.Path) == 0 {
 		allErrors = append(allErrors, field.Required(fldPath.Child("path"), ""))
+	}
+
+	if len(http.Host) > 0 {
+		allErrors = append(allErrors, field.Invalid(fldPath.Child("host"), http.Host, "host field in probes is not allowed"))
 	}
 	if _, err := url.Parse(http.Path); err != nil {
 		allErrors = append(allErrors, field.Invalid(fldPath.Child("path"), http.Path, "must be a valid URL path"))
