@@ -193,7 +193,24 @@ func TestGetEmptyObjectWithKey(t *testing.T) {
 	}
 }
 
-func TestGetEmptyObjectWithKey_PreservesMetadata(t *testing.T) {
+func TestGetEmptyObjectWithKey_UnsupportedType(t *testing.T) {
+	// Test with an unsupported resource type (not in the switch statement)
+	// Current implementation will panic when calling SetName on nil 'empty' variable
+	// This test documents the current behavior - consider fixing the implementation
+	configMap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-configmap",
+			Namespace: "default",
+		},
+	}
+
+	// This will panic in the current implementation
+	assert.Panics(t, func() {
+		GetEmptyObjectWithKey(configMap)
+	}, "GetEmptyObjectWithKey should panic for unsupported types")
+}
+
+func TestGetEmptyObjectWithKey_MetadataPreservation(t *testing.T) {
 	// Test that only name and namespace are preserved, not other metadata
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -234,8 +251,9 @@ func TestGetEmptyObjectWithKey_PreservesMetadata(t *testing.T) {
 	assert.Empty(t, resultPod.Spec.Containers)
 }
 
-func TestGetEmptyObjectWithKey_ClusterScopedResource(t *testing.T) {
-	// Test with a cluster-scoped resource (no namespace)
+func TestGetEmptyObjectWithKey_EmptyNamespace(t *testing.T) {
+	// Test with a namespaced resource that has no namespace set
+	// CloneSet is a namespaced resource, this tests empty namespace handling
 	cloneSet := &appsv1alpha1.CloneSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-cloneset",
