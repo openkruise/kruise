@@ -35,13 +35,17 @@ type pubControl interface {
 	// 1. pod.Status.Phase == v1.PodRunning
 	// 2. pod.condition PodReady == true
 	IsPodReady(pod *corev1.Pod) bool
+	// IsPodGroupConsistentAndReady indicates whether these pods are all ready.
+	// 1. len(pods) >= groupSize
+	// 2. all pods are consistent and ready
+	IsPodGroupConsistentAndReady(pods []*corev1.Pod, groupSize int32) bool
 	// IsPodStateConsistent indicates whether pod.spec and pod.status are consistent after updating containers
 	IsPodStateConsistent(pod *corev1.Pod) bool
 	// GetPodsForPub returns Pods protected by the pub object.
 	// return two parameters
 	// 1. podList
 	// 2. expectedCount, the default is workload.Replicas
-	GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) ([]*corev1.Pod, int32, error)
+	GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) (map[string][]*corev1.Pod, int32, error)
 
 	// webhook
 	// determine if this change to pod might cause unavailability
