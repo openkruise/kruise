@@ -387,6 +387,15 @@ spec:
                           ReferenceObject comprises a resource name, with a mandatory namespace,
                           rendered as "<namespace>/<name>".
                         properties:
+                          mode:
+                            description: |-
+                              The previous mode, where each imagePullJob would generate a kruise-daemon-config secret, caused various problems.
+                              In the new mode, each secret will only be synchronized once, instead of generating a separate secret for each imagePullJob. For example:
+                              job1 pullSecrets is secret1, job2 pullSecrets is still secret1.
+                              In existing clusters, there are already many pullSecrets configurations in NodeImage that need to be cleaned up, so an additional flag is needed to identify this.
+                              Only clean up the old secrets, while the new approach can be cleaned up together with imageSpec.
+                              Therefore, for pullSecrets with mode=batch, they need to be cleaned up together with imageSpec.
+                            type: string
                           name:
                             type: string
                           namespace:

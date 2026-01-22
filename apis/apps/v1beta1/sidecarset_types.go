@@ -40,7 +40,7 @@ const (
 	// For the above scenario, SidecarSet itself does not directly support multi-version capabilities, but achieves similar purposes through priority.
 	// SidecarSetCanaryAnnotation indicates this is a canary SidecarSet, which has higher priority compared to the base sidecarSet.
 	// SidecarSetBaseAnnotation is the name of the base sidecarSet.
-	
+
 	// TODO, the current capability only supports injection, and does not allow canary SidecarSet to be configured as RollingUpdate
 	SidecarSetCanaryAnnotation = "apps.kruise.io/sidecarset-canary"
 	SidecarSetBaseAnnotation   = "apps.kruise.io/sidecarset-base"
