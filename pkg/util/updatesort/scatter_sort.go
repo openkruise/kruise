@@ -185,7 +185,7 @@ func newScatterGroup(matched, unmatched int) scatterGroup {
 		sg.groupNum = unmatched
 	}
 
-	sg.matchedGroupSize = int(math.Round(float64(matched) / float64(sg.groupNum)))
+	sg.matchedGroupSize = matched / sg.groupNum
 	sg.unmatchedGroupSize = int(math.Round(float64(unmatched) / float64(sg.groupNum)))
 	return sg
 }
