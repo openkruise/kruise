@@ -32,6 +32,18 @@ const (
 	// sidecarSet to "version-2", and they write the "version-2" to InjectionStrategy.Revision.CustomVersion
 	// when they decided to promote the "version-2", to avoid some risks about gray deployment of SidecarSet.
 	SidecarSetCustomVersionLabel = "apps.kruise.io/sidecarset-custom-version"
+
+	// SidecarSetCanaryAnnotation and SidecarSetBaseAnnotation implement the SidecarSet priority capability (up to two levels), with the following scenario:
+	// SidecarSet as a K8S advanced workload, a very basic principle is that the cluster versions tend to be consistent (at most allowing intermediate transition states, but will also move towards the latest version),
+	// which is not quite suitable for multi-version scenarios. However, in actual production, there may be multi-version requirements, for example: the major version of sidecar in the cluster is the master branch,
+	// but there are often customer-specific branches like case1-master to support some relatively customized capabilities at that time, and will iterate on this basis.
+	// For the above scenario, SidecarSet itself does not directly support multi-version capabilities, but achieves similar purposes through priority.
+	// SidecarSetCanaryAnnotation indicates this is a canary SidecarSet, which has higher priority compared to the base sidecarSet.
+	// SidecarSetBaseAnnotation is the name of the base sidecarSet.
+
+	// TODO, the current capability only supports injection, and does not allow canary SidecarSet to be configured as RollingUpdate
+	SidecarSetCanaryAnnotation = "apps.kruise.io/sidecarset-canary"
+	SidecarSetBaseAnnotation   = "apps.kruise.io/sidecarset-base"
 )
 
 // SidecarSetSpec defines the desired state of SidecarSet

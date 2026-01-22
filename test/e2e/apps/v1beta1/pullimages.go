@@ -75,7 +75,7 @@ var _ = ginkgo.Describe("PullImage", ginkgo.Label("PullImage", "operation"), gin
 	}
 
 	referenceSetFromTarget := func(target *v1.Secret) map[types.NamespacedName]struct{} {
-		refs := strings.Split(target.Annotations[imagepulljob.TargetOwnerReferencesAnno], ",")
+		refs := strings.Split(target.Annotations[imagepulljob.SecretAnnotationReferenceJobs], ",")
 		keys := map[types.NamespacedName]struct{}{}
 		for _, ref := range refs {
 			namespace, name, err := cache.SplitMetaNamespaceKey(ref)

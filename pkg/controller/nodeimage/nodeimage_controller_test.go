@@ -1,6 +1,8 @@
 package nodeimage
 
 import (
+	"context"
+	"reflect"
 	"regexp"
 	"testing"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 // TestDoUpdateNodeImage tests the doUpdateNodeImage function
@@ -73,6 +76,8 @@ func TestDoUpdateNodeImage(t *testing.T) {
 		wantWaitNotNil bool
 		wantTagCounts  map[string]int  // New field to check tag counts
 		objs           []client.Object // For mocking k8s objects
+		secrets        []v1.Secret
+		expectSecrets  []appsv1beta1.ReferenceObject
 	}{
 		{
 			name: "normal case without modification",
@@ -507,6 +512,80 @@ func TestDoUpdateNodeImage(t *testing.T) {
 			wantModified:  false,
 			wantTagCounts: map[string]int{"nginx": 2, "redis": 1},
 		},
+		{
+			name: "secrets changed",
+			args: args{
+				nodeImage: func() *appsv1beta1.NodeImage {
+					ni := baseNodeImage.DeepCopy()
+					pastTime := metav1.NewTime(time.Now().Add(-30 * time.Second)) // 30 seconds ago
+					ni.Spec.Images["nginx"].Tags[0].PullPolicy = &appsv1beta1.ImageTagPullPolicy{
+						TTLSecondsAfterFinished: int32Ptr(60),
+					}
+					imageSpec := ni.Spec.Images["nginx"]
+					imageSpec.PullSecrets = []appsv1beta1.ReferenceObject{
+						{
+							Namespace: "default",
+							Name:      "secret1",
+						},
+						{
+							Namespace: "default",
+							Name:      "secret2",
+						},
+						{
+							Namespace: "default",
+							Name:      "secret3",
+							Mode:      appsv1beta1.ReferenceObjectModeBatch,
+						},
+					}
+					ni.Spec.Images["nginx"] = imageSpec
+
+					ni.Status.ImageStatuses = map[string]appsv1beta1.ImageStatus{
+						"nginx": {
+							Tags: []appsv1beta1.ImageTagStatus{
+								{
+									Tag:            "latest",
+									Version:        1,
+									CompletionTime: &pastTime,
+								},
+							},
+						},
+					}
+					return ni
+				}(),
+				node: baseNode.DeepCopy(),
+			},
+			objs: []client.Object{
+				&appsv1beta1.ImagePullJob{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "job1",
+						Namespace: "default",
+						UID:       "uid1",
+					},
+				},
+			},
+			secrets: []v1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "secret1",
+						Namespace: "default",
+					},
+				},
+			},
+			wantModified:   true,
+			wantWaitNotNil: true,
+			wantTagCounts:  map[string]int{"nginx": 1}, // Tag preserved as TTL not exceeded
+			expectSecrets: []appsv1beta1.ReferenceObject{
+				{
+					Name:      "secret1",
+					Namespace: "default",
+				},
+				{
+					Name:      "secret3",
+					Namespace: "default",
+					Mode:      appsv1beta1.ReferenceObjectModeBatch,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -521,6 +600,10 @@ func TestDoUpdateNodeImage(t *testing.T) {
 				WithObjects(tt.objs...).
 				WithStatusSubresource(tt.objs...).
 				Build()
+
+			for _, secret := range tt.secrets {
+				_ = fakeclient.Create(context.TODO(), &secret)
+			}
 
 			r := &ReconcileNodeImage{
 				Client: fakeclient,
@@ -553,6 +636,11 @@ func TestDoUpdateNodeImage(t *testing.T) {
 
 			if tt.wantWaitNotNil && gotWait == nil {
 				t.Errorf("expected wait duration to be set, but not")
+			}
+
+			// secrets
+			if !reflect.DeepEqual(tt.expectSecrets, tt.args.nodeImage.Spec.Images["nginx"].PullSecrets) {
+				t.Fatalf("expected secrets(%s), but get(%s)", util.DumpJSON(tt.expectSecrets), util.DumpJSON(tt.args.nodeImage.Spec.Images["nginx"].PullSecrets))
 			}
 
 			// Check tag counts

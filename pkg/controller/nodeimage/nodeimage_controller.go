@@ -356,6 +356,37 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1beta1.NodeImage,
 			}
 			newTags = append(newTags, *tagSpec)
 		}
+
+		// Clean up secrets, remove if not found
+		var newPullSecrets []appsv1beta1.ReferenceObject
+		for _, ref := range imageSpec.PullSecrets {
+			// Newly created secrets will have the following flag, for this type of pullSecrets configuration will be cleaned up together with ImageSpec
+			if ref.Mode == appsv1beta1.ReferenceObjectModeBatch {
+				newPullSecrets = append(newPullSecrets, ref)
+				continue
+			}
+			// The following cleanup logic only applies to old secrets
+			secret := &v1.Secret{}
+			err := r.Get(context.TODO(), client.ObjectKey{Namespace: ref.Namespace, Name: ref.Name}, secret)
+			// err=nil indicates that the secret exists
+			if err == nil {
+				newPullSecrets = append(newPullSecrets, ref)
+				continue
+			}
+			// get secret failed
+			if !errors.IsNotFound(err) {
+				// For stability in this scenario, do not clean up for now
+				newPullSecrets = append(newPullSecrets, ref)
+				klog.ErrorS(err, "get secrets failed", "secret", ref.Name)
+			}
+			// not found
+		}
+		// secrets changed
+		if len(newPullSecrets) != len(imageSpec.PullSecrets) {
+			modified = true
+			imageSpec.PullSecrets = newPullSecrets
+		}
+
 		if len(newTags) > 0 {
 			imageSpec.Tags = newTags
 			utilimagejob.SortSpecImageTagsV1beta1(&imageSpec)
