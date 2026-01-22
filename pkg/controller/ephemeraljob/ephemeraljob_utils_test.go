@@ -76,7 +76,7 @@ func TestPastActiveDeadline(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "exactly at deadline",
+			name: "at or past deadline (exactly at deadline)",
 			job: &appsv1alpha1.EphemeralJob{
 				Spec: appsv1alpha1.EphemeralJobSpec{
 					ActiveDeadlineSeconds: ptr(int64(300)),
@@ -174,7 +174,7 @@ func TestPodMatchedEphemeralJob(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "empty selector",
+			name: "empty selector does not match",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-pod",
