@@ -480,7 +480,13 @@ func (r *ControllerFinder) getScaleController(ref ControllerReference, namespace
 	scale, err := r.scaleNamespacer.Scales(namespace).Get(context.TODO(), gr, ref.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// TODO, implementsScale
+			gvk := schema.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: ref.Kind}
+			if !r.implementsScale(gvk) {
+				// This resource type doesn't support scale (e.g., ConfigMap, DaemonSet)
+				return nil, nil
+			}
+			// Resource supports scale but this instance wasn't found
+			// Future: could add logging or return different errors to distinguish these cases
 			return nil, nil
 		}
 		return nil, err
@@ -551,6 +557,39 @@ func isValidGroupVersionKind(apiVersion, kind string) bool {
 		if err != nil {
 			return false
 		} else if valid {
+			return true
+		}
+	}
+	return false
+}
+
+// implementsScale checks if a resource type supports the scale subresource.
+// Some resources like Deployment, StatefulSet have "/scale" subresource for HPA.
+// Others like ConfigMap, DaemonSet don't support scaling.
+func (r *ControllerFinder) implementsScale(gvk schema.GroupVersionKind) bool {
+	if r.discoveryClient == nil {
+		return true
+	}
+
+	resourceList, err := r.discoveryClient.ServerResourcesForGroupVersion(gvk.GroupVersion().String())
+	if err != nil {
+		return true
+	}
+
+	var resourceName string
+	for _, resource := range resourceList.APIResources {
+		if resource.Kind == gvk.Kind {
+			resourceName = resource.Name
+			break
+		}
+	}
+	if resourceName == "" {
+		return false // Kind not registered in this API group
+	}
+
+	scaleSubresourceName := resourceName + "/scale"
+	for _, resource := range resourceList.APIResources {
+		if resource.Name == scaleSubresourceName {
 			return true
 		}
 	}
