@@ -22,9 +22,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"reflect"
+	"sort"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -144,14 +145,14 @@ func Ensure(kubeClient clientset.Interface, handlers map[string]types.HandlerGet
 	}
 	validatingConfig.Webhooks = validatingWHs
 
-	if !reflect.DeepEqual(mutatingConfig, oldMutatingConfig) {
+	if !AreSemanticEqualMutatingWebhooks(mutatingConfig, oldMutatingConfig) {
 		if _, err := kubeClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(context.TODO(), mutatingConfig, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("failed to update %s: %v", mutatingWebhookConfigurationName, err)
 		}
 		klog.InfoS("Update caBundle success", "MutatingWebhookConfigurations", klog.KObj(mutatingConfig))
 	}
 
-	if !reflect.DeepEqual(validatingConfig, oldValidatingConfig) {
+	if !AreSemanticEqualValidatingWebhooks(validatingConfig, oldValidatingConfig) {
 		if _, err := kubeClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(context.TODO(), validatingConfig, metav1.UpdateOptions{}); err != nil {
 			return fmt.Errorf("failed to update %s: %v", validatingWebhookConfigurationName, err)
 		}
@@ -159,6 +160,88 @@ func Ensure(kubeClient clientset.Interface, handlers map[string]types.HandlerGet
 	}
 
 	return nil
+}
+
+// AreSemanticEqualMutatingWebhooks compares two MutatingWebhookConfigurations using semantic equality.
+// It returns true if the configurations are semantically equal, even if the order of webhooks
+// or MatchExpressions differs. This avoids unnecessary updates when only ordering changes.
+func AreSemanticEqualMutatingWebhooks(config1, config2 *admissionregistrationv1.MutatingWebhookConfiguration) bool {
+	normalized1 := normalizeMutatingWebhookConfiguration(config1)
+	normalized2 := normalizeMutatingWebhookConfiguration(config2)
+	return equality.Semantic.DeepEqual(normalized1, normalized2)
+}
+
+// AreSemanticEqualValidatingWebhooks compares two ValidatingWebhookConfigurations using semantic equality.
+// It returns true if the configurations are semantically equal, even if the order of webhooks
+// or MatchExpressions differs. This avoids unnecessary updates when only ordering changes.
+func AreSemanticEqualValidatingWebhooks(config1, config2 *admissionregistrationv1.ValidatingWebhookConfiguration) bool {
+	normalized1 := normalizeValidatingWebhookConfiguration(config1)
+	normalized2 := normalizeValidatingWebhookConfiguration(config2)
+	return equality.Semantic.DeepEqual(normalized1, normalized2)
+}
+
+// normalizeMutatingWebhookConfiguration returns a normalized copy of the configuration
+// with webhooks sorted by name and MatchExpressions sorted by key.
+func normalizeMutatingWebhookConfiguration(config *admissionregistrationv1.MutatingWebhookConfiguration) *admissionregistrationv1.MutatingWebhookConfiguration {
+	if config == nil {
+		return nil
+	}
+	normalized := config.DeepCopy()
+
+	// Sort webhooks by name
+	sort.Slice(normalized.Webhooks, func(i, j int) bool {
+		return normalized.Webhooks[i].Name < normalized.Webhooks[j].Name
+	})
+
+	// Sort MatchExpressions within each webhook's NamespaceSelector
+	for i := range normalized.Webhooks {
+		normalizeNamespaceSelector(normalized.Webhooks[i].NamespaceSelector)
+	}
+
+	return normalized
+}
+
+// normalizeValidatingWebhookConfiguration returns a normalized copy of the configuration
+// with webhooks sorted by name and MatchExpressions sorted by key.
+func normalizeValidatingWebhookConfiguration(config *admissionregistrationv1.ValidatingWebhookConfiguration) *admissionregistrationv1.ValidatingWebhookConfiguration {
+	if config == nil {
+		return nil
+	}
+	normalized := config.DeepCopy()
+
+	// Sort webhooks by name
+	sort.Slice(normalized.Webhooks, func(i, j int) bool {
+		return normalized.Webhooks[i].Name < normalized.Webhooks[j].Name
+	})
+
+	// Sort MatchExpressions within each webhook's NamespaceSelector
+	for i := range normalized.Webhooks {
+		normalizeNamespaceSelector(normalized.Webhooks[i].NamespaceSelector)
+	}
+
+	return normalized
+}
+
+// normalizeNamespaceSelector normalizes a LabelSelector to ensure consistent comparison:
+// - Sorts MatchExpressions by key to handle ordering differences
+// - MatchLabels (map) is already order-independent, but we normalize nil to empty map
+//   to ensure consistent comparison even if semantic equality handles this
+func normalizeNamespaceSelector(selector *metav1.LabelSelector) {
+	if selector == nil {
+		return
+	}
+
+	// Normalize nil MatchLabels to empty map for consistency
+	if selector.MatchLabels == nil {
+		selector.MatchLabels = make(map[string]string)
+	}
+
+	// Sort MatchExpressions by key
+	if len(selector.MatchExpressions) > 0 {
+		sort.Slice(selector.MatchExpressions, func(i, j int) bool {
+			return selector.MatchExpressions[i].Key < selector.MatchExpressions[j].Key
+		})
+	}
 }
 
 func getPath(clientConfig *admissionregistrationv1.WebhookClientConfig) (string, error) {
@@ -181,13 +264,131 @@ func convertClientConfig(clientConfig *admissionregistrationv1.WebhookClientConf
 	clientConfig.Service = nil
 }
 
+// mergeNamespaceSelectors merges two LabelSelectors into one, combining both MatchLabels and MatchExpressions.
+// If either selector is nil, it returns the other. If both are nil, it returns nil.
+// Returns an error if there are conflicts in MatchLabels (same key with different values) or
+// contradictory MatchExpressions.
+func mergeNamespaceSelectors(selector1, selector2 *metav1.LabelSelector) (*metav1.LabelSelector, error) {
+	if selector1 == nil && selector2 == nil {
+		return nil, nil
+	}
+	if selector1 == nil {
+		return selector2.DeepCopy(), nil
+	}
+	if selector2 == nil {
+		return selector1.DeepCopy(), nil
+	}
+
+	// Initialize merged with a deep copy of selector1
+	merged := selector1.DeepCopy()
+
+	// Merge MatchLabels from selector2
+	// Check for conflicts in MatchLabels (same key with different values)
+	if selector2.MatchLabels != nil {
+		if merged.MatchLabels == nil {
+			merged.MatchLabels = make(map[string]string)
+		}
+		for k, v := range selector2.MatchLabels {
+			if existingValue, exists := merged.MatchLabels[k]; exists && existingValue != v {
+				return nil, fmt.Errorf("conflict in MatchLabels: key %q has different values %q and %q", k, existingValue, v)
+			}
+			merged.MatchLabels[k] = v
+		}
+	}
+
+	// Merge MatchExpressions from selector2
+	// Check for conflicts in MatchExpressions
+	if selector2.MatchExpressions != nil {
+		merged.MatchExpressions = append(merged.MatchExpressions, selector2.MatchExpressions...)
+	}
+
+	// Check for contradictory expressions in the combined set
+	if err := validateExpressions(merged.MatchExpressions); err != nil {
+		return nil, fmt.Errorf("conflict in MatchExpressions: %w", err)
+	}
+
+	return merged, nil
+}
+
+// validateExpressions checks for contradictory label selector expressions
+func validateExpressions(expressions []metav1.LabelSelectorRequirement) error {
+	// Group expressions by key to detect conflicts
+	keyExpressions := make(map[string][]metav1.LabelSelectorRequirement)
+	for _, expr := range expressions {
+		keyExpressions[expr.Key] = append(keyExpressions[expr.Key], expr)
+	}
+
+	// Check for conflicts within each key
+	for key, exprs := range keyExpressions {
+		if err := validateExpressionsForKey(key, exprs); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateExpressionsForKey checks for contradictory expressions for a single key
+func validateExpressionsForKey(key string, expressions []metav1.LabelSelectorRequirement) error {
+	var hasExists, hasDoesNotExist bool
+	var inValues, notInValues []string
+
+	for _, expr := range expressions {
+		switch expr.Operator {
+		case metav1.LabelSelectorOpExists:
+			hasExists = true
+		case metav1.LabelSelectorOpDoesNotExist:
+			hasDoesNotExist = true
+		case metav1.LabelSelectorOpIn:
+			inValues = append(inValues, expr.Values...)
+		case metav1.LabelSelectorOpNotIn:
+			notInValues = append(notInValues, expr.Values...)
+		}
+	}
+
+	// Check for Exists vs DoesNotExist conflict
+	if hasExists && hasDoesNotExist {
+		return fmt.Errorf("conflicting requirements for key %q: both Exists and DoesNotExist operators", key)
+	}
+
+	// Check for In vs NotIn conflicts (values that appear in both)
+	for _, inVal := range inValues {
+		for _, notInVal := range notInValues {
+			if inVal == notInVal {
+				return fmt.Errorf("conflicting requirements for key %q: value %q appears in both In and NotIn", key, inVal)
+			}
+		}
+	}
+
+	return nil
+}
+
 func parseMutatingTemplate(mutatingConfig *admissionregistrationv1.MutatingWebhookConfiguration) ([]admissionregistrationv1.MutatingWebhook, error) {
 	if templateStr := mutatingConfig.Annotations["template"]; len(templateStr) > 0 {
-		var mutatingWHs []admissionregistrationv1.MutatingWebhook
-		if err := json.Unmarshal([]byte(templateStr), &mutatingWHs); err != nil {
+		var templateWHs []admissionregistrationv1.MutatingWebhook
+		if err := json.Unmarshal([]byte(templateStr), &templateWHs); err != nil {
 			return nil, err
 		}
-		return mutatingWHs, nil
+
+		// Create a map of current webhooks by name for easy lookup
+		currentWHMap := make(map[string]*admissionregistrationv1.MutatingWebhook)
+		for i := range mutatingConfig.Webhooks {
+			currentWHMap[mutatingConfig.Webhooks[i].Name] = &mutatingConfig.Webhooks[i]
+		}
+
+		// Merge NamespaceSelector from both sources for each webhook
+		for i := range templateWHs {
+			wh := &templateWHs[i]
+			if currentWH, exists := currentWHMap[wh.Name]; exists {
+				merged, err := mergeNamespaceSelectors(wh.NamespaceSelector, currentWH.NamespaceSelector)
+				if err != nil {
+					return nil, fmt.Errorf("failed to merge NamespaceSelector for webhook %q: %w", wh.Name, err)
+				}
+				wh.NamespaceSelector = merged
+			}
+		}
+
+		return templateWHs, nil
 	}
 
 	templateBytes, err := json.Marshal(mutatingConfig.Webhooks)
@@ -203,11 +404,30 @@ func parseMutatingTemplate(mutatingConfig *admissionregistrationv1.MutatingWebho
 
 func parseValidatingTemplate(validatingConfig *admissionregistrationv1.ValidatingWebhookConfiguration) ([]admissionregistrationv1.ValidatingWebhook, error) {
 	if templateStr := validatingConfig.Annotations["template"]; len(templateStr) > 0 {
-		var validatingWHs []admissionregistrationv1.ValidatingWebhook
-		if err := json.Unmarshal([]byte(templateStr), &validatingWHs); err != nil {
+		var templateWHs []admissionregistrationv1.ValidatingWebhook
+		if err := json.Unmarshal([]byte(templateStr), &templateWHs); err != nil {
 			return nil, err
 		}
-		return validatingWHs, nil
+
+		// Create a map of current webhooks by name for easy lookup
+		currentWHMap := make(map[string]*admissionregistrationv1.ValidatingWebhook)
+		for i := range validatingConfig.Webhooks {
+			currentWHMap[validatingConfig.Webhooks[i].Name] = &validatingConfig.Webhooks[i]
+		}
+
+		// Merge NamespaceSelector from both sources for each webhook
+		for i := range templateWHs {
+			wh := &templateWHs[i]
+			if currentWH, exists := currentWHMap[wh.Name]; exists {
+				merged, err := mergeNamespaceSelectors(wh.NamespaceSelector, currentWH.NamespaceSelector)
+				if err != nil {
+					return nil, fmt.Errorf("failed to merge NamespaceSelector for webhook %q: %w", wh.Name, err)
+				}
+				wh.NamespaceSelector = merged
+			}
+		}
+
+		return templateWHs, nil
 	}
 
 	templateBytes, err := json.Marshal(validatingConfig.Webhooks)
