@@ -36,7 +36,7 @@ var (
 	patchCodec = scheme.Codecs.LegacyCodec(appsv1beta1.SchemeGroupVersion)
 )
 
-// Interface is a interface to new and apply ControllerRevision.
+// Interface is an interface to new and apply ControllerRevision.
 type Interface interface {
 	NewRevision(cs *appsv1beta1.CloneSet, revision int64, collisionCount *int32) (*apps.ControllerRevision, error)
 	ApplyRevision(cs *appsv1beta1.CloneSet, revision *apps.ControllerRevision) (*appsv1beta1.CloneSet, error)

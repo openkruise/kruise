@@ -490,7 +490,7 @@ func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1beta1.BroadcastJob,
 // isJobComplete returns true if all pods on all desiredNodes are either succeeded or failed or deletionTimestamp !=nil.
 func isJobComplete(job *appsv1beta1.BroadcastJob, desiredNodes map[string]*corev1.Pod) bool {
 	if job.Spec.CompletionPolicy.Type == appsv1beta1.Never {
-		// the job will not terminate, if the the completion policy is never
+		// the job will not terminate, if the completion policy is never
 		return false
 	}
 	// if no desiredNodes, job pending

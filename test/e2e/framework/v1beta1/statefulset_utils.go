@@ -112,7 +112,7 @@ func (s *StatefulSetTester) CheckMount(ss *appsv1beta1.StatefulSet, mountPath st
 	return nil
 }
 
-// ExecInStatefulPods executes cmd in all Pods in ss. If a error occurs it is returned and cmd is not execute in any subsequent Pods.
+// ExecInStatefulPods executes cmd in all Pods in ss. If an error occurs it is returned and cmd is not executed in any subsequent Pods.
 func (s *StatefulSetTester) ExecInStatefulPods(ss *appsv1beta1.StatefulSet, cmd string) error {
 	podList := s.GetPodList(ss)
 	for _, statefulPod := range podList.Items {

@@ -98,7 +98,7 @@ const (
 	PreDownloadImageForDaemonSetUpdate featuregate.Feature = "PreDownloadImageForDaemonSetUpdate"
 
 	// CloneSetEventHandlerOptimization enable optimization for cloneset-controller to reduce the
-	// queuing frequency cased by pod update.
+	// queuing frequency caused by pod update.
 	CloneSetEventHandlerOptimization featuregate.Feature = "CloneSetEventHandlerOptimization"
 
 	// PreparingUpdateAsUpdate enable CloneSet/Advanced StatefulSet controller to regard preparing-update Pod
@@ -114,7 +114,7 @@ const (
 	// DeletionProtectionForCRDCascadingGate enable deletionProtection for crd Cascading
 	DeletionProtectionForCRDCascadingGate featuregate.Feature = "DeletionProtectionForCRDCascadingGate"
 
-	// Enables a enhanced livenessProbe solution
+	// Enables an enhanced livenessProbe solution
 	EnhancedLivenessProbeGate featuregate.Feature = "EnhancedLivenessProbe"
 
 	// RecreatePodWhenChangeVCTInCloneSetGate recreate the pod upon changing volume claim templates in a clone set to ensure PVC consistency.

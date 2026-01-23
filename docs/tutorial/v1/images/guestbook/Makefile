@@ -14,7 +14,7 @@ release: clean build push clean
 build:
 	docker build --pull -t "${REGISTRY}/guestbook:${VERSION}" .
 
-# push the image to an registry
+# push the image to a registry
 push: build
 	docker push ${REGISTRY}/guestbook:${VERSION}
 

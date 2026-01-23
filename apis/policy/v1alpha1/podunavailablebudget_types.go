@@ -58,7 +58,7 @@ type PodUnavailableBudgetSpec struct {
 	// Selector label query over pods managed by the budget
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
-	// TargetReference contains enough information to let you identify an workload for PodUnavailableBudget
+	// TargetReference contains enough information to let you identify a workload for PodUnavailableBudget
 	// Selector and TargetReference are mutually exclusive, TargetReference is priority to take effect
 	TargetReference *TargetReference `json:"targetRef,omitempty"`
 
@@ -72,7 +72,7 @@ type PodUnavailableBudgetSpec struct {
 	MinAvailable *intstr.IntOrString `json:"minAvailable,omitempty"`
 }
 
-// TargetReference contains enough information to let you identify an workload for PodUnavailableBudget
+// TargetReference contains enough information to let you identify a workload for PodUnavailableBudget
 type TargetReference struct {
 	// API version of the referent.
 	APIVersion string `json:"apiVersion,omitempty"`

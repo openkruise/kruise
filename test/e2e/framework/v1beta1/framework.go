@@ -86,7 +86,7 @@ type Framework struct {
 	AfterEachActions []func()
 }
 
-// TestDataSummary defines a interface to test data summary
+// TestDataSummary defines an interface to test data summary
 type TestDataSummary interface {
 	SummaryKind() string
 	PrintHumanReadable() string

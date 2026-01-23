@@ -223,11 +223,11 @@ When a Pod that belongs to a subset changes status phase to 'succeed' or 'failed
 
 ### Reschedule strategy
 
-Reschedule strategy will delete unscheduled Pods that still in pending status. Some subsets have no sufficient resource can lead to some Pods unscheduable.
+Reschedule strategy will delete unscheduled Pods that still in pending status. Some subsets have no sufficient resource can lead to some Pods unschedulable.
 WorkloadSpread has multiple subset, so the unschedulable pods should be rescheduled to other subsets.
 
-Controller will mark the subset containing unscheduable pods to unscheduable status and Webhook cannot inject Pod into this subset by check subset's status.
-And then controller cleans up all unscheduable Pods to trigger workload creating new replicas, and webhook will skip unscheduable subset and chose suitable subset to inject.
+Controller will mark the subset containing unschedulable pods to unschedulable status and Webhook cannot inject Pod into this subset by check subset's status.
+And then controller cleans up all unschedulable Pods to trigger workload creating new replicas, and webhook will skip unschedulable subset and chose suitable subset to inject.
 
 The unscheduled subset can be kept for 10 minutes and then should be recovered schedulable to schedule Pod again by controller.
 

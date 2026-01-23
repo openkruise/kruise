@@ -529,7 +529,7 @@ func dumpAllNodeInfo(c clientset.Interface) {
 	//DumpNodeDebugInfo(c, names, Logf)
 }
 
-// EventsLister defines a event listener
+// EventsLister defines an event listener
 type EventsLister func(opts metav1.ListOptions, ns string) (*v1.EventList, error)
 
 // DumpEventsInNamespace dump events in namespace

@@ -115,9 +115,9 @@ func (e *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent
 	if curPod.DeletionTimestamp != nil {
 		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
 		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
-		// for modification of the deletion timestamp and expect an rs to create more replicas asap, not wait
+		// for modification of the deletion timestamp and expect a rs to create more replicas asap, not wait
 		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
-		// an rs never initiates a phase change, and so is never asleep waiting for the same.
+		// a rs never initiates a phase change, and so is never asleep waiting for the same.
 		e.Delete(ctx, event.TypedDeleteEvent[*v1.Pod]{Object: evt.ObjectNew}, q)
 		if labelChanged {
 			// we don't need to check the oldPod.DeletionTimestamp because DeletionTimestamp cannot be unset.

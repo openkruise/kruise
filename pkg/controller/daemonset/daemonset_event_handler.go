@@ -119,7 +119,7 @@ func (e *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent
 	if curPod.DeletionTimestamp != nil {
 		// when a pod is deleted gracefully its deletion timestamp is first modified to reflect a grace period,
 		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
-		// for modification of the deletion timestamp and expect an ds to create more replicas asap, not wait
+		// for modification of the deletion timestamp and expect a ds to create more replicas asap, not wait
 		// until the kubelet actually deletes the pod.
 		e.deletePod(ctx, curPod, q, false)
 		return

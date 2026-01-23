@@ -82,7 +82,7 @@ func TestSortingActivePods(t *testing.T) {
 	for _, pod := range equalityTests {
 		podsWithDeletionCost := ActivePodsWithRanks{Pods: []*v1.Pod{pod, pod}}
 		if podsWithDeletionCost.Less(0, 1) || podsWithDeletionCost.Less(1, 0) {
-			t.Errorf("expected pod %q not to be less than than itself", pod.Name)
+			t.Errorf("expected pod %q not to be less than itself", pod.Name)
 		}
 	}
 	type podWithDeletionCost *v1.Pod
