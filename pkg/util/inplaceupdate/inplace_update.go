@@ -50,8 +50,9 @@ var (
 )
 
 type RefreshResult struct {
-	RefreshErr    error
-	DelayDuration time.Duration
+	RefreshErr     error
+	DelayDuration  time.Duration
+	RefreshUpdated bool
 }
 
 type UpdateResult struct {
@@ -123,11 +124,11 @@ func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 
 	// check if it is in grace period
 	if gracePeriod, _ := appspub.GetInPlaceUpdateGrace(pod); gracePeriod != "" {
-		delayDuration, err := c.finishGracePeriod(pod, opts)
+		delayDuration, updated, err := c.finishGracePeriod(pod, opts)
 		if err != nil {
 			return RefreshResult{RefreshErr: err}
 		}
-		return RefreshResult{DelayDuration: delayDuration}
+		return RefreshResult{DelayDuration: delayDuration, RefreshUpdated: updated}
 	}
 
 	if stateStr, ok := appspub.GetInPlaceUpdateState(pod); ok {
@@ -155,7 +156,7 @@ func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 			if updated, err := c.updateNextBatch(pod, opts); err != nil {
 				return RefreshResult{RefreshErr: err}
 			} else if updated {
-				return RefreshResult{}
+				return RefreshResult{RefreshUpdated: true}
 			}
 		}
 	}
@@ -176,7 +177,7 @@ func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 	// Do not retry on conflict; only update the condition for the checked Pod version.
 	// see https://github.com/openkruise/kruise/pull/2274
 	err := c.updateCondition(pod, newCondition)
-	return RefreshResult{RefreshErr: err}
+	return RefreshResult{RefreshErr: err, RefreshUpdated: err == nil}
 }
 
 // updateCondition update the given Pod's condition by updating status on a copy with the same ResourceVersion;
@@ -191,9 +192,11 @@ func (c *realControl) updateCondition(pod *v1.Pod, condition v1.PodCondition) er
 	return c.podAdapter.UpdatePodStatus(clone)
 }
 
-func (c *realControl) finishGracePeriod(pod *v1.Pod, opts *UpdateOptions) (time.Duration, error) {
+func (c *realControl) finishGracePeriod(pod *v1.Pod, opts *UpdateOptions) (time.Duration, bool, error) {
 	var delayDuration time.Duration
+	var updated bool
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		updated = false
 		clone, err := c.podAdapter.GetPod(pod.Namespace, pod.Name)
 		if err != nil {
 			return err
@@ -221,6 +224,7 @@ func (c *realControl) finishGracePeriod(pod *v1.Pod, opts *UpdateOptions) (time.
 		if !c.revisionAdapter.EqualToRevisionHash("", clone, spec.Revision) {
 			// If revision-hash has changed, just drop this GracePeriodSpec and go through the normal update process again.
 			appspub.RemoveInPlaceUpdateGrace(clone)
+			updated = true
 		} else {
 			if span := time.Since(updateState.UpdateTimestamp.Time); span < graceDuration {
 				delayDuration = roundupSeconds(graceDuration - span)
@@ -245,13 +249,14 @@ func (c *realControl) finishGracePeriod(pod *v1.Pod, opts *UpdateOptions) (time.
 					}
 				}
 			}
+			updated = true
 		}
 
 		_, err = c.podAdapter.UpdatePod(clone)
 		return err
 	})
 
-	return delayDuration, err
+	return delayDuration, updated, err
 }
 
 func (c *realControl) updateNextBatch(pod *v1.Pod, opts *UpdateOptions) (bool, error) {

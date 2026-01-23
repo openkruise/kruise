@@ -171,6 +171,9 @@ func (c *realControl) refreshPodState(cs *appsv1beta1.CloneSet, coreControl clon
 			"cloneSet", klog.KObj(cs), "pod", klog.KObj(pod))
 		return false, 0, res.RefreshErr
 	}
+	if res.RefreshUpdated {
+		return true, res.DelayDuration, nil
+	}
 
 	var state appspub.LifecycleStateType
 	switch lifecycle.GetPodLifecycleState(pod) {
