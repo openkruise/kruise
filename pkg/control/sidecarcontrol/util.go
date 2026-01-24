@@ -387,17 +387,23 @@ func GetInjectedVolumeDevices(sidecarContainer *appsv1beta1.SidecarContainer, po
 
 	// injected volumeDevices
 	var volumeDevices []corev1.VolumeDevice
-	for _, appContainer := range pod.Spec.Containers {
-		// ignore the injected sidecar container
-		if IsInjectedSidecarContainerInPod(&appContainer) {
-			continue
-		}
 
-		for _, volumeDevice := range appContainer.VolumeDevices {
-			volumeDevices = append(volumeDevices, volumeDevice)
+	processContainers := func(containers []corev1.Container) {
+		for _, container := range containers {
+			// ignore the injected sidecar container
+			if IsInjectedSidecarContainerInPod(&container) {
+				continue
+			}
+
+			for _, volumeDevice := range container.VolumeDevices {
+				volumeDevices = append(volumeDevices, volumeDevice)
+			}
 		}
 	}
-	// TODO: share pod.spec.initContainers[*].volumeDevices
+
+	processContainers(pod.Spec.Containers)
+	processContainers(pod.Spec.InitContainers)
+
 	return volumeDevices
 }
 
