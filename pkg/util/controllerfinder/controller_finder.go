@@ -482,7 +482,7 @@ func (r *ControllerFinder) getScaleController(ref ControllerReference, namespace
 		if errors.IsNotFound(err) {
 			gvk := schema.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: ref.Kind}
 			if !r.implementsScale(gvk) {
-				// This resource type doesn't support scale (e.g., ConfigMap, DaemonSet)
+				// This resource type doesn't support scale (e.g., ConfigMap)
 				return nil, nil
 			}
 			// Resource supports scale but this instance wasn't found
@@ -565,7 +565,7 @@ func isValidGroupVersionKind(apiVersion, kind string) bool {
 
 // implementsScale checks if a resource type supports the scale subresource.
 // Some resources like Deployment, StatefulSet have "/scale" subresource for HPA.
-// Others like ConfigMap, DaemonSet don't support scaling.
+// Whether a resource supports scale is determined dynamically via the discovery API.
 func (r *ControllerFinder) implementsScale(gvk schema.GroupVersionKind) bool {
 	if r.discoveryClient == nil {
 		return true
