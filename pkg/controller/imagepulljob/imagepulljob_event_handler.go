@@ -217,10 +217,10 @@ func (e *secretEventHandler) Generic(ctx context.Context, evt event.TypedGeneric
 
 func (e *secretEventHandler) handle(secret *v1.Secret, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	if secret != nil && secret.Namespace == kruiseutil.GetKruiseDaemonConfigNamespace() {
-		jobKeySet := referenceSetFromTarget(secret)
-		klog.V(4).InfoS("Observed Secret created", "secret", klog.KObj(secret), "secretUID", secret.UID, "jobRefs", jobKeySet)
-		for key := range jobKeySet {
-			scaleExpectations.ObserveScale(key.String(), expectations.Create, secret.Labels[SourceSecretUIDLabelKey])
+		jobKeySet := getReferencingJobsFromSecret(secret)
+		klog.V(5).InfoS("Observed Secret created", "secret", klog.KObj(secret), "secretUID", secret.UID, "jobRefs", jobKeySet)
+		for _, ref := range jobKeySet.UnsortedList() {
+			scaleExpectations.ObserveScale(ref.String(), expectations.Create, secret.Name)
 		}
 		return
 	}
@@ -232,6 +232,7 @@ func (e *secretEventHandler) handle(secret *v1.Secret, q workqueue.TypedRateLimi
 	jobKeys, err := e.getActiveJobKeysForSecret(secret)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get jobs for Secret", "secret", klog.KObj(secret))
+		return
 	}
 	for _, jKey := range jobKeys {
 		q.Add(reconcile.Request{NamespacedName: jKey})
@@ -240,9 +241,9 @@ func (e *secretEventHandler) handle(secret *v1.Secret, q workqueue.TypedRateLimi
 
 func (e *secretEventHandler) handleUpdate(secretNew, secretOld *v1.Secret, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	if secretNew != nil && secretNew.Namespace == kruiseutil.GetKruiseDaemonConfigNamespace() {
-		jobKeySet := referenceSetFromTarget(secretNew)
-		for key := range jobKeySet {
-			scaleExpectations.ObserveScale(key.String(), expectations.Create, secretNew.Labels[SourceSecretUIDLabelKey])
+		jobKeySet := getReferencingJobsFromSecret(secretNew)
+		for _, ref := range jobKeySet.UnsortedList() {
+			scaleExpectations.ObserveScale(ref.String(), expectations.Create, secretNew.Name)
 		}
 		return
 	}
@@ -273,7 +274,7 @@ func (e *secretEventHandler) getActiveJobKeysForSecret(secret *v1.Secret) ([]typ
 			continue
 		}
 		if jobContainsSecret(job, secret.Name) {
-			jobKeys = append(jobKeys, keyFromObject(job))
+			jobKeys = append(jobKeys, types.NamespacedName{Namespace: job.Namespace, Name: job.Name})
 		}
 	}
 	return jobKeys, nil

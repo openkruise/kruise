@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -49,6 +51,42 @@ type ImageSpec struct {
 type ReferenceObject struct {
 	Namespace string `json:"namespace,omitempty"`
 	Name      string `json:"name,omitempty"`
+	// The previous mode, where each imagePullJob would generate a kruise-daemon-config secret, caused various problems.
+	// In the new mode, each secret will only be synchronized once, instead of generating a separate secret for each imagePullJob. For example:
+	// job1 pullSecrets is secret1, job2 pullSecrets is still secret1.
+	// In existing clusters, there are already many pullSecrets configurations in NodeImage that need to be cleaned up, so an additional flag is needed to identify this.
+	// Only clean up the old secrets, while the new approach can be cleaned up together with imageSpec.
+	// Therefore, for pullSecrets with mode=batch, they need to be cleaned up together with imageSpec.
+	Mode string `json:"mode,omitempty"`
+}
+
+const ReferenceObjectModeBatch = "batch"
+
+// String returns the string representation of ReferenceObject in "namespace/name" format
+func (r *ReferenceObject) String() string {
+	if r.Namespace == "" {
+		return r.Name
+	}
+	return r.Namespace + "/" + r.Name
+}
+
+// ParseReferenceObject parses a string in "namespace/name" format to ReferenceObject
+func ParseReferenceObject(str string) *ReferenceObject {
+	if str == "" {
+		return &ReferenceObject{}
+	}
+
+	parts := strings.Split(str, "/")
+	if len(parts) == 1 {
+		return &ReferenceObject{
+			Name: parts[0],
+		}
+	}
+
+	return &ReferenceObject{
+		Namespace: parts[0],
+		Name:      parts[1],
+	}
 }
 
 // ImageTagSpec defines the pulling spec of an image tag

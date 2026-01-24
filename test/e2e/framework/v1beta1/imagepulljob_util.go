@@ -21,7 +21,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 
@@ -85,9 +84,18 @@ func (tester *ImagePullJobTester) UpdateSecret(secret *v1.Secret) (*v1.Secret, e
 }
 
 func (tester *ImagePullJobTester) ListSyncedSecrets(source *v1.Secret) ([]v1.Secret, error) {
-	options := metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(map[string]string{imagepulljob.SourceSecretUIDLabelKey: string(source.UID)}).String(),
-	}
+	options := metav1.ListOptions{}
 	lister, err := tester.c.CoreV1().Secrets(util.GetKruiseDaemonConfigNamespace()).List(context.TODO(), options)
-	return lister.Items, err
+	if err != nil {
+		return nil, err
+	}
+	var secrets []v1.Secret
+	for i := range lister.Items {
+		obj := lister.Items[i]
+		ref := AppsV1beta1.ParseReferenceObject(obj.Annotations[imagepulljob.SecretAnnotationSourceSecretKey])
+		if ref.Namespace == source.Namespace && ref.Name == source.Name {
+			secrets = append(secrets, obj)
+		}
+	}
+	return secrets, nil
 }
