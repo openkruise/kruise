@@ -84,7 +84,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		Reconciler: r, MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: util.GetControllerCacheSyncTimeout(),
 		RateLimiter: ratelimiter.DefaultControllerRateLimiter[reconcile.Request]()})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create resourcedistribution controller: %w", err)
 	}
 
 	// Watch for changes to ResourceDistribution
@@ -125,7 +125,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			},
 		}))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to watch Secret resources for ResourceDistribution: %w", err)
 	}
 
 	// Watch for changes to ConfigMap
@@ -142,7 +142,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			},
 		}))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to watch ConfigMap resources for ResourceDistribution: %w", err)
 	}
 
 	return nil
