@@ -16,6 +16,12 @@ import (
 	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 	tcpprobe "k8s.io/kubernetes/pkg/probe/tcp"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+
+	grpcprobe "k8s.io/kubernetes/pkg/probe/grpc"
+
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/pkg/util"
 )
@@ -25,6 +31,7 @@ func New() prober {
 	return prober{
 		tcp:  tcpprobe.New(),
 		http: httpprobe.New(false),
+		grpc: grpcprobe.New(),
 	}
 }
 
@@ -42,6 +49,24 @@ func TestRunProbe(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+
+	// Setup gRPC server
+	grpcServer := grpc.NewServer()
+	healthServer := health.NewServer()
+	healthpb.RegisterHealthServer(grpcServer, healthServer)
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to listen: %v", err)
+	}
+	go grpcServer.Serve(lis)
+	defer grpcServer.Stop()
+	grpcPort := lis.Addr().(*net.TCPAddr).Port
+	grpcHost := "127.0.0.1"
+	serviceHealthy := "healthy"
+	serviceUnhealthy := "unhealthy"
+
+	healthServer.SetServingStatus(serviceHealthy, healthpb.HealthCheckResponse_SERVING)
+	healthServer.SetServingStatus(serviceUnhealthy, healthpb.HealthCheckResponse_NOT_SERVING)
 
 	tests := []struct {
 		name                   string
@@ -116,7 +141,7 @@ func TestRunProbe(t *testing.T) {
 		},
 
 		{
-			name: "invalid probe handler",
+			name: "unknown probe handler",
 			p: &appsv1alpha1.ContainerProbeSpec{
 				Probe: corev1.Probe{
 					ProbeHandler: corev1.ProbeHandler{},
@@ -129,6 +154,42 @@ func TestRunProbe(t *testing.T) {
 			},
 			expectedStatus: probe.Unknown,
 			expectedError:  fmt.Errorf("missing probe handler for %s", "container-name"),
+		},
+		{
+			name: "test grpcProbe check, healthy",
+			p: &appsv1alpha1.ContainerProbeSpec{
+				Probe: corev1.Probe{
+					ProbeHandler: corev1.ProbeHandler{
+						GRPC: &corev1.GRPCAction{
+							Port:    int32(grpcPort),
+							Service: &serviceHealthy,
+						},
+					},
+				},
+			},
+			probeKey: probeKey{
+				podIP: grpcHost,
+			},
+			expectedStatus: probe.Success,
+			expectedError:  nil,
+		},
+		{
+			name: "test grpcProbe check, unhealthy",
+			p: &appsv1alpha1.ContainerProbeSpec{
+				Probe: corev1.Probe{
+					ProbeHandler: corev1.ProbeHandler{
+						GRPC: &corev1.GRPCAction{
+							Port:    int32(grpcPort),
+							Service: &serviceUnhealthy,
+						},
+					},
+				},
+			},
+			probeKey: probeKey{
+				podIP: grpcHost,
+			},
+			expectedStatus: probe.Failure,
+			expectedError:  nil,
 		},
 	}
 
