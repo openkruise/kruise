@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	utilpodreadiness "github.com/openkruise/kruise/pkg/util/podreadiness"
 )
@@ -304,6 +305,123 @@ func TestReconcile(t *testing.T) {
 			fakeClock:       clocktesting.NewFakeClock(time.Now()),
 			expectedPhase:   "", // Should be deleted
 			expectedRequeue: 0,
+		},
+		{
+			name: "Lifecycle: Pod deleted (not found)",
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr-no-pod",
+					Namespace: "default",
+					UID:       "crr-uid-no-pod",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "pod-uid-deleted",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName: "test-pod-deleted",
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{},
+				},
+			},
+			pods:            []*v1.Pod{}, // No pod
+			existingObjs:    []client.Object{},
+			fakeClock:       clocktesting.NewFakeClock(time.Now()),
+			expectedPhase:   appsv1alpha1.ContainerRecreateRequestCompleted,
+			expectedMsg:     "pod has gone",
+			expectedRequeue: 0,
+		},
+		{
+			name: "Lifecycle: Pod UID mismatch",
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr-uid-mismatch",
+					Namespace: "default",
+					UID:       "crr-uid-mismatch",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "old-pod-uid",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName: "test-pod-mismatch",
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-mismatch",
+						Namespace: "default",
+						UID:       "new-pod-uid", // Mismatch
+					},
+				},
+			},
+			existingObjs:    []client.Object{},
+			fakeClock:       clocktesting.NewFakeClock(time.Now()),
+			expectedPhase:   appsv1alpha1.ContainerRecreateRequestCompleted,
+			expectedMsg:     "pod has gone",
+			expectedRequeue: 0,
+		},
+		{
+			name: "Finalizer: UnreadyGracePeriodSeconds adds finalizer and not-ready key",
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr-unready",
+					Namespace: "default",
+					UID:       "crr-uid-unready",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "pod-uid-unready",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName: "test-pod-unready",
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{
+						UnreadyGracePeriodSeconds: func() *int64 { i := int64(30); return &i }(),
+					},
+				},
+				Status: appsv1alpha1.ContainerRecreateRequestStatus{
+					Phase: appsv1alpha1.ContainerRecreateRequestRecreating,
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-unready",
+						Namespace: "default",
+						UID:       "pod-uid-unready",
+						Labels: map[string]string{
+							string(appspub.KruisePodReadyConditionType): "true",
+						},
+					},
+					Status: v1.PodStatus{
+						ContainerStatuses: []v1.ContainerStatus{
+							{
+								Name: "main",
+								State: v1.ContainerState{
+									Running: &v1.ContainerStateRunning{
+										StartedAt: metav1.NewTime(time.Now().Add(-5 * time.Minute)),
+									},
+								},
+								ContainerID: "docker://abc",
+								Ready:       true,
+							},
+						},
+					},
+				},
+			},
+			existingObjs:       []client.Object{},
+			fakeClock:          clocktesting.NewFakeClock(time.Now()),
+			podReadinessGate:   true,
+			expectedPhase:      appsv1alpha1.ContainerRecreateRequestRecreating,
+			expectedRequeue:    0,
+			expectedFinalizers: []string{appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey},
 		},
 	}
 
