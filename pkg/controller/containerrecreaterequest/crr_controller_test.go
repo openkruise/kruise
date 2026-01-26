@@ -195,6 +195,116 @@ func TestReconcile(t *testing.T) {
 			expectedPhase:   appsv1alpha1.ContainerRecreateRequestRecreating,
 			expectedRequeue: 0,
 		},
+		{
+			name:               "Timeout: ActiveDeadlineSeconds exceeded",
+			creationTimeOffset: -11 * time.Minute,
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr-timeout",
+					Namespace: "default",
+					UID:       "crr-uid-timeout",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "pod-uid-timeout",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName:               "test-pod-timeout",
+					ActiveDeadlineSeconds: func() *int64 { i := int64(600); return &i }(), // 10 minutes
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{},
+				},
+				Status: appsv1alpha1.ContainerRecreateRequestStatus{
+					Phase: appsv1alpha1.ContainerRecreateRequestRecreating,
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-timeout",
+						Namespace: "default",
+						UID:       "pod-uid-timeout",
+					},
+				},
+			},
+			existingObjs:  []client.Object{},
+			fakeClock:     clocktesting.NewFakeClock(time.Now()),
+			expectedPhase: appsv1alpha1.ContainerRecreateRequestCompleted,
+			expectedMsg:   "recreating has exceeded the activeDeadlineSeconds",
+		},
+		{
+			name:               "Timeout: Response timeout (1 min)",
+			creationTimeOffset: -61 * time.Second,
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr-resp-timeout",
+					Namespace: "default",
+					UID:       "crr-uid-resp-timeout",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "pod-uid-resp-timeout",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName: "test-pod-resp-timeout",
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-resp-timeout",
+						Namespace: "default",
+						UID:       "pod-uid-resp-timeout",
+					},
+				},
+			},
+			existingObjs:  []client.Object{},
+			fakeClock:     clocktesting.NewFakeClock(time.Now()),
+			expectedPhase: appsv1alpha1.ContainerRecreateRequestCompleted,
+			expectedMsg:   "daemon has not responded for a long time",
+		},
+		{
+			name: "TTL: Cleanup after finished",
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr-ttl",
+					Namespace: "default",
+					UID:       "crr-uid-ttl",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "pod-uid-ttl",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName:                 "test-pod-ttl",
+					TTLSecondsAfterFinished: func() *int32 { i := int32(100); return &i }(),
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{},
+				},
+				Status: appsv1alpha1.ContainerRecreateRequestStatus{
+					Phase:          appsv1alpha1.ContainerRecreateRequestCompleted,
+					CompletionTime: &metav1.Time{Time: time.Now().Add(-200 * time.Second)}, // TTL 100s, elapsed 200s
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-ttl",
+						Namespace: "default",
+						UID:       "pod-uid-ttl",
+					},
+				},
+			},
+			existingObjs:    []client.Object{},
+			fakeClock:       clocktesting.NewFakeClock(time.Now()),
+			expectedPhase:   "", // Should be deleted
+			expectedRequeue: 0,
+		},
 	}
 
 	for _, tt := range tests {
