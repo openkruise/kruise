@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/clock"
+	clocktesting "k8s.io/utils/clock/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -94,7 +95,106 @@ func TestReconcile(t *testing.T) {
 		expectedMsg        string
 		creationTimeOffset time.Duration
 	}{
-		// Tests will be added here
+		{
+			name:               "Happy Path: New CRR created, Pod exists, Phase empty -> Recreating",
+			creationTimeOffset: 0,
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr",
+					Namespace: "default",
+					UID:       "crr-uid",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "pod-uid",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName: "test-pod",
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "test-pod",
+						Namespace:   "default",
+						UID:         "pod-uid",
+						Annotations: map[string]string{},
+						Labels:      map[string]string{},
+					},
+					Status: v1.PodStatus{
+						ContainerStatuses: []v1.ContainerStatus{
+							{
+								Name: "main",
+								State: v1.ContainerState{
+									Running: &v1.ContainerStateRunning{
+										StartedAt: metav1.NewTime(time.Now().Add(-10 * time.Minute)),
+									},
+								},
+								ContainerID: "docker://123",
+							},
+						},
+					},
+				},
+			},
+			existingObjs:     []client.Object{},
+			fakeClock:        clocktesting.NewFakeClock(time.Now()),
+			podReadinessGate: true,
+			expectedPhase:    "",
+			expectedRequeue:  responseTimeout,
+		},
+		{
+			name: "Status Sync: CRR in Recreating phase should sync container statuses",
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr-sync",
+					Namespace: "default",
+					UID:       "crr-uid-sync",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "pod-uid-sync",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName: "test-pod-sync",
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{},
+				},
+				Status: appsv1alpha1.ContainerRecreateRequestStatus{
+					Phase: appsv1alpha1.ContainerRecreateRequestRecreating,
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-sync",
+						Namespace: "default",
+						UID:       "pod-uid-sync",
+					},
+					Status: v1.PodStatus{
+						ContainerStatuses: []v1.ContainerStatus{
+							{
+								Name: "main",
+								State: v1.ContainerState{
+									Running: &v1.ContainerStateRunning{
+										StartedAt: metav1.NewTime(time.Now().Add(-5 * time.Minute)),
+									},
+								},
+								ContainerID:  "docker://abc",
+								RestartCount: 1,
+							},
+						},
+					},
+				},
+			},
+			existingObjs:    []client.Object{},
+			fakeClock:       clocktesting.NewFakeClock(time.Now()),
+			expectedPhase:   appsv1alpha1.ContainerRecreateRequestRecreating,
+			expectedRequeue: 0,
+		},
 	}
 
 	for _, tt := range tests {
