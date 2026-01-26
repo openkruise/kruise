@@ -204,14 +204,12 @@ func GetActiveJobsForNodeImage(reader client.Reader, nodeImage, oldNodeImage *ap
 			if err != nil {
 				return nil, nil, fmt.Errorf("parse selector for %s/%s error: %v", job.Namespace, job.Name, err)
 			}
-			if !selector.Empty() {
-				if selector.Matches(labels.Set(nodeImage.Labels)) {
-					matched = true
-				}
-				if oldNodeImage != nil {
-					if selector.Matches(labels.Set(oldNodeImage.Labels)) {
-						oldMatched = true
-					}
+			if selector.Empty() || selector.Matches(labels.Set(nodeImage.Labels)) {
+				matched = true
+			}
+			if oldNodeImage != nil {
+				if selector.Empty() || selector.Matches(labels.Set(oldNodeImage.Labels)) {
+					oldMatched = true
 				}
 			}
 		}
