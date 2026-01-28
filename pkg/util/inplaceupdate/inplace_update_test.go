@@ -255,6 +255,418 @@ func TestCheckInPlaceUpdateCompleted(t *testing.T) {
 	}
 }
 
+func TestUpdateNextBatchNoState(t *testing.T) {
+	aHourAgo := metav1.NewTime(time.Unix(time.Now().Add(-time.Hour).Unix(), 0))
+	Clock = testingclock.NewFakeClock(aHourAgo.Time)
+
+	// Test case: Pod with NextContainerImages but when fetched (clone) has no InPlaceUpdateState
+	// This tests the early return path in updateNextBatch when GetInPlaceUpdateState returns !ok
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pod-no-state",
+			Labels: map[string]string{
+				apps.StatefulSetRevisionLabel: "new-revision",
+			},
+			// Pod has NextContainerImages in state initially
+			Annotations: map[string]string{
+				appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
+					Revision:            "new-revision",
+					UpdateTimestamp:     aHourAgo,
+					NextContainerImages: map[string]string{"c2": "c2-img2"},
+				}),
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers:     []v1.Container{{Name: "c1", Image: "c1-img2"}, {Name: "c2", Image: "c2-img1"}},
+			ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{Name: "c1", ImageID: "c1-img2-ID"},
+				{Name: "c2", ImageID: "c2-img1-ID"},
+			},
+		},
+	}
+
+	// Create a modified pod in the fake client WITHOUT the InPlaceUpdateState annotation
+	// This simulates the scenario where the clone (fetched pod) differs from the original pod
+	podInClient := pod.DeepCopy()
+	delete(podInClient.Annotations, appspub.InPlaceUpdateStateKey)
+
+	cli := fake.NewClientBuilder().WithObjects(podInClient).Build()
+	ctrl := New(cli, revisionadapter.NewDefaultImpl())
+
+	// The Refresh should call updateNextBatch which should return early because clone has no state
+	res := ctrl.Refresh(pod, nil)
+	if res.RefreshErr != nil {
+		t.Fatalf("unexpected error: %v", res.RefreshErr)
+	}
+
+	// Verify the pod was not modified (since updateNextBatch returned early)
+	got := &v1.Pod{}
+	if err := cli.Get(context.TODO(), types.NamespacedName{Name: pod.Name}, got); err != nil {
+		t.Fatalf("failed to get pod: %v", err)
+	}
+
+	// The pod should have the InPlaceUpdateReady condition set to True now
+	// (since updateNextBatch returned early with no update)
+	foundCondition := false
+	for _, cond := range got.Status.Conditions {
+		if cond.Type == appspub.InPlaceUpdateReady {
+			foundCondition = true
+			if cond.Status != v1.ConditionTrue {
+				t.Fatalf("expected InPlaceUpdateReady condition to be True, got %v", cond.Status)
+			}
+			break
+		}
+	}
+	if !foundCondition {
+		t.Fatalf("expected InPlaceUpdateReady condition to be set")
+	}
+}
+
+func TestUpdateNextBatchEmptyState(t *testing.T) {
+	aHourAgo := metav1.NewTime(time.Unix(time.Now().Add(-time.Hour).Unix(), 0))
+	Clock = testingclock.NewFakeClock(aHourAgo.Time)
+
+	// Test case: Original pod has NextContainerImages, but the clone (fetched pod) has empty state
+	// This tests the early return path in updateNextBatch at line 273 when state has no NextContainer* fields
+	// The original pod must have NextContainerImages to pass the check in Refresh (line 146)
+	// But the clone (stored in client) has empty NextContainer* fields
+	podForRefresh := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-pod-empty-state",
+			Labels: map[string]string{
+				apps.StatefulSetRevisionLabel: "new-revision",
+			},
+			Annotations: map[string]string{
+				appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
+					Revision:            "new-revision",
+					UpdateTimestamp:     aHourAgo,
+					NextContainerImages: map[string]string{"c2": "c2-img2"}, // Has Next* to pass Refresh check
+				}),
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers:     []v1.Container{{Name: "c1", Image: "c1-img2"}, {Name: "c2", Image: "c2-img1"}},
+			ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{Name: "c1", ImageID: "c1-img2-ID"},
+				{Name: "c2", ImageID: "c2-img1-ID"},
+			},
+		},
+	}
+
+	// The pod stored in the client has EMPTY NextContainer* fields
+	// This simulates a concurrent update where the batch was already processed
+	podInClient := podForRefresh.DeepCopy()
+	podInClient.Annotations[appspub.InPlaceUpdateStateKey] = util.DumpJSON(appspub.InPlaceUpdateState{
+		Revision:        "new-revision",
+		UpdateTimestamp: aHourAgo,
+		// Empty NextContainerImages, NextContainerRefMetadata, NextContainerResources
+	})
+
+	cli := fake.NewClientBuilder().WithObjects(podInClient).Build()
+	ctrl := New(cli, revisionadapter.NewDefaultImpl())
+
+	// Refresh passes podForRefresh which has NextContainerImages
+	// But updateNextBatch fetches clone from client which has empty Next* fields
+	res := ctrl.Refresh(podForRefresh, nil)
+	if res.RefreshErr != nil {
+		t.Fatalf("unexpected error: %v", res.RefreshErr)
+	}
+
+	// Verify the pod condition was updated
+	got := &v1.Pod{}
+	if err := cli.Get(context.TODO(), types.NamespacedName{Name: podForRefresh.Name}, got); err != nil {
+		t.Fatalf("failed to get pod: %v", err)
+	}
+
+	foundCondition := false
+	for _, cond := range got.Status.Conditions {
+		if cond.Type == appspub.InPlaceUpdateReady && cond.Status == v1.ConditionTrue {
+			foundCondition = true
+			break
+		}
+	}
+	if !foundCondition {
+		t.Fatalf("expected InPlaceUpdateReady condition to be True")
+	}
+}
+
+func TestUpdateNextBatch(t *testing.T) {
+	aHourAgo := metav1.NewTime(time.Unix(time.Now().Add(-time.Hour).Unix(), 0))
+
+	cases := []struct {
+		name        string
+		pod         *v1.Pod
+		expectedPod *v1.Pod
+	}{
+		{
+			name: "updateNextBatch processes next batch images",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						apps.StatefulSetRevisionLabel: "new-revision",
+					},
+					Annotations: map[string]string{
+						appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
+							Revision:               "new-revision",
+							UpdateTimestamp:        aHourAgo,
+							LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "c1-img1-ID"}},
+							ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: aHourAgo, Containers: []string{"c1"}}},
+							NextContainerImages:    map[string]string{"c2": "c2-img2"},
+						}),
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers:     []v1.Container{{Name: "c1", Image: "c1-img2"}, {Name: "c2", Image: "c2-img1"}},
+					ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{Name: "c1", ImageID: "c1-img2-ID"},
+						{Name: "c2", ImageID: "c2-img1-ID"},
+					},
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.ContainersReady,
+							Status: v1.ConditionTrue,
+						},
+						{
+							Type:               appspub.InPlaceUpdateReady,
+							Status:             v1.ConditionFalse,
+							LastTransitionTime: aHourAgo,
+						},
+					},
+				},
+			},
+			expectedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						apps.StatefulSetRevisionLabel: "new-revision",
+					},
+					Annotations: map[string]string{
+						appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
+							Revision:               "new-revision",
+							UpdateTimestamp:        aHourAgo,
+							LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "c1-img1-ID"}, "c2": {ImageID: "c2-img1-ID"}},
+							ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: aHourAgo, Containers: []string{"c1"}}, {Timestamp: aHourAgo, Containers: []string{"c2"}}},
+						}),
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers:     []v1.Container{{Name: "c1", Image: "c1-img2"}, {Name: "c2", Image: "c2-img2"}},
+					ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{Name: "c1", ImageID: "c1-img2-ID"},
+						{Name: "c2", ImageID: "c2-img1-ID"},
+					},
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.ContainersReady,
+							Status: v1.ConditionTrue,
+						},
+						{
+							Type:               appspub.InPlaceUpdateReady,
+							Status:             v1.ConditionFalse,
+							LastTransitionTime: aHourAgo,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "updateNextBatch with NextContainerRefMetadata only",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						apps.StatefulSetRevisionLabel: "new-revision",
+					},
+					Annotations: map[string]string{
+						appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
+							Revision:               "new-revision",
+							UpdateTimestamp:        aHourAgo,
+							LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "c1-img1-ID"}},
+							ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: aHourAgo, Containers: []string{"c1"}}},
+							NextContainerRefMetadata: map[string]metav1.ObjectMeta{
+								"c2": {Labels: map[string]string{"test": "value"}},
+							},
+						}),
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers:     []v1.Container{{Name: "c1", Image: "c1-img2"}, {Name: "c2", Image: "c2-img1"}},
+					ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{Name: "c1", ImageID: "c1-img2-ID"},
+						{Name: "c2", ImageID: "c2-img1-ID"},
+					},
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.ContainersReady,
+							Status: v1.ConditionTrue,
+						},
+						{
+							Type:               appspub.InPlaceUpdateReady,
+							Status:             v1.ConditionFalse,
+							LastTransitionTime: aHourAgo,
+						},
+					},
+				},
+			},
+			expectedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						apps.StatefulSetRevisionLabel: "new-revision",
+						"test":                        "value",
+					},
+					Annotations: map[string]string{
+						appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
+							Revision:               "new-revision",
+							UpdateTimestamp:        aHourAgo,
+							LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "c1-img1-ID"}},
+							ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: aHourAgo, Containers: []string{"c1"}}, {Timestamp: aHourAgo, Containers: []string{"c2"}}},
+						}),
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers:     []v1.Container{{Name: "c1", Image: "c1-img2"}, {Name: "c2", Image: "c2-img1"}},
+					ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{Name: "c1", ImageID: "c1-img2-ID"},
+						{Name: "c2", ImageID: "c2-img1-ID"},
+					},
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.ContainersReady,
+							Status: v1.ConditionTrue,
+						},
+						{
+							Type:               appspub.InPlaceUpdateReady,
+							Status:             v1.ConditionFalse,
+							LastTransitionTime: aHourAgo,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "updateNextBatch returns early when state has no NextContainer fields",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						apps.StatefulSetRevisionLabel: "new-revision",
+					},
+					Annotations: map[string]string{
+						appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
+							Revision:               "new-revision",
+							UpdateTimestamp:        aHourAgo,
+							LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "c1-img1-ID"}},
+							ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: aHourAgo, Containers: []string{"c1"}}},
+							NextContainerImages:    map[string]string{"c2": "c2-img2"},
+						}),
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers:     []v1.Container{{Name: "c1", Image: "c1-img2"}, {Name: "c2", Image: "c2-img1"}},
+					ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{Name: "c1", ImageID: "c1-img2-ID"},
+						{Name: "c2", ImageID: "c2-img1-ID"},
+					},
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.ContainersReady,
+							Status: v1.ConditionTrue,
+						},
+						{
+							Type:               appspub.InPlaceUpdateReady,
+							Status:             v1.ConditionFalse,
+							LastTransitionTime: aHourAgo,
+						},
+					},
+				},
+			},
+			expectedPod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						apps.StatefulSetRevisionLabel: "new-revision",
+					},
+					Annotations: map[string]string{
+						appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
+							Revision:               "new-revision",
+							UpdateTimestamp:        aHourAgo,
+							LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "c1-img1-ID"}, "c2": {ImageID: "c2-img1-ID"}},
+							ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: aHourAgo, Containers: []string{"c1"}}, {Timestamp: aHourAgo, Containers: []string{"c2"}}},
+						}),
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers:     []v1.Container{{Name: "c1", Image: "c1-img2"}, {Name: "c2", Image: "c2-img2"}},
+					ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{Name: "c1", ImageID: "c1-img2-ID"},
+						{Name: "c2", ImageID: "c2-img1-ID"},
+					},
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.ContainersReady,
+							Status: v1.ConditionTrue,
+						},
+						{
+							Type:               appspub.InPlaceUpdateReady,
+							Status:             v1.ConditionFalse,
+							LastTransitionTime: aHourAgo,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	Clock = testingclock.NewFakeClock(aHourAgo.Time)
+	for i, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			testCase.pod.Name = fmt.Sprintf("pod-%d", i)
+			testCase.expectedPod.Name = fmt.Sprintf("pod-%d", i)
+			testCase.expectedPod.APIVersion = "v1"
+			testCase.expectedPod.Kind = "Pod"
+
+			cli := fake.NewClientBuilder().WithObjects(testCase.pod).Build()
+			ctrl := New(cli, revisionadapter.NewDefaultImpl())
+			if res := ctrl.Refresh(testCase.pod, nil); res.RefreshErr != nil {
+				t.Fatalf("failed to update condition: %v", res.RefreshErr)
+			}
+
+			got := &v1.Pod{}
+			if err := cli.Get(context.TODO(), types.NamespacedName{Name: testCase.pod.Name}, got); err != nil {
+				t.Fatalf("failed to get pod: %v", err)
+			}
+
+			got.APIVersion = "v1"
+			got.Kind = "Pod"
+
+			testCase.expectedPod.ResourceVersion = got.ResourceVersion
+			if !reflect.DeepEqual(testCase.expectedPod, got) {
+				t.Fatalf("case %s failed, expected \n%v\n got \n%v", testCase.name, util.DumpJSON(testCase.expectedPod), util.DumpJSON(got))
+			}
+		})
+	}
+}
+
 func TestRefresh(t *testing.T) {
 	aHourAgo := metav1.NewTime(time.Unix(time.Now().Add(-time.Hour).Unix(), 0))
 	tenSecondsAgo := metav1.NewTime(time.Now().Add(-time.Second * 10))
