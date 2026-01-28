@@ -165,6 +165,14 @@ var (
 			ObjectMeta: metav1.ObjectMeta{Name: "job6", Finalizers: []string{"apps.kruise.io/fake-block"}},
 			Spec:       appsv1beta1.ImagePullJobSpec{},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "job7"},
+			Spec: appsv1beta1.ImagePullJobSpec{
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					Selector: &appsv1beta1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{}}, // Empty selector should match nothing
+				},
+			},
+		},
 	}
 )
 
@@ -240,6 +248,8 @@ func testGetNodeImagesForJob(g *gomega.GomegaWithT) {
 	g.Expect(getNodeImagesForJob(initialJobs[3])).Should(gomega.Equal([]string{"node1", "node4"}))
 	g.Expect(getNodeImagesForJob(initialJobs[4])).Should(gomega.Equal([]string{"node2"}))
 	// g.Expect(getNodeImagesForJob(initialJobs[5])).Should(gomega.Equal([]string{"node2"}))
+	// Empty selector should match nothing
+	g.Expect(getNodeImagesForJob(initialJobs[6])).Should(gomega.Equal([]string{}))
 }
 
 func testGetActiveJobsForPod(g *gomega.GomegaWithT) {
@@ -278,4 +288,5 @@ func testGetActiveJobsForNodeImage(g *gomega.GomegaWithT) {
 	g.Expect(getActiveJobsForNodeImage(initialNodeImages[2])).Should(gomega.Equal([]string{"job1", "job3"}))
 	g.Expect(getActiveJobsForNodeImage(initialNodeImages[3])).Should(gomega.Equal([]string{"job1", "job2", "job4"}))
 	g.Expect(getActiveJobsForNodeImage(initialNodeImages[4])).Should(gomega.Equal([]string{"job1", "job3", "job5"}))
+	// Empty selector should not match any node (job7 should not appear in any results)
 }
