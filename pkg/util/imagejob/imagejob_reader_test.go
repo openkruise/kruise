@@ -169,7 +169,7 @@ var (
 			ObjectMeta: metav1.ObjectMeta{Name: "job7"},
 			Spec: appsv1beta1.ImagePullJobSpec{
 				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
-					Selector: &appsv1beta1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{}},
+					Selector: &appsv1beta1.ImagePullJobNodeSelector{LabelSelector: metav1.LabelSelector{}}, // Empty selector should match nothing
 				},
 			},
 		},
@@ -247,8 +247,9 @@ func testGetNodeImagesForJob(g *gomega.GomegaWithT) {
 	g.Expect(getNodeImagesForJob(initialJobs[2])).Should(gomega.Equal([]string{"node3", "node5"}))
 	g.Expect(getNodeImagesForJob(initialJobs[3])).Should(gomega.Equal([]string{"node1", "node4"}))
 	g.Expect(getNodeImagesForJob(initialJobs[4])).Should(gomega.Equal([]string{"node2"}))
-	g.Expect(getNodeImagesForJob(initialJobs[6])).Should(gomega.Equal([]string{"node1", "node2", "node3", "node4", "node5"}))
 	// g.Expect(getNodeImagesForJob(initialJobs[5])).Should(gomega.Equal([]string{"node2"}))
+	// Empty selector should match nothing
+	g.Expect(getNodeImagesForJob(initialJobs[6])).Should(gomega.Equal([]string{}))
 }
 
 func testGetActiveJobsForPod(g *gomega.GomegaWithT) {
@@ -282,9 +283,10 @@ func testGetActiveJobsForNodeImage(g *gomega.GomegaWithT) {
 		return names.List()
 	}
 
-	g.Expect(getActiveJobsForNodeImage(initialNodeImages[0])).Should(gomega.Equal([]string{"job1", "job4", "job7"}))
-	g.Expect(getActiveJobsForNodeImage(initialNodeImages[1])).Should(gomega.Equal([]string{"job1", "job2", "job5", "job7"}))
-	g.Expect(getActiveJobsForNodeImage(initialNodeImages[2])).Should(gomega.Equal([]string{"job1", "job3", "job7"}))
-	g.Expect(getActiveJobsForNodeImage(initialNodeImages[3])).Should(gomega.Equal([]string{"job1", "job2", "job4", "job7"}))
-	g.Expect(getActiveJobsForNodeImage(initialNodeImages[4])).Should(gomega.Equal([]string{"job1", "job3", "job5", "job7"}))
+	g.Expect(getActiveJobsForNodeImage(initialNodeImages[0])).Should(gomega.Equal([]string{"job1", "job4"}))
+	g.Expect(getActiveJobsForNodeImage(initialNodeImages[1])).Should(gomega.Equal([]string{"job1", "job2", "job5"}))
+	g.Expect(getActiveJobsForNodeImage(initialNodeImages[2])).Should(gomega.Equal([]string{"job1", "job3"}))
+	g.Expect(getActiveJobsForNodeImage(initialNodeImages[3])).Should(gomega.Equal([]string{"job1", "job2", "job4"}))
+	g.Expect(getActiveJobsForNodeImage(initialNodeImages[4])).Should(gomega.Equal([]string{"job1", "job3", "job5"}))
+	// Empty selector should not match any node (job7 should not appear in any results)
 }

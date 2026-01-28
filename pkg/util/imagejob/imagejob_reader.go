@@ -149,6 +149,10 @@ func GetNodeImagesForJob(reader client.Reader, job *appsv1beta1.ImagePullJob) (n
 	if err != nil {
 		return nil, fmt.Errorf("parse selector error: %v", err)
 	}
+	// Empty selector {} should match nothing
+	if selector.Empty() {
+		return nil, nil
+	}
 	if err := reader.List(context.TODO(), nodeImageList, client.MatchingLabelsSelector{Selector: selector}, utilclient.DisableDeepCopy); err != nil {
 		return nil, err
 	}
@@ -204,12 +208,16 @@ func GetActiveJobsForNodeImage(reader client.Reader, nodeImage, oldNodeImage *ap
 			if err != nil {
 				return nil, nil, fmt.Errorf("parse selector for %s/%s error: %v", job.Namespace, job.Name, err)
 			}
-			if selector.Matches(labels.Set(nodeImage.Labels)) {
-				matched = true
-			}
-			if oldNodeImage != nil {
-				if selector.Matches(labels.Set(oldNodeImage.Labels)) {
-					oldMatched = true
+			// Empty selector {} should match nothing, so we don't set matched
+			// An empty selector will have selector.Empty() == true and won't match any labels
+			if !selector.Empty() {
+				if selector.Matches(labels.Set(nodeImage.Labels)) {
+					matched = true
+				}
+				if oldNodeImage != nil {
+					if selector.Matches(labels.Set(oldNodeImage.Labels)) {
+						oldMatched = true
+					}
 				}
 			}
 		}
