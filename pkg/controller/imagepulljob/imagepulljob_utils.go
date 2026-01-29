@@ -20,6 +20,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	mathrand "math/rand"
 	"strings"
 	"time"
@@ -154,10 +155,13 @@ func getSourceSecret(secret *v1.Secret) appsv1beta1.ReferenceObject {
 	return *appsv1beta1.ParseReferenceObject(secret.Annotations[SecretAnnotationSourceSecretKey])
 }
 
+// randReader is a variable that can be replaced in tests to simulate failures
+var randReader io.Reader = rand.Reader
+
 // Generate a six-character random string
 func defaultGenerateRandomString() string {
 	bytes := make([]byte, 3)
-	if _, err := rand.Read(bytes); err != nil {
+	if _, err := randReader.Read(bytes); err != nil {
 		// Fallback to timestamp-based random string if rand.Read fails
 		klog.Warningf("Failed to generate random bytes: %v, using fallback", err)
 		return fmt.Sprintf("%06x", time.Now().UnixNano()%0xFFFFFF)
