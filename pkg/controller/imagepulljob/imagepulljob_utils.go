@@ -17,9 +17,10 @@ limitations under the License.
 package imagepulljob
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
+	mathrand "math/rand"
 	"strings"
 	"time"
 
@@ -55,7 +56,7 @@ func getTTLSecondsForAlways(job *appsv1beta1.ImagePullJob) *int32 {
 		}
 		ret = timeoutSeconds * backoffLimit
 	}
-	ret += util.GetDefaultTtlsecondsForAlwaysNodeimage() + rand.Int31n(300)
+	ret += util.GetDefaultTtlsecondsForAlwaysNodeimage() + mathrand.Int31n(300)
 	return &ret
 }
 
@@ -87,7 +88,7 @@ func getImagePullPolicy(job *appsv1beta1.ImagePullJob) *appsv1beta1.ImageTagPull
 
 func getTTLSecondsForNever() *int32 {
 	// 24h +- 10min
-	var ret = defaultTTLSecondsForNever + rand.Int31n(1200) - 600
+	var ret = defaultTTLSecondsForNever + mathrand.Int31n(1200) - 600
 	return &ret
 }
 
