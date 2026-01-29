@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -156,7 +157,9 @@ func getSourceSecret(secret *v1.Secret) appsv1beta1.ReferenceObject {
 func defaultGenerateRandomString() string {
 	bytes := make([]byte, 3)
 	if _, err := rand.Read(bytes); err != nil {
-		panic(err)
+		// Fallback to timestamp-based random string if rand.Read fails
+		klog.Warningf("Failed to generate random bytes: %v, using fallback", err)
+		return fmt.Sprintf("%06x", time.Now().UnixNano()%0xFFFFFF)
 	}
 	return hex.EncodeToString(bytes)[:6]
 }
