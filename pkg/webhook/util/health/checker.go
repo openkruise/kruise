@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"sync"
+	"sync/atomic"
 
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/klog/v2"
@@ -34,9 +35,13 @@ import (
 var (
 	caCertFilePath = path.Join(webhookutil.GetCertDir(), "ca-cert.pem")
 
-	onceWatch sync.Once
-	lock      sync.Mutex
-	client    *http.Client
+	// Initialization state: 0=uninit, 1=initializing, 2=success, 3=failed
+	initState   int32
+	initLock    sync.Mutex // Protects initialization attempt
+	initErr     error      // Stores last initialization error
+	lock        sync.Mutex // Protects client access
+	client      *http.Client
+	certWatcher *fsnotify.Watcher
 )
 
 func loadHTTPClientWithCACert() error {
@@ -107,21 +112,72 @@ func isRemove(event fsnotify.Event) bool {
 	return event.Op&fsnotify.Remove == fsnotify.Remove
 }
 
-func Checker(_ *http.Request) error {
-	onceWatch.Do(func() {
-		if err := loadHTTPClientWithCACert(); err != nil {
-			panic(fmt.Errorf("failed to load ca-cert for the first time: %v", err))
-		}
-		watcher, err := fsnotify.NewWatcher()
-		if err != nil {
-			panic(fmt.Errorf("failed to new ca-cert watcher: %v", err))
-		}
-		if err = watcher.Add(caCertFilePath); err != nil {
-			panic(fmt.Errorf("failed to add %v into watcher: %v", caCertFilePath, err))
-		}
-		go watchCACert(watcher)
-	})
+// tryInitialize attempts to initialize the health checker.
+// Returns nil on success, error on failure.
+// Safe to call multiple times - uses initLock for concurrency control.
+func tryInitialize() error {
+	// Fast path: already initialized successfully
+	if atomic.LoadInt32(&initState) == 2 {
+		return nil
+	}
 
+	initLock.Lock()
+	defer initLock.Unlock()
+
+	// Check again after acquiring lock (double-checked locking)
+	currentState := atomic.LoadInt32(&initState)
+	if currentState == 2 {
+		return nil // Another goroutine succeeded
+	}
+	if currentState == 1 {
+		return fmt.Errorf("initialization in progress by another goroutine")
+	}
+
+	// Mark as initializing
+	atomic.StoreInt32(&initState, 1)
+
+	// Attempt to load CA cert
+	if err := loadHTTPClientWithCACert(); err != nil {
+		atomic.StoreInt32(&initState, 3) // Failed
+		initErr = fmt.Errorf("failed to load CA cert: %w", err)
+		klog.ErrorS(initErr, "Health checker initialization failed")
+		return initErr
+	}
+
+	// Attempt to create watcher
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		atomic.StoreInt32(&initState, 3)
+		initErr = fmt.Errorf("failed to create fsnotify watcher: %w", err)
+		klog.ErrorS(initErr, "Health checker initialization failed")
+		return initErr
+	}
+
+	// Attempt to watch cert file
+	if err = watcher.Add(caCertFilePath); err != nil {
+		watcher.Close() // Clean up
+		atomic.StoreInt32(&initState, 3)
+		initErr = fmt.Errorf("failed to watch %s: %w", caCertFilePath, err)
+		klog.ErrorS(initErr, "Health checker initialization failed")
+		return initErr
+	}
+
+	// Success!
+	certWatcher = watcher
+	go watchCACert(watcher)
+	atomic.StoreInt32(&initState, 2)
+	initErr = nil
+	klog.InfoS("Health checker initialized successfully")
+	return nil
+}
+
+func Checker(_ *http.Request) error {
+	// Attempt initialization (idempotent, returns immediately if already initialized)
+	if err := tryInitialize(); err != nil {
+		return fmt.Errorf("health checker not initialized: %w", err)
+	}
+
+	// Proceed with health check
 	url := fmt.Sprintf("https://localhost:%d/healthz", webhookutil.GetPort())
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -131,6 +187,9 @@ func Checker(_ *http.Request) error {
 
 	lock.Lock()
 	defer lock.Unlock()
+	if client == nil {
+		return fmt.Errorf("http client not initialized")
+	}
 	_, err = client.Do(req)
 	return err
 }
