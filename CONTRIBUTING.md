@@ -105,6 +105,12 @@ make build
 
 # Run the unit tests
 make test
+
+### Local development with KIND
+
+For local development using KIND and locally built images,
+use manifests under `config/dev`, which set imagePullPolicy
+to `IfNotPresent`.
 ```
 
 **There are some guide documents for contributors in [./docs/contributing/](./docs/contributing), such as a debug guide to help you test your own branch in a Kubernetes cluster.**
