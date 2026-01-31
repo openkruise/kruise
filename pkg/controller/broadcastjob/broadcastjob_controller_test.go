@@ -606,7 +606,16 @@ func TestJobFailedAfterActiveDeadline(t *testing.T) {
 
 func createReconcileJob(scheme *runtime.Scheme, initObjs ...client.Object) ReconcileBroadcastJob {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
-		WithObjects(initObjs...).WithStatusSubresource(&appsv1beta1.BroadcastJob{}).Build()
+		WithObjects(initObjs...).WithStatusSubresource(&appsv1beta1.BroadcastJob{}).
+		WithIndex(&v1.Pod{}, "metadata.labels", func(obj client.Object) []string {
+			pod := obj.(*v1.Pod)
+			var keys []string
+			for k, v := range pod.Labels {
+				keys = append(keys, k+"="+v)
+			}
+			return keys
+		}).
+		Build()
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "broadcast-controller"})
 	reconcileJob := ReconcileBroadcastJob{
@@ -675,4 +684,123 @@ func patchPodName(pod *v1.Pod) {
 	if pod != nil && pod.Name == "" {
 		pod.Name = pod.GenerateName + string(uuid.NewUUID())
 	}
+}
+
+// Test scenario:
+// 2 nodes: node1 has NoSchedule taint, node2 is normal
+// Pod template does not tolerate the taint
+// Only 1 pod should be created on node2
+func TestPodsOnNodeWithTaint(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
+
+	p := intstr.FromInt(2)
+	job := createJob("job-taint", p)
+
+	// Create Node1 with NoSchedule taint
+	node1 := createNode("node1")
+	node1.Spec.Taints = []v1.Taint{
+		{
+			Key:    "dedicated",
+			Value:  "special-user",
+			Effect: v1.TaintEffectNoSchedule,
+		},
+	}
+
+	// Create node2 without taints
+	node2 := createNode("node2")
+
+	reconcileJob := createReconcileJob(scheme, job, node1, node2)
+	request := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "job-taint",
+			Namespace: "default",
+		},
+	}
+
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
+	assert.NoError(t, err)
+	retrievedJob := &appsv1beta1.BroadcastJob{}
+	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
+	assert.NoError(t, err)
+
+	podList := &v1.PodList{}
+	listOptions := client.InNamespace(request.Namespace)
+	err = reconcileJob.List(context.TODO(), podList, listOptions)
+	assert.NoError(t, err)
+
+	// Only 1 pod active on node2, node1 has untolerated taint
+	assert.Equal(t, int32(1), retrievedJob.Status.Active)
+	assert.Equal(t, int32(1), retrievedJob.Status.Desired)
+	assert.Equal(t, 1, len(podList.Items))
+	assert.Equal(t, appsv1beta1.PhaseRunning, retrievedJob.Status.Phase)
+}
+
+// Test scenario:
+// 2 nodes: node1 has insufficient CPU, node2 has enough resources
+// Pod requests CPU that node1 cannot satisfy
+// Only 1 pod should be created on node2
+func TestPodsOnNodeWithInsufficientResources(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
+
+	p := intstr.FromInt(2)
+	job := createJob("job-resources", p)
+	// Add resource requests to the pod template
+	job.Spec.Template = v1.PodTemplateSpec{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "test",
+					Image: "busybox",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Create Node1 with limited CPU
+	node1 := createNode("node1")
+	node1.Status.Allocatable = v1.ResourceList{
+		v1.ResourcePods: resource.MustParse("10"),
+		v1.ResourceCPU:  resource.MustParse("1"), // Only 1 CPU available
+	}
+
+	// Create node2 with enough CPU
+	node2 := createNode("node2")
+	node2.Status.Allocatable = v1.ResourceList{
+		v1.ResourcePods: resource.MustParse("10"),
+		v1.ResourceCPU:  resource.MustParse("4"), // 4 CPUs available
+	}
+
+	reconcileJob := createReconcileJob(scheme, job, node1, node2)
+	request := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "job-resources",
+			Namespace: "default",
+		},
+	}
+
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
+	assert.NoError(t, err)
+	retrievedJob := &appsv1beta1.BroadcastJob{}
+	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
+	assert.NoError(t, err)
+
+	podList := &v1.PodList{}
+	listOptions := client.InNamespace(request.Namespace)
+	err = reconcileJob.List(context.TODO(), podList, listOptions)
+	assert.NoError(t, err)
+
+	// Only 1 pod active on node2, node1 has insufficient resources
+	assert.Equal(t, int32(1), retrievedJob.Status.Active)
+	assert.Equal(t, int32(1), retrievedJob.Status.Desired)
+	assert.Equal(t, 1, len(podList.Items))
+	assert.Equal(t, appsv1beta1.PhaseRunning, retrievedJob.Status.Phase)
 }

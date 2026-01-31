@@ -2075,6 +2075,76 @@ var _ = ginkgo.Describe("StatefulSet v1beta1", ginkgo.Label("StatefulSet", "work
 		})
 
 		/*
+			Testname: StatefulSet, MaxUnavailable with OrderedReady
+			Description: StatefulSet resource MUST support the MaxUnavailable with OrderedReady PodManagementPolicy
+			when the MaxUnavailableStatefulSet feature gate is enabled (default in k8s 1.34+).
+		*/
+		ginkgo.It("Should support maxUnavailable with OrderedReady pod management policy", func() {
+			ginkgo.By("Creating statefulset " + ssName + " with OrderedReady and maxUnavailable=2 in namespace " + ns)
+			maxUnavailable := intstr.FromInt32(2)
+			ss := v1beta1.NewStatefulSet(ssName, ns, headlessSvcName, 3, nil, nil, labels)
+			ss.Spec.Template.Spec.Containers[0].Name = "busybox"
+			ss.Spec.Template.Spec.Containers[0].Image = apps2.BusyboxImage
+			ss.Spec.Template.Spec.Containers[0].Command = []string{"sleep", "3600"}
+			// OrderedReady is the default, but we set it explicitly for clarity
+			ss.Spec.PodManagementPolicy = apps.OrderedReadyPodManagement
+			ss.Spec.Template.Spec.RestartPolicy = v1.RestartPolicyAlways
+			ss.Spec.UpdateStrategy.RollingUpdate = &appsv1beta1.RollingUpdateStatefulSetStrategy{
+				MaxUnavailable:  &maxUnavailable,
+				MinReadySeconds: pointer.Int32(3),
+				PodUpdatePolicy: appsv1beta1.InPlaceIfPossiblePodUpdateStrategyType,
+			}
+			ss.Spec.Template.Spec.ReadinessGates = append(ss.Spec.Template.Spec.ReadinessGates, v1.PodReadinessGate{ConditionType: appspub.InPlaceUpdateReady})
+			sst := v1beta1.NewStatefulSetTester(c, kc)
+
+			ginkgo.By("Creating StatefulSet with OrderedReady and maxUnavailable=2")
+			ss, err := kc.AppsV1beta1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			apps2.ExpectNoError(err)
+
+			ginkgo.By("Waiting for StatefulSet to be running")
+			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
+
+			ginkgo.By("Verifying the StatefulSet spec is set correctly")
+			ss, err = kc.AppsV1beta1().StatefulSets(ns).Get(context.TODO(), ss.Name, metav1.GetOptions{})
+			apps2.ExpectNoError(err)
+			gomega.Expect(ss.Spec.PodManagementPolicy).To(gomega.Equal(apps.OrderedReadyPodManagement))
+			gomega.Expect(ss.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable.IntVal).To(gomega.Equal(int32(2)))
+
+			ginkgo.By("Updating StatefulSet to trigger rolling update")
+			ss, err = v1beta1.UpdateStatefulSetWithRetries(kc, ns, ss.Name, func(update *appsv1beta1.StatefulSet) {
+				update.Spec.Template.Labels["test-orderedready-maxunavailable"] = "yes"
+			})
+			apps2.ExpectNoError(err)
+
+			ginkgo.By("Waiting for rolling update to complete")
+			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
+			var pods *v1.PodList
+			sst.WaitForState(ss, func(set *appsv1beta1.StatefulSet, pl *v1.PodList) (bool, error) {
+				pods = pl
+				// Wait for all pods to have the new label AND the UpdateRevision
+				// We check both because:
+				// 1. The new label confirms the pod was recreated with the new template
+				// 2. The UpdateRevision confirms the controller has processed the update
+				for i := range pl.Items {
+					// Check if the pod has the new label (confirms it was recreated with new template)
+					if pl.Items[i].Labels["test-orderedready-maxunavailable"] != "yes" {
+						return false, nil
+					}
+					// Also verify the revision label matches UpdateRevision
+					if pl.Items[i].Labels[apps.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
+						return false, nil
+					}
+				}
+				return true, nil
+			})
+
+			ginkgo.By("Verifying all pods have the new label")
+			for i := range pods.Items {
+				gomega.Expect(pods.Items[i].Labels["test-orderedready-maxunavailable"]).To(gomega.Equal("yes"))
+			}
+		})
+
+		/*
 			Testname: StatefulSet, Specified delete
 			Description: Specified delete pod MUST under maxUnavailable constrain.
 		*/

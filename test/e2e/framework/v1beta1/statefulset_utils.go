@@ -306,17 +306,34 @@ func (s *StatefulSetTester) WaitForRunning(numPodsRunning, numPodsReady int32, s
 
 // WaitForState periodically polls for the ss and its pods until the until function returns either true or an error
 func (s *StatefulSetTester) WaitForState(ss *appsv1beta1.StatefulSet, until func(*appsv1beta1.StatefulSet, *v1.PodList) (bool, error)) {
+	var lastSS *appsv1beta1.StatefulSet
+	var lastPods *v1.PodList
 	pollErr := wait.PollUntilContextTimeout(context.TODO(), StatefulSetPoll, StatefulSetTimeout, true,
 		func(ctx context.Context) (bool, error) {
 			ssGet, err := s.kc.AppsV1beta1().StatefulSets(ss.Namespace).Get(context.TODO(), ss.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
-			podList := s.GetPodList(ssGet)
-			return until(ssGet, podList)
+			lastSS = ssGet
+			lastPods = s.GetPodList(ssGet)
+			return until(ssGet, lastPods)
 		})
 	if pollErr != nil {
-		Failf("Failed waiting for state update: %v", pollErr)
+		// Build diagnostic info
+		var podInfo string
+		if lastPods != nil {
+			for i, pod := range lastPods.Items {
+				podInfo += fmt.Sprintf("\n  Pod[%d] %s: Phase=%s, Ready=%v, Conditions=%v",
+					i, pod.Name, pod.Status.Phase, podutil.IsPodReady(&pod), pod.Status.Conditions)
+			}
+		}
+		var ssInfo string
+		if lastSS != nil {
+			ssInfo = fmt.Sprintf("StatefulSet %s/%s: Replicas=%d, ReadyReplicas=%d, UpdatedReplicas=%d, CurrentReplicas=%d, ObservedGeneration=%d, Generation=%d",
+				lastSS.Namespace, lastSS.Name, lastSS.Status.Replicas, lastSS.Status.ReadyReplicas,
+				lastSS.Status.UpdatedReplicas, lastSS.Status.CurrentReplicas, lastSS.Status.ObservedGeneration, lastSS.Generation)
+		}
+		Failf("Failed waiting for state update: %v\n%s\nPods:%s", pollErr, ssInfo, podInfo)
 	}
 }
 

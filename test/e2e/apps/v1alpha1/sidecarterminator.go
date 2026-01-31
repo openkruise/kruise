@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -38,13 +39,13 @@ var _ = ginkgo.Describe("SidecarTerminator", ginkgo.Label("SidecarTerminator", "
 		ginkgo.It("job and broadcast job with sidecar", func() {
 			mainContainer := v1.Container{
 				Name:            "main",
-				Image:           "busybox:latest",
+				Image:           imageutils.GetE2EImage(imageutils.BusyBox),
 				ImagePullPolicy: v1.PullIfNotPresent,
 				Command:         []string{"/bin/sh", "-c", "sleep 5"},
 			}
 			sidecarContainer := v1.Container{
 				Name:            "sidecar",
-				Image:           "nginx:latest",
+				Image:           imageutils.GetE2EImage(imageutils.Nginx),
 				ImagePullPolicy: v1.PullIfNotPresent,
 				Env: []v1.EnvVar{
 					{
@@ -55,7 +56,7 @@ var _ = ginkgo.Describe("SidecarTerminator", ginkgo.Label("SidecarTerminator", "
 			}
 			sidecarContainerNeverStop := v1.Container{
 				Name:            "sidecar",
-				Image:           "busybox:latest",
+				Image:           imageutils.GetE2EImage(imageutils.BusyBox),
 				ImagePullPolicy: v1.PullIfNotPresent,
 				Command:         []string{"/bin/sh", "-c", "sleep 10000"},
 				Env: []v1.EnvVar{
@@ -328,13 +329,13 @@ var _ = ginkgo.Describe("SidecarTerminator", ginkgo.Label("SidecarTerminator", "
 			ginkgo.It("use in-place update strategy to kill containers", func() {
 				mainContainer := v1.Container{
 					Name:            "main",
-					Image:           "busybox:latest",
+					Image:           imageutils.GetE2EImage(imageutils.BusyBox),
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Command:         []string{"/bin/sh", "-c", "sleep 5"},
 				}
 				sidecarContainer := v1.Container{
 					Name:            "sidecar",
-					Image:           "nginx:latest",
+					Image:           imageutils.GetE2EImage(imageutils.Nginx),
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Env: []v1.EnvVar{
 						{

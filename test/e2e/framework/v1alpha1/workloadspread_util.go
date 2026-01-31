@@ -103,7 +103,7 @@ func (t *WorkloadSpreadTester) NewBaseCloneSet(namespace string) *appsv1alpha1.C
 					Containers: []corev1.Container{
 						{
 							Name:  "main",
-							Image: imageutils.GetE2EImage(imageutils.Httpd),
+							Image: imageutils.GetE2EImage(imageutils.Nginx),
 							//Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 						},
 					},
@@ -140,7 +140,7 @@ func (t *WorkloadSpreadTester) NewBaseHeadlessStatefulSet(namespace string) (*ap
 					Containers: []corev1.Container{
 						{
 							Name:  "main",
-							Image: imageutils.GetE2EImage(imageutils.Httpd),
+							Image: imageutils.GetE2EImage(imageutils.Nginx),
 							//Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 						},
 					},
@@ -230,7 +230,7 @@ func (t *WorkloadSpreadTester) NewBaseDeployment(namespace string) *appsv1.Deplo
 					Containers: []corev1.Container{
 						{
 							Name:  "main",
-							Image: imageutils.GetE2EImage(imageutils.Httpd),
+							Image: imageutils.GetE2EImage(imageutils.Nginx),
 							//Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 						},
 					},
@@ -288,7 +288,7 @@ func (t *WorkloadSpreadTester) NewBaseDaemonSet(name, namespace string) *appsv1a
 					Containers: []corev1.Container{
 						{
 							Name:    "main",
-							Image:   imageutils.GetE2EImage(imageutils.Httpd),
+							Image:   imageutils.GetE2EImage(imageutils.Nginx),
 							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 						},
 					},
@@ -442,7 +442,7 @@ func (t *WorkloadSpreadTester) CreateTFJob(obj *unstructured.Unstructured, ps, m
 				Containers: []corev1.Container{
 					{
 						Name:    "main",
-						Image:   imageutils.GetE2EImage(imageutils.Httpd),
+						Image:   imageutils.GetE2EImage(imageutils.Nginx),
 						Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 					},
 				},

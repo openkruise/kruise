@@ -447,3 +447,54 @@ func (t *DaemonSetTester) GetNodesToDaemonPods(label map[string]string) (map[str
 
 	return nodeToDaemonPods, nil
 }
+
+// WaitForDaemonSetUpdated waits for the DaemonSet to have its ObservedGeneration match the expected generation.
+// It polls every 3 seconds for up to 2 minutes.
+func (t *DaemonSetTester) WaitForDaemonSetUpdated(ds *appsv1alpha1.DaemonSet, expectedGeneration int64) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), 3*time.Second, 2*time.Minute, true,
+		func(ctx context.Context) (bool, error) {
+			inner, err := t.kc.AppsV1alpha1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			if inner.Status.ObservedGeneration >= expectedGeneration {
+				return true, nil
+			}
+			common.Logf("DaemonSet %s/%s ObservedGeneration: %d, expected: %d",
+				ds.Namespace, ds.Name, inner.Status.ObservedGeneration, expectedGeneration)
+			return false, nil
+		})
+	if pollErr != nil {
+		ds, _ := t.GetDaemonSet(ds.Name)
+		common.Failf("Failed waiting for DaemonSet %s/%s to be updated (expected generation %d): %v\nDaemonSet status: %+v",
+			ds.Namespace, ds.Name, expectedGeneration, pollErr, ds.Status)
+	}
+}
+
+// WaitForDaemonSetReady waits for the DaemonSet to have all pods updated and ready.
+// It polls every 3 seconds for up to 10 minutes.
+func (t *DaemonSetTester) WaitForDaemonSetReady(ds *appsv1alpha1.DaemonSet, label map[string]string) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), 3*time.Second, 10*time.Minute, true,
+		func(ctx context.Context) (bool, error) {
+			inner, err := t.kc.AppsV1alpha1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			desired := inner.Status.DesiredNumberScheduled
+			updated := inner.Status.UpdatedNumberScheduled
+			ready := inner.Status.NumberReady
+			unavailable := inner.Status.NumberUnavailable
+			common.Logf("DaemonSet %s/%s: Desired=%d, Updated=%d, Ready=%d, Unavailable=%d",
+				ds.Namespace, ds.Name, desired, updated, ready, unavailable)
+			if desired == updated && desired == ready && unavailable == 0 {
+				return true, nil
+			}
+			return false, nil
+		})
+	if pollErr != nil {
+		ds, _ := t.GetDaemonSet(ds.Name)
+		pods, _ := t.ListDaemonPods(label)
+		common.Failf("Failed waiting for DaemonSet %s/%s to be ready: %v\nDaemonSet status: %+v\nPods: %+v",
+			ds.Namespace, ds.Name, pollErr, ds.Status, pods)
+	}
+}

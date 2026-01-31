@@ -503,11 +503,7 @@ var _ = ginkgo.Describe("InplaceVPA", ginkgo.Label("InplaceVPA", "operation"), f
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error to update daemon")
 
-			gomega.Eventually(func() int64 {
-				ads, err = tester.GetDaemonSet(dsName)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return ads.Status.ObservedGeneration
-			}, time.Second*30, time.Second*3).Should(gomega.Equal(int64(2)))
+			tester.WaitForDaemonSetUpdated(ds, 2)
 
 			ginkgo.By("Wait for all pods updated and ready")
 			lastId := len(oldPodList.Items) - 1
@@ -917,8 +913,15 @@ func testUpdateResource(tester *v1alpha1.CloneSetTester, fn func(pod *v1.PodTemp
 			for _, pod := range pods {
 				revision := pod.Labels[apps.ControllerRevisionHashLabelKey]
 				if strings.Contains(updatedVersion, revision) {
+					// Check for infeasible resize status (old behavior)
 					if pod.Status.Resize == v1.PodResizeStatusInfeasible {
 						return 1
+					}
+					// Check for PodResizePending condition with Infeasible reason (new behavior in k8s 1.33+)
+					for _, condition := range pod.Status.Conditions {
+						if condition.Type == v1.PodResizePending && condition.Reason == v1.PodReasonInfeasible {
+							return 1
+						}
 					}
 				}
 			}
@@ -1081,10 +1084,29 @@ func testWithResizePolicy(resizePolicy []v1.ContainerResizePolicy) {
 		gomega.Expect(redisContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 
 		ginkgo.By("Verify nginx should be stopped after new redis has started 10s")
-		gomega.Expect(nginxContainerStatus.LastTerminationState.Terminated.FinishedAt.After(redisContainerStatus.State.Running.StartedAt.Time.Add(time.Second*10))).
-			Should(gomega.Equal(true), fmt.Sprintf("nginx finish at %v is not after redis start %v + 10s",
-				nginxContainerStatus.LastTerminationState.Terminated.FinishedAt,
-				redisContainerStatus.State.Running.StartedAt))
+		gomega.Eventually(func() bool {
+			pods, err = tester.ListPodsForCloneSet(cs.Name)
+			if err != nil || len(pods) != 1 {
+				return false
+			}
+			pod = pods[0]
+			nginxContainerStatus = util.GetContainerStatus("nginx", pod)
+			redisContainerStatus = util.GetContainerStatus("redis", pod)
+
+			// Ensure all required fields are not nil
+			if nginxContainerStatus == nil || redisContainerStatus == nil {
+				return false
+			}
+			if nginxContainerStatus.LastTerminationState.Terminated == nil {
+				return false
+			}
+			if redisContainerStatus.State.Running == nil {
+				return false
+			}
+
+			return nginxContainerStatus.LastTerminationState.Terminated.FinishedAt.After(
+				redisContainerStatus.State.Running.StartedAt.Time.Add(time.Second * 10))
+		}, 60*time.Second, time.Second).Should(gomega.BeTrue(), "nginx should be stopped after new redis has started 10s")
 
 		ginkgo.By("Verify in-place update state in two batches")
 		inPlaceUpdateState := appspub.InPlaceUpdateState{}
@@ -1228,18 +1250,37 @@ func testWithResizePolicy(resizePolicy []v1.ContainerResizePolicy) {
 		//gomega.Expect(nginxContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 		gomega.Expect(redisContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 
-		ginkgo.By("Verify nginx should be stopped after new redis has started")
-		var t time.Time
-		if nginxContainerStatus.LastTerminationState.Terminated != nil {
-			t = nginxContainerStatus.LastTerminationState.Terminated.FinishedAt.Time
-		} else {
+		ginkgo.By("Verify nginx should be stopped after new redis has started 10s")
+		gomega.Eventually(func() bool {
+			pods, err = tester.ListPodsForCloneSet(cs.Name)
+			if err != nil || len(pods) != 1 {
+				return false
+			}
+			pod = pods[0]
+			nginxContainerStatus = util.GetContainerStatus("nginx", pod)
+			redisContainerStatus = util.GetContainerStatus("redis", pod)
+
+			// Ensure all required fields are not nil
+			if nginxContainerStatus == nil || redisContainerStatus == nil {
+				return false
+			}
+			if redisContainerStatus.State.Running == nil {
+				return false
+			}
+
+			// Get nginx time - either from termination or running state
 			// fix https://github.com/openkruise/kruise/issues/1925
-			t = nginxContainerStatus.State.Running.StartedAt.Time
-		}
-		gomega.Expect(t.After(redisContainerStatus.State.Running.StartedAt.Time.Add(time.Second*10))).
-			Should(gomega.Equal(true), fmt.Sprintf("nginx finish at %v is not after redis start %v + 10s",
-				nginxContainerStatus.LastTerminationState.Terminated.FinishedAt,
-				redisContainerStatus.State.Running.StartedAt))
+			var t time.Time
+			if nginxContainerStatus.LastTerminationState.Terminated != nil {
+				t = nginxContainerStatus.LastTerminationState.Terminated.FinishedAt.Time
+			} else if nginxContainerStatus.State.Running != nil {
+				t = nginxContainerStatus.State.Running.StartedAt.Time
+			} else {
+				return false
+			}
+
+			return t.After(redisContainerStatus.State.Running.StartedAt.Time.Add(time.Second * 10))
+		}, 60*time.Second, time.Second).Should(gomega.BeTrue(), "nginx should be stopped after new redis has started 10s")
 
 		ginkgo.By("Verify in-place update state in two batches")
 		inPlaceUpdateState := appspub.InPlaceUpdateState{}

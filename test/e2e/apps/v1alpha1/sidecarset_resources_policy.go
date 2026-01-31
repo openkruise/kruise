@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -79,7 +80,7 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 						{
 							Container: corev1.Container{
 								Name:    "sidecar1",
-								Image:   "busybox:latest",
+								Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
@@ -231,7 +232,7 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 						{
 							Container: corev1.Container{
 								Name:    "sidecar1",
-								Image:   "busybox:latest",
+								Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
@@ -378,7 +379,7 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 						{
 							Container: corev1.Container{
 								Name:    "sidecar1",
-								Image:   "busybox:latest",
+								Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
@@ -525,7 +526,7 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 						{
 							Container: corev1.Container{
 								Name:    "sidecar1",
-								Image:   "busybox:latest",
+								Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
@@ -676,7 +677,7 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 						{
 							Container: corev1.Container{
 								Name:    "sidecar1",
-								Image:   "busybox:latest",
+								Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
@@ -835,7 +836,7 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 						{
 							Container: corev1.Container{
 								Name:          "init-sidecar",
-								Image:         "busybox:latest",
+								Image:         imageutils.GetE2EImage(imageutils.BusyBox),
 								Command:       []string{"/bin/sh", "-c", "sleep 10000000"},
 								RestartPolicy: &restartAlways, // Native sidecar container
 							},
@@ -881,7 +882,7 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 							Containers: []corev1.Container{
 								{
 									Name:    "app1",
-									Image:   "busybox:latest",
+									Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 									Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 									Resources: corev1.ResourceRequirements{
 										Limits: corev1.ResourceList{
@@ -896,7 +897,7 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 								},
 								{
 									Name:    "app2",
-									Image:   "busybox:latest",
+									Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 									Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 									Resources: corev1.ResourceRequirements{
 										Limits: corev1.ResourceList{
@@ -993,7 +994,7 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 						{
 							Container: corev1.Container{
 								Name:    "sidecar1",
-								Image:   "busybox:latest",
+								Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{
@@ -1038,7 +1039,7 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 							InitContainers: []corev1.Container{
 								{
 									Name:    "plain-init",
-									Image:   "busybox:latest",
+									Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 									Command: []string{"sh", "-c", "echo init"},
 									Resources: corev1.ResourceRequirements{
 										Limits: corev1.ResourceList{
@@ -1154,7 +1155,7 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 						{
 							Container: corev1.Container{
 								Name:          "kruise-init-sidecar",
-								Image:         "busybox:latest",
+								Image:         imageutils.GetE2EImage(imageutils.BusyBox),
 								Command:       []string{"/bin/sh", "-c", "sleep 10000000"},
 								RestartPolicy: &restartAlways,
 								Resources: corev1.ResourceRequirements{
@@ -1174,7 +1175,7 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 						{
 							Container: corev1.Container{
 								Name:    "kruise-sidecar",
-								Image:   "busybox:latest",
+								Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 								Resources: corev1.ResourceRequirements{
 									Limits: corev1.ResourceList{
@@ -1206,7 +1207,7 @@ var _ = ginkgo.Describe("SidecarResourcesPolicy", ginkgo.Label("SidecarResources
 						{
 							Container: corev1.Container{
 								Name:    "policy-sidecar",
-								Image:   "busybox:latest",
+								Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 								Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 							},
 							ResourcesPolicy: &appsv1alpha1.ResourcesPolicy{

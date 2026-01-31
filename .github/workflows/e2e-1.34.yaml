@@ -1,0 +1,298 @@
+name: E2E-1.34
+
+on:
+  push:
+    branches:
+      - master
+      - release-*
+  pull_request: {}
+  workflow_dispatch: {}
+
+# Declare default permissions as read only.
+permissions: read-all
+
+env:
+  # Common versions
+  GO_VERSION: "1.24"
+  KIND_VERSION: "v0.27.0"
+  KIND_IMAGE: "kindest/node:v1.34.3"
+  KIND_CLUSTER_NAME: "ci-testing"
+
+jobs:
+  astatefulset-storage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: true
+      - name: Setup Go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Setup Kind Cluster
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          node_image: ${{ env.KIND_IMAGE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
+          config: ./test/kind-conf-with-vpa.yaml
+          version: ${{ env.KIND_VERSION }}
+      - name: Install-CSI
+        run: |
+          make install-csi
+
+      - name: Build image
+        run: |
+          export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
+          docker build --pull --no-cache . -t $IMAGE
+          kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+      - name: Install Kruise
+        run: |
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
+      - name: Run E2E Tests
+        run: |
+          export KUBECONFIG=/home/runner/.kube/config
+          tools/hack/run-kruise-e2e-test.sh --focus 'VolumeExpansion' --print-info
+
+  astatefulset:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: true
+      - name: Setup Go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Setup Kind Cluster
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          node_image: ${{ env.KIND_IMAGE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
+          config: ./test/kind-conf-with-vpa.yaml
+          version: ${{ env.KIND_VERSION }}
+      - name: Build image
+        run: |
+          export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
+          docker build --pull --no-cache . -t $IMAGE
+          kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+      - name: Install Kruise
+        run: |
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
+      - name: Run E2E Tests
+        run: |
+          export KUBECONFIG=/home/runner/.kube/config
+          tools/hack/run-kruise-e2e-test.sh --focus 'StatefulSet' --print-info
+
+  operation:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: true
+      - name: Setup Go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Setup Kind Cluster
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          node_image: ${{ env.KIND_IMAGE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
+          config: ./test/kind-conf-with-vpa.yaml
+          version: ${{ env.KIND_VERSION }}
+      - name: Build image
+        run: |
+          export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
+          docker build --pull --no-cache . -t $IMAGE
+          kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+      - name: Install Kruise
+        run: |
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
+      - name: Run E2E Tests
+        run: |
+          export KUBECONFIG=/home/runner/.kube/config
+          tools/hack/run-kruise-e2e-test.sh --focus '(PullImage|ContainerRecreateRequest|PullImages|ResourceDistribution|PersistentPodState|PodProbeMarker)' --print-info
+
+  advanced-daemonset:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: true
+      - name: Setup Go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Setup Kind Cluster
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          node_image: ${{ env.KIND_IMAGE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
+          config: ./test/kind-conf-with-vpa.yaml
+          version: ${{ env.KIND_VERSION }}
+      - name: Build image
+        run: |
+          export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
+          docker build --pull --no-cache . -t $IMAGE
+          kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+      - name: Install Kruise
+        run: |
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
+      - name: Run E2E Tests
+        run: |
+          export KUBECONFIG=/home/runner/.kube/config
+          tools/hack/run-kruise-e2e-test.sh --focus 'DaemonSet' --print-info
+
+  sidecar:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: true
+      - name: Setup Go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Setup Kind Cluster
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          node_image: ${{ env.KIND_IMAGE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
+          config: ./test/kind-conf-with-vpa.yaml
+          version: ${{ env.KIND_VERSION }}
+      - name: Build image
+        run: |
+          export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
+          docker build --pull --no-cache . -t $IMAGE
+          kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+      - name: Install Kruise
+        run: |
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
+      - name: Run E2E Tests
+        run: |
+          export KUBECONFIG=/home/runner/.kube/config
+          tools/hack/run-kruise-e2e-test.sh --focus 'SidecarSet|SidecarTerminator|ContainerPriority|SidecarResourcesPolicy' --print-info
+
+  job-workload:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: true
+      - name: Setup Go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Setup Kind Cluster
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          node_image: ${{ env.KIND_IMAGE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
+          config: ./test/kind-conf-with-vpa.yaml
+          version: ${{ env.KIND_VERSION }}
+      - name: Build image
+        run: |
+          export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
+          docker build --pull --no-cache . -t $IMAGE
+          kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+      - name: Install Kruise
+        run: |
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
+      - name: Run E2E Tests
+        run: |
+          export KUBECONFIG=/home/runner/.kube/config
+          tools/hack/run-kruise-e2e-test.sh --focus '(EphemeralJob|BroadcastJob|AdvancedCronJob)' --print-info
+
+  policy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: true
+      - name: Setup Go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Setup Kind Cluster
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          node_image: ${{ env.KIND_IMAGE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
+          config: ./test/kind-conf-with-vpa.yaml
+          version: ${{ env.KIND_VERSION }}
+      - name: Build image
+        run: |
+          export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
+          docker build --pull --no-cache . -t $IMAGE
+          kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+      - name: Install Kruise
+        run: |
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
+      - name: Run E2E Tests
+        run: |
+          export KUBECONFIG=/home/runner/.kube/config
+          tools/hack/run-kruise-e2e-test.sh --focus '(PodUnavailableBudget|DeletionProtection)' --print-info
+
+  cloneset:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: true
+      - name: Setup Go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Setup Kind Cluster
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          node_image: ${{ env.KIND_IMAGE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
+          config: ./test/kind-conf-with-vpa.yaml
+          version: ${{ env.KIND_VERSION }}
+      - name: Install-CSI
+        run: |
+          make install-csi
+
+      - name: Build image
+        run: |
+          export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
+          docker build --pull --no-cache . -t $IMAGE
+          kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+      - name: Install Kruise
+        run: |
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
+      - name: Run E2E Tests
+        run: |
+          export KUBECONFIG=/home/runner/.kube/config
+          tools/hack/run-kruise-e2e-test.sh --focus '(CloneSet|ContainerMeta|InplaceVPA)' --print-info
+
+  multidomain:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          submodules: true
+      - name: Setup Go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Setup Kind Cluster
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # v1.12.0
+        with:
+          node_image: ${{ env.KIND_IMAGE }}
+          cluster_name: ${{ env.KIND_CLUSTER_NAME }}
+          config: ./test/kind-conf-with-vpa.yaml
+          version: ${{ env.KIND_VERSION }}
+      - name: Build image
+        run: |
+          export IMAGE="openkruise/kruise-manager:e2e-${GITHUB_RUN_ID}"
+          docker build --pull --no-cache . -t $IMAGE
+          kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
+      - name: Install Kruise
+        run: |
+          ENABLE_E2E_CONFIG=true IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
+      - name: Run E2E Tests
+        run: |
+          export KUBECONFIG=/home/runner/.kube/config
+          tools/hack/run-kruise-e2e-test.sh --focus '(UnitedDeployment|WorkloadSpread)' --print-info

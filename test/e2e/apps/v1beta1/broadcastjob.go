@@ -113,11 +113,7 @@ var _ = ginkgo.Describe("BroadcastJob v1beta1", ginkgo.Label("BroadcastJob", "jo
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check the status of job")
-			gomega.Eventually(func() int32 {
-				job, err = tester.GetBroadcastJob(job.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return job.Status.Desired
-			}, 10*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
+			tester.WaitForBroadcastJobDesired(job, int32(len(nodes)))
 
 			gomega.Eventually(func() int {
 				pods, err := tester.GetPodsOfJob(job)
@@ -147,11 +143,7 @@ var _ = ginkgo.Describe("BroadcastJob v1beta1", ginkgo.Label("BroadcastJob", "jo
 				return len(pods)
 			}, 180*time.Second, 3*time.Second).Should(gomega.Equal(len(nodes)))
 
-			gomega.Eventually(func() int32 {
-				job, err = tester.GetBroadcastJob(job.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return job.Status.Succeeded
-			}, 60*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
+			tester.WaitForBroadcastJobSucceeded(job, int32(len(nodes)))
 		})
 
 		ginkgo.It("test v1beta1 specific features", func() {
@@ -182,6 +174,196 @@ var _ = ginkgo.Describe("BroadcastJob v1beta1", ginkgo.Label("BroadcastJob", "jo
 			ginkgo.By("Verify TTL is set correctly")
 			gomega.Expect(job.Spec.CompletionPolicy.TTLSecondsAfterFinished).NotTo(gomega.BeNil())
 			gomega.Expect(*job.Spec.CompletionPolicy.TTLSecondsAfterFinished).To(gomega.Equal(int32(30)))
+		})
+
+		ginkgo.It("test v1beta1 PodFailurePolicy with exit codes", func() {
+			ginkgo.By("Create BroadcastJob v1beta1 with PodFailurePolicy")
+			containerName := "box"
+			job := &appsv1beta1.BroadcastJob{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-pfp-" + randStr},
+				Spec: appsv1beta1.BroadcastJobSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{{
+								Name:    containerName,
+								Image:   common.BusyboxImage,
+								Command: []string{"/bin/sh", "-c", "echo 'test'"},
+							}},
+							RestartPolicy: v1.RestartPolicyNever,
+						},
+					},
+					CompletionPolicy: appsv1beta1.CompletionPolicy{
+						Type: appsv1beta1.Always,
+					},
+					PodFailurePolicy: &appsv1beta1.PodFailurePolicy{
+						Rules: []appsv1beta1.PodFailurePolicyRule{
+							{
+								Action: appsv1beta1.PodFailurePolicyActionFailJob,
+								OnExitCodes: &appsv1beta1.PodFailurePolicyOnExitCodesRequirement{
+									ContainerName: &containerName,
+									Operator:      appsv1beta1.PodFailurePolicyOnExitCodesOpIn,
+									Values:        []int32{42},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			job, err := tester.CreateBroadcastJob(job)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Verify PodFailurePolicy is set correctly")
+			gomega.Expect(job.Spec.PodFailurePolicy).NotTo(gomega.BeNil())
+			gomega.Expect(len(job.Spec.PodFailurePolicy.Rules)).To(gomega.Equal(1))
+			gomega.Expect(job.Spec.PodFailurePolicy.Rules[0].Action).To(gomega.Equal(appsv1beta1.PodFailurePolicyActionFailJob))
+			gomega.Expect(job.Spec.PodFailurePolicy.Rules[0].OnExitCodes).NotTo(gomega.BeNil())
+			gomega.Expect(job.Spec.PodFailurePolicy.Rules[0].OnExitCodes.Operator).To(gomega.Equal(appsv1beta1.PodFailurePolicyOnExitCodesOpIn))
+			gomega.Expect(job.Spec.PodFailurePolicy.Rules[0].OnExitCodes.Values).To(gomega.Equal([]int32{42}))
+		})
+
+		ginkgo.It("test v1beta1 PodFailurePolicy with pod conditions", func() {
+			ginkgo.By("Create BroadcastJob v1beta1 with PodFailurePolicy using pod conditions")
+			job := &appsv1beta1.BroadcastJob{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-pfp-cond-" + randStr},
+				Spec: appsv1beta1.BroadcastJobSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{{
+								Name:    "box",
+								Image:   common.BusyboxImage,
+								Command: []string{"/bin/sh", "-c", "echo 'test'"},
+							}},
+							RestartPolicy: v1.RestartPolicyNever,
+						},
+					},
+					CompletionPolicy: appsv1beta1.CompletionPolicy{
+						Type: appsv1beta1.Always,
+					},
+					PodFailurePolicy: &appsv1beta1.PodFailurePolicy{
+						Rules: []appsv1beta1.PodFailurePolicyRule{
+							{
+								Action: appsv1beta1.PodFailurePolicyActionIgnore,
+								OnPodConditions: []appsv1beta1.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   v1.DisruptionTarget,
+										Status: v1.ConditionTrue,
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			job, err := tester.CreateBroadcastJob(job)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Verify PodFailurePolicy with pod conditions is set correctly")
+			gomega.Expect(job.Spec.PodFailurePolicy).NotTo(gomega.BeNil())
+			gomega.Expect(len(job.Spec.PodFailurePolicy.Rules)).To(gomega.Equal(1))
+			gomega.Expect(job.Spec.PodFailurePolicy.Rules[0].Action).To(gomega.Equal(appsv1beta1.PodFailurePolicyActionIgnore))
+			gomega.Expect(len(job.Spec.PodFailurePolicy.Rules[0].OnPodConditions)).To(gomega.Equal(1))
+			gomega.Expect(job.Spec.PodFailurePolicy.Rules[0].OnPodConditions[0].Type).To(gomega.Equal(v1.DisruptionTarget))
+		})
+
+		ginkgo.It("test v1beta1 PodFailurePolicy validation rejects invalid spec", func() {
+			ginkgo.By("Attempt to create BroadcastJob v1beta1 with invalid PodFailurePolicy (exit code 0 with In operator)")
+			job := &appsv1beta1.BroadcastJob{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-pfp-invalid-" + randStr},
+				Spec: appsv1beta1.BroadcastJobSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{{
+								Name:    "box",
+								Image:   common.BusyboxImage,
+								Command: []string{"/bin/sh", "-c", "echo 'test'"},
+							}},
+							RestartPolicy: v1.RestartPolicyNever,
+						},
+					},
+					CompletionPolicy: appsv1beta1.CompletionPolicy{
+						Type: appsv1beta1.Always,
+					},
+					PodFailurePolicy: &appsv1beta1.PodFailurePolicy{
+						Rules: []appsv1beta1.PodFailurePolicyRule{
+							{
+								Action: appsv1beta1.PodFailurePolicyActionFailJob,
+								OnExitCodes: &appsv1beta1.PodFailurePolicyOnExitCodesRequirement{
+									Operator: appsv1beta1.PodFailurePolicyOnExitCodesOpIn,
+									Values:   []int32{0, 1}, // exit code 0 is invalid with In operator
+								},
+							},
+						},
+					},
+				},
+			}
+
+			_, err := kc.AppsV1beta1().BroadcastJobs(ns).Create(context.TODO(), job, metav1.CreateOptions{})
+			gomega.Expect(err).To(gomega.HaveOccurred())
+			ginkgo.By("Verified that invalid PodFailurePolicy is rejected")
+		})
+
+		ginkgo.It("test v1beta1 PodReplacementPolicy with TerminatingOrFailed", func() {
+			ginkgo.By("Create BroadcastJob v1beta1 with PodReplacementPolicy=TerminatingOrFailed")
+			terminatingOrFailed := appsv1beta1.TerminatingOrFailed
+			job := &appsv1beta1.BroadcastJob{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-prp-tof-" + randStr},
+				Spec: appsv1beta1.BroadcastJobSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{{
+								Name:    "box",
+								Image:   common.BusyboxImage,
+								Command: []string{"/bin/sh", "-c", "echo 'test'"},
+							}},
+							RestartPolicy: v1.RestartPolicyNever,
+						},
+					},
+					CompletionPolicy: appsv1beta1.CompletionPolicy{
+						Type: appsv1beta1.Always,
+					},
+					PodReplacementPolicy: &terminatingOrFailed,
+				},
+			}
+
+			job, err := tester.CreateBroadcastJob(job)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Verify PodReplacementPolicy is set correctly")
+			gomega.Expect(job.Spec.PodReplacementPolicy).NotTo(gomega.BeNil())
+			gomega.Expect(*job.Spec.PodReplacementPolicy).To(gomega.Equal(appsv1beta1.TerminatingOrFailed))
+		})
+
+		ginkgo.It("test v1beta1 PodReplacementPolicy with Failed", func() {
+			ginkgo.By("Create BroadcastJob v1beta1 with PodReplacementPolicy=Failed")
+			failed := appsv1beta1.Failed
+			job := &appsv1beta1.BroadcastJob{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-prp-failed-" + randStr},
+				Spec: appsv1beta1.BroadcastJobSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{{
+								Name:    "box",
+								Image:   common.BusyboxImage,
+								Command: []string{"/bin/sh", "-c", "echo 'test'"},
+							}},
+							RestartPolicy: v1.RestartPolicyNever,
+						},
+					},
+					CompletionPolicy: appsv1beta1.CompletionPolicy{
+						Type: appsv1beta1.Always,
+					},
+					PodReplacementPolicy: &failed,
+				},
+			}
+
+			job, err := tester.CreateBroadcastJob(job)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Verify PodReplacementPolicy is set correctly")
+			gomega.Expect(job.Spec.PodReplacementPolicy).NotTo(gomega.BeNil())
+			gomega.Expect(*job.Spec.PodReplacementPolicy).To(gomega.Equal(appsv1beta1.Failed))
 		})
 	})
 })

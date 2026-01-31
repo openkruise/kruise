@@ -17,6 +17,7 @@ limitations under the License.
 package podprobe
 
 import (
+	"context"
 	"reflect"
 	"sync"
 	"testing"
@@ -372,25 +373,22 @@ func TestUpdateNodePodProbeStatus(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			fakeClient := fake.NewSimpleClientset(cs.getNodePodProbe())
-			informer := newNodePodProbeInformer(fakeClient, "node-1")
+			nodePodProbe := cs.getNodePodProbe()
+			fakeClient := fake.NewSimpleClientset(nodePodProbe)
+			// Use a simple indexer instead of a full informer to avoid watch hanging
+			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+			_ = indexer.Add(nodePodProbe)
 			fakeRecorder := record.NewFakeRecorder(100)
 			c := &Controller{
-				nodePodProbeInformer: informer,
-				nodePodProbeLister:   listersalpha1.NewNodePodProbeLister(informer.GetIndexer()),
-				workers:              make(map[probeKey]*worker),
-				nodePodProbeClient:   fakeClient.AppsV1alpha1().NodePodProbes(),
-				nodeName:             "node-1",
+				nodePodProbeLister: listersalpha1.NewNodePodProbeLister(indexer),
+				workers:            make(map[probeKey]*worker),
+				nodePodProbeClient: fakeClient.AppsV1alpha1().NodePodProbes(),
+				nodeName:           "node-1",
 				result: newResultManager(workqueue.NewNamedRateLimitingQueue(
 					workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 50*time.Second),
 					"sync_node_pod_probe",
 				)),
 				eventRecorder: fakeRecorder,
-			}
-			stopCh := make(chan struct{}, 1)
-			go c.nodePodProbeInformer.Run(stopCh)
-			if !cache.WaitForCacheSync(stopCh, c.nodePodProbeInformer.HasSynced) {
-				return
 			}
 			c.result.cache = &sync.Map{}
 			c.result.cache.Store("container-id-1", cs.getUpdate())
@@ -399,7 +397,11 @@ func TestUpdateNodePodProbeStatus(t *testing.T) {
 				t.Fatalf("syncUpdateNodePodProbeStatus failed: %s", err.Error())
 				return
 			}
-			time.Sleep(time.Second)
+			// Update the indexer with the latest state from fake client
+			updated, _ := fakeClient.AppsV1alpha1().NodePodProbes().Get(context.TODO(), "node-1", metav1.GetOptions{})
+			if updated != nil {
+				_ = indexer.Update(updated)
+			}
 			if !checkNodePodProbeStatusEqual(c.nodePodProbeLister, cs.expectNodePodProbeStatus()) {
 				t.Fatalf("checkNodePodProbeStatusEqual failed")
 			}
@@ -569,14 +571,16 @@ func TestSyncNodePodProbe(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			fakeClient := fake.NewSimpleClientset(cs.getNodePodProbe())
-			informer := newNodePodProbeInformer(fakeClient, "node-1")
+			nodePodProbe := cs.getNodePodProbe()
+			fakeClient := fake.NewSimpleClientset(nodePodProbe)
+			// Use a simple indexer instead of a full informer to avoid watch hanging
+			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+			_ = indexer.Add(nodePodProbe)
 			c := &Controller{
-				nodePodProbeInformer: informer,
-				nodePodProbeLister:   listersalpha1.NewNodePodProbeLister(informer.GetIndexer()),
-				workers:              make(map[probeKey]*worker),
-				nodePodProbeClient:   fakeClient.AppsV1alpha1().NodePodProbes(),
-				nodeName:             "node-1",
+				nodePodProbeLister: listersalpha1.NewNodePodProbeLister(indexer),
+				workers:            make(map[probeKey]*worker),
+				nodePodProbeClient: fakeClient.AppsV1alpha1().NodePodProbes(),
+				nodeName:           "node-1",
 				result: newResultManager(workqueue.NewNamedRateLimitingQueue(
 					workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 50*time.Second),
 					"sync_node_pod_probe",
@@ -586,11 +590,6 @@ func TestSyncNodePodProbe(t *testing.T) {
 					workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 50*time.Second+time.Millisecond*time.Duration(1000)),
 					"update_node_pod_probe_status",
 				),
-			}
-			stopCh := make(chan struct{}, 1)
-			go c.nodePodProbeInformer.Run(stopCh)
-			if !cache.WaitForCacheSync(stopCh, c.nodePodProbeInformer.HasSynced) {
-				return
 			}
 			cs.setWorkers(c)
 			time.Sleep(time.Second)

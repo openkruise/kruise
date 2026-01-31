@@ -81,7 +81,7 @@ func (rd *Duration) UpdateWithMsg(newDuration time.Duration, format string, args
 func (rd *Duration) Merge(rd2 *Duration) {
 	rd2.Lock()
 	defer rd2.Unlock()
-	rd.UpdateWithMsg(rd2.duration, rd2.message)
+	rd.UpdateWithMsg(rd2.duration, "%s", rd2.message)
 }
 
 func (rd *Duration) Get() time.Duration {

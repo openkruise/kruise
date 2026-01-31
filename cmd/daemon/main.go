@@ -91,7 +91,7 @@ func main() {
 	}
 
 	if _, err := os.Stat(*pluginConfigFile); err == nil {
-		err = plugin.RegisterCredentialProviderPlugins(*pluginConfigFile, *pluginBinDir)
+		err = plugin.RegisterCredentialProviderPlugins(*pluginConfigFile, *pluginBinDir, nil, nil)
 		if err != nil {
 			klog.ErrorS(err, "Failed to register credential provider plugins")
 		}

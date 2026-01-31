@@ -22,6 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -29,6 +30,8 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
+
+var podGVK = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}
 
 func (r *ReconcileSidecarTerminator) executeKillContainerAction(pod *corev1.Pod, sidecars sets.Set[string]) error {
 	uncompletedSidecars := filterUncompletedSidecars(pod, sidecars)
@@ -59,7 +62,7 @@ func (r *ReconcileSidecarTerminator) executeKillContainerAction(pod *corev1.Pod,
 			Namespace: pod.Namespace,
 			Name:      getCRRName(pod),
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(pod, pod.GroupVersionKind()),
+				*metav1.NewControllerRef(pod, podGVK),
 			},
 		},
 		Spec: appsv1alpha1.ContainerRecreateRequestSpec{

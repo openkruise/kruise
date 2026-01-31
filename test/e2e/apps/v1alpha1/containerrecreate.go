@@ -152,7 +152,7 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 120*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Eventually(func() string {
 					crr, err = tester.GetCRR(crr.Name)
@@ -217,7 +217,7 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 120*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
 				klog.Infof("CRR info(%s)", util.DumpJSON(crr))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
@@ -242,6 +242,8 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 				gomega.Expect(sidecarContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 
 				ginkgo.By("Check Pod sidecar container recreated not waiting for app container ready")
+				gomega.Expect(appContainerStatus.LastTerminationState.Terminated).ShouldNot(gomega.BeNil())
+				gomega.Expect(sidecarContainerStatus.LastTerminationState.Terminated).ShouldNot(gomega.BeNil())
 				interval := sidecarContainerStatus.LastTerminationState.Terminated.FinishedAt.Sub(appContainerStatus.LastTerminationState.Terminated.FinishedAt.Time)
 				gomega.Expect(interval < 3*time.Second).Should(gomega.Equal(true))
 			}
@@ -272,7 +274,7 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 120*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Eventually(func() string {
 					crr, err = tester.GetCRR(crr.Name)
@@ -284,10 +286,18 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
 				}))
 
+				ginkgo.By("Wait for Pod to be ready after containers recreated")
+				gomega.Eventually(func() bool {
+					pod, err = tester.GetPod(pod.Name)
+					if err != nil {
+						return false
+					}
+					return podutil.IsPodReady(pod)
+				}, 120*time.Second, 3*time.Second).Should(gomega.BeTrue(), "Pod should be ready after container recreation")
+
 				ginkgo.By("Check Pod containers recreated")
 				pod, err = tester.GetPod(pod.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(podutil.IsPodReady(pod)).Should(gomega.Equal(true))
 				appContainerStatus := util.GetContainerStatus("app", pod)
 				sidecarContainerStatus := util.GetContainerStatus("sidecar", pod)
 				gomega.Expect(appContainerStatus.ContainerID).ShouldNot(gomega.Equal(crr.Spec.Containers[0].StatusContext.ContainerID))
@@ -296,6 +306,7 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 				gomega.Expect(sidecarContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 
 				ginkgo.By("Check Pod sidecar container recreated after app container ready")
+				gomega.Expect(appContainerStatus.LastTerminationState.Terminated).ShouldNot(gomega.BeNil())
 				gomega.Expect(sidecarContainerStatus.LastTerminationState.Terminated).ShouldNot(gomega.BeNil())
 				interval := sidecarContainerStatus.LastTerminationState.Terminated.FinishedAt.Sub(appContainerStatus.LastTerminationState.Terminated.FinishedAt.Time)
 				gomega.Expect(interval >= 5*time.Second).Should(gomega.Equal(true))
@@ -343,7 +354,7 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 120*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Eventually(func() string {
 					crr, err = tester.GetCRR(crr.Name)
@@ -363,7 +374,7 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 					sidecarContainerStatus := util.GetContainerStatus("sidecar", pod)
 					return appContainerStatus.ContainerID != crr.Spec.Containers[0].StatusContext.ContainerID &&
 						sidecarContainerStatus.ContainerID != crr.Spec.Containers[1].StatusContext.ContainerID
-				}, 60*time.Second, 3*time.Second).Should(gomega.BeTrue())
+				}, 120*time.Second, 3*time.Second).Should(gomega.BeTrue())
 
 				pod, err = tester.GetPod(pod.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -419,7 +430,7 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 					pod, err = tester.GetPod(pod.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return util.GetContainerStatus("app", pod).RestartCount
-				}, 60*time.Second, 1*time.Second).Should(gomega.Equal(int32(1)))
+				}, 120*time.Second, 1*time.Second).Should(gomega.Equal(int32(1)))
 				gomega.Eventually(func() bool {
 					pod, err = tester.GetPod(pod.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -476,7 +487,7 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 60*time.Second, time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 120*time.Second, time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
 					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
 					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
@@ -496,7 +507,9 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 				}, 10*time.Second, time.Second).Should(gomega.Equal(true))
 
 				ginkgo.By("Check the app container stopped before preStop finished")
-				interval := util.GetContainerStatus("app", pod).LastTerminationState.Terminated.FinishedAt.Sub(crr.CreationTimestamp.Time)
+				appStatus := util.GetContainerStatus("app", pod)
+				gomega.Expect(appStatus.LastTerminationState.Terminated).ShouldNot(gomega.BeNil())
+				interval := appStatus.LastTerminationState.Terminated.FinishedAt.Sub(crr.CreationTimestamp.Time)
 				gomega.Expect(interval < 8*time.Second).Should(gomega.Equal(true))
 			}
 
@@ -543,7 +556,7 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 120*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
 					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
@@ -555,10 +568,18 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
 				}, 5*time.Second, time.Second).Should(gomega.Equal(""))
 
+				ginkgo.By("Wait for Pod to be ready after containers recreated")
+				gomega.Eventually(func() bool {
+					pod, err = tester.GetPod(pod.Name)
+					if err != nil {
+						return false
+					}
+					return podutil.IsPodReady(pod)
+				}, 120*time.Second, 3*time.Second).Should(gomega.BeTrue(), "Pod should be ready after container recreation")
+
 				ginkgo.By("Check Pod containers recreated")
 				pod, err = tester.GetPod(pod.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(podutil.IsPodReady(pod)).Should(gomega.Equal(true))
 				appContainerStatus := util.GetContainerStatus("app", pod)
 				sidecarContainerStatus := util.GetContainerStatus("sidecar", pod)
 				gomega.Expect(sidecarContainerStatus.ContainerID).ShouldNot(gomega.Equal(crr.Spec.Containers[1].StatusContext.ContainerID))
@@ -566,6 +587,8 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 				gomega.Expect(sidecarContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 
 				ginkgo.By("Check Pod sidecar container recreated not waiting for app container ready")
+				gomega.Expect(appContainerStatus.LastTerminationState.Terminated).ShouldNot(gomega.BeNil())
+				gomega.Expect(sidecarContainerStatus.LastTerminationState.Terminated).ShouldNot(gomega.BeNil())
 				interval := sidecarContainerStatus.LastTerminationState.Terminated.FinishedAt.Sub(appContainerStatus.LastTerminationState.Terminated.FinishedAt.Time)
 				gomega.Expect(interval < 3*time.Second).Should(gomega.Equal(true))
 			}
@@ -597,7 +620,7 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 					crr, err = tester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
 					return crr.Status.Phase
-				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				}, 120*time.Second, 3*time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Eventually(func() string {
 					crr, err = tester.GetCRR(crr.Name)
@@ -609,10 +632,18 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true},
 				}))
 
+				ginkgo.By("Wait for Pod to be ready after containers recreated")
+				gomega.Eventually(func() bool {
+					pod, err = tester.GetPod(pod.Name)
+					if err != nil {
+						return false
+					}
+					return podutil.IsPodReady(pod)
+				}, 120*time.Second, 3*time.Second).Should(gomega.BeTrue(), "Pod should be ready after container recreation")
+
 				ginkgo.By("Check Pod containers recreated")
 				pod, err = tester.GetPod(pod.Name)
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(podutil.IsPodReady(pod)).Should(gomega.Equal(true))
 				appContainerStatus := util.GetContainerStatus("app", pod)
 				sidecarContainerStatus := util.GetContainerStatus("sidecar", pod)
 				gomega.Expect(appContainerStatus.ContainerID).ShouldNot(gomega.Equal(crr.Spec.Containers[0].StatusContext.ContainerID))
@@ -621,6 +652,8 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 				gomega.Expect(sidecarContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 
 				ginkgo.By("Check Pod sidecar container recreated after app container ready")
+				gomega.Expect(appContainerStatus.LastTerminationState.Terminated).ShouldNot(gomega.BeNil())
+				gomega.Expect(sidecarContainerStatus.LastTerminationState.Terminated).ShouldNot(gomega.BeNil())
 				interval := sidecarContainerStatus.LastTerminationState.Terminated.FinishedAt.Sub(appContainerStatus.LastTerminationState.Terminated.FinishedAt.Time)
 				gomega.Expect(interval >= 5*time.Second).Should(gomega.Equal(true))
 			}

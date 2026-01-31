@@ -2071,12 +2071,12 @@ func TestMarkerServerlessPod(t *testing.T) {
 			r := &ReconcilePodProbeMarker{Client: fakeClient}
 			err := r.markServerlessPod(tc.getPod(), tc.markers)
 			if err != nil {
-				t.Fatalf(err.Error())
+				t.Fatal(err)
 			}
 			newPod := &corev1.Pod{}
 			err = fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(pod), newPod)
 			if err != nil {
-				t.Fatalf(err.Error())
+				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(tc.expectedLabels, newPod.Labels) {
 				t.Errorf("expect: %v, but: %v", tc.expectedLabels, newPod.Labels)

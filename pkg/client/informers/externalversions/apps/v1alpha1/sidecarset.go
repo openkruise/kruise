@@ -60,13 +60,25 @@ func NewFilteredSidecarSetInformer(client versioned.Interface, resyncPeriod time
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().SidecarSets().List(context.TODO(), options)
+				return client.AppsV1alpha1().SidecarSets().List(context.Background(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().SidecarSets().Watch(context.TODO(), options)
+				return client.AppsV1alpha1().SidecarSets().Watch(context.Background(), options)
+			},
+			ListWithContextFunc: func(ctx context.Context, options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AppsV1alpha1().SidecarSets().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
+				return client.AppsV1alpha1().SidecarSets().Watch(ctx, options)
 			},
 		},
 		&apisappsv1alpha1.SidecarSet{},

@@ -80,8 +80,8 @@ func (v *NativeVerticalUpdate) UpdateInplaceUpdateMetadata(op *jsonpatch.Operati
 		return fmt.Errorf("invalid container index: %s", op.Path)
 	}
 	if op.Operation == "remove" || op.Operation == "add" {
-		// Before k8s 1.32, we can not resize resources for a container with no limit or request
-		// TODO(Abner-1) change it if 1.32 released and allowing this operation
+		// Before k8s 1.32, we can not resize resources for a container with no limit or request.
+		// Note: In-Place Pod Resize is beta in K8s 1.33 (enabled by default).
 		return errors.New("can not add or remove resources")
 	}
 

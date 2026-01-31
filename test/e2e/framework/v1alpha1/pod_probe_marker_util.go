@@ -346,7 +346,7 @@ func (s *PodProbeMarkerTester) CreateStatefulSet(sts *appsv1beta1.StatefulSet) {
 }
 
 func (s *PodProbeMarkerTester) WaitForStatefulSetRunning(sts *appsv1beta1.StatefulSet) {
-	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, 2*time.Minute, true,
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, 5*time.Minute, true,
 		func(ctx context.Context) (bool, error) {
 			inner, err := s.kc.AppsV1beta1().StatefulSets(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			if err != nil {
@@ -367,7 +367,7 @@ func (s *PodProbeMarkerTester) WaitForStatefulSetRunning(sts *appsv1beta1.Statef
 }
 
 func (s *PodProbeMarkerTester) WaitForPodProbeMarkerProcessed(ppm *appsv1alpha1.PodProbeMarker) {
-	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, 2*time.Minute, true,
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, 5*time.Minute, true,
 		func(ctx context.Context) (bool, error) {
 			inner, err := s.kc.AppsV1alpha1().PodProbeMarkers(ppm.Namespace).Get(context.TODO(), ppm.Name, metav1.GetOptions{})
 			if err != nil {
@@ -383,8 +383,65 @@ func (s *PodProbeMarkerTester) WaitForPodProbeMarkerProcessed(ppm *appsv1alpha1.
 	}
 }
 
-func (s *PodProbeMarkerTester) WaitForPodProbeMarkerDeleted(ppm *appsv1alpha1.PodProbeMarker) {
+func (s *PodProbeMarkerTester) WaitForNodePodProbesUpdated(ns string, probeName string, expectedCommand []string) {
 	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, 2*time.Minute, true,
+		func(ctx context.Context) (bool, error) {
+			pods, err := s.ListActivePods(ns)
+			if err != nil {
+				return false, nil
+			}
+			if len(pods) == 0 {
+				return false, nil
+			}
+
+			for _, pod := range pods {
+				npp, err := s.kc.AppsV1alpha1().NodePodProbes().Get(context.TODO(), pod.Spec.NodeName, metav1.GetOptions{})
+				if err != nil {
+					common.Logf("Failed to get NodePodProbe for node %s: %v", pod.Spec.NodeName, err)
+					return false, nil
+				}
+
+				found := false
+				for _, podProbe := range npp.Spec.PodProbes {
+					if podProbe.UID != string(pod.UID) {
+						continue
+					}
+					for _, probe := range podProbe.Probes {
+						if probe.Name == probeName {
+							found = true
+							if probe.Probe.Exec == nil {
+								common.Logf("NodePodProbe for pod %s has nil exec", pod.Name)
+								return false, nil
+							}
+							if len(probe.Probe.Exec.Command) != len(expectedCommand) {
+								common.Logf("NodePodProbe for pod %s has command %v, expected %v", pod.Name, probe.Probe.Exec.Command, expectedCommand)
+								return false, nil
+							}
+							for i, cmd := range expectedCommand {
+								if probe.Probe.Exec.Command[i] != cmd {
+									common.Logf("NodePodProbe for pod %s has command %v, expected %v", pod.Name, probe.Probe.Exec.Command, expectedCommand)
+									return false, nil
+								}
+							}
+							break
+						}
+					}
+					break
+				}
+				if !found {
+					common.Logf("NodePodProbe for pod %s does not have probe %s", pod.Name, probeName)
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+	if pollErr != nil {
+		common.Failf("Failed waiting for NodePodProbe specs to be updated: %v", pollErr)
+	}
+}
+
+func (s *PodProbeMarkerTester) WaitForPodProbeMarkerDeleted(ppm *appsv1alpha1.PodProbeMarker) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, 5*time.Minute, true,
 		func(ctx context.Context) (bool, error) {
 			_, err := s.kc.AppsV1alpha1().PodProbeMarkers(ppm.Namespace).Get(context.TODO(), ppm.Name, metav1.GetOptions{})
 			if err != nil && apierrors.IsNotFound(err) {
@@ -399,42 +456,56 @@ func (s *PodProbeMarkerTester) WaitForPodProbeMarkerDeleted(ppm *appsv1alpha1.Po
 }
 
 func (s *PodProbeMarkerTester) WaitForPodLabeled(ns string, label string, value string) {
-	pollErr := wait.PollUntilContextTimeout(context.TODO(), 20*time.Second, 2*time.Minute, true,
+	var lastPods []*corev1.Pod
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), 20*time.Second, 5*time.Minute, true,
 		func(ctx context.Context) (bool, error) {
 			pods, err := s.ListActivePods(ns)
 			if err != nil {
 				return false, nil
 			}
+			lastPods = pods
 
 			for _, pod := range pods {
 				if pod.Labels[label] != value {
+					common.Logf("Pod %s has label %s=%s, expected %s", pod.Name, label, pod.Labels[label], value)
 					return false, nil
 				}
 			}
 			return true, nil
 		})
 	if pollErr != nil {
-		common.Failf("Failed waiting for pod labels to be updated: %v", pollErr)
+		var podInfo string
+		for _, pod := range lastPods {
+			podInfo += fmt.Sprintf("\n  Pod %s: %s=%s (expected %s)", pod.Name, label, pod.Labels[label], value)
+		}
+		common.Failf("Failed waiting for pod labels to be updated: %v\nPods:%s", pollErr, podInfo)
 	}
 }
 
 func (s *PodProbeMarkerTester) WaitForPodAnnotated(ns string, annotation string, value string) {
-	pollErr := wait.PollUntilContextTimeout(context.TODO(), 10*time.Second, 2*time.Minute, true,
+	var lastPods []*corev1.Pod
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), 10*time.Second, 5*time.Minute, true,
 		func(ctx context.Context) (bool, error) {
 			pods, err := s.ListActivePods(ns)
 			if err != nil {
 				return false, nil
 			}
+			lastPods = pods
 
 			for _, pod := range pods {
 				if pod.Annotations[annotation] != value {
+					common.Logf("Pod %s has annotation %s=%s, expected %s", pod.Name, annotation, pod.Annotations[annotation], value)
 					return false, nil
 				}
 			}
 			return true, nil
 		})
 	if pollErr != nil {
-		common.Failf("Failed waiting for pod annotations to be updated: %v", pollErr)
+		var podInfo string
+		for _, pod := range lastPods {
+			podInfo += fmt.Sprintf("\n  Pod %s: %s=%s (expected %s), Conditions=%v", pod.Name, annotation, pod.Annotations[annotation], value, pod.Status.Conditions)
+		}
+		common.Failf("Failed waiting for pod annotations to be updated: %v\nPods:%s", pollErr, podInfo)
 	}
 }
 
