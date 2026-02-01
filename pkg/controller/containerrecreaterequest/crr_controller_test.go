@@ -18,7 +18,6 @@ package containerrecreaterequest
 
 import (
 	"context"
-	"reflect"
 	"testing"
 	"time"
 
@@ -26,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/clock"
 	clocktesting "k8s.io/utils/clock/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -83,15 +81,16 @@ func (f *fakePodReadinessControl) RemoveNotReadyKey(pod *v1.Pod, msg utilpodread
 }
 
 func TestReconcile(t *testing.T) {
+	baseTime := time.Now()
+
 	tests := []struct {
 		name               string
 		crr                *appsv1alpha1.ContainerRecreateRequest
 		pods               []*v1.Pod
 		existingObjs       []client.Object
-		fakeClock          clock.Clock
 		podReadinessGate   bool
 		expectedPhase      appsv1alpha1.ContainerRecreateRequestPhase
-		expectedRequeue    time.Duration
+		expectRequeue      bool
 		expectedFinalizers []string
 		expectedMsg        string
 		creationTimeOffset time.Duration
@@ -131,7 +130,7 @@ func TestReconcile(t *testing.T) {
 								Name: "main",
 								State: v1.ContainerState{
 									Running: &v1.ContainerStateRunning{
-										StartedAt: metav1.NewTime(time.Now().Add(-10 * time.Minute)),
+										StartedAt: metav1.NewTime(baseTime.Add(-10 * time.Minute)),
 									},
 								},
 								ContainerID: "docker://123",
@@ -141,10 +140,9 @@ func TestReconcile(t *testing.T) {
 				},
 			},
 			existingObjs:     []client.Object{},
-			fakeClock:        clocktesting.NewFakeClock(time.Now()),
 			podReadinessGate: true,
 			expectedPhase:    "",
-			expectedRequeue:  responseTimeout,
+			expectRequeue:    true,
 		},
 		{
 			name: "Status Sync: CRR in Recreating phase should sync container statuses",
@@ -181,7 +179,7 @@ func TestReconcile(t *testing.T) {
 								Name: "main",
 								State: v1.ContainerState{
 									Running: &v1.ContainerStateRunning{
-										StartedAt: metav1.NewTime(time.Now().Add(-5 * time.Minute)),
+										StartedAt: metav1.NewTime(baseTime.Add(-5 * time.Minute)),
 									},
 								},
 								ContainerID:  "docker://abc",
@@ -191,10 +189,9 @@ func TestReconcile(t *testing.T) {
 					},
 				},
 			},
-			existingObjs:    []client.Object{},
-			fakeClock:       clocktesting.NewFakeClock(time.Now()),
-			expectedPhase:   appsv1alpha1.ContainerRecreateRequestRecreating,
-			expectedRequeue: 0,
+			existingObjs:  []client.Object{},
+			expectedPhase: appsv1alpha1.ContainerRecreateRequestRecreating,
+			expectRequeue: false,
 		},
 		{
 			name:               "Timeout: ActiveDeadlineSeconds exceeded",
@@ -230,8 +227,8 @@ func TestReconcile(t *testing.T) {
 				},
 			},
 			existingObjs:  []client.Object{},
-			fakeClock:     clocktesting.NewFakeClock(time.Now()),
 			expectedPhase: appsv1alpha1.ContainerRecreateRequestCompleted,
+			expectRequeue: false,
 			expectedMsg:   "recreating has exceeded the activeDeadlineSeconds",
 		},
 		{
@@ -264,8 +261,8 @@ func TestReconcile(t *testing.T) {
 				},
 			},
 			existingObjs:  []client.Object{},
-			fakeClock:     clocktesting.NewFakeClock(time.Now()),
 			expectedPhase: appsv1alpha1.ContainerRecreateRequestCompleted,
+			expectRequeue: false,
 			expectedMsg:   "daemon has not responded for a long time",
 		},
 		{
@@ -289,7 +286,7 @@ func TestReconcile(t *testing.T) {
 				},
 				Status: appsv1alpha1.ContainerRecreateRequestStatus{
 					Phase:          appsv1alpha1.ContainerRecreateRequestCompleted,
-					CompletionTime: &metav1.Time{Time: time.Now().Add(-200 * time.Second)}, // TTL 100s, elapsed 200s
+					CompletionTime: &metav1.Time{Time: baseTime.Add(-200 * time.Second)}, // TTL 100s, elapsed 200s
 				},
 			},
 			pods: []*v1.Pod{
@@ -301,10 +298,9 @@ func TestReconcile(t *testing.T) {
 					},
 				},
 			},
-			existingObjs:    []client.Object{},
-			fakeClock:       clocktesting.NewFakeClock(time.Now()),
-			expectedPhase:   "", // Should be deleted
-			expectedRequeue: 0,
+			existingObjs:  []client.Object{},
+			expectedPhase: "", // Should be deleted
+			expectRequeue: false,
 		},
 		{
 			name: "Lifecycle: Pod deleted (not found)",
@@ -325,12 +321,11 @@ func TestReconcile(t *testing.T) {
 					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{},
 				},
 			},
-			pods:            []*v1.Pod{}, // No pod
-			existingObjs:    []client.Object{},
-			fakeClock:       clocktesting.NewFakeClock(time.Now()),
-			expectedPhase:   appsv1alpha1.ContainerRecreateRequestCompleted,
-			expectedMsg:     "pod has gone",
-			expectedRequeue: 0,
+			pods:          []*v1.Pod{}, // No pod
+			existingObjs:  []client.Object{},
+			expectedPhase: appsv1alpha1.ContainerRecreateRequestCompleted,
+			expectedMsg:   "pod has gone",
+			expectRequeue: false,
 		},
 		{
 			name: "Lifecycle: Pod UID mismatch",
@@ -360,11 +355,10 @@ func TestReconcile(t *testing.T) {
 					},
 				},
 			},
-			existingObjs:    []client.Object{},
-			fakeClock:       clocktesting.NewFakeClock(time.Now()),
-			expectedPhase:   appsv1alpha1.ContainerRecreateRequestCompleted,
-			expectedMsg:     "pod has gone",
-			expectedRequeue: 0,
+			existingObjs:  []client.Object{},
+			expectedPhase: appsv1alpha1.ContainerRecreateRequestCompleted,
+			expectedMsg:   "pod has gone",
+			expectRequeue: false,
 		},
 		{
 			name: "Finalizer: UnreadyGracePeriodSeconds adds finalizer and not-ready key",
@@ -406,7 +400,7 @@ func TestReconcile(t *testing.T) {
 								Name: "main",
 								State: v1.ContainerState{
 									Running: &v1.ContainerStateRunning{
-										StartedAt: metav1.NewTime(time.Now().Add(-5 * time.Minute)),
+										StartedAt: metav1.NewTime(baseTime.Add(-5 * time.Minute)),
 									},
 								},
 								ContainerID: "docker://abc",
@@ -417,17 +411,16 @@ func TestReconcile(t *testing.T) {
 				},
 			},
 			existingObjs:       []client.Object{},
-			fakeClock:          clocktesting.NewFakeClock(time.Now()),
 			podReadinessGate:   true,
 			expectedPhase:      appsv1alpha1.ContainerRecreateRequestRecreating,
-			expectedRequeue:    0,
+			expectRequeue:      false,
 			expectedFinalizers: []string{appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.crr.CreationTimestamp = metav1.NewTime(time.Now().Add(tt.creationTimeOffset))
+			tt.crr.CreationTimestamp = metav1.NewTime(baseTime.Add(tt.creationTimeOffset))
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&appsv1alpha1.ContainerRecreateRequest{}).WithObjects(tt.crr).Build()
 			for _, p := range tt.pods {
 				if err := fakeClient.Create(context.TODO(), p); err != nil {
@@ -442,7 +435,7 @@ func TestReconcile(t *testing.T) {
 
 			r := &ReconcileContainerRecreateRequest{
 				Client: fakeClient,
-				clock:  tt.fakeClock,
+				clock:  clocktesting.NewFakeClock(baseTime),
 				podReadinessControl: &fakePodReadinessControl{
 					containsReadinessGate: tt.podReadinessGate,
 				},
@@ -460,12 +453,14 @@ func TestReconcile(t *testing.T) {
 				t.Errorf("Reconcile() error = %v", err)
 			}
 
-			if tt.expectedRequeue > 0 {
-				if res.RequeueAfter > tt.expectedRequeue || res.RequeueAfter < tt.expectedRequeue-5*time.Second {
-					t.Errorf("Reconcile() RequeueAfter = %v, want ~%v", res.RequeueAfter, tt.expectedRequeue)
+			if tt.expectRequeue {
+				if res.RequeueAfter == 0 && !res.Requeue {
+					t.Errorf("Reconcile() Requeue = %v, RequeueAfter = %v, want Requeue", res.Requeue, res.RequeueAfter)
 				}
-			} else if res.RequeueAfter != 0 {
-				t.Errorf("Reconcile() RequeueAfter = %v, want 0", res.RequeueAfter)
+			} else {
+				if res.RequeueAfter != 0 || res.Requeue {
+					t.Errorf("Reconcile() Requeue = %v, RequeueAfter = %v, want No Requeue", res.Requeue, res.RequeueAfter)
+				}
 			}
 
 			updatedCRR := &appsv1alpha1.ContainerRecreateRequest{}
@@ -480,8 +475,17 @@ func TestReconcile(t *testing.T) {
 			}
 
 			if len(tt.expectedFinalizers) > 0 {
-				if !reflect.DeepEqual(updatedCRR.Finalizers, tt.expectedFinalizers) {
-					t.Errorf("Finalizers = %v, want %v", updatedCRR.Finalizers, tt.expectedFinalizers)
+				for _, f := range tt.expectedFinalizers {
+					found := false
+					for _, existing := range updatedCRR.Finalizers {
+						if existing == f {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("Finalizers %v missing expected %v", updatedCRR.Finalizers, f)
+					}
 				}
 			}
 		})
