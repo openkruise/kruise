@@ -423,7 +423,7 @@ func (r *ReconcileCloneSet) syncCloneSet(
 	var podsScaleErr error
 	var podsUpdateErr error
 
-	scaling, podsScaleErr = r.syncControl.Scale(currentSet, updateSet, currentRevision.Name, updateRevision.Name, filteredPods, filteredPVCs)
+	scaling, podsScaleErr = r.syncControl.Scale(currentSet, updateSet, currentRevision, updateRevision, filteredPods, filteredPVCs)
 	if podsScaleErr != nil {
 		cond := appsv1beta1.CloneSetCondition{
 			Type:               appsv1beta1.CloneSetConditionFailedScale,

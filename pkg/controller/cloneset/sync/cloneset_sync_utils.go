@@ -22,6 +22,7 @@ import (
 	"math"
 	"reflect"
 
+	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
@@ -34,6 +35,7 @@ import (
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/specifieddelete"
 )
@@ -98,7 +100,7 @@ type IsPodUpdateFunc func(pod *v1.Pod, updateRevision string) bool
 
 // This is the most important algorithm in cloneset-controller.
 // It calculates the pod numbers to scaling and updating for current CloneSet.
-func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string, isPodUpdate IsPodUpdateFunc) (res expectationDiffs) {
+func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision *apps.ControllerRevision, inplaceControl inplaceupdate.Interface, isPodUpdate IsPodUpdateFunc) (res expectationDiffs) {
 	coreControl := clonesetcore.New(cs)
 	replicas := int(*cs.Spec.Replicas)
 	var partition, maxSurge, maxUnavailable, scaleMaxUnavailable int
@@ -157,7 +159,7 @@ func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, cur
 	}
 
 	for _, p := range pods {
-		if isPodUpdate(p, updateRevision) {
+		if isPodUpdate(p, updateRevision.Name) {
 
 			newRevisionCount++
 
@@ -197,7 +199,7 @@ func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, cur
 	totalUnavailable := preDeletingNewRevisionCount + preDeletingOldRevisionCount + unavailableNewRevisionCount + unavailableOldRevisionCount
 	// If the currentRevision and updateRevision are consistent, Pods can only update to this revision
 	// If the CloneSetPartitionRollback is not enabled, Pods can only update to the new revision
-	if updateRevision == currentRevision || !utilfeature.DefaultFeatureGate.Enabled(features.CloneSetPartitionRollback) {
+	if updateRevision.Name == currentRevision.Name || !utilfeature.DefaultFeatureGate.Enabled(features.CloneSetPartitionRollback) {
 		updateOldDiff = integer.IntMax(updateOldDiff, 0)
 		updateNewDiff = integer.IntMin(updateNewDiff, 0)
 	}
@@ -215,8 +217,17 @@ func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, cur
 		}
 
 		// Use surge for old and new revision updating
+		// IMPORTANT: Surge should ONLY be used when pods need to be recreated
+		// In-place updates don't need surge because pods are updated without recreation
 		var updateSurge, updateOldRevisionSurge int
-		if util.IsIntPlusAndMinus(updateOldDiff, updateNewDiff) {
+
+		// Check if in-place update is actually possible for these changes
+		canUpdateInPlace := false
+		if inplaceControl != nil {
+			canUpdateInPlace = inplaceControl.CanUpdateInPlace(currentRevision, updateRevision, coreControl.GetUpdateOptions())
+		}
+
+		if !canUpdateInPlace && util.IsIntPlusAndMinus(updateOldDiff, updateNewDiff) {
 			if util.IntAbs(updateOldDiff) <= util.IntAbs(updateNewDiff) {
 				updateSurge = util.IntAbs(updateOldDiff)
 				if updateOldDiff < 0 {

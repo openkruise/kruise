@@ -23,6 +23,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -48,7 +49,7 @@ const (
 
 func (r *realControl) Scale(
 	currentCS, updateCS *appsv1beta1.CloneSet,
-	currentRevision, updateRevision string,
+	currentRevision, updateRevision *apps.ControllerRevision,
 	pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 ) (bool, error) {
 	if updateCS.Spec.Replicas == nil {
@@ -68,8 +69,8 @@ func (r *realControl) Scale(
 	}
 
 	// 2. calculate scale numbers
-	diffRes := calculateDiffsWithExpectation(updateCS, pods, currentRevision, updateRevision, revision.IsPodUpdate)
-	updatedPods, notUpdatedPods := clonesetutils.GroupUpdateAndNotUpdatePods(pods, updateRevision)
+	diffRes := calculateDiffsWithExpectation(updateCS, pods, currentRevision, updateRevision, r.inplaceControl, revision.IsPodUpdate)
+	updatedPods, notUpdatedPods := clonesetutils.GroupUpdateAndNotUpdatePods(pods, updateRevision.Name)
 
 	if diffRes.scaleUpNum > diffRes.scaleUpLimit {
 		r.recorder.Event(updateCS, v1.EventTypeWarning, "ScaleUpLimited", fmt.Sprintf("scaleUp is limited because of scaleStrategy.maxUnavailable, limit: %d", diffRes.scaleUpLimit))
@@ -94,7 +95,7 @@ func (r *realControl) Scale(
 		}
 
 		return r.createPods(expectedCreations, expectedCurrentCreations,
-			currentCS, updateCS, currentRevision, updateRevision, availableIDs.List(), existingPVCNames)
+			currentCS, updateCS, currentRevision.Name, updateRevision.Name, availableIDs.List(), existingPVCNames)
 	}
 
 	// 4. try to delete pods already in pre-delete
@@ -107,7 +108,7 @@ func (r *realControl) Scale(
 
 	// 5. specified delete
 	if podsToDelete := util.DiffPods(podsSpecifiedToDelete, podsInPreDelete); len(podsToDelete) > 0 {
-		newPodsToDelete, oldPodsToDelete := clonesetutils.GroupUpdateAndNotUpdatePods(podsToDelete, updateRevision)
+		newPodsToDelete, oldPodsToDelete := clonesetutils.GroupUpdateAndNotUpdatePods(podsToDelete, updateRevision.Name)
 		klog.V(3).InfoS("CloneSet tried to delete pods specified", "cloneSet", klog.KObj(updateCS), "deleteReadyLimit", diffRes.deleteReadyLimit,
 			"newPods", util.GetPodNames(newPodsToDelete).List(), "oldPods", util.GetPodNames(oldPodsToDelete).List())
 
