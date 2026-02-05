@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: controller-manager
-  namespace: system
+  namespace: kruise-system
 spec:
   template:
     spec:
@@ -14,7 +14,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: daemon
-  namespace: system
+  namespace: kruise-system
 spec:
   template:
     spec:
