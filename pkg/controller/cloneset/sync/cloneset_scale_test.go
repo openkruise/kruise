@@ -747,7 +747,10 @@ func TestScale(t *testing.T) {
 				Client:   fClient,
 				recorder: record.NewFakeRecorder(10),
 			}
-			modified, err := rControl.Scale(cs.getCloneSets()[0], cs.getCloneSets()[1], cs.getRevisions()[0], cs.getRevisions()[1], pods, nil)
+			revisions := cs.getRevisions()
+			currentRev := &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: revisions[0]}}
+			updateRev := &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: revisions[1]}}
+			modified, err := rControl.Scale(cs.getCloneSets()[0], cs.getCloneSets()[1], currentRev, updateRev, pods, nil)
 			if err != nil {
 				t.Fatalf(err.Error())
 			}
