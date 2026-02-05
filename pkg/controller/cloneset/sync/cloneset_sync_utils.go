@@ -17,8 +17,8 @@ limitations under the License.
 package sync
 
 import (
-	"encoding/json"
 	"flag"
+	"fmt"
 	"math"
 	"reflect"
 
@@ -90,8 +90,8 @@ func (e expectationDiffs) isEmpty() bool {
 
 // String implement this to print information in klog
 func (e expectationDiffs) String() string {
-	b, _ := json.Marshal(e)
-	return string(b)
+	type noMethod expectationDiffs
+	return fmt.Sprintf("%+v", noMethod(e))
 }
 
 type IsPodUpdateFunc func(pod *v1.Pod, updateRevision string) bool
