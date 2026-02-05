@@ -1,9 +1,7 @@
-version: "2"
 run:
   concurrency: 4
   issues-exit-code: 1
   tests: true
-
 
 # output configuration options
 output:
@@ -30,8 +28,8 @@ linters:
       rules:
         forbid-pkg-errors:
           deny:
-          - pkg: "github.com/pkg/errors"
-            desc: Should be replaced with standard lib errors or fmt.Errorf
+            - pkg: "github.com/pkg/errors"
+              desc: Should be replaced with standard lib errors or fmt.Errorf
   exclusions:
     generated: lax
     presets:
@@ -52,15 +50,15 @@ linters:
       - test
 formatters:
   enable:
-  - gofmt
-  - goimports
+    - gofmt
+    - goimports
   settings:
     gofmt:
       simplify: true
     goimports:
       # put imports beginning with prefix after 3rd-party packages;
-      local-prefixes: 
-      - github.com/openkruise/kruise
+      local-prefixes:
+        - github.com/openkruise/kruise
   exclusions:
     generated: lax
     paths:
