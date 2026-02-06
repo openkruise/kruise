@@ -102,13 +102,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			},
 		}))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to watch ResourceDistribution resources: %w", err)
 	}
 
 	// Watch for changes to all namespaces
 	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Namespace{}, &enqueueRequestForNamespace{reader: mgr.GetCache()}))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to watch Namespace resources for ResourceDistribution: %w", err)
 	}
 
 	// Watch for changes to Secrets
