@@ -21,7 +21,6 @@ import (
 	"testing"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
@@ -31,6 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func newTestPodEventHandler(reader client.Reader, expectations kubecontroller.ControllerExpectationsInterface) *podEventHandler {
@@ -44,7 +45,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 	lTrue := true
 	cases := []struct {
 		name                          string
-		dss                           []*appsv1alpha1.DaemonSet
+		dss                           []*appsv1beta1.DaemonSet
 		e                             event.TypedCreateEvent[*v1.Pod]
 		alterExpectationCreationsKey  string
 		alterExpectationCreationsAdds []string
@@ -64,13 +65,13 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 		},
 		{
 			name: "multi ds",
-			dss: []*appsv1alpha1.DaemonSet{
+			dss: []*appsv1beta1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ds01",
 						Namespace: "default",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -86,7 +87,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 						Name:      "ds02",
 						Namespace: "default",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -103,14 +104,14 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 		},
 		{
 			name: "correct owner reference",
-			dss: []*appsv1alpha1.DaemonSet{
+			dss: []*appsv1beta1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ds01",
 						Namespace: "default",
 						UID:       "001",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -127,7 +128,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 						Namespace: "default",
 						UID:       "002",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -147,7 +148,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 						Labels:    map[string]string{"key": "v1"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds02",
 								UID:        "002",
@@ -205,7 +206,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 	lTrue := true
 	cases := []struct {
 		name             string
-		dss              []*appsv1alpha1.DaemonSet
+		dss              []*appsv1beta1.DaemonSet
 		e                event.TypedUpdateEvent[*v1.Pod]
 		expectedQueueLen int
 	}{
@@ -216,14 +217,14 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 		},
 		{
 			name: "label changed and update 1",
-			dss: []*appsv1alpha1.DaemonSet{
+			dss: []*appsv1beta1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ds01",
 						Namespace: "default",
 						UID:       "001",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -240,7 +241,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Namespace: "default",
 						UID:       "002",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v2"},
 						},
@@ -260,7 +261,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Labels:          map[string]string{"key": "v1", "test": "true"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds01",
 								UID:        "001",
@@ -277,7 +278,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds01",
 								UID:        "001",
@@ -291,14 +292,14 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 		},
 		{
 			name: "label changed and update 2",
-			dss: []*appsv1alpha1.DaemonSet{
+			dss: []*appsv1beta1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ds01",
 						Namespace: "default",
 						UID:       "001",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -315,7 +316,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Namespace: "default",
 						UID:       "002",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v2"},
 						},
@@ -335,7 +336,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Labels:          map[string]string{"key": "v1", "test": "true"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds01",
 								UID:        "001",
@@ -352,7 +353,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						DeletionTimestamp: &metav1.Time{Time: time.Now()},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds02",
 								UID:        "002",
@@ -366,14 +367,14 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 		},
 		{
 			name: "reference changed",
-			dss: []*appsv1alpha1.DaemonSet{
+			dss: []*appsv1beta1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ds01",
 						Namespace: "default",
 						UID:       "001",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -390,7 +391,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Namespace: "default",
 						UID:       "002",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v2"},
 						},
@@ -410,7 +411,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Labels:          map[string]string{"key": "v1", "test": "true"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds01",
 								UID:        "001",
@@ -426,7 +427,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Labels:          map[string]string{"key": "v2", "test": "true"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds02",
 								UID:        "002",
@@ -440,14 +441,14 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 		},
 		{
 			name: "reference not changed",
-			dss: []*appsv1alpha1.DaemonSet{
+			dss: []*appsv1beta1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ds01",
 						Namespace: "default",
 						UID:       "001",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -464,7 +465,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Namespace: "default",
 						UID:       "002",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v2"},
 						},
@@ -484,7 +485,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Labels:          map[string]string{"key": "v1", "test": "true"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds01",
 								UID:        "001",
@@ -500,7 +501,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Labels:          map[string]string{"key": "v1", "test": "true"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds01",
 								UID:        "001",
@@ -514,14 +515,14 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 		},
 		{
 			name: "orphan changed",
-			dss: []*appsv1alpha1.DaemonSet{
+			dss: []*appsv1beta1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ds01",
 						Namespace: "default",
 						UID:       "001",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -538,7 +539,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Namespace: "default",
 						UID:       "002",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v2"},
 						},
@@ -570,14 +571,14 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 		},
 		{
 			name: "reference changed",
-			dss: []*appsv1alpha1.DaemonSet{
+			dss: []*appsv1beta1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ds01",
 						Namespace: "default",
 						UID:       "001",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -594,7 +595,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Namespace: "default",
 						UID:       "002",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v2"},
 						},
@@ -611,7 +612,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Namespace: "default",
 						UID:       "003",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v2"},
 						},
@@ -631,7 +632,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Labels:          map[string]string{"key": "v1", "test": "true"},
 						OwnerReferences: []metav1.OwnerReference{
 							{
-								APIVersion: "apps.kruise.io/v1alpha1",
+								APIVersion: "apps.kruise.io/v1beta1",
 								Kind:       "DaemonSet",
 								Name:       "ds01",
 								UID:        "001",
@@ -683,19 +684,19 @@ func newTestNodeEventHandler(client client.Client) *nodeEventHandler {
 func TestEnqueueRequestForNodeCreate(t *testing.T) {
 	cases := []struct {
 		name             string
-		dss              []*appsv1alpha1.DaemonSet
+		dss              []*appsv1beta1.DaemonSet
 		e                event.TypedCreateEvent[*v1.Node]
 		expectedQueueLen int
 	}{
 		{
 			name: "add one unmatched node",
-			dss: []*appsv1alpha1.DaemonSet{
+			dss: []*appsv1beta1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ds01",
 						Namespace: "default",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -711,7 +712,7 @@ func TestEnqueueRequestForNodeCreate(t *testing.T) {
 						Name:      "ds02",
 						Namespace: "default",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -740,13 +741,13 @@ func TestEnqueueRequestForNodeCreate(t *testing.T) {
 		},
 		{
 			name: "add one matched node",
-			dss: []*appsv1alpha1.DaemonSet{
+			dss: []*appsv1beta1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ds01",
 						Namespace: "default",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -762,7 +763,7 @@ func TestEnqueueRequestForNodeCreate(t *testing.T) {
 						Name:      "ds02",
 						Namespace: "default",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -803,7 +804,7 @@ func TestEnqueueRequestForNodeCreate(t *testing.T) {
 func TestEnqueueRequestForNodeUpdate(t *testing.T) {
 	cases := []struct {
 		name             string
-		dss              []*appsv1alpha1.DaemonSet
+		dss              []*appsv1beta1.DaemonSet
 		e                event.TypedUpdateEvent[*v1.Node]
 		expectedQueueLen int
 	}{
@@ -825,13 +826,13 @@ func TestEnqueueRequestForNodeUpdate(t *testing.T) {
 		},
 		{
 			name: "from unmatched to matched",
-			dss: []*appsv1alpha1.DaemonSet{
+			dss: []*appsv1beta1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ds01",
 						Namespace: "default",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -868,13 +869,13 @@ func TestEnqueueRequestForNodeUpdate(t *testing.T) {
 		},
 		{
 			name: "from matched to unmatched",
-			dss: []*appsv1alpha1.DaemonSet{
+			dss: []*appsv1beta1.DaemonSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "ds01",
 						Namespace: "default",
 					},
-					Spec: appsv1alpha1.DaemonSetSpec{
+					Spec: appsv1beta1.DaemonSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},

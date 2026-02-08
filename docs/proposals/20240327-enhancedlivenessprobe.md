@@ -76,8 +76,8 @@ which support to check the nodePodProbe(e.g., tcp/http/exec checking) as the sam
 the webhook will admit the pod resource to remove the native livenessProbe and patch the configuration to the pod annotations `apps.kruise.io/container-probe-context: '{...json format for liveness probe with specified containers in pod...}''`.
 
 **LivenessNodeProbeController**
-> For using the nodPodProbe controller processing,
-> the livenessProbe config filed in the pod annotations should be converted to the nodePodProbe custom defined resource in Kruise suite.
+> For using the nodePodProbe controller processing,
+> the livenessProbe config field in the pod annotations should be converted to the nodePodProbe custom defined resource in Kruise suite.
 > This controller can create and update the nodePodProbe resource.
 > In Figure 1, the controller reconcile illustrates the nodePodProbe process for the pod different action(creation/update/deletion event).
 > For example with the pod creation, if there is not the nodePodProbe resource related with the pod assigned, the new resource will be created by the controller.
@@ -245,7 +245,7 @@ kind: Pod
 metadata:
   annotations:
   ...
-    // [user defined] using this enhanced livnessProbe, otherwise the native checking
+    // [user defined] using this enhanced livenessProbe, otherwise the native checking
     apps.kruise.io/using-enhanced-liveness: "true"
   ...
 
@@ -271,9 +271,9 @@ metadata:
 | enhanced(this solution)                                                                                                                                                                         | native                            |
 |-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|
 | ● specified component detection(nodePodProbe controller in kruise-daemonset)  + global component decision(enhancedLivenessProbeController in kruise-manager) in cluster                         | ● single machine detection + single machine decision(all in kubelet) |
-| ● kruiseDaemon/ProbeDetector detection enabled in bypaas,  strong expansibility                                                                                                                 | ● no                              |
-| ● the global perspective of the application, the maxUnavailable protection policy and the capactiy building of the resilience protection system(Kruise-manager/EnhancedLivenessProbeController) | ● no                              |
-| ● the architecture is easy to expand, without invasive modification of native components, adapt easily to different scaenarios with strong scalability                                          | ● strong coupling, poor scalability |
+| ● kruiseDaemon/ProbeDetector detection enabled in bypass,  strong expansibility                                                                                                                 | ● no                              |
+| ● the global perspective of the application, the maxUnavailable protection policy and the capacity building of the resilience protection system(Kruise-manager/EnhancedLivenessProbeController) | ● no                              |
+| ● the architecture is easy to expand, without invasive modification of native components, adapt easily to different scenarios with strong scalability                                          | ● strong coupling, poor scalability |
 
 ### Other Notes
 ● Since the probe detection is implemented by the nodePodProbe controller in Kruise-daemonset, for the pod without ownerreference, this solution can also take effect on the enhancement ability for restarting containers when in failure livenessProbe status.

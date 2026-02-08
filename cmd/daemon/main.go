@@ -17,19 +17,17 @@ limitations under the License.
 package main
 
 import (
-	"os"
-
-	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
-
 	"flag"
 	"math/rand"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 	"time"
 
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
+	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
@@ -54,6 +52,9 @@ var (
 	// preventing the consumption of all available disk IOPS or network bandwidth,
 	// which could otherwise impact the performance of other running pods.
 	maxWorkersForPullImage = flag.Int("max-workers-for-pull-image", -1, "The maximum number of workers for pulling images.")
+
+	restConfigQPS   = flag.Int("rest-config-qps", 0, "QPS of rest config. Defaults to 0, which means using the default value of client-go.")
+	restConfigBurst = flag.Int("rest-config-burst", 0, "Burst of rest config. Defaults to 0, which means using the default value of client-go.")
 )
 
 func main() {
@@ -67,6 +68,12 @@ func main() {
 
 	cfg := config.GetConfigOrDie()
 	cfg.UserAgent = "kruise-daemon"
+	if *restConfigQPS > 0 {
+		cfg.QPS = float32(*restConfigQPS)
+	}
+	if *restConfigBurst > 0 {
+		cfg.Burst = *restConfigBurst
+	}
 	if err := client.NewRegistry(cfg); err != nil {
 		klog.Fatalf("Failed to init clientset registry: %v", err)
 	}

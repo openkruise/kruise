@@ -23,12 +23,12 @@ import (
 	"github.com/openkruise/kruise/pkg/webhook/types"
 )
 
-// +kubebuilder:webhook:path=/mutate-apps-kruise-io-v1alpha1-advancedcronjob,mutating=true,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=advancedcronjobs,verbs=create;update,versions=v1alpha1,name=madvancedcronjob.kb.io
+// +kubebuilder:webhook:path=/mutate-apps-kruise-io-advancedcronjob,mutating=true,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=advancedcronjobs,verbs=create;update,versions=v1alpha1;v1beta1,name=madvancedcronjob.kb.io
 
 var (
 	// HandlerGetterMap contains admission webhook handlers
 	HandlerGetterMap = map[string]types.HandlerGetter{
-		"mutate-apps-kruise-io-v1alpha1-advancedcronjob": func(mgr manager.Manager) admission.Handler {
+		"mutate-apps-kruise-io-advancedcronjob": func(mgr manager.Manager) admission.Handler {
 			return &AdvancedCronJobCreateUpdateHandler{Decoder: admission.NewDecoder(mgr.GetScheme())}
 		},
 	}

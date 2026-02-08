@@ -135,7 +135,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.CloneSet{}, handler.TypedEnqueueRequestForOwner[*appsv1alpha1.CloneSet](
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.CloneSet{}, handler.TypedEnqueueRequestForOwner[*appsv1beta1.CloneSet](
 		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner())))
 	if err != nil {
 		return err
@@ -284,7 +284,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 }
 
 // getExistingSubsets fetches all subset workloads in cluster managed by this UnitedDeployment
-// if adaptive scheduling strategy is used, existing subset unscheduable status will be set true here (newly created subsets are default false)
+// if adaptive scheduling strategy is used, existing subset unschedulable status will be set true here (newly created subsets are default false)
 func (r *ReconcileUnitedDeployment) getExistingSubsets(instance *appsv1alpha1.UnitedDeployment, control ControlInterface, expectedRevision string) (existingSubsets map[string]*Subset, err error) {
 	subSets, err := control.GetAllSubsets(instance, expectedRevision)
 	if err != nil {
@@ -329,7 +329,7 @@ func setUpdatedCondition(status *appsv1alpha1.UnitedDeploymentStatus, currentRev
 	}
 }
 
-// calculateSubsetsStatusForDefaultAdaptiveStrategy manages subset unscheduable status and store them in the Subset.Status.UnschedulableStatus field.
+// calculateSubsetsStatusForDefaultAdaptiveStrategy manages subset unschedulable status and store them in the Subset.Status.UnschedulableStatus field.
 func calculateSubsetsStatusForDefaultAdaptiveStrategy(name string, subset *Subset, ud *appsv1alpha1.UnitedDeployment) {
 	now := time.Now()
 	unitedDeploymentKey := getUnitedDeploymentKey(ud)

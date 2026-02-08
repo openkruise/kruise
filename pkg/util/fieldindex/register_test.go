@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func TestIndexSidecarSet(t *testing.T) {
@@ -94,4 +97,36 @@ func TestIndexSidecarSet(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestIndexImagePullJob tests the IndexImagePullJob function for correct indexing behavior
+func TestIndexImagePullJob(t *testing.T) {
+	// Case 1: Active job (no deletion timestamp, no completion time)
+	activeJob := &appsv1beta1.ImagePullJob{
+		ObjectMeta: metav1.ObjectMeta{},
+		Status: appsv1beta1.ImagePullJobStatus{
+			CompletionTime: nil,
+		},
+	}
+	assert.Equal(t, []string{"true"}, IndexImagePullJob(activeJob), "Expected active job to return 'true'")
+
+	// Case 2: Inactive job due to completion time being set
+	completedJob := &appsv1beta1.ImagePullJob{
+		ObjectMeta: metav1.ObjectMeta{},
+		Status: appsv1beta1.ImagePullJobStatus{
+			CompletionTime: &metav1.Time{Time: time.Now()},
+		},
+	}
+	assert.Equal(t, []string{"false"}, IndexImagePullJob(completedJob), "Expected completed job to return 'false'")
+
+	// Case 3: Inactive job due to deletion timestamp
+	deletedJob := &appsv1beta1.ImagePullJob{
+		ObjectMeta: metav1.ObjectMeta{
+			DeletionTimestamp: &metav1.Time{Time: time.Now()},
+		},
+		Status: appsv1beta1.ImagePullJobStatus{
+			CompletionTime: nil,
+		},
+	}
+	assert.Equal(t, []string{"false"}, IndexImagePullJob(deletedJob), "Expected deleted job to return 'false'")
 }

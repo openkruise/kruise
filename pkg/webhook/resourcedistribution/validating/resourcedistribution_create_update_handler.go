@@ -18,11 +18,6 @@ import (
 	"fmt"
 	"net/http"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/features"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -34,6 +29,11 @@ import (
 	coreval "k8s.io/kubernetes/pkg/apis/core/validation"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 )
 
 // ResourceDistributionCreateUpdateHandler handles ResourceDistribution

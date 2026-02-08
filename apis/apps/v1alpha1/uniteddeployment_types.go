@@ -19,12 +19,13 @@ package v1alpha1
 import (
 	"time"
 
-	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 // UpdateStrategyType is a string enumeration type that enumerates
@@ -125,7 +126,7 @@ type CloneSetTemplateSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Schemaless
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              CloneSetSpec `json:"spec"`
+	Spec              v1beta1.CloneSetSpec `json:"spec"`
 }
 
 // DeploymentTemplateSpec defines the subset template of Deployment.
@@ -150,7 +151,7 @@ type UnitedDeploymentUpdateStrategy struct {
 	ManualUpdate *ManualUpdate `json:"manualUpdate,omitempty"`
 }
 
-// ManualUpdate is a update strategy which allows users to control the update progress
+// ManualUpdate is an update strategy which allows users to control the update progress
 // by providing the partition of each subset.
 type ManualUpdate struct {
 	// Indicates number of subset partition.

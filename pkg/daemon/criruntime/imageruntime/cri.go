@@ -20,10 +20,6 @@ import (
 	"reflect"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
-	"github.com/openkruise/kruise/pkg/util/secret"
-
 	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -32,6 +28,10 @@ import (
 	"k8s.io/cri-client/pkg/util"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/util/parsers"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/util/secret"
 )
 
 const (
@@ -79,7 +79,7 @@ func (c *commonCRIImageService) useV1API() bool {
 }
 
 // PullImage implements ImageService.PullImage.
-func (c *commonCRIImageService) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, sandboxConfig *appsv1alpha1.SandboxConfig) (ImagePullStatusReader, error) {
+func (c *commonCRIImageService) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, sandboxConfig *appsv1beta1.SandboxConfig) (ImagePullStatusReader, error) {
 	if c.useV1API() {
 		return c.pullImageV1(ctx, imageName, tag, pullSecrets, sandboxConfig)
 	}
@@ -95,7 +95,7 @@ func (c *commonCRIImageService) ListImages(ctx context.Context) ([]ImageInfo, er
 }
 
 // PullImage implements ImageService.PullImage using v1 CRI client.
-func (c *commonCRIImageService) pullImageV1(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, sandboxConfig *appsv1alpha1.SandboxConfig) (ImagePullStatusReader, error) {
+func (c *commonCRIImageService) pullImageV1(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, sandboxConfig *appsv1beta1.SandboxConfig) (ImagePullStatusReader, error) {
 	registry := daemonutil.ParseRegistry(imageName)
 	fullImageName := imageName + ":" + tag
 	repoToPull, _, _, err := parsers.ParseImageName(fullImageName)
@@ -112,7 +112,7 @@ func (c *commonCRIImageService) pullImageV1(ctx context.Context, imageName, tag 
 			Image:       fullImageName,
 			Annotations: make(map[string]string),
 		},
-		Auth: auth, //default is nil
+		Auth: auth, // default is nil
 	}
 	if sandboxConfig != nil {
 		pullImageReq.SandboxConfig = &runtimeapi.PodSandboxConfig{
@@ -215,7 +215,7 @@ func (c *commonCRIImageService) listImagesV1(ctx context.Context) ([]ImageInfo, 
 }
 
 // PullImage implements ImageService.PullImage using v1alpha2 CRI client.
-func (c *commonCRIImageService) pullImageV1alpha2(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, sandboxConfig *appsv1alpha1.SandboxConfig) (ImagePullStatusReader, error) {
+func (c *commonCRIImageService) pullImageV1alpha2(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, sandboxConfig *appsv1beta1.SandboxConfig) (ImagePullStatusReader, error) {
 	registry := daemonutil.ParseRegistry(imageName)
 	fullImageName := imageName + ":" + tag
 	repoToPull, _, _, err := parsers.ParseImageName(fullImageName)
@@ -232,7 +232,7 @@ func (c *commonCRIImageService) pullImageV1alpha2(ctx context.Context, imageName
 			Image:       fullImageName,
 			Annotations: make(map[string]string),
 		},
-		Auth: auth, //default is nil
+		Auth: auth, // default is nil
 	}
 	if sandboxConfig != nil {
 		pullImageReq.SandboxConfig = &runtimeapiv1alpha2.PodSandboxConfig{

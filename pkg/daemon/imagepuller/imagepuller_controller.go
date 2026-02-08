@@ -39,10 +39,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/client"
 	kruiseclient "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	listersbeta1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
 	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
@@ -53,7 +53,7 @@ type Controller struct {
 	queue                 workqueue.RateLimitingInterface
 	puller                puller
 	imagePullNodeInformer cache.SharedIndexInformer
-	imagePullNodeLister   listersalpha1.NodeImageLister
+	imagePullNodeLister   listersbeta1.NodeImageLister
 	statusUpdater         *statusUpdater
 }
 
@@ -75,14 +75,14 @@ func NewController(opts daemonoptions.Options, secretManager daemonutil.SecretMa
 
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			nodeImage, ok := obj.(*appsv1alpha1.NodeImage)
+			nodeImage, ok := obj.(*appsv1beta1.NodeImage)
 			if ok {
 				enqueue(queue, nodeImage)
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			oldNodeImage, oldOK := oldObj.(*appsv1alpha1.NodeImage)
-			newNodeImage, newOK := newObj.(*appsv1alpha1.NodeImage)
+			oldNodeImage, oldOK := oldObj.(*appsv1beta1.NodeImage)
+			newNodeImage, newOK := newObj.(*appsv1beta1.NodeImage)
 			if !oldOK || !newOK {
 				return
 			}
@@ -117,8 +117,8 @@ func NewController(opts daemonoptions.Options, secretManager daemonutil.SecretMa
 		queue:                 queue,
 		puller:                puller,
 		imagePullNodeInformer: informer,
-		imagePullNodeLister:   listersalpha1.NewNodeImageLister(informer.GetIndexer()),
-		statusUpdater:         newStatusUpdater(genericClient.KruiseClient.AppsV1alpha1().NodeImages()),
+		imagePullNodeLister:   listersbeta1.NewNodeImageLister(informer.GetIndexer()),
+		statusUpdater:         newStatusUpdater(genericClient.KruiseClient.AppsV1beta1().NodeImages()),
 	}, nil
 }
 
@@ -131,20 +131,20 @@ func newNodeImageInformer(client kruiseclient.Interface, nodeName string) cache.
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				tweakListOptionsFunc(&options)
-				return client.AppsV1alpha1().NodeImages().List(context.TODO(), options)
+				return client.AppsV1beta1().NodeImages().List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				tweakListOptionsFunc(&options)
-				return client.AppsV1alpha1().NodeImages().Watch(context.TODO(), options)
+				return client.AppsV1beta1().NodeImages().Watch(context.TODO(), options)
 			},
 		},
-		&appsv1alpha1.NodeImage{},
+		&appsv1beta1.NodeImage{},
 		0, // do not resync
 		cache.Indexers{},
 	)
 }
 
-func enqueue(queue workqueue.Interface, obj *appsv1alpha1.NodeImage) {
+func enqueue(queue workqueue.Interface, obj *appsv1beta1.NodeImage) {
 	if obj.DeletionTimestamp != nil {
 		return
 	}
@@ -230,8 +230,8 @@ func (c *Controller) sync(key string) (retErr error) {
 		return
 	}
 
-	newStatus := appsv1alpha1.NodeImageStatus{
-		ImageStatuses: make(map[string]appsv1alpha1.ImageStatus),
+	newStatus := appsv1beta1.NodeImageStatus{
+		ImageStatuses: make(map[string]appsv1beta1.ImageStatus),
 	}
 	for imageName, imageSpec := range nodeImage.Spec.Images {
 		newStatus.Desired += int32(len(imageSpec.Tags))
@@ -243,17 +243,17 @@ func (c *Controller) sync(key string) (retErr error) {
 		if imageStatus == nil {
 			continue
 		}
-		utilimagejob.SortStatusImageTags(imageStatus)
+		utilimagejob.SortStatusImageTagsV1beta1(imageStatus)
 		newStatus.ImageStatuses[imageName] = *imageStatus
 		for _, tagStatus := range imageStatus.Tags {
 			switch tagStatus.Phase {
-			case appsv1alpha1.ImagePhaseSucceeded:
+			case appsv1beta1.ImagePhaseSucceeded:
 				newStatus.Succeeded++
-			case appsv1alpha1.ImagePhaseFailed:
+			case appsv1beta1.ImagePhaseFailed:
 				newStatus.Failed++
-			case appsv1alpha1.ImagePhasePulling:
+			case appsv1beta1.ImagePhasePulling:
 				newStatus.Pulling++
-			case appsv1alpha1.ImagePhaseWaiting:
+			case appsv1beta1.ImagePhaseWaiting:
 				newStatus.Waiting++
 			}
 		}

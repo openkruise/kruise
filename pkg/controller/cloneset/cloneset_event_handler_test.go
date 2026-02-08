@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util/expectations"
@@ -46,7 +46,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 	lTrue := true
 	cases := []struct {
 		name                          string
-		css                           []*appsv1alpha1.CloneSet
+		css                           []*appsv1beta1.CloneSet
 		e                             event.TypedCreateEvent[*v1.Pod]
 		alterExpectationCreationsKey  string
 		alterExpectationCreationsAdds []string
@@ -66,13 +66,13 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 		},
 		{
 			name: "multi cs",
-			css: []*appsv1alpha1.CloneSet{
+			css: []*appsv1beta1.CloneSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "cs01",
 						Namespace: "default",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -88,7 +88,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 						Name:      "cs02",
 						Namespace: "default",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -105,14 +105,14 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 		},
 		{
 			name: "correct owner reference",
-			css: []*appsv1alpha1.CloneSet{
+			css: []*appsv1beta1.CloneSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "cs01",
 						Namespace: "default",
 						UID:       "001",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -129,7 +129,7 @@ func TestEnqueueRequestForPodCreate(t *testing.T) {
 						Namespace: "default",
 						UID:       "002",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -205,7 +205,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 	lTrue := true
 	cases := []struct {
 		name             string
-		css              []*appsv1alpha1.CloneSet
+		css              []*appsv1beta1.CloneSet
 		e                event.TypedUpdateEvent[*v1.Pod]
 		expectedQueueLen int
 	}{
@@ -216,14 +216,14 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 		},
 		{
 			name: "label changed and delete 1",
-			css: []*appsv1alpha1.CloneSet{
+			css: []*appsv1beta1.CloneSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "cs01",
 						Namespace: "default",
 						UID:       "001",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -240,7 +240,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Namespace: "default",
 						UID:       "002",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v2"},
 						},
@@ -291,14 +291,14 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 		},
 		{
 			name: "label changed and delete 2",
-			css: []*appsv1alpha1.CloneSet{
+			css: []*appsv1beta1.CloneSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "cs01",
 						Namespace: "default",
 						UID:       "001",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -315,7 +315,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Namespace: "default",
 						UID:       "002",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v2"},
 						},
@@ -366,14 +366,14 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 		},
 		{
 			name: "reference changed",
-			css: []*appsv1alpha1.CloneSet{
+			css: []*appsv1beta1.CloneSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "cs01",
 						Namespace: "default",
 						UID:       "001",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -390,7 +390,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Namespace: "default",
 						UID:       "002",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v2"},
 						},
@@ -440,14 +440,14 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 		},
 		{
 			name: "reference not changed",
-			css: []*appsv1alpha1.CloneSet{
+			css: []*appsv1beta1.CloneSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "cs01",
 						Namespace: "default",
 						UID:       "001",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -464,7 +464,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Namespace: "default",
 						UID:       "002",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v2"},
 						},
@@ -514,14 +514,14 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 		},
 		{
 			name: "orphan changed",
-			css: []*appsv1alpha1.CloneSet{
+			css: []*appsv1beta1.CloneSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "cs01",
 						Namespace: "default",
 						UID:       "001",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -538,7 +538,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Namespace: "default",
 						UID:       "002",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v2"},
 						},
@@ -570,14 +570,14 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 		},
 		{
 			name: "reference changed",
-			css: []*appsv1alpha1.CloneSet{
+			css: []*appsv1beta1.CloneSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "cs01",
 						Namespace: "default",
 						UID:       "001",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -594,7 +594,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Namespace: "default",
 						UID:       "002",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v2"},
 						},
@@ -611,7 +611,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Namespace: "default",
 						UID:       "003",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v2"},
 						},
@@ -652,14 +652,14 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 		},
 		{
 			name: "container status invalid change",
-			css: []*appsv1alpha1.CloneSet{
+			css: []*appsv1beta1.CloneSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "cs01",
 						Namespace: "default",
 						UID:       "001",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v1"},
 						},
@@ -676,7 +676,7 @@ func TestEnqueueRequestForPodUpdate(t *testing.T) {
 						Namespace: "default",
 						UID:       "002",
 					},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{"key": "v2"},
 						},
@@ -760,23 +760,23 @@ func TestEnqueueRequestForPodDelete(t *testing.T) {
 
 func TestGetPodCloneSets(t *testing.T) {
 	testCases := []struct {
-		inRSs     []*appsv1alpha1.CloneSet
+		inRSs     []*appsv1beta1.CloneSet
 		pod       *v1.Pod
 		outRSName string
 	}{
 		// pods without labels don't match any CloneSets
 		{
-			inRSs: []*appsv1alpha1.CloneSet{
+			inRSs: []*appsv1beta1.CloneSet{
 				{ObjectMeta: metav1.ObjectMeta{Name: "basic"}}},
 			pod:       &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: metav1.NamespaceAll}},
 			outRSName: "",
 		},
 		// Matching labels, not namespace
 		{
-			inRSs: []*appsv1alpha1.CloneSet{
+			inRSs: []*appsv1beta1.CloneSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},
@@ -788,10 +788,10 @@ func TestGetPodCloneSets(t *testing.T) {
 		},
 		// Matching ns and labels returns the key to the CloneSet, not the CloneSet name
 		{
-			inRSs: []*appsv1alpha1.CloneSet{
+			inRSs: []*appsv1beta1.CloneSet{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "ns"},
-					Spec: appsv1alpha1.CloneSetSpec{
+					Spec: appsv1beta1.CloneSetSpec{
 						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 					},
 				},

@@ -31,7 +31,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-advancedcronjob
+      path: /mutate-apps-kruise-io-advancedcronjob
   failurePolicy: Fail
   name: madvancedcronjob.kb.io
   rules:
@@ -39,6 +39,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -52,7 +53,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-broadcastjob
+      path: /mutate-apps-kruise-io-broadcastjob
   failurePolicy: Fail
   name: mbroadcastjob.kb.io
   rules:
@@ -60,6 +61,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -73,7 +75,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-cloneset
+      path: /mutate-apps-kruise-io-cloneset
   failurePolicy: Fail
   name: mcloneset.kb.io
   rules:
@@ -81,6 +83,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -115,7 +118,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-daemonset
+      path: /mutate-apps-kruise-io-daemonset
   failurePolicy: Fail
   name: mdaemonset.kb.io
   rules:
@@ -123,6 +126,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -136,14 +140,15 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-imagelistpulljob
+      path: /mutate-apps-kruise-io-imagelistpulljob
   failurePolicy: Fail
-  name: mimagelistpulljob.kb.io
+  name: mimagelistpulljob-v1beta1.kb.io
   rules:
   - apiGroups:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -157,14 +162,15 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-imagepulljob
+      path: /mutate-apps-kruise-io-imagepulljob
   failurePolicy: Fail
-  name: mimagepulljob.kb.io
+  name: mimagepulljob-v1beta1.kb.io
   rules:
   - apiGroups:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -178,7 +184,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-nodeimage
+      path: /mutate-apps-kruise-io-nodeimage
   failurePolicy: Fail
   name: mnodeimage.kb.io
   rules:
@@ -186,6 +192,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -199,7 +206,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-sidecarset
+      path: /mutate-apps-kruise-io-sidecarset
   failurePolicy: Fail
   name: msidecarset.kb.io
   rules:
@@ -207,6 +214,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -311,7 +319,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-apps-kruise-io-v1alpha1-advancedcronjob
+      path: /validate-apps-kruise-io-advancedcronjob
   failurePolicy: Fail
   name: vadvancedcronjob.kb.io
   rules:
@@ -319,6 +327,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -332,7 +341,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-apps-kruise-io-v1alpha1-broadcastjob
+      path: /validate-apps-kruise-io-broadcastjob
   failurePolicy: Fail
   name: vbroadcastjob.kb.io
   rules:
@@ -340,6 +349,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -413,7 +423,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-apps-kruise-io-v1alpha1-cloneset
+      path: /validate-apps-kruise-io-cloneset
   failurePolicy: Fail
   name: vcloneset.kb.io
   rules:
@@ -421,6 +431,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -456,7 +467,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-apps-kruise-io-v1alpha1-daemonset
+      path: /validate-apps-kruise-io-daemonset
   failurePolicy: Fail
   name: vdaemonset.kb.io
   rules:
@@ -464,6 +475,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -498,14 +510,15 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-apps-kruise-io-v1alpha1-imagelistpulljob
+      path: /validate-apps-kruise-io-imagelistpulljob
   failurePolicy: Fail
-  name: vimagelistpulljob.kb.io
+  name: vimagelistpulljob-v1beta1.kb.io
   rules:
   - apiGroups:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -519,14 +532,15 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-apps-kruise-io-v1alpha1-imagepulljob
+      path: /validate-apps-kruise-io-imagepulljob
   failurePolicy: Fail
-  name: vimagepulljob.kb.io
+  name: vimagepulljob-v1beta1.kb.io
   rules:
   - apiGroups:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -581,7 +595,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-apps-kruise-io-v1alpha1-nodeimage
+      path: /validate-apps-kruise-io-nodeimage
   failurePolicy: Fail
   name: vnodeimage.kb.io
   rules:
@@ -589,6 +603,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -726,7 +741,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-apps-kruise-io-v1alpha1-sidecarset
+      path: /validate-apps-kruise-io-sidecarset
   failurePolicy: Fail
   name: vsidecarset.kb.io
   rules:
@@ -734,6 +749,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE

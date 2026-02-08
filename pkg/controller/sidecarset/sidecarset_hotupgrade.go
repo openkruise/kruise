@@ -20,15 +20,15 @@ import (
 	"context"
 	"fmt"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
-	"github.com/openkruise/kruise/pkg/util"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 func (p *Processor) flipHotUpgradingContainers(control sidecarcontrol.SidecarControl, pods []*corev1.Pod) error {
@@ -50,6 +50,7 @@ func (p *Processor) flipPodSidecarContainer(control sidecarcontrol.SidecarContro
 		// update pod in store
 		updateErr := p.Client.Update(context.TODO(), podClone)
 		if updateErr == nil {
+			sidecarcontrol.ResourceVersionExpectations.Expect(podClone)
 			return nil
 		}
 
@@ -96,7 +97,7 @@ func flipPodSidecarContainerDo(control sidecarcontrol.SidecarControl, pod *corev
 	control.UpdatePodAnnotationsInUpgrade(changedContainer, pod)
 }
 
-func isSidecarSetHasHotUpgradeContainer(sidecarSet *appsv1alpha1.SidecarSet) bool {
+func isSidecarSetHasHotUpgradeContainer(sidecarSet *appsv1beta1.SidecarSet) bool {
 	for _, sidecarContainer := range sidecarSet.Spec.Containers {
 		if sidecarcontrol.IsHotUpgradeContainer(&sidecarContainer) {
 			return true
@@ -105,7 +106,7 @@ func isSidecarSetHasHotUpgradeContainer(sidecarSet *appsv1alpha1.SidecarSet) boo
 	return false
 }
 
-func isHotUpgradingReady(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) bool {
+func isHotUpgradingReady(sidecarSet *appsv1beta1.SidecarSet, pod *corev1.Pod) bool {
 	if util.IsRunningAndReady(pod) {
 		return true
 	}
@@ -134,7 +135,7 @@ func isHotUpgradingReady(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) b
 
 // If none of the hot upgrade container has HotUpgradeEmptyImage,
 // then Pod is in hotUpgrading and return true
-func isPodSidecarInHotUpgrading(sidecarSet *appsv1alpha1.SidecarSet, pod *corev1.Pod) bool {
+func isPodSidecarInHotUpgrading(sidecarSet *appsv1beta1.SidecarSet, pod *corev1.Pod) bool {
 	containerImage := make(map[string]string)
 	for _, container := range pod.Spec.Containers {
 		containerImage[container.Name] = container.Image

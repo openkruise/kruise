@@ -5,9 +5,10 @@ import (
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	fuzzutils "github.com/openkruise/kruise/test/fuzz"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	fuzzutils "github.com/openkruise/kruise/test/fuzz"
 )
 
 func FuzzPatchPodMetadata(f *testing.F) {
@@ -48,11 +49,11 @@ func FuzzPatchPodMetadata(f *testing.F) {
 			}
 		}
 
-		_, err = PatchPodMetadata(metadata, []appsv1alpha1.SidecarSetPatchPodMetadata{*patch})
+		_, err = PatchPodMetadata(metadata, []appsv1beta1.SidecarSetPatchPodMetadata{*patch})
 		// Because function can capture panic error, so here to deal with the errors due to panic,
 		// Meanwhile, the error of the failed Patch merge in JSON format needs to be ignored.
 		if err != nil {
-			if !jsonPatch && patch.PatchPolicy == appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy {
+			if !jsonPatch && patch.PatchPolicy == appsv1beta1.SidecarSetMergePatchJsonPatchPolicy {
 				t.Logf("Ignore patch merge in JSON format failed: %s", err)
 				return
 			}

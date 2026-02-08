@@ -23,12 +23,12 @@ import (
 	"github.com/openkruise/kruise/pkg/webhook/types"
 )
 
-// +kubebuilder:webhook:path=/mutate-apps-kruise-io-v1alpha1-daemonset,mutating=true,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=daemonsets,verbs=create;update,versions=v1alpha1,name=mdaemonset.kb.io
+// +kubebuilder:webhook:path=/mutate-apps-kruise-io-daemonset,mutating=true,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=daemonsets,verbs=create;update,versions=v1alpha1;v1beta1,name=mdaemonset.kb.io
 
 var (
 	// HandlerGetterMap contains admission webhook handlers
 	HandlerGetterMap = map[string]types.HandlerGetter{
-		"mutate-apps-kruise-io-v1alpha1-daemonset": func(mgr manager.Manager) admission.Handler {
+		"mutate-apps-kruise-io-daemonset": func(mgr manager.Manager) admission.Handler {
 			return &DaemonSetCreateUpdateHandler{Decoder: admission.NewDecoder(mgr.GetScheme())}
 		},
 	}

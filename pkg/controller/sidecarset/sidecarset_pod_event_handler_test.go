@@ -22,15 +22,15 @@ import (
 	"testing"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/workqueue"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 )
 
 func TestPodEventHandler(t *testing.T) {
@@ -104,7 +104,7 @@ func TestGetPodMatchedSidecarSets(t *testing.T) {
 	cases := []struct {
 		name                  string
 		getPod                func() *corev1.Pod
-		getSidecarSets        func() []*appsv1alpha1.SidecarSet
+		getSidecarSets        func() []*appsv1beta1.SidecarSet
 		exceptSidecarSetCount int
 	}{
 		{
@@ -114,14 +114,14 @@ func TestGetPodMatchedSidecarSets(t *testing.T) {
 				pod.Annotations[sidecarcontrol.SidecarSetListAnnotation] = "test-sidecarset-2"
 				return pod
 			},
-			getSidecarSets: func() []*appsv1alpha1.SidecarSet {
+			getSidecarSets: func() []*appsv1beta1.SidecarSet {
 				sidecar1 := sidecarSetDemo.DeepCopy()
 				sidecar1.Name = "test-sidecarset-1"
 				sidecar2 := sidecarSetDemo.DeepCopy()
 				sidecar2.Name = "test-sidecarset-2"
 				sidecar3 := sidecarSetDemo.DeepCopy()
 				sidecar3.Name = "test-sidecarset-3"
-				return []*appsv1alpha1.SidecarSet{sidecar1, sidecar2, sidecar3}
+				return []*appsv1beta1.SidecarSet{sidecar1, sidecar2, sidecar3}
 			},
 			exceptSidecarSetCount: 1,
 		},
@@ -132,14 +132,14 @@ func TestGetPodMatchedSidecarSets(t *testing.T) {
 				pod.Annotations[sidecarcontrol.SidecarSetListAnnotation] = "test-sidecarset-1,test-sidecarset-3"
 				return pod
 			},
-			getSidecarSets: func() []*appsv1alpha1.SidecarSet {
+			getSidecarSets: func() []*appsv1beta1.SidecarSet {
 				sidecar1 := sidecarSetDemo.DeepCopy()
 				sidecar1.Name = "test-sidecarset-1"
 				sidecar2 := sidecarSetDemo.DeepCopy()
 				sidecar2.Name = "test-sidecarset-2"
 				sidecar3 := sidecarSetDemo.DeepCopy()
 				sidecar3.Name = "test-sidecarset-3"
-				return []*appsv1alpha1.SidecarSet{sidecar1, sidecar2, sidecar3}
+				return []*appsv1beta1.SidecarSet{sidecar1, sidecar2, sidecar3}
 			},
 			exceptSidecarSetCount: 2,
 		},
@@ -150,14 +150,14 @@ func TestGetPodMatchedSidecarSets(t *testing.T) {
 				pod.Annotations[sidecarcontrol.SidecarSetListAnnotation] = "test-sidecarset-4"
 				return pod
 			},
-			getSidecarSets: func() []*appsv1alpha1.SidecarSet {
+			getSidecarSets: func() []*appsv1beta1.SidecarSet {
 				sidecar1 := sidecarSetDemo.DeepCopy()
 				sidecar1.Name = "test-sidecarset-1"
 				sidecar2 := sidecarSetDemo.DeepCopy()
 				sidecar2.Name = "test-sidecarset-2"
 				sidecar3 := sidecarSetDemo.DeepCopy()
 				sidecar3.Name = "test-sidecarset-3"
-				return []*appsv1alpha1.SidecarSet{sidecar1, sidecar2, sidecar3}
+				return []*appsv1beta1.SidecarSet{sidecar1, sidecar2, sidecar3}
 			},
 			exceptSidecarSetCount: 0,
 		},

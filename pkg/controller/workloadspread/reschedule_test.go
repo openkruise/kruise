@@ -123,7 +123,7 @@ func TestRescheduleSubset(t *testing.T) {
 			},
 		},
 		{
-			name: "create no Pods, subset-a is scheduable",
+			name: "create no Pods, subset-a is schedulable",
 			getPods: func() []*corev1.Pod {
 				return []*corev1.Pod{}
 			},
@@ -151,7 +151,7 @@ func TestRescheduleSubset(t *testing.T) {
 			},
 		},
 		{
-			name: "create two Pods, two pending, subset-a is unscheduable",
+			name: "create two Pods, two pending, subset-a is unschedulable",
 			getPods: func() []*corev1.Pod {
 				pods := make([]*corev1.Pod, 2)
 				for i := range pods {
@@ -185,7 +185,7 @@ func TestRescheduleSubset(t *testing.T) {
 			},
 		},
 		{
-			name: "subset-a was unscheduable and not reach up 5 minutes",
+			name: "subset-a was unschedulable and not reach up 5 minutes",
 			getPods: func() []*corev1.Pod {
 				pods := make([]*corev1.Pod, 0)
 				return pods
@@ -220,7 +220,7 @@ func TestRescheduleSubset(t *testing.T) {
 			},
 		},
 		{
-			name: "subset-a was recovered from unscheduable to scheduable",
+			name: "subset-a was recovered from unschedulable to schedulable",
 			getPods: func() []*corev1.Pod {
 				pods := make([]*corev1.Pod, 0)
 				return pods

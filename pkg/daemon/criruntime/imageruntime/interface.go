@@ -19,9 +19,9 @@ package imageruntime
 import (
 	"context"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-
 	v1 "k8s.io/api/core/v1"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 type ImageInfo struct {
@@ -48,6 +48,6 @@ type ImagePullStatusReader interface {
 }
 
 type ImageService interface {
-	PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, sandboxConfig *appsv1alpha1.SandboxConfig) (ImagePullStatusReader, error)
+	PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, sandboxConfig *appsv1beta1.SandboxConfig) (ImagePullStatusReader, error)
 	ListImages(ctx context.Context) ([]ImageInfo, error)
 }

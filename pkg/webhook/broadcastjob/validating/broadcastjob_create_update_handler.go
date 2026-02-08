@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller/broadcastjob"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
@@ -57,7 +58,7 @@ type BroadcastJobCreateUpdateHandler struct {
 	Decoder admission.Decoder
 }
 
-func (h *BroadcastJobCreateUpdateHandler) validatingBroadcastJobFn(ctx context.Context, obj *appsv1alpha1.BroadcastJob) (bool, string, error) {
+func (h *BroadcastJobCreateUpdateHandler) validatingBroadcastJobFn(ctx context.Context, obj *appsv1beta1.BroadcastJob) (bool, string, error) {
 
 	allErrs := validateBroadcastJob(obj)
 	if len(allErrs) != 0 {
@@ -66,19 +67,19 @@ func (h *BroadcastJobCreateUpdateHandler) validatingBroadcastJobFn(ctx context.C
 	return true, "allowed to be admitted", nil
 }
 
-func validateBroadcastJob(obj *appsv1alpha1.BroadcastJob) field.ErrorList {
+func validateBroadcastJob(obj *appsv1beta1.BroadcastJob) field.ErrorList {
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, true, validateBroadcastJobName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateBroadcastJobSpec(&obj.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
-func validateBroadcastJobSpec(spec *appsv1alpha1.BroadcastJobSpec, fldPath *field.Path) field.ErrorList {
+func validateBroadcastJobSpec(spec *appsv1beta1.BroadcastJobSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	switch spec.CompletionPolicy.Type {
-	case appsv1alpha1.Always:
+	case appsv1beta1.Always:
 
-	case appsv1alpha1.Never:
+	case appsv1beta1.Never:
 		if spec.CompletionPolicy.TTLSecondsAfterFinished != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("completionPolicy").Child("ttlSecondsAfterFinished"),
 				spec.CompletionPolicy.TTLSecondsAfterFinished,
@@ -126,10 +127,9 @@ var _ admission.Handler = &BroadcastJobCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *BroadcastJobCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.BroadcastJob{}
+	obj := &appsv1beta1.BroadcastJob{}
 
-	err := h.Decoder.Decode(req, obj)
-	if err != nil {
+	if err := h.decodeObject(req, obj); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
@@ -138,6 +138,24 @@ func (h *BroadcastJobCreateUpdateHandler) Handle(ctx context.Context, req admiss
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 	return admission.ValidationResponse(allowed, reason)
+}
+
+func (h *BroadcastJobCreateUpdateHandler) decodeObject(req admission.Request, obj *appsv1beta1.BroadcastJob) error {
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return err
+		}
+	case appsv1alpha1.GroupVersion.Version:
+		objv1alpha1 := &appsv1alpha1.BroadcastJob{}
+		if err := h.Decoder.Decode(req, objv1alpha1); err != nil {
+			return err
+		}
+		if err := objv1alpha1.ConvertTo(obj); err != nil {
+			return fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err)
+		}
+	}
+	return nil
 }
 
 //var _ inject.Client = &BroadcastJobCreateUpdateHandler{}

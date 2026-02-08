@@ -19,27 +19,14 @@ package e2e
 import (
 	"testing"
 
-	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 
-	"github.com/openkruise/kruise/test/e2e/framework"
-
-	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
 )
-
-// Similar to SynchronizedBeforeSuite, we want to run some operations only once (such as collecting cluster logs).
-// Here, the order of functions is reversed; first, the function which runs everywhere,
-// and then the function that only runs on the first Ginkgo node.
-var _ = ginkgo.SynchronizedAfterSuite(func() {
-	// Run on all Ginkgo nodes
-	framework.Logf("Running AfterSuite actions on all nodes")
-	framework.RunCleanupActions()
-}, func() {
-	// Run only Ginkgo on node 1
-	framework.Logf("Running AfterSuite actions on node 1")
-})
 
 // RunE2ETests checks configuration parameters (specified through flags) and then runs
 // E2E tests using the Ginkgo runner.
@@ -51,13 +38,9 @@ func RunE2ETests(t *testing.T) {
 
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	// Disable skipped tests unless they are explicitly requested.
-	if len(config.GinkgoConfig.FocusStrings) == 0 && len(config.GinkgoConfig.SkipStrings) == 0 {
-		config.GinkgoConfig.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}
-	}
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
-	var r []ginkgo.Reporter
-	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
+	klog.Infof("Starting e2e run %q on Ginkgo node %d", common.RunID, config.GinkgoConfig.ParallelNode)
 
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kruise e2e suite", r)
+	ginkgo.RunSpecs(t, "Kruise e2e suite")
 }

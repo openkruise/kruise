@@ -25,12 +25,12 @@ resources:
 patchesStrategicMerge:
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix.
 # patches here are for enabling the conversion webhook for each CRD
-#- patches/webhook_in_clonesets.yaml
+- patches/webhook_in_clonesets.yaml
 #- patches/webhook_in_broadcastjobs.yaml
-#- patches/webhook_in_sidecarsets.yaml
+- patches/webhook_in_sidecarsets.yaml
 - patches/webhook_in_statefulsets.yaml
 #- patches/webhook_in_uniteddeployments.yaml
-#- patches/webhook_in_daemonsets.yaml
+- patches/webhook_in_daemonsets.yaml
 #- patches/webhook_in_nodeimages.yaml
 #- patches/webhook_in_imagepulljobs.yaml
 #- patches/webhook_in_advancedcronjobs.yaml

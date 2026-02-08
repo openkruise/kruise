@@ -19,23 +19,29 @@ package cloneset
 import (
 	"context"
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	"github.com/openkruise/kruise/pkg/controller/cloneset/sync"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
 )
 
+var (
+	timer clock.Clock = clock.RealClock{}
+)
+
 // StatusUpdater is interface for updating CloneSet status.
 type StatusUpdater interface {
-	UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error
+	UpdateCloneSetStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus, pods []*v1.Pod) error
 }
 
 func newStatusUpdater(c client.Client) StatusUpdater {
@@ -46,7 +52,7 @@ type realStatusUpdater struct {
 	client.Client
 }
 
-func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) error {
+func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus, pods []*v1.Pod) error {
 	r.calculateStatus(cs, newStatus, pods)
 	if err := clonesetcore.New(cs).ExtraStatusCalculation(newStatus, pods); err != nil {
 		return fmt.Errorf("failed to calculate extra status for cloneSet %s/%s: %v", cs.Namespace, cs.Name, err)
@@ -59,9 +65,9 @@ func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1alpha1.CloneSet, newS
 	return r.updateStatus(cs, newStatus)
 }
 
-func (r *realStatusUpdater) updateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) error {
+func (r *realStatusUpdater) updateStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		clone := &appsv1alpha1.CloneSet{}
+		clone := &appsv1beta1.CloneSet{}
 		if err := r.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, clone); err != nil {
 			return err
 		}
@@ -70,7 +76,7 @@ func (r *realStatusUpdater) updateStatus(cs *appsv1alpha1.CloneSet, newStatus *a
 	})
 }
 
-func (r *realStatusUpdater) inconsistentStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus) bool {
+func (r *realStatusUpdater) inconsistentStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus) bool {
 	oldStatus := cs.Status
 	return newStatus.ObservedGeneration > oldStatus.ObservedGeneration ||
 		newStatus.Replicas != oldStatus.Replicas ||
@@ -82,10 +88,11 @@ func (r *realStatusUpdater) inconsistentStatus(cs *appsv1alpha1.CloneSet, newSta
 		newStatus.ExpectedUpdatedReplicas != oldStatus.ExpectedUpdatedReplicas ||
 		newStatus.UpdateRevision != oldStatus.UpdateRevision ||
 		newStatus.CurrentRevision != oldStatus.CurrentRevision ||
-		newStatus.LabelSelector != oldStatus.LabelSelector
+		newStatus.LabelSelector != oldStatus.LabelSelector ||
+		hasProgressingConditionChanged(cs.Status, *newStatus)
 }
 
-func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus, pods []*v1.Pod) {
+func (r *realStatusUpdater) calculateStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus, pods []*v1.Pod) {
 	coreControl := clonesetcore.New(cs)
 	for _, pod := range pods {
 		newStatus.Replicas++
@@ -110,7 +117,85 @@ func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus
 		newStatus.CurrentRevision = newStatus.UpdateRevision
 	}
 
-	if partition, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.Partition, cs.Spec.Replicas); err == nil {
-		newStatus.ExpectedUpdatedReplicas = *cs.Spec.Replicas - int32(partition)
+	if cs.Spec.UpdateStrategy.RollingUpdate != nil {
+		if partition, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.RollingUpdate.Partition, cs.Spec.Replicas); err == nil {
+			newStatus.ExpectedUpdatedReplicas = *cs.Spec.Replicas - int32(partition)
+		}
+	} else {
+		newStatus.ExpectedUpdatedReplicas = *cs.Spec.Replicas
 	}
+	duration := r.calculateProgressingStatus(cs, newStatus)
+	clonesetutils.DurationStore.Push(clonesetutils.GetControllerKey(cs), duration)
+}
+
+func (r *realStatusUpdater) calculateProgressingStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus) time.Duration {
+	if !clonesetutils.HasProgressDeadline(cs) {
+		clonesetutils.RemoveCloneSetCondition(newStatus, appsv1beta1.CloneSetConditionTypeProgressing)
+		return time.Duration(-1)
+	}
+
+	timeNow := time.Now()
+	switch {
+	case clonesetutils.CloneSetAvailable(cs, newStatus):
+		klog.V(5).InfoS("CloneSet is available", "cloneSet", klog.KObj(cs))
+		condition := clonesetutils.NewCloneSetCondition(appsv1beta1.CloneSetConditionTypeProgressing,
+			v1.ConditionTrue, appsv1beta1.CloneSetAvailable, "CloneSet is available", timer.Now())
+		clonesetutils.SetCloneSetCondition(newStatus, *condition)
+		return time.Duration(-1)
+
+	case clonesetutils.CloneSetBePaused(cs):
+		klog.V(5).InfoS("CloneSet is paused", "cloneSet", klog.KObj(cs))
+		condition := clonesetutils.NewCloneSetCondition(appsv1beta1.CloneSetConditionTypeProgressing,
+			v1.ConditionTrue, appsv1beta1.CloneSetProgressPaused, "CloneSet is paused", timer.Now())
+		clonesetutils.SetCloneSetCondition(newStatus, *condition)
+		return time.Duration(-1)
+
+	case clonesetutils.CloneSetPartitionAvailable(cs, newStatus):
+		klog.V(5).InfoS("CloneSet is partition available", "cloneSet", klog.KObj(cs))
+		condition := clonesetutils.NewCloneSetCondition(appsv1beta1.CloneSetConditionTypeProgressing,
+			v1.ConditionTrue, appsv1beta1.CloneSetProgressPartitionAvailable, "CloneSet has been paused due to partition ready", timer.Now())
+		clonesetutils.SetCloneSetCondition(newStatus, *condition)
+		return time.Duration(-1)
+
+	case clonesetutils.CloneSetDeadlineExceeded(cs, newStatus, timeNow):
+		klog.V(5).InfoS("CloneSet is timed out progressing", "cloneSet", klog.KObj(cs))
+		msg := fmt.Sprintf("CloneSet revision %s has timed out progressing", newStatus.UpdateRevision)
+		condition := clonesetutils.NewCloneSetCondition(appsv1beta1.CloneSetConditionTypeProgressing,
+			v1.ConditionFalse, appsv1beta1.CloneSetProgressDeadlineExceeded, msg, timeNow)
+		clonesetutils.SetCloneSetCondition(newStatus, *condition)
+		return time.Duration(-1)
+
+	default:
+		klog.V(5).InfoS("CloneSet is progressing", "cloneSet", klog.KObj(cs))
+		condition := clonesetutils.NewCloneSetCondition(appsv1beta1.CloneSetConditionTypeProgressing,
+			v1.ConditionTrue, appsv1beta1.CloneSetProgressUpdated, "CloneSet is progressing", timer.Now())
+		clonesetutils.SetCloneSetCondition(newStatus, *condition)
+		condition = clonesetutils.GetCloneSetCondition(*newStatus, appsv1beta1.CloneSetConditionTypeProgressing)
+		return getRequeueSecondsFromCondition(condition, *cs.Spec.ProgressDeadlineSeconds, timeNow)
+	}
+}
+
+func hasProgressingConditionChanged(oldStatus appsv1beta1.CloneSetStatus, newStatus appsv1beta1.CloneSetStatus) bool {
+	oldCond := clonesetutils.GetCloneSetCondition(oldStatus, appsv1beta1.CloneSetConditionTypeProgressing)
+	newCond := clonesetutils.GetCloneSetCondition(newStatus, appsv1beta1.CloneSetConditionTypeProgressing)
+
+	if oldCond == nil && newCond == nil {
+		return false
+	} else if oldCond == nil || newCond == nil {
+		return true
+	}
+	return oldCond.Status != newCond.Status || oldCond.Reason != newCond.Reason
+}
+
+func getRequeueSecondsFromCondition(condition *appsv1beta1.CloneSetCondition, progressDeadlineSeconds int32, now time.Time) time.Duration {
+	if condition == nil {
+		return -1
+	}
+	after := condition.LastUpdateTime.Time.Add(time.Duration(progressDeadlineSeconds) * time.Second).Sub(now)
+	if after < time.Second {
+		return after
+	}
+	// this helps avoid milliseconds skew in AddAfter.
+	// ref: https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133.
+	return after + time.Second
 }

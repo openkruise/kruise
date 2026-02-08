@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 )
 
@@ -46,7 +46,7 @@ type podEventHandler struct {
 	deletionUIDCache sync.Map
 }
 
-func enqueueDaemonSet(q workqueue.TypedRateLimitingInterface[reconcile.Request], ds *appsv1alpha1.DaemonSet) {
+func enqueueDaemonSet(q workqueue.TypedRateLimitingInterface[reconcile.Request], ds *appsv1beta1.DaemonSet) {
 	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
 		Name:      ds.GetName(),
 		Namespace: ds.GetNamespace(),
@@ -89,7 +89,7 @@ func (e *podEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent
 	}
 }
 
-func joinDaemonSetNames(dsList []*appsv1alpha1.DaemonSet) string {
+func joinDaemonSetNames(dsList []*appsv1beta1.DaemonSet) string {
 	var names []string
 	for _, ds := range dsList {
 		names = append(names, ds.Name)
@@ -119,7 +119,7 @@ func (e *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent
 	if curPod.DeletionTimestamp != nil {
 		// when a pod is deleted gracefully its deletion timestamp is first modified to reflect a grace period,
 		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
-		// for modification of the deletion timestamp and expect an ds to create more replicas asap, not wait
+		// for modification of the deletion timestamp and expect a ds to create more replicas asap, not wait
 		// until the kubelet actually deletes the pod.
 		e.deletePod(ctx, curPod, q, false)
 		return
@@ -185,12 +185,12 @@ func (e *podEventHandler) Generic(ctx context.Context, evt event.TypedGenericEve
 
 }
 
-func (e *podEventHandler) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *appsv1alpha1.DaemonSet {
+func (e *podEventHandler) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *appsv1beta1.DaemonSet {
 	if controllerRef.Kind != controllerKind.Kind || controllerRef.APIVersion != controllerKind.GroupVersion().String() {
 		return nil
 	}
 
-	ds := &appsv1alpha1.DaemonSet{}
+	ds := &appsv1beta1.DaemonSet{}
 	if err := e.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: controllerRef.Name}, ds); err != nil {
 		return nil
 	}
@@ -202,13 +202,13 @@ func (e *podEventHandler) resolveControllerRef(namespace string, controllerRef *
 	return ds
 }
 
-func (e *podEventHandler) getPodDaemonSets(pod *v1.Pod) []*appsv1alpha1.DaemonSet {
-	dsList := appsv1alpha1.DaemonSetList{}
+func (e *podEventHandler) getPodDaemonSets(pod *v1.Pod) []*appsv1beta1.DaemonSet {
+	dsList := appsv1beta1.DaemonSetList{}
 	if err := e.List(context.TODO(), &dsList, client.InNamespace(pod.Namespace)); err != nil {
 		return nil
 	}
 
-	var dsMatched []*appsv1alpha1.DaemonSet
+	var dsMatched []*appsv1beta1.DaemonSet
 	for i := range dsList.Items {
 		ds := &dsList.Items[i]
 		selector, err := util.ValidatedLabelSelectorAsSelector(ds.Spec.Selector)
@@ -234,7 +234,7 @@ type nodeEventHandler struct {
 }
 
 func (e *nodeEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.Node], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	dsList := &appsv1alpha1.DaemonSetList{}
+	dsList := &appsv1beta1.DaemonSetList{}
 	err := e.reader.List(context.TODO(), dsList)
 	if err != nil {
 		klog.V(4).ErrorS(err, "Error enqueueing DaemonSets")
@@ -260,7 +260,7 @@ func (e *nodeEventHandler) Update(ctx context.Context, evt event.TypedUpdateEven
 		return
 	}
 
-	dsList := &appsv1alpha1.DaemonSetList{}
+	dsList := &appsv1beta1.DaemonSetList{}
 	err := e.reader.List(context.TODO(), dsList)
 	if err != nil {
 		klog.V(4).ErrorS(err, "Error listing DaemonSets")

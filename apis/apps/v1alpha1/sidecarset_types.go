@@ -17,10 +17,11 @@ limitations under the License.
 package v1alpha1
 
 import (
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
 )
 
 const (
@@ -143,6 +144,11 @@ type SidecarContainer struct {
 	// TransferEnv will transfer env info from other container
 	// SourceContainerName is pod.spec.container[x].name; EnvName is pod.spec.container[x].Env.name
 	TransferEnv []TransferEnvVar `json:"transferEnv,omitempty"`
+
+	// ResourcesPolicy defines the policy for dynamically configuring container resources based on Pod specification during pod creation.
+	// Validation webhook will reject pod creation request if both resourcesPolicy and resources are configured.
+	// +optional
+	ResourcesPolicy *ResourcesPolicy `json:"resourcesPolicy,omitempty"`
 }
 
 type ShareVolumePolicy struct {
@@ -175,6 +181,83 @@ type TransferEnvVar struct {
 type SourceContainerNameSource struct {
 	// Selects a field of the pod: supports metadata.name, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
 	FieldRef *corev1.ObjectFieldSelector `json:"fieldRef,omitempty"`
+}
+
+// ResourcesPolicy defines the policy for dynamically configuring container resources based on Pod specification during pod creation.
+type ResourcesPolicy struct {
+	// TargetContainersMode defines how to aggregate resources from target containers
+	// +kubebuilder:validation:Enum=sum;max
+	// +kubebuilder:validation:Required
+	TargetContainersMode TargetContainersModeType `json:"targetContainersMode"`
+
+	// TargetContainersNameRegex is the regex pattern to match target container names
+	// If no container names match this regex, the pod creation request will be rejected by the webhook
+	// Target containers include native sidecar containers and plain containers, excluding Kruise sidecar containers
+	// +optional
+	// +kubebuilder:default=".*"
+	TargetContainersNameRegex string `json:"targetContainersNameRegex,omitempty"`
+
+	// ResourcesExpr defines the expressions for calculating resource values
+	// +kubebuilder:validation:Required
+	ResourcesExpr ResourcesExpr `json:"resourcesExpr"`
+}
+
+// TargetContainersModeType defines how to aggregate resources from target containers
+type TargetContainersModeType string
+
+const (
+	// TargetContainersModeSum aggregates resources by summing up all matched containers
+	TargetContainersModeSum TargetContainersModeType = "sum"
+
+	// TargetContainersModeMax aggregates resources by taking the maximum of all matched containers
+	TargetContainersModeMax TargetContainersModeType = "max"
+)
+
+// ResourcesExpr defines the expressions for calculating resource values
+type ResourcesExpr struct {
+	// Limits defines expressions for calculating resource limits
+	// +optional
+	Limits *ResourceExprLimits `json:"limits,omitempty"`
+
+	// Requests defines expressions for calculating resource requests
+	// +optional
+	Requests *ResourceExprRequests `json:"requests,omitempty"`
+}
+
+// ResourceExprLimits defines expressions for calculating resource limits
+type ResourceExprLimits struct {
+	// CPU expression for calculating CPU limits
+	// Support +, -, *, /, max(), min() and variable 'cpu'
+	// Variable 'cpu' represents the sum or max of resources.limits.cpu of all matched containers
+	// If matched containers don't have resources.limits configured, this field will be treated as unlimited
+	// If the expression result is unlimited, sidecar container resources.limits won't be configured
+	// +optional
+	CPU string `json:"cpu,omitempty"`
+
+	// Memory expression for calculating memory limits
+	// Support +, -, *, /, max(), min() and variable 'memory'
+	// Variable 'memory' represents the sum or max of resources.limits.memory of all matched containers
+	// If matched containers don't have resources.limits configured, this field will be treated as unlimited
+	// If the expression result is unlimited, sidecar container resources.limits won't be configured
+	// +optional
+	Memory string `json:"memory,omitempty"`
+}
+
+// ResourceExprRequests defines expressions for calculating resource requests
+type ResourceExprRequests struct {
+	// CPU expression for calculating CPU requests
+	// Support +, -, *, /, max(), min() and variable 'cpu'
+	// Variable 'cpu' represents the sum or max of resources.limits.cpu of all matched containers
+	// If matched containers don't have resources.requests configured, the corresponding resource value will be treated as 0
+	// +optional
+	CPU string `json:"cpu,omitempty"`
+
+	// Memory expression for calculating memory requests
+	// Support +, -, *, /, max(), min() and variable 'memory'
+	// Variable 'memory' represents the sum or max of resources.limits.memory of all matched containers
+	// If matched containers don't have resources.requests configured, the corresponding resource value will be treated as 0
+	// +optional
+	Memory string `json:"memory,omitempty"`
 }
 
 type SidecarContainerUpgradeType string

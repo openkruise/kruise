@@ -31,12 +31,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
-func (dsc *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1alpha1.DaemonSet, oldRevisions []*apps.ControllerRevision, updateRevision *apps.ControllerRevision) error {
+func (dsc *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1beta1.DaemonSet, oldRevisions []*apps.ControllerRevision, updateRevision *apps.ControllerRevision) error {
 	if _, ok := updateRevision.Labels[appsv1alpha1.ImagePreDownloadCreatedKey]; ok {
 		return nil
 	} else if _, ok := updateRevision.Labels[appsv1alpha1.ImagePreDownloadIgnoredKey]; ok {
@@ -47,10 +48,14 @@ func (dsc *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1alp
 	var partition, maxUnavailable int
 	var dsPodsNumber = int(ds.Status.DesiredNumberScheduled)
 	if ds.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
-		partition = int(*ds.Spec.UpdateStrategy.RollingUpdate.Partition)
+		var err error
+		partition, err = intstrutil.GetScaledValueFromIntOrPercent(ds.Spec.UpdateStrategy.RollingUpdate.Partition, dsPodsNumber, false)
+		if err != nil {
+			return fmt.Errorf("failed to get partition value: %v", err)
+		}
 	}
-	maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
-		intstrutil.ValueOrDefault(ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), dsPodsNumber, false)
+	maxUnavailable, _ = intstrutil.GetScaledValueFromIntOrPercent(
+		intstrutil.ValueOrDefault(ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), dsPodsNumber, true)
 	if partition == 0 && maxUnavailable >= dsPodsNumber {
 		klog.V(4).InfoS("DaemonSet skipped to create ImagePullJob for all Pods update in one batch",
 			"daemonSet", klog.KObj(ds), "replicas", dsPodsNumber, "partition", partition, "maxUnavailable", maxUnavailable)
@@ -70,8 +75,8 @@ func (dsc *ReconcileDaemonSet) createImagePullJobsForInPlaceUpdate(ds *appsv1alp
 		Values:   []string{updateRevision.Name, updateRevision.Labels[history.ControllerRevisionHashLabel]},
 	})
 
-	// As deamonset is the job's owner, we have the convention that all resources owned by deamonset
-	// have to match the selector of deamonset, such as pod, pvc and controllerrevision.
+	// As daemonset is the job's owner, we have the convention that all resources owned by daemonset
+	// have to match the selector of daemonset, such as pod, pvc and controllerrevision.
 	// So we had better put the labels into jobs.
 	labelMap := make(map[string]string)
 	for k, v := range ds.Spec.Template.Labels {

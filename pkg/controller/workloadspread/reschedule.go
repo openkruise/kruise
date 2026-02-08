@@ -23,9 +23,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"github.com/openkruise/kruise/pkg/controller/util"
-
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/controller/util"
 	wsutil "github.com/openkruise/kruise/pkg/webhook/workloadspread/validating"
 )
 

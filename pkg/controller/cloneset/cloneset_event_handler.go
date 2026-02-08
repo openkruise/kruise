@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
@@ -115,9 +115,9 @@ func (e *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent
 	if curPod.DeletionTimestamp != nil {
 		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
 		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
-		// for modification of the deletion timestamp and expect an rs to create more replicas asap, not wait
+		// for modification of the deletion timestamp and expect a rs to create more replicas asap, not wait
 		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
-		// an rs never initiates a phase change, and so is never asleep waiting for the same.
+		// a rs never initiates a phase change, and so is never asleep waiting for the same.
 		e.Delete(ctx, event.TypedDeleteEvent[*v1.Pod]{Object: evt.ObjectNew}, q)
 		if labelChanged {
 			// we don't need to check the oldPod.DeletionTimestamp because DeletionTimestamp cannot be unset.
@@ -179,7 +179,7 @@ func (e *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent
 }
 
 func (e *podEventHandler) shouldIgnoreUpdate(req *reconcile.Request, oldPod, curPod *v1.Pod) bool {
-	cs := &appsv1alpha1.CloneSet{}
+	cs := &appsv1beta1.CloneSet{}
 	if err := e.Get(context.TODO(), req.NamespacedName, cs); err != nil {
 		return false
 	}
@@ -233,13 +233,13 @@ func resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference
 	return nil
 }
 
-func (e *podEventHandler) getPodCloneSets(pod *v1.Pod) []appsv1alpha1.CloneSet {
-	csList := appsv1alpha1.CloneSetList{}
+func (e *podEventHandler) getPodCloneSets(pod *v1.Pod) []appsv1beta1.CloneSet {
+	csList := appsv1beta1.CloneSetList{}
 	if err := e.List(context.TODO(), &csList, client.InNamespace(pod.Namespace)); err != nil {
 		return nil
 	}
 
-	var csMatched []appsv1alpha1.CloneSet
+	var csMatched []appsv1beta1.CloneSet
 	for _, cs := range csList.Items {
 		selector, err := metav1.LabelSelectorAsSelector(cs.Spec.Selector)
 		if err != nil || selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
@@ -257,7 +257,7 @@ func (e *podEventHandler) getPodCloneSets(pod *v1.Pod) []appsv1alpha1.CloneSet {
 	return csMatched
 }
 
-func (e *podEventHandler) joinCloneSetNames(csList []appsv1alpha1.CloneSet) string {
+func (e *podEventHandler) joinCloneSetNames(csList []appsv1beta1.CloneSet) string {
 	var names []string
 	for _, cs := range csList {
 		names = append(names, cs.Name)

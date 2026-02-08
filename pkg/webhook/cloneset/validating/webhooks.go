@@ -23,12 +23,12 @@ import (
 	"github.com/openkruise/kruise/pkg/webhook/types"
 )
 
-// +kubebuilder:webhook:path=/validate-apps-kruise-io-v1alpha1-cloneset,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=clonesets,verbs=create;update;delete,versions=v1alpha1,name=vcloneset.kb.io
+// +kubebuilder:webhook:path=/validate-apps-kruise-io-cloneset,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=clonesets,verbs=create;update;delete,versions=v1alpha1;v1beta1,name=vcloneset.kb.io
 
 var (
 	// HandlerGetterMap contains admission webhook handlers
 	HandlerGetterMap = map[string]types.HandlerGetter{
-		"validate-apps-kruise-io-v1alpha1-cloneset": func(mgr manager.Manager) admission.Handler {
+		"validate-apps-kruise-io-cloneset": func(mgr manager.Manager) admission.Handler {
 			return &CloneSetCreateUpdateHandler{
 				Client:  mgr.GetClient(),
 				Decoder: admission.NewDecoder(mgr.GetScheme()),

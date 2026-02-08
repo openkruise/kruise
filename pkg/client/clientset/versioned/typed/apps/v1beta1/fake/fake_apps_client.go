@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kruise Authors.
+Copyright 2025 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,38 @@ import (
 
 type FakeAppsV1beta1 struct {
 	*testing.Fake
+}
+
+func (c *FakeAppsV1beta1) AdvancedCronJobs(namespace string) v1beta1.AdvancedCronJobInterface {
+	return newFakeAdvancedCronJobs(c, namespace)
+}
+
+func (c *FakeAppsV1beta1) BroadcastJobs(namespace string) v1beta1.BroadcastJobInterface {
+	return newFakeBroadcastJobs(c, namespace)
+}
+
+func (c *FakeAppsV1beta1) CloneSets(namespace string) v1beta1.CloneSetInterface {
+	return newFakeCloneSets(c, namespace)
+}
+
+func (c *FakeAppsV1beta1) DaemonSets(namespace string) v1beta1.DaemonSetInterface {
+	return newFakeDaemonSets(c, namespace)
+}
+
+func (c *FakeAppsV1beta1) ImageListPullJobs(namespace string) v1beta1.ImageListPullJobInterface {
+	return newFakeImageListPullJobs(c, namespace)
+}
+
+func (c *FakeAppsV1beta1) ImagePullJobs(namespace string) v1beta1.ImagePullJobInterface {
+	return newFakeImagePullJobs(c, namespace)
+}
+
+func (c *FakeAppsV1beta1) NodeImages() v1beta1.NodeImageInterface {
+	return newFakeNodeImages(c)
+}
+
+func (c *FakeAppsV1beta1) SidecarSets() v1beta1.SidecarSetInterface {
+	return newFakeSidecarSets(c)
 }
 
 func (c *FakeAppsV1beta1) StatefulSets(namespace string) v1beta1.StatefulSetInterface {
