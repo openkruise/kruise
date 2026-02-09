@@ -1325,7 +1325,6 @@ func newMockCloneSetReconciler() *ReconcileCloneSet {
 
 func randomString(n int) string {
 	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	rand.Seed(time.Now().UnixNano()) // Go 1.20 之前需要这行；Go 1.20+ 可省略（但保留也无妨）
 	b := make([]byte, n)
 	for i := range b {
 		b[i] = letters[rand.Intn(len(letters))]

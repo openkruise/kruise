@@ -18,11 +18,9 @@ package main
 
 import (
 	"flag"
-	"math/rand"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"time"
 
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
@@ -62,7 +60,6 @@ func main() {
 	klog.InitFlags(nil)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
-	rand.Seed(time.Now().UnixNano())
 	features.SetDefaultFeatureGates()
 	ctrl.SetLogger(klogr.New())
 
