@@ -46,6 +46,7 @@ import (
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
 var (
@@ -552,7 +553,7 @@ func TestScale(t *testing.T) {
 	cases := []struct {
 		name             string
 		getCloneSets     func() [2]*appsv1beta1.CloneSet
-		getRevisions     func() [2]string
+		getRevisions     func() [2]*apps.ControllerRevision
 		getPods          func() []*v1.Pod
 		expectedPodsLen  int
 		expectedModified bool
@@ -579,8 +580,9 @@ func TestScale(t *testing.T) {
 				}
 				return [2]*appsv1beta1.CloneSet{obj.DeepCopy(), obj.DeepCopy()}
 			},
-			getRevisions: func() [2]string {
-				return [2]string{"sample-b976d4544", "sample-b976d4544"}
+			getRevisions: func() [2]*apps.ControllerRevision {
+				rev := &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "sample-b976d4544"}}
+				return [2]*apps.ControllerRevision{rev, rev}
 			},
 			getPods: func() []*v1.Pod {
 				t := time.Now().Add(-time.Second * 10)
@@ -636,8 +638,9 @@ func TestScale(t *testing.T) {
 				}
 				return [2]*appsv1beta1.CloneSet{obj.DeepCopy(), obj.DeepCopy()}
 			},
-			getRevisions: func() [2]string {
-				return [2]string{"sample-b976d4544", "sample-b976d4544"}
+			getRevisions: func() [2]*apps.ControllerRevision {
+				rev := &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "sample-b976d4544"}}
+				return [2]*apps.ControllerRevision{rev, rev}
 			},
 			getPods: func() []*v1.Pod {
 				t := time.Now().Add(-time.Second * 10)
@@ -695,8 +698,9 @@ func TestScale(t *testing.T) {
 				}
 				return [2]*appsv1beta1.CloneSet{obj.DeepCopy(), obj.DeepCopy()}
 			},
-			getRevisions: func() [2]string {
-				return [2]string{"sample-b976d4544", "sample-b976d4544"}
+			getRevisions: func() [2]*apps.ControllerRevision {
+				rev := &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "sample-b976d4544"}}
+				return [2]*apps.ControllerRevision{rev, rev}
 			},
 			getPods: func() []*v1.Pod {
 				t := time.Now().Add(-time.Second * 10)
@@ -731,6 +735,130 @@ func TestScale(t *testing.T) {
 			expectedPodsLen:  3,
 			expectedModified: true,
 		},
+		{
+			name: "cloneSet(replicas=5,maxUnavailable=1,maxSurge=3,InPlaceIfPossible), image-only change should skip surge",
+			getCloneSets: func() [2]*appsv1beta1.CloneSet {
+				obj := &appsv1beta1.CloneSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "sample",
+					},
+					Spec: appsv1beta1.CloneSetSpec{
+						Replicas: utilpointer.Int32(5),
+						UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+							RollingUpdate: &appsv1beta1.RollingUpdateCloneSetStrategy{
+								MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+								MaxSurge:       &intstr.IntOrString{Type: intstr.Int, IntVal: 3},
+								PodUpdatePolicy: appsv1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType,
+							},
+						},
+					},
+				}
+				return [2]*appsv1beta1.CloneSet{obj.DeepCopy(), obj.DeepCopy()}
+			},
+			getRevisions: func() [2]*apps.ControllerRevision {
+				oldRev := &apps.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{Name: "sample-old"},
+					Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"main","image":"sample:v1"}]}}}}`)},
+				}
+				newRev := &apps.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{Name: "sample-new"},
+					Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"main","image":"sample:v2"}]}}}}`)},
+				}
+				return [2]*apps.ControllerRevision{oldRev, newRev}
+			},
+			getPods: func() []*v1.Pod {
+				t := time.Now().Add(-time.Second * 10)
+				obj := &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "sample",
+						Labels: map[string]string{
+							apps.ControllerRevisionHashLabelKey: "sample-old",
+						},
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "main",
+								Image: "sample:v1",
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+						Conditions: []v1.PodCondition{
+							{
+								Type:               v1.PodReady,
+								Status:             v1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: t},
+							},
+						},
+					},
+				}
+				return generatePods(obj, 5)
+			},
+			// With in-place update possible, no surge pods should be created,
+			// so pod count stays at 5 (no scale up, no scale down).
+			expectedPodsLen:  5,
+			expectedModified: false,
+		},
+		{
+			name: "cloneSet(replicas=5,maxUnavailable=20%,partition=nil,maxSurge=nil,minReadySeconds=0), pods=3, scale up 3 -> 5",
+			getCloneSets: func() [2]*appsv1beta1.CloneSet {
+				obj := &appsv1beta1.CloneSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "sample",
+					},
+					Spec: appsv1beta1.CloneSetSpec{
+						Replicas: utilpointer.Int32(5),
+						UpdateStrategy: appsv1beta1.CloneSetUpdateStrategy{
+							RollingUpdate: &appsv1beta1.RollingUpdateCloneSetStrategy{
+								MaxUnavailable: &intstr.IntOrString{
+									Type:   intstr.String,
+									StrVal: "20%",
+								},
+							},
+						},
+					},
+				}
+				return [2]*appsv1beta1.CloneSet{obj.DeepCopy(), obj.DeepCopy()}
+			},
+			getRevisions: func() [2]*apps.ControllerRevision {
+				rev := &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: "sample-b976d4544"}}
+				return [2]*apps.ControllerRevision{rev, rev}
+			},
+			getPods: func() []*v1.Pod {
+				t := time.Now().Add(-time.Second * 10)
+				obj := &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "sample",
+						Labels: map[string]string{
+							apps.ControllerRevisionHashLabelKey: "sample-b976d4544",
+						},
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "main",
+								Image: "sample:v1",
+							},
+						},
+					},
+					Status: v1.PodStatus{
+						Phase: v1.PodRunning,
+						Conditions: []v1.PodCondition{
+							{
+								Type:               v1.PodReady,
+								Status:             v1.ConditionTrue,
+								LastTransitionTime: metav1.Time{Time: t},
+							},
+						},
+					},
+				}
+				return generatePods(obj, 3)
+			},
+			expectedPodsLen:  5,
+			expectedModified: true,
+		},
 	}
 
 	for _, cs := range cases {
@@ -744,10 +872,12 @@ func TestScale(t *testing.T) {
 				}
 			}
 			rControl := &realControl{
-				Client:   fClient,
-				recorder: record.NewFakeRecorder(10),
+				Client:         fClient,
+				inplaceControl: inplaceupdate.New(fClient, clonesetutils.RevisionAdapterImpl),
+				recorder:       record.NewFakeRecorder(10),
 			}
-			modified, err := rControl.Scale(cs.getCloneSets()[0], cs.getCloneSets()[1], cs.getRevisions()[0], cs.getRevisions()[1], pods, nil)
+			revisions := cs.getRevisions()
+			modified, err := rControl.Scale(cs.getCloneSets()[0], cs.getCloneSets()[1], revisions[0], revisions[1], pods, nil)
 			if err != nil {
 				t.Fatalf(err.Error())
 			}

@@ -98,7 +98,7 @@ type IsPodUpdateFunc func(pod *v1.Pod, updateRevision string) bool
 
 // This is the most important algorithm in cloneset-controller.
 // It calculates the pod numbers to scaling and updating for current CloneSet.
-func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string, isPodUpdate IsPodUpdateFunc) (res expectationDiffs) {
+func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string, canInPlaceUpdate bool, isPodUpdate IsPodUpdateFunc) (res expectationDiffs) {
 	coreControl := clonesetcore.New(cs)
 	replicas := int(*cs.Spec.Replicas)
 	var partition, maxSurge, maxUnavailable, scaleMaxUnavailable int
@@ -214,9 +214,11 @@ func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, cur
 			}
 		}
 
-		// Use surge for old and new revision updating
+		// Use surge for old and new revision updating.
+		// When in-place update is possible, pods are updated without recreation,
+		// so surge is unnecessary.
 		var updateSurge, updateOldRevisionSurge int
-		if util.IsIntPlusAndMinus(updateOldDiff, updateNewDiff) {
+		if !canInPlaceUpdate && util.IsIntPlusAndMinus(updateOldDiff, updateNewDiff) {
 			if util.IntAbs(updateOldDiff) <= util.IntAbs(updateNewDiff) {
 				updateSurge = util.IntAbs(updateOldDiff)
 				if updateOldDiff < 0 {
