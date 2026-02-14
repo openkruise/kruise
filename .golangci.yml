@@ -1,4 +1,4 @@
-version: 2
+version: "2"
 run:
   concurrency: 4
   issues-exit-code: 1
