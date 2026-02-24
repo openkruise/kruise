@@ -107,7 +107,7 @@ func SetupWithManager(mgr manager.Manager) error {
 func Initialize(ctx context.Context, cfg *rest.Config, webhookInitializeTime time.Duration) error {
 	c, err := webhookcontroller.New(cfg, HandlerMap)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create webhook controller: %w", err)
 	}
 	go func() {
 		c.Start(ctx)
