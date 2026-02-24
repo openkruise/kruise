@@ -1707,6 +1707,96 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 		ginkgo.It(`change resource and qos -> succeed to recreate`, func() {
 			testChangePodQOS(tester, randStr, c)
 		})
+
+		// Test for maxSurge with in-place update (should not create surge pods)
+		ginkgo.It("in-place update with maxSurge should not create surge pods", func() {
+			updateStrategy := appsv1alpha1.CloneSetUpdateStrategy{
+				Type:           appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType,
+				MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+				MaxSurge:       &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+			}
+			cs := tester.NewCloneSet("clone-"+randStr, 3, updateStrategy)
+			imageConfig := imageutils.GetConfig(imageutils.Nginx)
+			imageConfig.SetRegistry("docker.io/library")
+			imageConfig.SetVersion("alpine")
+			cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
+			cs.Spec.MinReadySeconds, cs.Spec.ProgressDeadlineSeconds = 10, &tenMinutes
+			cs, err = tester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(cs.Spec.UpdateStrategy.Type).To(gomega.Equal(appsv1alpha1.InPlaceIfPossibleCloneSetUpdateStrategyType))
+			gomega.Expect(*cs.Spec.UpdateStrategy.MaxSurge).To(gomega.Equal(intstr.IntOrString{Type: intstr.Int, IntVal: 1}))
+
+			ginkgo.By("Wait for all pods ready")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
+
+			pods, err := tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).Should(gomega.Equal(3))
+
+			// Record old pod UIDs to verify in-place update
+			oldPodUIDs := sets.NewString()
+			for _, pod := range pods {
+				oldPodUIDs.Insert(string(pod.UID))
+			}
+
+			ginkgo.By("Update image to nginx mainline-alpine (should trigger in-place update)")
+			imageConfig.SetVersion("mainline-alpine")
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1alpha1.CloneSet) {
+				cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Wait for CloneSet generation consistent")
+			gomega.Eventually(func() bool {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Generation == cs.Status.ObservedGeneration
+			}, 10*time.Second, 3*time.Second).Should(gomega.Equal(true))
+
+			ginkgo.By("Verify no surge pods were created (pod count should remain 3)")
+			gomega.Consistently(func() int {
+				pods, err := tester.ListPodsForCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return len(pods)
+			}, 10*time.Second, time.Second).Should(gomega.Equal(3))
+
+			ginkgo.By("Wait for all pods updated and ready")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.UpdatedReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(int32(3)))
+
+			ginkgo.By("Verify all pods were updated in-place (UIDs unchanged)")
+			pods, err = tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).Should(gomega.Equal(3))
+
+			newPodUIDs := sets.NewString()
+			for _, pod := range pods {
+				newPodUIDs.Insert(string(pod.UID))
+			}
+			gomega.Expect(oldPodUIDs.Equal(newPodUIDs)).Should(gomega.BeTrue(),
+				"Pod UIDs should be unchanged for in-place update, but got old=%v, new=%v", oldPodUIDs, newPodUIDs)
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
+		})
 	})
 
 	ginkgo.Context("CloneSet pre-download images", func() {
