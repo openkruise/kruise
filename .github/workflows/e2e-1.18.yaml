@@ -21,7 +21,7 @@ env:
 jobs:
 
   astatefulset:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -113,7 +113,7 @@ jobs:
           exit $retVal
 
   pullimages-containerrecreate:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -204,7 +204,7 @@ jobs:
           exit $retVal
 
   advanced-daemonset:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -295,7 +295,7 @@ jobs:
           exit $retVal
 
   sidecarset:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -386,7 +386,7 @@ jobs:
           exit $retVal
 
   podUnavailableBudget:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -451,7 +451,7 @@ jobs:
           fi      
           exit $retVal
   other:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
