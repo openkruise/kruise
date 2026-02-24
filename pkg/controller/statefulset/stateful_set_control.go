@@ -808,6 +808,9 @@ func (ssc *defaultStatefulSetControl) refreshPodState(set *appsv1beta1.StatefulS
 			} else {
 				state = appspub.LifecycleStateNormal
 			}
+			//patch restart_cnt to annotation
+			pod, _ = ssc.inplaceControl.RefreshRestartCountBaseToPod(pod)
+			inplaceupdate.CalcInplaceUpdateDuration(pod)
 		}
 	case appspub.LifecycleStateUpdated:
 		if set.Spec.Lifecycle == nil ||

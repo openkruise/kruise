@@ -59,7 +59,7 @@ test: generate fmt vet manifests envtest ## Run tests
 	rm pkg/daemon/criruntime/imageruntime/fake_plugin/fake-credential-plugin
 	grep -v "pkg/client" raw-cover.out > cover.out
 
-atest: 
+atest: envtest
 	echo $(ENVTEST)
 	go build -o pkg/daemon/criruntime/imageruntime/fake_plugin/fake-credential-plugin pkg/daemon/criruntime/imageruntime/fake_plugin/main.go && chmod +x pkg/daemon/criruntime/imageruntime/fake_plugin/fake-credential-plugin
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test -race ./pkg/... -coverprofile raw-cover.out
