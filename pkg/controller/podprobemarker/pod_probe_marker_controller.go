@@ -488,6 +488,7 @@ func (r *ReconcilePodProbeMarker) removePodProbeFromNodePodProbe(ppmNamespace, p
 		return err
 	}
 
+	prefix := fmt.Sprintf("%s#", ppmName)
 	newSpec := appsv1alpha1.NodePodProbeSpec{}
 	for i := range npp.Spec.PodProbes {
 		podProbe := npp.Spec.PodProbes[i]
@@ -496,10 +497,10 @@ func (r *ReconcilePodProbeMarker) removePodProbeFromNodePodProbe(ppmNamespace, p
 			continue
 		}
 		newPodProbe := appsv1alpha1.PodProbe{Name: podProbe.Name, Namespace: podProbe.Namespace, UID: podProbe.UID, IP: podProbe.IP}
-		for i := range podProbe.Probes {
-			probe := podProbe.Probes[i]
+		for j := range podProbe.Probes {
+			probe := podProbe.Probes[j]
 			// probe.Name -> podProbeMarker.Name#probe.Name
-			if !strings.Contains(probe.Name, fmt.Sprintf("%s#", ppmName)) {
+			if !strings.HasPrefix(probe.Name, prefix) {
 				newPodProbe.Probes = append(newPodProbe.Probes, probe)
 			}
 		}
