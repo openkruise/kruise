@@ -1,0 +1,493 @@
+/*
+Copyright 2021 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package containerrecreaterequest
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	clocktesting "k8s.io/utils/clock/testing"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	utilpodreadiness "github.com/openkruise/kruise/pkg/util/podreadiness"
+)
+
+var (
+	scheme = runtime.NewScheme()
+)
+
+func init() {
+	v1.AddToScheme(scheme)
+	appsv1alpha1.AddToScheme(scheme)
+}
+
+type fakePodReadinessControl struct {
+	containsReadinessGate bool
+	addNotReadyError      error
+	removeNotReadyError   error
+	addedKeys             map[types.NamespacedName][]utilpodreadiness.Message
+	removedKeys           map[types.NamespacedName][]utilpodreadiness.Message
+}
+
+func (f *fakePodReadinessControl) ContainsReadinessGate(pod *v1.Pod) bool {
+	return f.containsReadinessGate
+}
+
+func (f *fakePodReadinessControl) AddNotReadyKey(pod *v1.Pod, msg utilpodreadiness.Message) error {
+	if f.addNotReadyError != nil {
+		return f.addNotReadyError
+	}
+	if f.addedKeys == nil {
+		f.addedKeys = make(map[types.NamespacedName][]utilpodreadiness.Message)
+	}
+	nn := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+	f.addedKeys[nn] = append(f.addedKeys[nn], msg)
+	return nil
+}
+
+func (f *fakePodReadinessControl) RemoveNotReadyKey(pod *v1.Pod, msg utilpodreadiness.Message) error {
+	if f.removeNotReadyError != nil {
+		return f.removeNotReadyError
+	}
+	if f.removedKeys == nil {
+		f.removedKeys = make(map[types.NamespacedName][]utilpodreadiness.Message)
+	}
+	nn := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+	f.removedKeys[nn] = append(f.removedKeys[nn], msg)
+	return nil
+}
+
+func TestReconcile(t *testing.T) {
+	baseTime := time.Now()
+
+	tests := []struct {
+		name               string
+		crr                *appsv1alpha1.ContainerRecreateRequest
+		pods               []*v1.Pod
+		existingObjs       []client.Object
+		podReadinessGate   bool
+		expectedPhase      appsv1alpha1.ContainerRecreateRequestPhase
+		expectRequeue      bool
+		expectedFinalizers []string
+		expectedMsg        string
+		creationTimeOffset time.Duration
+	}{
+		{
+			name:               "Happy Path: New CRR created, Pod exists, Phase empty -> Recreating",
+			creationTimeOffset: 0,
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr",
+					Namespace: "default",
+					UID:       "crr-uid",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "pod-uid",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName: "test-pod",
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "test-pod",
+						Namespace:   "default",
+						UID:         "pod-uid",
+						Annotations: map[string]string{},
+						Labels:      map[string]string{},
+					},
+					Status: v1.PodStatus{
+						ContainerStatuses: []v1.ContainerStatus{
+							{
+								Name: "main",
+								State: v1.ContainerState{
+									Running: &v1.ContainerStateRunning{
+										StartedAt: metav1.NewTime(baseTime.Add(-10 * time.Minute)),
+									},
+								},
+								ContainerID: "docker://123",
+							},
+						},
+					},
+				},
+			},
+			existingObjs:     []client.Object{},
+			podReadinessGate: true,
+			expectedPhase:    "",
+			expectRequeue:    true,
+		},
+		{
+			name: "Status Sync: CRR in Recreating phase should sync container statuses",
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr-sync",
+					Namespace: "default",
+					UID:       "crr-uid-sync",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "pod-uid-sync",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName: "test-pod-sync",
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{},
+				},
+				Status: appsv1alpha1.ContainerRecreateRequestStatus{
+					Phase: appsv1alpha1.ContainerRecreateRequestRecreating,
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-sync",
+						Namespace: "default",
+						UID:       "pod-uid-sync",
+					},
+					Status: v1.PodStatus{
+						ContainerStatuses: []v1.ContainerStatus{
+							{
+								Name: "main",
+								State: v1.ContainerState{
+									Running: &v1.ContainerStateRunning{
+										StartedAt: metav1.NewTime(baseTime.Add(-5 * time.Minute)),
+									},
+								},
+								ContainerID:  "docker://abc",
+								RestartCount: 1,
+							},
+						},
+					},
+				},
+			},
+			existingObjs:  []client.Object{},
+			expectedPhase: appsv1alpha1.ContainerRecreateRequestRecreating,
+			expectRequeue: false,
+		},
+		{
+			name:               "Timeout: ActiveDeadlineSeconds exceeded",
+			creationTimeOffset: -11 * time.Minute,
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr-timeout",
+					Namespace: "default",
+					UID:       "crr-uid-timeout",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "pod-uid-timeout",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName:               "test-pod-timeout",
+					ActiveDeadlineSeconds: func() *int64 { i := int64(600); return &i }(), // 10 minutes
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{},
+				},
+				Status: appsv1alpha1.ContainerRecreateRequestStatus{
+					Phase: appsv1alpha1.ContainerRecreateRequestRecreating,
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-timeout",
+						Namespace: "default",
+						UID:       "pod-uid-timeout",
+					},
+				},
+			},
+			existingObjs:  []client.Object{},
+			expectedPhase: appsv1alpha1.ContainerRecreateRequestCompleted,
+			expectRequeue: false,
+			expectedMsg:   "recreating has exceeded the activeDeadlineSeconds",
+		},
+		{
+			name:               "Timeout: Response timeout (1 min)",
+			creationTimeOffset: -61 * time.Second,
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr-resp-timeout",
+					Namespace: "default",
+					UID:       "crr-uid-resp-timeout",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "pod-uid-resp-timeout",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName: "test-pod-resp-timeout",
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-resp-timeout",
+						Namespace: "default",
+						UID:       "pod-uid-resp-timeout",
+					},
+				},
+			},
+			existingObjs:  []client.Object{},
+			expectedPhase: appsv1alpha1.ContainerRecreateRequestCompleted,
+			expectRequeue: false,
+			expectedMsg:   "daemon has not responded for a long time",
+		},
+		{
+			name: "TTL: Cleanup after finished",
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr-ttl",
+					Namespace: "default",
+					UID:       "crr-uid-ttl",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "pod-uid-ttl",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName:                 "test-pod-ttl",
+					TTLSecondsAfterFinished: func() *int32 { i := int32(100); return &i }(),
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{},
+				},
+				Status: appsv1alpha1.ContainerRecreateRequestStatus{
+					Phase:          appsv1alpha1.ContainerRecreateRequestCompleted,
+					CompletionTime: &metav1.Time{Time: baseTime.Add(-200 * time.Second)}, // TTL 100s, elapsed 200s
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-ttl",
+						Namespace: "default",
+						UID:       "pod-uid-ttl",
+					},
+				},
+			},
+			existingObjs:  []client.Object{},
+			expectedPhase: "", // Should be deleted
+			expectRequeue: false,
+		},
+		{
+			name: "Lifecycle: Pod deleted (not found)",
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr-no-pod",
+					Namespace: "default",
+					UID:       "crr-uid-no-pod",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "pod-uid-deleted",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName: "test-pod-deleted",
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{},
+				},
+			},
+			pods:          []*v1.Pod{}, // No pod
+			existingObjs:  []client.Object{},
+			expectedPhase: appsv1alpha1.ContainerRecreateRequestCompleted,
+			expectedMsg:   "pod has gone",
+			expectRequeue: false,
+		},
+		{
+			name: "Lifecycle: Pod UID mismatch",
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr-uid-mismatch",
+					Namespace: "default",
+					UID:       "crr-uid-mismatch",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "old-pod-uid",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName: "test-pod-mismatch",
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-mismatch",
+						Namespace: "default",
+						UID:       "new-pod-uid", // Mismatch
+					},
+				},
+			},
+			existingObjs:  []client.Object{},
+			expectedPhase: appsv1alpha1.ContainerRecreateRequestCompleted,
+			expectedMsg:   "pod has gone",
+			expectRequeue: false,
+		},
+		{
+			name: "Finalizer: UnreadyGracePeriodSeconds adds finalizer and not-ready key",
+			crr: &appsv1alpha1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr-unready",
+					Namespace: "default",
+					UID:       "crr-uid-unready",
+					Labels: map[string]string{
+						appsv1alpha1.ContainerRecreateRequestPodUIDKey: "pod-uid-unready",
+					},
+				},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName: "test-pod-unready",
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "main"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{
+						UnreadyGracePeriodSeconds: func() *int64 { i := int64(30); return &i }(),
+					},
+				},
+				Status: appsv1alpha1.ContainerRecreateRequestStatus{
+					Phase: appsv1alpha1.ContainerRecreateRequestRecreating,
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-pod-unready",
+						Namespace: "default",
+						UID:       "pod-uid-unready",
+						Labels: map[string]string{
+							string(appspub.KruisePodReadyConditionType): "true",
+						},
+					},
+					Status: v1.PodStatus{
+						ContainerStatuses: []v1.ContainerStatus{
+							{
+								Name: "main",
+								State: v1.ContainerState{
+									Running: &v1.ContainerStateRunning{
+										StartedAt: metav1.NewTime(baseTime.Add(-5 * time.Minute)),
+									},
+								},
+								ContainerID: "docker://abc",
+								Ready:       true,
+							},
+						},
+					},
+				},
+			},
+			existingObjs:       []client.Object{},
+			podReadinessGate:   true,
+			expectedPhase:      appsv1alpha1.ContainerRecreateRequestRecreating,
+			expectRequeue:      false,
+			expectedFinalizers: []string{appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.crr.CreationTimestamp = metav1.NewTime(baseTime.Add(tt.creationTimeOffset))
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&appsv1alpha1.ContainerRecreateRequest{}).WithObjects(tt.crr).Build()
+			for _, p := range tt.pods {
+				if err := fakeClient.Create(context.TODO(), p); err != nil {
+					t.Fatalf("Failed to create pod: %v", err)
+				}
+			}
+			for _, o := range tt.existingObjs {
+				if err := fakeClient.Create(context.TODO(), o); err != nil {
+					t.Fatalf("Failed to create existing object: %v", err)
+				}
+			}
+
+			r := &ReconcileContainerRecreateRequest{
+				Client: fakeClient,
+				clock:  clocktesting.NewFakeClock(baseTime),
+				podReadinessControl: &fakePodReadinessControl{
+					containsReadinessGate: tt.podReadinessGate,
+				},
+			}
+
+			req := reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: tt.crr.Namespace,
+					Name:      tt.crr.Name,
+				},
+			}
+
+			res, err := r.Reconcile(context.TODO(), req)
+			if err != nil {
+				t.Errorf("Reconcile() error = %v", err)
+			}
+
+			if tt.expectRequeue {
+				if res.RequeueAfter == 0 && !res.Requeue {
+					t.Errorf("Reconcile() Requeue = %v, RequeueAfter = %v, want Requeue", res.Requeue, res.RequeueAfter)
+				}
+			} else {
+				if res.RequeueAfter != 0 || res.Requeue {
+					t.Errorf("Reconcile() Requeue = %v, RequeueAfter = %v, want No Requeue", res.Requeue, res.RequeueAfter)
+				}
+			}
+
+			updatedCRR := &appsv1alpha1.ContainerRecreateRequest{}
+			fakeClient.Get(context.TODO(), req.NamespacedName, updatedCRR)
+
+			if tt.expectedPhase != "" && updatedCRR.Status.Phase != tt.expectedPhase {
+				t.Errorf("Requests Phase = %v, want %v", updatedCRR.Status.Phase, tt.expectedPhase)
+			}
+
+			if tt.expectedMsg != "" && updatedCRR.Status.Message != tt.expectedMsg {
+				t.Errorf("Requests Message = %v, want %v", updatedCRR.Status.Message, tt.expectedMsg)
+			}
+
+			if len(tt.expectedFinalizers) > 0 {
+				for _, f := range tt.expectedFinalizers {
+					found := false
+					for _, existing := range updatedCRR.Finalizers {
+						if existing == f {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("Finalizers %v missing expected %v", updatedCRR.Finalizers, f)
+					}
+				}
+			}
+		})
+	}
+}
