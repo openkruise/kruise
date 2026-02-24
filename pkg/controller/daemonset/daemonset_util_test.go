@@ -719,3 +719,178 @@ func newStandardRollingUpdateStrategy(matchLabels map[string]string) appsv1beta1
 	}
 	return strategy
 }
+
+func TestIsNodeExemptFromMaxUnavailable(t *testing.T) {
+	// 创建测试节点
+	nodeWithLabels := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			Labels: map[string]string{
+				"zone": "us-east-1a",
+				"type": "worker",
+			},
+		},
+	}
+
+	nodeWithoutLabels := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "test-node-no-labels",
+			Labels: map[string]string{},
+		},
+	}
+
+	tests := []struct {
+		name           string
+		node           *corev1.Node
+		exemptSelector *metav1.LabelSelector
+		expectedResult bool
+		expectError    bool
+	}{
+		{
+			name:           "nil selector",
+			node:           nodeWithLabels,
+			exemptSelector: nil,
+			expectedResult: false,
+			expectError:    false,
+		},
+		{
+			name: "empty selector",
+			node: nodeWithLabels,
+			exemptSelector: &metav1.LabelSelector{
+				MatchLabels:      map[string]string{},
+				MatchExpressions: []metav1.LabelSelectorRequirement{},
+			},
+			expectedResult: false,
+			expectError:    false,
+		},
+		{
+			name: "selector matches node labels",
+			node: nodeWithLabels,
+			exemptSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"zone": "us-east-1a",
+				},
+			},
+			expectedResult: true,
+			expectError:    false,
+		},
+		{
+			name: "selector does not match node labels",
+			node: nodeWithLabels,
+			exemptSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"zone": "us-west-1a",
+				},
+			},
+			expectedResult: false,
+			expectError:    false,
+		},
+		{
+			name: "selector matches node labels via MatchExpressions",
+			node: nodeWithLabels,
+			exemptSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "zone",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"us-east-1a", "us-east-1b"},
+					},
+				},
+			},
+			expectedResult: true,
+			expectError:    false,
+		},
+		{
+			name: "selector does not match node labels via MatchExpressions",
+			node: nodeWithLabels,
+			exemptSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "zone",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"us-west-1a"},
+					},
+				},
+			},
+			expectedResult: false,
+			expectError:    false,
+		},
+		{
+			name: "node without labels but selector matches",
+			node: nodeWithoutLabels,
+			exemptSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"nonexistent": "value",
+				},
+			},
+			expectedResult: false,
+			expectError:    false,
+		},
+		{
+			name: "complex selector with both MatchLabels and MatchExpressions",
+			node: nodeWithLabels,
+			exemptSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"type": "worker",
+				},
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "zone",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"us-east-1a", "us-east-1b"},
+					},
+				},
+			},
+			expectedResult: true,
+			expectError:    false,
+		},
+		{
+			name: "complex selector that does not match",
+			node: nodeWithLabels,
+			exemptSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"type": "master",
+				},
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "zone",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{"us-east-1a", "us-east-1b"},
+					},
+				},
+			},
+			expectedResult: false,
+			expectError:    false,
+		},
+		{
+			name: "invalid operator in MatchExpressions",
+			node: nodeWithLabels,
+			exemptSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "zone",
+						Operator: "InvalidOperator",
+						Values:   []string{"us-east-1a"},
+					},
+				},
+			},
+			expectedResult: false,
+			expectError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := isNodeExemptFromMaxUnavailable(tt.node, tt.exemptSelector)
+
+			if (err != nil) != tt.expectError {
+				t.Errorf("isNodeExemptFromMaxUnavailable() error = %v, expectError %v", err, tt.expectError)
+				return
+			}
+
+			if result != tt.expectedResult {
+				t.Errorf("isNodeExemptFromMaxUnavailable() = %v, want %v", result, tt.expectedResult)
+			}
+		})
+	}
+}
