@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 )
 
@@ -41,7 +42,7 @@ type pubControl interface {
 	// return two parameters
 	// 1. podList
 	// 2. expectedCount, the default is workload.Replicas
-	GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) ([]*corev1.Pod, int32, error)
+	GetPodsForPub(pub *policyv1beta1.PodUnavailableBudget) ([]*corev1.Pod, int32, error)
 
 	// webhook
 	// determine if this change to pod might cause unavailability
@@ -49,7 +50,7 @@ type pubControl interface {
 	// determine if this change can resize inplace
 	CanResizeInplace(oldPod, newPod *corev1.Pod) bool
 	// get pub for pod
-	GetPubForPod(pod *corev1.Pod) (*policyv1alpha1.PodUnavailableBudget, error)
+	GetPubForPod(pod *corev1.Pod) (*policyv1beta1.PodUnavailableBudget, error)
 	// get pod controller of
 	GetPodControllerOf(pod *corev1.Pod) *metav1.OwnerReference
 }
