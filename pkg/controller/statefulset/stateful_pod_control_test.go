@@ -1296,19 +1296,19 @@ func TestUpdatePodClaimForRetentionPolicy(t *testing.T) {
 			for _, pod := range pods {
 				err := control.UpdatePodClaimForRetentionPolicy(set, pod)
 				if err != nil {
-					t.Fatalf(err.Error())
+					t.Fatal(err)
 				}
 			}
 
 			claims, err := claimLister.List(labels.Everything())
 			if err != nil {
-				t.Fatalf(err.Error())
+				t.Fatal(err)
 			}
 
 			for _, claim := range claims {
 				obj, err := fakeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(context.TODO(), claim.Name, metav1.GetOptions{})
 				if err != nil {
-					t.Fatalf(err.Error())
+					t.Fatal(err)
 				}
 				ownerRef := obj.GetOwnerReferences()
 				if len(ownerRef) != 1 {
