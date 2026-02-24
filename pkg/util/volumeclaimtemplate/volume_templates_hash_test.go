@@ -96,6 +96,74 @@ func Test_vctHasher_GetExpectHash(t *testing.T) {
 			},
 			want: 510584408,
 		},
+		// Verify that input order does not affect hash (sort.SliceStable behavior)
+		{
+			name: "multi-pvcs-reverse-order-same-hash",
+			args: args{
+				[]v1.PersistentVolumeClaim{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pvc-2",
+						},
+						Spec: v1.PersistentVolumeClaimSpec{
+							AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+							Resources: v1.VolumeResourceRequirements{
+								Requests: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceStorage: resource.MustParse("2Gi"),
+								},
+								Limits: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceStorage: resource.MustParse("4Gi"),
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pvc-1",
+						},
+						Spec: v1.PersistentVolumeClaimSpec{
+							AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+							Resources: v1.VolumeResourceRequirements{
+								Requests: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceStorage: resource.MustParse("1Gi"),
+								},
+								Limits: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceStorage: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			want: 510584408, // Same as multi-pvcs due to sorting
+		},
+		// Verify that PVC labels/annotations do not affect hash (only Name and Spec matter)
+		{
+			name: "single-pvc-with-labels-annotations-ignored",
+			args: args{
+				[]v1.PersistentVolumeClaim{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:        "pvc-1",
+							Labels:      map[string]string{"app": "test", "env": "prod"},
+							Annotations: map[string]string{"description": "test pvc"},
+						},
+						Spec: v1.PersistentVolumeClaimSpec{
+							AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+							Resources: v1.VolumeResourceRequirements{
+								Requests: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceStorage: resource.MustParse("1Gi"),
+								},
+								Limits: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceStorage: resource.MustParse("2Gi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			want: 1129974074, // Same as single-pvc since Labels/Annotations are ignored
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -220,7 +288,6 @@ func TestGetVCTemplatesHash(t *testing.T) {
 		want  string
 		want1 bool
 	}{
-		// TODO: Add test cases.
 		{
 			name: "none-exist hash",
 			args: args{
@@ -250,6 +317,35 @@ func TestGetVCTemplatesHash(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Annotations: map[string]string{
 							HashAnnotation: "1129974074",
+						},
+					},
+				},
+			},
+			want:  "1129974074",
+			want1: true,
+		},
+		{
+			name: "other annotations exist but hash missing",
+			args: args{
+				&apps.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							"other-annotation": "some-value",
+						},
+					},
+				},
+			},
+			want:  "",
+			want1: false,
+		},
+		{
+			name: "hash coexists with other annotations",
+			args: args{
+				&apps.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							"other-annotation": "some-value",
+							HashAnnotation:     "1129974074",
 						},
 					},
 				},
@@ -396,6 +492,21 @@ func TestCanVCTemplateInplaceUpdate(t *testing.T) {
 				},
 			},
 			want: false,
+		},
+		// Backward compatibility: new revision has no hash annotation (kruise rollback scenario)
+		{
+			name: "new is nil - old has hash",
+			args: args{
+				&apps.ControllerRevision{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							HashAnnotation: "1129974074",
+						},
+					},
+				},
+				&apps.ControllerRevision{},
+			},
+			want: true, // newExist=false triggers backward compatibility mode
 		},
 	}
 	for _, tt := range tests {
