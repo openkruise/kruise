@@ -5,17 +5,17 @@ on:
     branches:
       - master
       - release-*
-  pull_request: { }
-  workflow_dispatch: { }
+  pull_request: {}
+  workflow_dispatch: {}
 
 # Declare default permissions as read only.
 permissions: read-all
 
 env:
   # Common versions
-  GO_VERSION: '1.23'
-  GOLANGCI_VERSION: 'v2.1'
-  DOCKER_BUILDX_VERSION: 'v0.4.2'
+  GO_VERSION: "1.23"
+  GOLANGCI_VERSION: "v1.64.5"
+  DOCKER_BUILDX_VERSION: "v0.4.2"
 
   # Common users. We can't run a step 'if secrets.AWS_USR != ""' but we can run
   # a step 'if env.AWS_USR' != ""', so we copy these to succinctly test whether
@@ -58,7 +58,7 @@ jobs:
         run: |
           make generate
       - name: Lint golang code
-        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8.0.0
+        uses: golangci/golangci-lint-action@v6.0.1
         with:
           version: ${{ env.GOLANGCI_VERSION }}
           args: --verbose
@@ -67,42 +67,42 @@ jobs:
       - name: Run Trivy vulnerability scanner in repo mode
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # master
         with:
-          scan-type: 'fs'
+          scan-type: "fs"
           ignore-unfixed: true
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL'
+          format: "sarif"
+          output: "trivy-results.sarif"
+          severity: "CRITICAL"
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@cf1bb45a277cb3c205638b2cd5c984db1c46a412 # v4.31.7
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: "trivy-results.sarif"
 
-#  markdownlint-misspell-shellcheck:
-#    runs-on: ubuntu-24.04
-#    # this image is build from Dockerfile
-#    # https://github.com/pouchcontainer/pouchlinter/blob/master/Dockerfile
-#    container: pouchcontainer/pouchlinter:v0.1.2
-#    steps:
-#      - name: Checkout
-#        uses: actions/checkout@v3
-#      - name: Run misspell
-#        run: find  ./* -name  "*"  | grep -v vendor | xargs misspell -error
-#      - name: Run shellcheck
-#        run: find ./ -name "*.sh" | grep -v vendor | xargs shellcheck
-#      - name: Lint markdown files
-#        run: find  ./ -name  "*.md" | grep -v vendor | grep -v commandline |  grep -v .github |  grep -v swagger |  grep -v api |  xargs mdl -r ~MD010,~MD013,~MD014,~MD022,~MD024,~MD029,~MD031,~MD032,~MD033,~MD036
-#      - name: Check markdown links
-#        run: |
-#          set +e
-#          for name in $(find . -name \*.md | grep -v vendor | grep -v CHANGELOG); do
-#            if [ -f $name ]; then
-#              markdown-link-check -q $name -c .github/workflows/markdown-link-check.config.json;
-#              if [ $? -ne 0 ]; then
-#                code=1
-#              fi
-#            fi
-#          done
-#          bash -c "exit $code";
+  #  markdownlint-misspell-shellcheck:
+  #    runs-on: ubuntu-24.04
+  #    # this image is build from Dockerfile
+  #    # https://github.com/pouchcontainer/pouchlinter/blob/master/Dockerfile
+  #    container: pouchcontainer/pouchlinter:v0.1.2
+  #    steps:
+  #      - name: Checkout
+  #        uses: actions/checkout@v3
+  #      - name: Run misspell
+  #        run: find  ./* -name  "*"  | grep -v vendor | xargs misspell -error
+  #      - name: Run shellcheck
+  #        run: find ./ -name "*.sh" | grep -v vendor | xargs shellcheck
+  #      - name: Lint markdown files
+  #        run: find  ./ -name  "*.md" | grep -v vendor | grep -v commandline |  grep -v .github |  grep -v swagger |  grep -v api |  xargs mdl -r ~MD010,~MD013,~MD014,~MD022,~MD024,~MD029,~MD031,~MD032,~MD033,~MD036
+  #      - name: Check markdown links
+  #        run: |
+  #          set +e
+  #          for name in $(find . -name \*.md | grep -v vendor | grep -v CHANGELOG); do
+  #            if [ -f $name ]; then
+  #              markdown-link-check -q $name -c .github/workflows/markdown-link-check.config.json;
+  #              if [ $? -ne 0 ]; then
+  #                code=1
+  #              fi
+  #            fi
+  #          done
+  #          bash -c "exit $code";
 
   unit-tests:
     runs-on: ubuntu-24.04
@@ -144,12 +144,12 @@ jobs:
         id: build
         uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@abe2c06d0e162320403dd10e8268adbb0b8923f8 # master
         with:
-          oss-fuzz-project-name: 'openkruise'
+          oss-fuzz-project-name: "openkruise"
           language: go
       - name: Run Fuzzers
         uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@abe2c06d0e162320403dd10e8268adbb0b8923f8 # master
         with:
-          oss-fuzz-project-name: 'openkruise'
+          oss-fuzz-project-name: "openkruise"
           language: go
           fuzz-seconds: 1200
           output-sarif: true

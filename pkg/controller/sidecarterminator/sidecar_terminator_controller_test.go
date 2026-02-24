@@ -568,9 +568,7 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 			realCRR.TypeMeta.APIVersion = appsv1alpha1.SchemeGroupVersion.String()
 			realCRR.TypeMeta.Kind = "ContainerRecreateRequest"
 
-			if realCRR != nil {
-				sort.Sort(SortContainers(realCRR.Spec.Containers))
-			}
+			sort.Sort(SortContainers(realCRR.Spec.Containers))
 			if expectCRR != nil {
 				sort.Sort(SortContainers(expectCRR.Spec.Containers))
 			}
