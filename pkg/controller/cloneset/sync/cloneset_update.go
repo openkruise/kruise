@@ -84,7 +84,14 @@ func (c *realControl) Update(cs *appsv1beta1.CloneSet,
 	}
 
 	// 2. calculate update diff and the revision to update
-	diffRes := calculateDiffsWithExpectation(cs, pods, currentRevision.Name, updateRevision.Name, nil)
+	canInPlaceUpdate := false
+	if cs.Spec.UpdateStrategy.RollingUpdate != nil &&
+		(cs.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy == appsv1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType ||
+			cs.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy == appsv1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType) {
+		canInPlaceUpdate = c.inplaceControl.CanUpdateInPlace(currentRevision, updateRevision, coreControl.GetUpdateOptions())
+	}
+
+	diffRes := calculateDiffsWithExpectation(cs, pods, currentRevision.Name, updateRevision.Name, canInPlaceUpdate, nil)
 	if diffRes.updateNum == 0 {
 		return nil
 	}
