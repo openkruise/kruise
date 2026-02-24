@@ -95,7 +95,7 @@ spec:
                 type: object
               targetRef:
                 description: |-
-                  TargetReference contains enough information to let you identify an workload for PersistentPodState
+                  TargetReference contains enough information to let you identify a workload for PersistentPodState
                   Selector and TargetReference are mutually exclusive, TargetReference is priority to take effect
                   current only support StatefulSet
                 properties:
