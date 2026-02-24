@@ -38,6 +38,7 @@ import (
 	"k8s.io/utils/exec"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util/version"
 )
 
 const maxProbeMessageLength = 1024
@@ -149,8 +150,7 @@ func formatURL(scheme string, host string, port int, path string) (*url.URL, err
 }
 
 func userAgent(purpose string) string {
-	// TODO: get kruise daemon version
-	return fmt.Sprintf("kube-%s", purpose)
+	return fmt.Sprintf("kruise-daemon/%s kube-%s", version.DaemonVersion, purpose)
 }
 
 // v1HeaderToHTTPHeader takes a list of HTTPHeader <name, value> string pairs
