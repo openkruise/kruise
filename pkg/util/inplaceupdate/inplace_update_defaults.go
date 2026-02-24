@@ -542,6 +542,12 @@ func checkAllContainersHashConsistent(pod *v1.Pod, runtimeContainerMetaSet *apps
 			isConsistentInNewVersion := kubeletcontainer.HashContainer(containerSpec) == containerMeta.Hashes.PlainHash
 			isConsistentInOldVersion := hashContainer(containerSpec) == containerMeta.Hashes.PlainHash
 			if !isConsistentInNewVersion && !isConsistentInOldVersion {
+				// If the container image in status matches the spec, and containerID matches the one in runtime-meta which means it has not been restarted,
+				// we can assume that the hash inconsistent is caused by the same image digest (but different tags).
+				if containerStatus.Image == containerSpec.Image && containerStatus.ContainerID == containerMeta.ContainerID {
+					continue
+				}
+
 				klog.InfoS("Find container in runtime-container-meta for Pod has different plain hash with spec",
 					"containerName", containerSpec.Name, "namespace", pod.Namespace, "podName", pod.Name,
 					"metaHash", containerMeta.Hashes.PlainHash, "expectedHashInNewVersion", kubeletcontainer.HashContainer(containerSpec), "expectedHashInOldVersion", hashContainer(containerSpec))
