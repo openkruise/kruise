@@ -26,7 +26,7 @@ env:
 jobs:
   typos-check:
     name: Spell Check with Typos
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout Actions Repository
         uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
           config: ./typos.toml
 
   golangci-lint:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     permissions:
       security-events: write
     steps:
@@ -106,7 +106,7 @@ jobs:
 #          bash -c "exit $code";
 
   unit-tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
