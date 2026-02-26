@@ -566,7 +566,7 @@ func TestSetPodConditionIfMsgChanged(t *testing.T) {
 		SetPodConditionIfMsgChanged(test.pod, test.condition)
 		actual := test.pod.Status.Conditions
 		if !reflect.DeepEqual(expect, actual) {
-			t.Fatalf("case %d: expect Conditions(%s), but get %s", i, expect, actual)
+			t.Fatalf("case %d: expect Conditions(%v), but get %v", i, expect, actual)
 		}
 	}
 }
@@ -902,7 +902,7 @@ func TestSetPodCondition(t *testing.T) {
 		SetPodCondition(test.pod, test.condition)
 		actual := test.pod.Status.Conditions
 		if !reflect.DeepEqual(expect, actual) {
-			t.Fatalf("case %d: expect Conditions(%s), but get %s", i, expect, actual)
+			t.Fatalf("case %d: expect Conditions(%v), but get %v", i, expect, actual)
 		}
 	}
 }

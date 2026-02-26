@@ -64,7 +64,7 @@ func TestDumpJson(t *testing.T) {
 		},
 	}
 
-	except := `{"metadata":{"creationTimestamp":null},"spec":{"volumes":[{"name":"nginx-volume"}],"containers":[{"name":"nginx","image":"nginx:1.15.1","env":[{"name":"nginx-env","value":"value-1"}],"resources":{},"volumeMounts":[{"name":"nginx-volume","mountPath":"/data/nginx"}]},{"name":"test-sidecar","image":"test-image:v1","env":[{"name":"IS_INJECTED","value":"true"}],"resources":{}}]},"status":{}}`
+	except := `{"metadata":{},"spec":{"volumes":[{"name":"nginx-volume"}],"containers":[{"name":"nginx","image":"nginx:1.15.1","env":[{"name":"nginx-env","value":"value-1"}],"resources":{},"volumeMounts":[{"name":"nginx-volume","mountPath":"/data/nginx"}]},{"name":"test-sidecar","image":"test-image:v1","env":[{"name":"IS_INJECTED","value":"true"}],"resources":{}}]},"status":{}}`
 	if except != DumpJSON(object) {
 		t.Errorf("expect %v but got %v", except, DumpJSON(object))
 	}

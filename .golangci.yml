@@ -59,7 +59,7 @@ formatters:
       simplify: true
     goimports:
       # put imports beginning with prefix after 3rd-party packages;
-      local-prefixes: 
+      local-prefixes:
       - github.com/openkruise/kruise
   exclusions:
     generated: lax

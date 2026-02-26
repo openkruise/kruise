@@ -17,9 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"fmt"
-	"time"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
@@ -28,7 +25,6 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework/common"
 	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
 )
@@ -73,8 +69,7 @@ var _ = ginkgo.Describe("ContainerPriority", ginkgo.Label("ContainerPriority", "
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
 				Image:   common.WebserverImage,
-				Command: []string{"/bin/bash", "-c", "read -p wait"},
-				Stdin:   true,
+				Command: []string{"/bin/sh", "-c", "while true; do sleep 3600; done"},
 				Env: []v1.EnvVar{
 					{Name: priorityName, Value: "10"},
 					{Name: "test", Value: "foo"},
@@ -100,18 +95,10 @@ var _ = ginkgo.Describe("ContainerPriority", ginkgo.Label("ContainerPriority", "
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Wait for the pod ready")
-			gomega.Eventually(func() int32 {
-				cs, err = cloneSetTester.GetCloneSet(cs.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return cs.Status.ReadyReplicas
-			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(replicas), fmt.Sprintf("current cloneset: %v, pods: %v", util.DumpJSON(cs), func() string {
-				pods, err := cloneSetTester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
-				if err != nil {
-					return fmt.Sprintf("failed to list pods: %v", err)
-				}
-				return util.DumpJSON(pods)
-			}()))
+			cloneSetTester.WaitForCloneSetRunning(cs)
 
+			cs, err = cloneSetTester.GetCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			pods, err := cloneSetTester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, pod := range pods {
@@ -145,8 +132,7 @@ var _ = ginkgo.Describe("ContainerPriority", ginkgo.Label("ContainerPriority", "
 			dp.Spec.Template.Spec.Containers = append(dp.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
 				Image:   common.WebserverImage,
-				Command: []string{"/bin/bash", "-c", "read -p wait"},
-				Stdin:   true,
+				Command: []string{"/bin/sh", "-c", "while true; do sleep 3600; done"},
 				Env: []v1.EnvVar{
 					{Name: priorityName, Value: "10"},
 					{Name: "test", Value: "foo"},
@@ -172,18 +158,10 @@ var _ = ginkgo.Describe("ContainerPriority", ginkgo.Label("ContainerPriority", "
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Wait for the pod ready")
-			gomega.Eventually(func() int32 {
-				dp, err = deploymentTester.GetDeployment(dp.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return dp.Status.ReadyReplicas
-			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(replicas), fmt.Sprintf("current deployment: %v, pods: %v", util.DumpJSON(dp), func() string {
-				pods, err := deploymentTester.GetSelectorPods(dp.Namespace, dp.Spec.Selector)
-				if err != nil {
-					return fmt.Sprintf("failed to list pods: %v", err)
-				}
-				return util.DumpJSON(pods)
-			}()))
+			deploymentTester.WaitForDeploymentRunning(dp)
 
+			dp, err = deploymentTester.GetDeployment(dp.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			pods, err := deploymentTester.GetSelectorPods(dp.Namespace, dp.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, pod := range pods {
@@ -217,8 +195,7 @@ var _ = ginkgo.Describe("ContainerPriority", ginkgo.Label("ContainerPriority", "
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
 				Image:   common.WebserverImage,
-				Command: []string{"/bin/bash", "-c", "read -p wait"},
-				Stdin:   true,
+				Command: []string{"/bin/sh", "-c", "while true; do sleep 3600; done"},
 				Env: []v1.EnvVar{
 					{Name: "test", Value: "foo"},
 				},
@@ -236,12 +213,10 @@ var _ = ginkgo.Describe("ContainerPriority", ginkgo.Label("ContainerPriority", "
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Wait for the pod ready")
-			gomega.Eventually(func() int32 {
-				cs, err = cloneSetTester.GetCloneSet(cs.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return cs.Status.ReadyReplicas
-			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(replicas))
+			cloneSetTester.WaitForCloneSetRunning(cs)
 
+			cs, err = cloneSetTester.GetCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			pods, err := cloneSetTester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, pod := range pods {
@@ -274,8 +249,7 @@ var _ = ginkgo.Describe("ContainerPriority", ginkgo.Label("ContainerPriority", "
 			cs.Spec.Template.Spec.Containers = append(cs.Spec.Template.Spec.Containers, v1.Container{
 				Name:    "c2",
 				Image:   common.WebserverImage,
-				Command: []string{"/bin/bash", "-c", "read -p wait"},
-				Stdin:   true,
+				Command: []string{"/bin/sh", "-c", "while true; do sleep 3600; done"},
 				Env: []v1.EnvVar{
 					{Name: "test", Value: "foo"},
 				},
@@ -289,8 +263,7 @@ var _ = ginkgo.Describe("ContainerPriority", ginkgo.Label("ContainerPriority", "
 			}, v1.Container{
 				Name:    "c3",
 				Image:   common.WebserverImage,
-				Command: []string{"/bin/bash", "-c", "read -p wait"},
-				Stdin:   true,
+				Command: []string{"/bin/sh", "-c", "while true; do sleep 3600; done"},
 				Env: []v1.EnvVar{
 					{Name: "test", Value: "foo"},
 				},
@@ -309,12 +282,10 @@ var _ = ginkgo.Describe("ContainerPriority", ginkgo.Label("ContainerPriority", "
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Wait for the pod ready")
-			gomega.Eventually(func() int32 {
-				cs, err = cloneSetTester.GetCloneSet(cs.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return cs.Status.ReadyReplicas
-			}, 150*time.Second, 3*time.Second).Should(gomega.Equal(replicas))
+			cloneSetTester.WaitForCloneSetRunning(cs)
 
+			cs, err = cloneSetTester.GetCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			pods, err := cloneSetTester.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, pod := range pods {

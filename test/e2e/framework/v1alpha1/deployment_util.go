@@ -18,14 +18,17 @@ package v1alpha1
 
 import (
 	"context"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
 )
 
 type DeploymentTester struct {
@@ -87,4 +90,29 @@ func (t *DeploymentTester) GetSelectorPods(namespace string, selector *metav1.La
 		return nil, err
 	}
 	return podList.Items, nil
+}
+
+// WaitForDeploymentRunning waits for the Deployment to have all replicas ready.
+// It polls every second for up to 5 minutes.
+func (t *DeploymentTester) WaitForDeploymentRunning(dp *appsv1.Deployment) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute*5, true,
+		func(ctx context.Context) (bool, error) {
+			inner, err := t.c.AppsV1().Deployments(dp.Namespace).Get(context.TODO(), dp.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			if inner.Status.ObservedGeneration >= dp.Generation &&
+				inner.Status.ReadyReplicas == *dp.Spec.Replicas &&
+				inner.Status.Replicas == *dp.Spec.Replicas &&
+				inner.Status.UpdatedReplicas == *dp.Spec.Replicas {
+				return true, nil
+			}
+			return false, nil
+		})
+	if pollErr != nil {
+		// Get detailed pod info for debugging
+		pods, _ := t.GetSelectorPods(dp.Namespace, dp.Spec.Selector)
+		common.Failf("Failed waiting for Deployment %s/%s to be running: %v\nDeployment: %s\nPods: %s",
+			dp.Namespace, dp.Name, pollErr, util.DumpJSON(dp), util.DumpJSON(pods))
+	}
 }

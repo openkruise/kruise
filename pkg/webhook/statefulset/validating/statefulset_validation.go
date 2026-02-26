@@ -21,7 +21,9 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/features"
 	apiutil "github.com/openkruise/kruise/pkg/util/api"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/pvc"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
@@ -207,7 +209,12 @@ func validateSpecSelector(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path
 			allErrs = append(allErrs, field.Invalid(fldPath.Root(), spec.Template, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
 			return allErrs
 		}
-		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, selector, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions)...)
+		// Add placeholder volumes from VolumeClaimTemplates so that volumeMounts
+		// referencing them can be validated. This mirrors what Kubernetes does
+		// in ValidateStatefulSetSpec.
+		coreTemplate.Spec.Volumes = append(coreTemplate.Spec.Volumes,
+			convertor.VolumesFromVolumeClaimTemplates(spec.VolumeClaimTemplates)...)
+		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, selector, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions, appsvalidation.StatefulSetValidationOptions{})...)
 	}
 	return allErrs
 }
@@ -295,7 +302,11 @@ func validateMaxUnavailableField(maxUnavailable *intstr.IntOrString, spec *appsv
 	} else if maxUnavailable < 1 {
 		allErrs = append(allErrs, field.Invalid(fldPath, maxUnavailable, "should not be less than 1"))
 	}
-	if apps.ParallelPodManagement != spec.PodManagementPolicy &&
+	// When MaxUnavailableStatefulSet feature gate is enabled, maxUnavailable can work with
+	// OrderedReady policy (matching upstream Kubernetes 1.34 behavior). Otherwise, only
+	// Parallel policy supports maxUnavailable > 1.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) &&
+		apps.ParallelPodManagement != spec.PodManagementPolicy &&
 		(maxUnavailable.Type != intstr.Int || maxUnavailable.IntVal != 1) {
 		allErrs = append(allErrs, field.Invalid(fldPath, maxUnavailable, "can only work with Parallel PodManagementPolicyType"))
 	}

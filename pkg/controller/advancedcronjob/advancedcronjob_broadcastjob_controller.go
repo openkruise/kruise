@@ -274,7 +274,7 @@ func (r *ReconcileAdvancedCronJob) reconcileBroadcastJob(ctx context.Context, re
 
 	// figure out the next times that we need to create
 	// jobs at (or anything we missed).
-	now := realClock{}.Now()
+	now := r.Now()
 	missedRun, nextRun, err := getNextSchedule(&advancedCronJob, now)
 	if err != nil {
 		klog.ErrorS(err, "Unable to figure out CronJob schedule", "advancedCronJob", req)
@@ -358,6 +358,8 @@ func (r *ReconcileAdvancedCronJob) reconcileBroadcastJob(ctx context.Context, re
 			job.Annotations[k] = v
 		}
 		job.Annotations[scheduledTimeAnnotation] = scheduledTime.Format(time.RFC3339)
+		// Add upstream Kubernetes CronJob scheduled timestamp annotation for compatibility (GA in k8s 1.32)
+		job.Annotations[cronJobScheduledTimestampAnnotation] = scheduledTime.Format(time.RFC3339)
 		for k, v := range advancedCronJob.Spec.Template.BroadcastJobTemplate.Labels {
 			job.Labels[k] = v
 		}

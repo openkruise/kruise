@@ -20,10 +20,12 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
@@ -33,6 +35,7 @@ import (
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/test/e2e/framework/common"
 )
 
 type CloneSetTester struct {
@@ -278,5 +281,30 @@ func (t *CloneSetTester) NewCloneSetPartitionAvailableCondition() *appsv1alpha1.
 		Status:  v1.ConditionTrue,
 		Reason:  string(appsv1alpha1.CloneSetProgressPartitionAvailable),
 		Message: "CloneSet has been paused due to partition ready",
+	}
+}
+
+// WaitForCloneSetRunning waits for the CloneSet to have all replicas ready.
+// It polls every second for up to 5 minutes.
+func (t *CloneSetTester) WaitForCloneSetRunning(cs *appsv1alpha1.CloneSet) {
+	pollErr := wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute*5, true,
+		func(ctx context.Context) (bool, error) {
+			inner, err := t.kc.AppsV1alpha1().CloneSets(cs.Namespace).Get(context.TODO(), cs.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			if inner.Status.ObservedGeneration >= cs.Generation &&
+				inner.Status.ReadyReplicas == *cs.Spec.Replicas &&
+				inner.Status.Replicas == *cs.Spec.Replicas &&
+				inner.Status.UpdatedReplicas == *cs.Spec.Replicas {
+				return true, nil
+			}
+			return false, nil
+		})
+	if pollErr != nil {
+		// Get detailed pod info for debugging
+		pods, _ := t.GetSelectorPods(cs.Namespace, cs.Spec.Selector)
+		common.Failf("Failed waiting for CloneSet %s/%s to be running: %v\nCloneSet: %s\nPods: %s",
+			cs.Namespace, cs.Name, pollErr, util.DumpJSON(cs), util.DumpJSON(pods))
 	}
 }

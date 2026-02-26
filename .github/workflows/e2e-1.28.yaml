@@ -13,10 +13,10 @@ permissions: read-all
 
 env:
   # Common versions
-  GO_VERSION: '1.23'
-  KIND_VERSION: 'v0.22.0'
-  KIND_IMAGE: 'kindest/node:v1.28.7'
-  KIND_CLUSTER_NAME: 'ci-testing'
+  GO_VERSION: "1.24"
+  KIND_VERSION: "v0.22.0"
+  KIND_IMAGE: "kindest/node:v1.28.7"
+  KIND_CLUSTER_NAME: "ci-testing"
 
 jobs:
   astatefulset-storage:
@@ -167,7 +167,7 @@ jobs:
           kind load docker-image --name=${KIND_CLUSTER_NAME} $IMAGE || { echo >&2 "kind not installed or error loading image: $IMAGE"; exit 1; }
       - name: Install Kruise
         run: |
-         IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
+          IMG=openkruise/kruise-manager:e2e-${GITHUB_RUN_ID} make install-kruise
       - name: Run E2E Tests
         run: |
           export KUBECONFIG=/home/runner/.kube/config

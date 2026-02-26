@@ -24,6 +24,7 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -97,7 +98,16 @@ func (h *DaemonSetCreateUpdateHandler) Handle(ctx context.Context, req admission
 				klog.ErrorS(err, "validate daemonset failed", "namespace", obj.Namespace, "name", obj.Name, "operation", req.AdmissionRequest.Operation)
 				return admission.Errored(http.StatusInternalServerError, err)
 			}
-			return admission.ValidationResponse(allowed, reason)
+			resp := admission.ValidationResponse(allowed, reason)
+			// Add warnings for potentially problematic configurations
+			var maxSurge *intstr.IntOrString
+			if obj.Spec.UpdateStrategy.RollingUpdate != nil {
+				maxSurge = obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge
+			}
+			if warnings := GetDaemonSetWarnings(&obj.Spec.Template.Spec, maxSurge); len(warnings) > 0 {
+				resp.Warnings = warnings
+			}
+			return resp
 
 		case admissionv1.Update:
 			if err := h.Decoder.Decode(req, obj); err != nil {
@@ -109,6 +119,16 @@ func (h *DaemonSetCreateUpdateHandler) Handle(ctx context.Context, req admission
 
 			if allErrs := h.validateDaemonSetUpdateV1beta1(obj, oldObj); len(allErrs) > 0 {
 				return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
+			}
+			// Add warnings for potentially problematic configurations
+			var maxSurge *intstr.IntOrString
+			if obj.Spec.UpdateStrategy.RollingUpdate != nil {
+				maxSurge = obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge
+			}
+			if warnings := GetDaemonSetWarnings(&obj.Spec.Template.Spec, maxSurge); len(warnings) > 0 {
+				resp := admission.ValidationResponse(true, "")
+				resp.Warnings = warnings
+				return resp
 			}
 		}
 		return admission.ValidationResponse(true, "")
@@ -126,7 +146,16 @@ func (h *DaemonSetCreateUpdateHandler) Handle(ctx context.Context, req admission
 				klog.ErrorS(err, "validate daemonset failed", "namespace", obj.Namespace, "name", obj.Name, "operation", req.AdmissionRequest.Operation)
 				return admission.Errored(http.StatusInternalServerError, err)
 			}
-			return admission.ValidationResponse(allowed, reason)
+			resp := admission.ValidationResponse(allowed, reason)
+			// Add warnings for potentially problematic configurations
+			var maxSurge *intstr.IntOrString
+			if obj.Spec.UpdateStrategy.RollingUpdate != nil {
+				maxSurge = obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge
+			}
+			if warnings := GetDaemonSetWarnings(&obj.Spec.Template.Spec, maxSurge); len(warnings) > 0 {
+				resp.Warnings = warnings
+			}
+			return resp
 
 		case admissionv1.Update:
 			if err := h.Decoder.Decode(req, obj); err != nil {
@@ -138,6 +167,16 @@ func (h *DaemonSetCreateUpdateHandler) Handle(ctx context.Context, req admission
 
 			if allErrs := h.validateDaemonSetUpdate(obj, oldObj); len(allErrs) > 0 {
 				return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
+			}
+			// Add warnings for potentially problematic configurations
+			var maxSurge *intstr.IntOrString
+			if obj.Spec.UpdateStrategy.RollingUpdate != nil {
+				maxSurge = obj.Spec.UpdateStrategy.RollingUpdate.MaxSurge
+			}
+			if warnings := GetDaemonSetWarnings(&obj.Spec.Template.Spec, maxSurge); len(warnings) > 0 {
+				resp := admission.ValidationResponse(true, "")
+				resp.Warnings = warnings
+				return resp
 			}
 		}
 		return admission.ValidationResponse(true, "")

@@ -7,6 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
 	credentialprovidersecrets "k8s.io/kubernetes/pkg/credentialprovider/secrets"
 
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
@@ -30,7 +31,10 @@ var (
 // make and set new docker keyring
 func MakeAndSetKeyring() {
 	klog.Info("make and set new docker keyring")
-	keyring = credentialprovider.NewDockerKeyring()
+	// Use NewExternalCredentialProviderDockerKeyring to include any registered
+	// credential provider plugins. Pass empty strings for pod info since this
+	// is used for general image pulling, not per-pod credentials.
+	keyring = plugin.NewExternalCredentialProviderDockerKeyring("", "", "", "")
 }
 
 func ConvertToRegistryAuths(pullSecrets []corev1.Secret, repo string) (infos []daemonutil.AuthInfo, err error) {

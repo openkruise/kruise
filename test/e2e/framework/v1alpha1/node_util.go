@@ -185,7 +185,7 @@ func (t *NodeTester) ListRealNodesWithFake(tolerations []v1.Toleration) ([]*v1.N
 	var nodes []*v1.Node
 	for i := range nodeList.Items {
 		node := &nodeList.Items[i]
-		taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, tolerations, nil)
+		taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, tolerations, func(t *v1.Taint) bool { return true })
 		if !isUntolerated {
 			nodes = append(nodes, node)
 			common.Logf("ListRealNodesWithFake check node %s matched", node.Name)

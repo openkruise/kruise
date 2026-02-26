@@ -48,6 +48,27 @@ type BroadcastJobSpec struct {
 	// FailurePolicy indicates the behavior of the job, when failed pod is found.
 	// +optional
 	FailurePolicy FailurePolicy `json:"failurePolicy,omitempty" protobuf:"bytes,5,opt,name=failurePolicy"`
+
+	// PodFailurePolicy specifies how failed pods influence the backoffLimit.
+	// Rules are evaluated in order, and once a rule matches a Pod failure,
+	// the remaining rules are ignored. When no rule matches, the default
+	// handling applies based on FailurePolicy.
+	// This is similar to upstream Kubernetes Job's PodFailurePolicy (GA in k8s 1.31).
+	// +optional
+	PodFailurePolicy *PodFailurePolicy `json:"podFailurePolicy,omitempty"`
+
+	// PodReplacementPolicy specifies when to create replacement Pods.
+	// Possible values are:
+	// - TerminatingOrFailed means that we recreate pods
+	//   when they are terminating (has a metadata.deletionTimestamp) or failed.
+	// - Failed means to wait until a previously created Pod is fully terminated (has phase
+	//   Failed or Succeeded) before creating a replacement Pod.
+	//
+	// When using podFailurePolicy, Failed is the the default.
+	// When not using podFailurePolicy, TerminatingOrFailed is the default.
+	// This is similar to upstream Kubernetes Job's PodReplacementPolicy (GA in k8s 1.34).
+	// +optional
+	PodReplacementPolicy *PodReplacementPolicy `json:"podReplacementPolicy,omitempty"`
 }
 
 // CompletionPolicy indicates the completion policy for the job
@@ -159,6 +180,125 @@ type FailurePolicy struct {
 	// RestartLimit specifies the number of retries before marking the pod failed.
 	RestartLimit int32 `json:"restartLimit,omitempty" protobuf:"varint,2,opt,name=restartLimit"`
 }
+
+// PodFailurePolicy describes how failed pods influence the backoffLimit.
+// This is similar to upstream Kubernetes Job's PodFailurePolicy.
+type PodFailurePolicy struct {
+	// A list of pod failure policy rules. The rules are evaluated in order.
+	// Once a rule matches a Pod failure, the remaining of the rules are ignored.
+	// When no rule matches the Pod failure, the default handling applies - the
+	// counter of pod failures is incremented and it is checked against
+	// the backoffLimit. At most 20 elements are allowed.
+	// +listType=atomic
+	Rules []PodFailurePolicyRule `json:"rules"`
+}
+
+// PodFailurePolicyRule describes how a pod failure is handled when the requirements are met.
+type PodFailurePolicyRule struct {
+	// Specifies the action taken on a pod failure when the requirements are satisfied.
+	// Possible values are:
+	//
+	// - FailJob: indicates that the pod's job is marked as Failed and all
+	//   running pods are terminated.
+	// - Ignore: indicates that the counter towards the .backoffLimit is not
+	//   incremented and a replacement pod is created.
+	// - Count: indicates that the pod is handled in the default way - the
+	//   counter towards the .backoffLimit is incremented.
+	// +kubebuilder:validation:Enum=FailJob;Ignore;Count
+	Action PodFailurePolicyAction `json:"action"`
+
+	// Represents the requirement on the container exit codes.
+	// +optional
+	OnExitCodes *PodFailurePolicyOnExitCodesRequirement `json:"onExitCodes,omitempty"`
+
+	// Represents the requirement on the pod conditions. The requirement is represented
+	// as a list of pod condition patterns. The requirement is satisfied if at
+	// least one pattern matches an actual pod condition. At most 20 elements are allowed.
+	// +listType=atomic
+	// +optional
+	OnPodConditions []PodFailurePolicyOnPodConditionsPattern `json:"onPodConditions,omitempty"`
+}
+
+// PodFailurePolicyAction specifies how a pod failure is handled.
+// +kubebuilder:validation:Enum=FailJob;Ignore;Count
+type PodFailurePolicyAction string
+
+const (
+	// PodFailurePolicyActionFailJob indicates that the pod's job is marked as Failed
+	// and all running pods are terminated.
+	PodFailurePolicyActionFailJob PodFailurePolicyAction = "FailJob"
+
+	// PodFailurePolicyActionIgnore indicates that the counter towards the .backoffLimit
+	// is not incremented and a replacement pod is created.
+	PodFailurePolicyActionIgnore PodFailurePolicyAction = "Ignore"
+
+	// PodFailurePolicyActionCount indicates that the pod is handled in the default way -
+	// the counter towards the .backoffLimit is incremented.
+	PodFailurePolicyActionCount PodFailurePolicyAction = "Count"
+)
+
+// PodFailurePolicyOnExitCodesRequirement describes the requirement for handling
+// a failed pod based on its container exit codes.
+type PodFailurePolicyOnExitCodesRequirement struct {
+	// Restricts the check for exit codes to the container with the
+	// specified name. When null, the rule applies to all containers.
+	// When specified, it should match one the container or initContainer
+	// names in the pod template.
+	// +optional
+	ContainerName *string `json:"containerName,omitempty"`
+
+	// Represents the relationship between the container exit code(s) and the
+	// specified values. Containers completed with success (exit code 0) are
+	// excluded from the requirement check.
+	// +kubebuilder:validation:Enum=In;NotIn
+	Operator PodFailurePolicyOnExitCodesOperator `json:"operator"`
+
+	// Specifies the set of values. Each returned container exit code (might be
+	// multiple in case of multiple containers) is checked against this set of
+	// values with respect to the operator. The list of values must be ordered
+	// and must not contain duplicates. Value '0' cannot be used for the In operator.
+	// At least one element is required. At most 255 elements are allowed.
+	// +listType=set
+	Values []int32 `json:"values"`
+}
+
+// PodFailurePolicyOnExitCodesOperator represents the operator for matching container exit codes.
+// +kubebuilder:validation:Enum=In;NotIn
+type PodFailurePolicyOnExitCodesOperator string
+
+const (
+	// PodFailurePolicyOnExitCodesOpIn means the exit code must be in the specified values.
+	PodFailurePolicyOnExitCodesOpIn PodFailurePolicyOnExitCodesOperator = "In"
+	// PodFailurePolicyOnExitCodesOpNotIn means the exit code must not be in the specified values.
+	PodFailurePolicyOnExitCodesOpNotIn PodFailurePolicyOnExitCodesOperator = "NotIn"
+)
+
+// PodFailurePolicyOnPodConditionsPattern describes a pattern for matching
+// an actual pod condition type.
+type PodFailurePolicyOnPodConditionsPattern struct {
+	// Specifies the required Pod condition type. To match a pod condition
+	// it is required that specified type equals the pod condition type.
+	Type v1.PodConditionType `json:"type"`
+
+	// Specifies the required Pod condition status. To match a pod condition
+	// it is required that the specified status equals the pod condition status.
+	// Defaults to True.
+	// +kubebuilder:default=True
+	Status v1.ConditionStatus `json:"status"`
+}
+
+// PodReplacementPolicy specifies the policy for creating pod replacements.
+// +kubebuilder:validation:Enum=TerminatingOrFailed;Failed
+type PodReplacementPolicy string
+
+const (
+	// TerminatingOrFailed means that we recreate pods
+	// when they are terminating (has a metadata.deletionTimestamp) or failed.
+	TerminatingOrFailed PodReplacementPolicy = "TerminatingOrFailed"
+	// Failed means to wait until a previously created Pod is fully terminated (has phase
+	// Failed or Succeeded) before creating a replacement Pod.
+	Failed PodReplacementPolicy = "Failed"
+)
 
 // FailurePolicyType indicates the type of FailurePolicyType.
 type FailurePolicyType string

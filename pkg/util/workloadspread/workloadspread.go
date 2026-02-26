@@ -1003,8 +1003,21 @@ func GetWorkloadVersion(reader client.Reader, object client.Object) (string, err
 }
 
 func enableVersionedStatus(object client.Object) bool {
-	objectKind := object.GetObjectKind().GroupVersionKind().Kind
-	if EnabledWorkloadSetForVersionedStatus.Has(strings.ToLower(objectKind)) {
+	// Use type switch to determine the kind since TypeMeta may not be preserved
+	// when objects are retrieved from the API server or fake client
+	var objectKind string
+	switch object.(type) {
+	case *appsv1alpha1.CloneSet:
+		objectKind = "cloneset"
+	case *appsv1.Deployment:
+		objectKind = "deployment"
+	case *appsv1.ReplicaSet:
+		objectKind = "replicaset"
+	default:
+		objectKind = strings.ToLower(object.GetObjectKind().GroupVersionKind().Kind)
+	}
+
+	if EnabledWorkloadSetForVersionedStatus.Has(objectKind) {
 		return true
 	}
 

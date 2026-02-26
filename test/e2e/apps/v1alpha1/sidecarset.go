@@ -591,7 +591,7 @@ var _ = ginkgo.Describe("SidecarSet", ginkgo.Label("SidecarSet", "workload"), fu
 					Container: corev1.Container{
 						Name:          "init-1",
 						Command:       []string{"/bin/sh", "-c", "sleep 1000000"},
-						Image:         "busybox:latest",
+						Image:         imageutils.GetE2EImage(imageutils.BusyBox),
 						RestartPolicy: &always,
 					},
 				},

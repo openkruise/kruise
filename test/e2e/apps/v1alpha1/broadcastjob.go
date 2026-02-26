@@ -112,11 +112,7 @@ var _ = ginkgo.Describe("BroadcastJob", ginkgo.Label("BroadcastJob", "job", "wor
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("Check the status of job")
-			gomega.Eventually(func() int32 {
-				job, err = tester.GetBroadcastJob(job.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return job.Status.Desired
-			}, 10*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
+			tester.WaitForBroadcastJobDesired(job, int32(len(nodes)))
 
 			gomega.Eventually(func() int {
 				pods, err := tester.GetPodsOfJob(job)
@@ -146,11 +142,7 @@ var _ = ginkgo.Describe("BroadcastJob", ginkgo.Label("BroadcastJob", "job", "wor
 				return len(pods)
 			}, 180*time.Second, 3*time.Second).Should(gomega.Equal(len(nodes)))
 
-			gomega.Eventually(func() int32 {
-				job, err = tester.GetBroadcastJob(job.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return job.Status.Succeeded
-			}, 60*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
+			tester.WaitForBroadcastJobSucceeded(job, int32(len(nodes)))
 		})
 	})
 })

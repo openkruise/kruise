@@ -54,7 +54,7 @@ func Test_vctHasher_GetExpectHash(t *testing.T) {
 					},
 				},
 			},
-			want: 1129974074,
+			want: 3840825636,
 		},
 		{
 			name: "multi-pvcs",
@@ -94,7 +94,7 @@ func Test_vctHasher_GetExpectHash(t *testing.T) {
 					},
 				},
 			},
-			want: 510584408,
+			want: 2563017496,
 		},
 		// Verify that input order does not affect hash (sort.SliceStable behavior)
 		{
@@ -224,7 +224,7 @@ func TestPatchVCTemplateHash(t *testing.T) {
 					},
 				},
 			},
-			want: "1129974074",
+			want: "3840825636",
 		},
 		{
 			name: "base-revision-pvcs",
@@ -265,7 +265,7 @@ func TestPatchVCTemplateHash(t *testing.T) {
 					},
 				},
 			},
-			want: "510584408",
+			want: "2563017496",
 		},
 	}
 	for _, tt := range tests {
