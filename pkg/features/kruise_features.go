@@ -158,7 +158,7 @@ const (
 	// (e.g. in a CloneSet,Advanced DaemonSet), which is the historical default.
 	DefaultHostNetworkHostPortsInPodTemplates featuregate.Feature = "DefaultHostNetworkHostPortsInPodTemplates"
 
-  // MaxUnavailableStatefulSet enables the maxUnavailable field for StatefulSet with
+    // MaxUnavailableStatefulSet enables the maxUnavailable field for StatefulSet with
 	// OrderedReady pod management policy, allowing multiple pods to be unavailable during
 	// rolling updates. This matches the upstream Kubernetes feature gate behavior.
 	// See: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
@@ -204,7 +204,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	EnableSortSidecarContainerByName:          {Default: false, PreRelease: featuregate.Alpha},
 	InPlacePodVerticalScaling:                 {Default: false, PreRelease: featuregate.Alpha},
 	DefaultHostNetworkHostPortsInPodTemplates: {Default: false, PreRelease: featuregate.Alpha},
-  MaxUnavailableStatefulSet:                 {Default: true, PreRelease: featuregate.Beta},
+    MaxUnavailableStatefulSet:                 {Default: true, PreRelease: featuregate.Beta},
 }
 
 func init() {
