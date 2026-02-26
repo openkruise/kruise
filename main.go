@@ -18,7 +18,6 @@ package main
 
 import (
 	"flag"
-	"math/rand"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -139,7 +138,6 @@ func main() {
 	klog.InitFlags(nil)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
-	rand.Seed(time.Now().UnixNano())
 	ctrl.SetLogger(klogr.New())
 	if err := logsapi.ValidateAndApply(logOptions, nil); err != nil {
 		setupLog.Error(err, "logsapi ValidateAndApply failed")

@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"reflect"
 	"testing"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -20,10 +19,6 @@ import (
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 func generateRandomId() string {
 	b := make([]byte, 32)
