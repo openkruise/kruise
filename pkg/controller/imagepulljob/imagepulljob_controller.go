@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -447,6 +448,13 @@ func (r *ReconcileImagePullJob) classifyPullSecretsForJob(job *appsv1beta1.Image
 		return nil, nil, err
 	}
 
+	// Import SecretList Items into a new array and sort by name
+	syncedSecrets := make([]v1.Secret, len(secretList.Items))
+	copy(syncedSecrets, secretList.Items)
+	sort.Slice(syncedSecrets, func(i, j int) bool {
+		return syncedSecrets[i].Name < syncedSecrets[j].Name
+	})
+
 	// jobKey is imagePullJob namespace/name
 	jobKey := jobAsReferenceObject(job)
 	// pull secret name -> v1.secret
@@ -460,8 +468,8 @@ func (r *ReconcileImagePullJob) classifyPullSecretsForJob(job *appsv1beta1.Image
 	}
 	// imagePullJob previously configured pullSecret, but later removed it during updates, so it needs to be released
 	var releasedSecrets []*v1.Secret
-	for i := range secretList.Items {
-		secret := &secretList.Items[i]
+	for i := range syncedSecrets {
+		secret := &syncedSecrets[i]
 		if secret.DeletionTimestamp != nil {
 			continue
 		}
@@ -476,10 +484,20 @@ func (r *ReconcileImagePullJob) classifyPullSecretsForJob(job *appsv1beta1.Image
 		}
 
 		sourceSecretRef := getSourceSecret(secret)
+		// There are three scenarios for kruise-daemon-config secrets:
+		// 1. No kruise-daemon-config secrets match pullSecrets, thus requiring creation of a new kruise-daemon-config secret
+		// 2. A kruise-daemon-config secret exists that matches pullSecrets and has matching referJobs. This has the highest priority and should be used preferentially
+		// 3. A kruise-daemon-config secret exists that matches pullSecrets but has non-matching referJobs. No new kruise-daemon-config secret needs to be created,
+		//    but the secret annotations referJobs need to be updated
+
 		// If the source secret matches the pullSecrets, it indicates that the imagePullJob can also use the secret to pull images
-		// Therefore, there is no need to duplicate the creation of a new kruise-daemon-config secret
-		if _, ok := pullSecrets[sourceSecretRef]; ok {
-			pullSecrets[sourceSecretRef] = secret
+		// Therefore, there is no need to duplicate the creation of a new kruise-daemon-config secret.
+		if obj, ok := pullSecrets[sourceSecretRef]; ok {
+			if obj == nil {
+				pullSecrets[sourceSecretRef] = secret
+			} else if referJobs.Has(jobKey) {
+				pullSecrets[sourceSecretRef] = secret
+			}
 			continue
 		}
 		// Code execution reaches here indicates: secret does not match pullSecrets, but secret referenceJobs includes this imagePullJob
@@ -618,7 +636,8 @@ func (r *ReconcileImagePullJob) calculateStatus(job *appsv1beta1.ImagePullJob, n
 		return nil, nil, fmt.Errorf("invalid image %s: %v", job.Spec.Image, err)
 	}
 
-	var notSynced, pulling, succeeded, failed []string
+	var pulling, succeeded, failed []string
+	notSynced := sets.NewString()
 	for _, nodeImage := range nodeImages {
 		var tagVersion int64 = -1
 		var secretSynced bool = true
@@ -629,10 +648,9 @@ func (r *ReconcileImagePullJob) calculateStatus(job *appsv1beta1.ImagePullJob, n
 					break
 				}
 			}
-
+			// In scenarios where secrets are not synchronized, do not skip the calculation of succeeded counts directly
 			if !secretSynced {
-				notSynced = append(notSynced, nodeImage.Name)
-				continue
+				notSynced.Insert(nodeImage.Name)
 			}
 
 			for _, tagSpec := range imageSpec.Tags {
@@ -654,7 +672,7 @@ func (r *ReconcileImagePullJob) calculateStatus(job *appsv1beta1.ImagePullJob, n
 		}
 
 		if tagVersion < 0 {
-			notSynced = append(notSynced, nodeImage.Name)
+			notSynced.Insert(nodeImage.Name)
 			continue
 		}
 
@@ -688,7 +706,7 @@ func (r *ReconcileImagePullJob) calculateStatus(job *appsv1beta1.ImagePullJob, n
 			newStatus.CompletionTime = &now
 			newStatus.Succeeded = int32(len(succeeded))
 			failed = append(failed, pulling...)
-			failed = append(failed, notSynced...)
+			failed = append(failed, notSynced.List()...)
 			newStatus.Failed = int32(len(failed))
 			newStatus.FailedNodes = failed
 			newStatus.Message = "job exceeds activeDeadlineSeconds"
@@ -706,7 +724,7 @@ func (r *ReconcileImagePullJob) calculateStatus(job *appsv1beta1.ImagePullJob, n
 
 	newStatus.Message = formatStatusMessage(&newStatus)
 	sort.Strings(newStatus.FailedNodes)
-	return &newStatus, notSynced, nil
+	return &newStatus, notSynced.List(), nil
 }
 
 func (r *ReconcileImagePullJob) namespaceIsActive(name string) error {
