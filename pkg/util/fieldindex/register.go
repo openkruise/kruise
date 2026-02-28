@@ -67,8 +67,10 @@ func RegisterFieldIndexes(c cache.Cache) error {
 			return
 		}
 		// ImagePullJob ownerReference
-		if err = c.IndexField(context.TODO(), &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
-			return
+		if utildiscovery.DiscoverObject(&appsv1alpha1.ImagePullJob{}) {
+			if err = c.IndexField(context.TODO(), &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
+				return
+			}
 		}
 		// ImagePullJob ownerReference for v1beta1
 		if utildiscovery.DiscoverObject(&appsv1beta1.ImagePullJob{}) {
