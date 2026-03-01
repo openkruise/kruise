@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -1122,6 +1123,256 @@ func TestValidateDaemonSetSpecV1beta1(t *testing.T) {
 			}
 			if !tt.expectErr && len(errs) != 0 {
 				t.Errorf("expected no error but got: %v", errs)
+			}
+		})
+	}
+}
+
+func validNodePatch() appsv1alpha1.DaemonSetNodePatch {
+	return appsv1alpha1.DaemonSetNodePatch{
+		Selector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{"disk": "large"},
+		},
+		Patch: appsv1alpha1.DaemonSetNodeTemplatePatch{
+			Metadata: &appsv1alpha1.DaemonSetNodePatchObjectMeta{
+				Labels:      map[string]string{"cache": "large"},
+				Annotations: map[string]string{"note": "ok"},
+			},
+			Spec: &appsv1alpha1.DaemonSetNodePatchPodSpec{
+				Containers: []appsv1alpha1.DaemonSetNodePatchContainer{
+					{
+						Name: "app",
+						Env:  []corev1.EnvVar{{Name: "CACHE_SIZE", Value: "2Ti"}},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestValidateNodePatches(t *testing.T) {
+	fldPath := field.NewPath("spec").Child("nodePatches")
+
+	tests := []struct {
+		name      string
+		patches   []appsv1alpha1.DaemonSetNodePatch
+		expectErr bool
+	}{
+		{
+			name:      "empty list — valid",
+			patches:   nil,
+			expectErr: false,
+		},
+		{
+			name:      "valid patch",
+			patches:   []appsv1alpha1.DaemonSetNodePatch{validNodePatch()},
+			expectErr: false,
+		},
+		{
+			name: "nil selector — invalid",
+			patches: []appsv1alpha1.DaemonSetNodePatch{
+				{
+					Selector: nil,
+					Patch:    appsv1alpha1.DaemonSetNodeTemplatePatch{},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "empty container name — invalid",
+			patches: []appsv1alpha1.DaemonSetNodePatch{
+				{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"k": "v"}},
+					Patch: appsv1alpha1.DaemonSetNodeTemplatePatch{
+						Spec: &appsv1alpha1.DaemonSetNodePatchPodSpec{
+							Containers: []appsv1alpha1.DaemonSetNodePatchContainer{
+								{Name: ""},
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "empty env var name — invalid",
+			patches: []appsv1alpha1.DaemonSetNodePatch{
+				{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"k": "v"}},
+					Patch: appsv1alpha1.DaemonSetNodeTemplatePatch{
+						Spec: &appsv1alpha1.DaemonSetNodePatchPodSpec{
+							Containers: []appsv1alpha1.DaemonSetNodePatchContainer{
+								{
+									Name: "app",
+									Env:  []corev1.EnvVar{{Name: ""}},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "invalid env var name — invalid",
+			patches: []appsv1alpha1.DaemonSetNodePatch{
+				{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"k": "v"}},
+					Patch: appsv1alpha1.DaemonSetNodeTemplatePatch{
+						Spec: &appsv1alpha1.DaemonSetNodePatchPodSpec{
+							Containers: []appsv1alpha1.DaemonSetNodePatchContainer{
+								{
+									Name: "app",
+									Env:  []corev1.EnvVar{{Name: "invalid name with spaces"}},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "multiple patches, one invalid — error reported",
+			patches: []appsv1alpha1.DaemonSetNodePatch{
+				validNodePatch(),
+				{Selector: nil},
+			},
+			expectErr: true,
+		},
+		{
+			name: "patch with metadata only and no spec — valid",
+			patches: []appsv1alpha1.DaemonSetNodePatch{
+				{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"k": "v"}},
+					Patch: appsv1alpha1.DaemonSetNodeTemplatePatch{
+						Metadata: &appsv1alpha1.DaemonSetNodePatchObjectMeta{
+							Labels: map[string]string{"env": "prod"},
+						},
+					},
+				},
+			},
+			expectErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validateNodePatches(tt.patches, fldPath)
+			if tt.expectErr && len(errs) == 0 {
+				t.Errorf("expected validation errors but got none")
+			}
+			if !tt.expectErr && len(errs) != 0 {
+				t.Errorf("expected no validation errors but got: %v", errs)
+			}
+		})
+	}
+}
+
+func TestValidateDaemonSetSpecNodePatchesV1beta1(t *testing.T) {
+	validV1beta1Patch := func() appsv1beta1.DaemonSetNodePatch {
+		return appsv1beta1.DaemonSetNodePatch{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"disk": "large"}},
+			Patch: appsv1beta1.DaemonSetNodeTemplatePatch{
+				Spec: &appsv1beta1.DaemonSetNodePatchPodSpec{
+					Containers: []appsv1beta1.DaemonSetNodePatchContainer{
+						{
+							Name: "app",
+							Env:  []corev1.EnvVar{{Name: "CACHE_SIZE", Value: "2Ti"}},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	baseSpec := func(patches []appsv1beta1.DaemonSetNodePatch) *appsv1beta1.DaemonSetSpec {
+		maxUnavailable := intstr.FromInt(1)
+		return &appsv1beta1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "test"}},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyAlways,
+					DNSPolicy:     corev1.DNSClusterFirst,
+					Containers:    []corev1.Container{{Name: "app", Image: "nginx:latest", ImagePullPolicy: corev1.PullIfNotPresent, TerminationMessagePolicy: corev1.TerminationMessageReadFile}},
+				},
+			},
+			UpdateStrategy: appsv1beta1.DaemonSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+					MaxUnavailable: &maxUnavailable,
+				},
+			},
+			NodePatches: patches,
+		}
+	}
+
+	tests := []struct {
+		name      string
+		patches   []appsv1beta1.DaemonSetNodePatch
+		expectErr bool
+	}{
+		{
+			name:      "no nodePatches — valid",
+			patches:   nil,
+			expectErr: false,
+		},
+		{
+			name:      "valid v1beta1 patch",
+			patches:   []appsv1beta1.DaemonSetNodePatch{validV1beta1Patch()},
+			expectErr: false,
+		},
+		{
+			name: "nil selector in v1beta1 patch — invalid",
+			patches: []appsv1beta1.DaemonSetNodePatch{
+				{Selector: nil},
+			},
+			expectErr: true,
+		},
+		{
+			name: "empty container name in v1beta1 patch — invalid",
+			patches: []appsv1beta1.DaemonSetNodePatch{
+				{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"k": "v"}},
+					Patch: appsv1beta1.DaemonSetNodeTemplatePatch{
+						Spec: &appsv1beta1.DaemonSetNodePatchPodSpec{
+							Containers: []appsv1beta1.DaemonSetNodePatchContainer{
+								{Name: ""},
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "empty env var name in v1beta1 patch — invalid",
+			patches: []appsv1beta1.DaemonSetNodePatch{
+				{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"k": "v"}},
+					Patch: appsv1beta1.DaemonSetNodeTemplatePatch{
+						Spec: &appsv1beta1.DaemonSetNodePatchPodSpec{
+							Containers: []appsv1beta1.DaemonSetNodePatchContainer{
+								{Name: "app", Env: []corev1.EnvVar{{Name: ""}}},
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validateDaemonSetSpecV1beta1(baseSpec(tt.patches), field.NewPath("spec"))
+			hasErr := len(errs) > 0
+			if tt.expectErr && !hasErr {
+				t.Errorf("expected validation errors but got none")
+			}
+			if !tt.expectErr && hasErr {
+				t.Errorf("expected no errors but got: %v", errs)
 			}
 		})
 	}
