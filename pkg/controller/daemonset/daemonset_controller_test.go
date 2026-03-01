@@ -409,3 +409,50 @@ func Test_isControlledByDaemonSet(t *testing.T) {
 		})
 	}
 }
+
+// TestNodePatchesAppliedOnPodCreation verifies that when a DaemonSet has NodePatches configured,
+// the controller executes the patch application code path during pod creation.
+func TestNodePatchesAppliedOnPodCreation(t *testing.T) {
+	// Create a node that matches the patch selector.
+	node := newNode("patch-node", nil)
+	node.Labels = map[string]string{"disk-type": "large"}
+	node.Status.Conditions = []corev1.NodeCondition{
+		{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+	}
+
+	// Build a DaemonSet with a NodePatch targeting nodes with disk-type=large.
+	ds := newDaemonSet("ds-with-patches")
+	ds.Spec.Selector = &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel}
+	ds.Spec.Template.Labels = simpleDaemonSetLabel
+	ds.Spec.NodePatches = []appsv1beta1.DaemonSetNodePatch{
+		{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"disk-type": "large"},
+			},
+			Patch: appsv1beta1.DaemonSetNodeTemplatePatch{
+				Metadata: &appsv1beta1.DaemonSetNodePatchObjectMeta{
+					Labels: map[string]string{"cache-tier": "large"},
+				},
+			},
+		},
+	}
+
+	manager, podControl, _, err := newTestController(node, ds)
+	if err != nil {
+		t.Fatalf("failed to create test controller: %v", err)
+	}
+	manager.dsStore.Add(ds)
+	manager.nodeStore.Add(node)
+
+	// Run sync — should create 1 pod, executing the NodePatches code path.
+	expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
+
+	if len(podControl.Templates) != 1 {
+		t.Fatalf("expected 1 pod template, got %d", len(podControl.Templates))
+	}
+	// The patched label should be present on the created pod template.
+	if podControl.Templates[0].Labels["cache-tier"] != "large" {
+		t.Errorf("expected label cache-tier=large from NodePatch, got %q",
+			podControl.Templates[0].Labels["cache-tier"])
+	}
+}
