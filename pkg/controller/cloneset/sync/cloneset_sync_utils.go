@@ -275,7 +275,17 @@ func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, cur
 		res.updateNum = 0 - updateNewDiff
 	}
 	if res.updateNum != 0 {
-		res.updateMaxUnavailable = maxUnavailable + len(pods) - replicas
+		// updateMaxUnavailable is the ceiling used by limitUpdateIndexes to decide
+		// how many pods may be simultaneously unavailable during an update pass.
+		// When len(pods) < replicas (e.g. the cluster is under-replicated because
+		// ScaleStrategy.MaxUnavailable is throttling new-pod creation to zero),
+		// the raw formula produces a negative number. limitUpdateIndexes's guard:
+		// targetRevisionUnavailableCount + canUpdateCount >= updateMaxUnavailable
+		// evaluates to 0 >= -N immediately, breaking the loop before any pod is
+		// examined and silently stalling the rollout. Clamping to zero preserves
+		// the correct blocking semantic for available pods (0+0 >= 0 is still true)
+		// without relying on integer-comparison overflow of a negative sentinel.
+		res.updateMaxUnavailable = integer.IntMax(maxUnavailable+len(pods)-replicas, 0)
 	}
 
 	return

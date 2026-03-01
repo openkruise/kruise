@@ -921,7 +921,38 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			expectResult: expectationDiffs{scaleUpNum: 2, scaleUpLimit: 2, updateNum: 3, updateMaxUnavailable: -2},
+			expectResult: expectationDiffs{scaleUpNum: 2, scaleUpLimit: 2, updateNum: 3, updateMaxUnavailable: 0},
+		},
+		{
+			// Regression: updateMaxUnavailable must never be negative.
+			//
+			// When ScaleStrategy.MaxUnavailable throttles pod creation to zero
+			// (scaleUpLimit=0), createPods(0,…) returns (false, nil) — not (true,nil).
+			// syncCloneSet therefore does NOT set scaling=true, so Update() is called
+			// with a pod list that is shorter than replicas. Without the clamp, the
+			// raw formula yields a negative updateMaxUnavailable and limitUpdateIndexes
+			// immediately returns an empty slice, silently stalling the rollout.
+			//
+			// Scenario: replicas=5, maxUnavailable=1, ScaleStrategy.MaxUnavailable=1
+			// pods: 1 available old-rev + 2 unavailable old-rev (node death)
+			// totalUnavailable=2 → scaleUpLimit=max(1-2,0)=0
+			// raw formula: 1 + 3 - 5 = -1 → clamped to 0
+			name: "update not blocked when scaleUpLimit=0 leaves cluster under-replicated",
+			set: setScaleStrategy(
+				createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
+				intstr.FromInt(1),
+			),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, false, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, false, false),
+			},
+			expectResult: expectationDiffs{
+				scaleUpNum:          2,
+				scaleUpLimit:        0,
+				updateNum:           3,
+				updateMaxUnavailable: 0,
+			},
 		},
 		{
 			name: "[UpdateStrategyPaused=true] scale down pods with maxSurge=3,maxUnavailable=0",
