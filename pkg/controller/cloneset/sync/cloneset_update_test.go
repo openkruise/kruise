@@ -1399,6 +1399,24 @@ func TestCalculateUpdateCount(t *testing.T) {
 			pods:               []*v1.Pod{readyPod(), readyPod(), readyPod(), readyPod(), readyPod(), readyPod()},
 			expectedResult:     2,
 		},
+		{
+			// Regression: when the cluster is under-replicated (len(pods) < replicas),
+			// updateMaxUnavailable clamps to zero. Already-unavailable pods must still
+			// be updated (updating them does not increase unavailability), while
+			// available pods must be blocked.
+			//
+			// replicas=5, maxUnavailable=1 (default 20%), pods=3 (2 missing)
+			// formula: 1 + 3 - 5 = -1 → clamped to 0
+			// pods[0] and pods[1] are unavailable old-rev → must be updated (count=2)
+			// pods[2] is available old-rev → must be blocked (budget exhausted)
+			strategy: appsv1beta1.CloneSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateCloneSetUpdateStrategyType,
+			},
+			totalReplicas:      5,
+			oldRevisionIndexes: []int{0, 1, 2},
+			pods:               []*v1.Pod{{}, {}, readyPod()},
+			expectedResult:     2,
+		},
 	}
 
 	coreControl := clonesetcore.New(&appsv1beta1.CloneSet{})
