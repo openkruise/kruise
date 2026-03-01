@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: guestbook-with-sidecar
+  labels:
+    app: guestbook-with-sidecar
+spec:
+  ports:
+  - port: 3000
+    targetPort: http-server
+    name: main-port
+  - port: 4000
+    targetPort: sidecar-server
+    name: sidecar-port
+  selector:
+    app.kubernetes.io/name: guestbook-with-sidecar
+  type: LoadBalancer

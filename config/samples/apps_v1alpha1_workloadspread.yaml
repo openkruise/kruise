@@ -1,0 +1,33 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: WorkloadSpread
+metadata:
+  name: workloadspread-sample
+spec:
+  targetRef:
+    apiVersion: apps.kruise.io/v1alpha1
+    kind: CloneSet
+    name: cs-sample
+  subsets:
+  - name: subset-a
+    requiredNodeSelectorTerm:
+      matchExpressions:
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values:
+          - zone-a
+    maxReplicas: 3
+    patch:
+      metadata:
+        labels:
+          subset-name: "subset-a"
+  - name: subset-b
+    requiredNodeSelectorTerm:
+      matchExpressions:
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values:
+          - zone-b
+    patch:
+      metadata:
+        labels:
+          subset-name: "subset-b"

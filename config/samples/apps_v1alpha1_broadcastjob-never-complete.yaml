@@ -1,0 +1,14 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: BroadcastJob
+metadata:
+  name: broadcastjob-never-complete
+spec:
+  template:
+    spec:
+      containers:
+        - name: sleep
+          image: busybox
+          command: ["sleep",  "5"]
+      restartPolicy: Never
+  completionPolicy:
+    type: Never

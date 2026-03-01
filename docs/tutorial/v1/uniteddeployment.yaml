@@ -1,0 +1,59 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: UnitedDeployment
+metadata:
+  labels:
+    app.kubernetes.io/name: guestbook-kruise
+    app.kubernetes.io/instance: demo
+  name: demo-guestbook-kruise
+spec:
+  replicas: 10
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: guestbook-kruise
+      app.kubernetes.io/instance: demo
+  template:
+    statefulSetTemplate:
+      metadata:
+        labels:
+          app.kubernetes.io/name: guestbook-kruise
+          app.kubernetes.io/instance: demo
+      spec:
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: guestbook-kruise
+              app.kubernetes.io/instance: demo
+          spec:
+            containers:
+              - name: guestbook-kruise
+                image: openkruise/guestbook:v1
+                imagePullPolicy: Always
+                ports:
+                  - name: http-server
+                    containerPort: 3000
+  topology:
+    subsets:
+      - name: subset-a
+        replicas: 2
+        nodeSelectorTerm:
+          matchExpressions:
+            - key: az
+              operator: In
+              values:
+                - zone-a
+      - name: subset-b
+        replicas: 50%
+        nodeSelectorTerm:
+          matchExpressions:
+            - key: az
+              operator: In
+              values:
+                - zone-b
+      - name: subset-c
+        nodeSelectorTerm:
+          matchExpressions:
+            - key: az
+              operator: In
+              values:
+                - zone-c

@@ -1,0 +1,51 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: UnitedDeployment
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: uniteddeployment-sample
+spec:
+  replicas: 6
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: foo
+  template:
+    statefulSetTemplate:
+      metadata:
+        labels:
+          app: foo
+      spec:
+        template:
+          metadata:
+            labels:
+              app: foo
+          spec:
+            containers:
+              - name: nginx
+                image: nginx
+  topology:
+    subsets:
+      - name: subset-a
+        replicas: 1
+        nodeSelectorTerm:
+          matchExpressions:
+            - key: node
+              operator: In
+              values:
+                - zone-a
+      - name: subset-b
+        replicas: 50%
+        nodeSelectorTerm:
+          matchExpressions:
+            - key: node
+              operator: In
+              values:
+                - zone-b
+      - name: subset-c
+        nodeSelectorTerm:
+          matchExpressions:
+            - key: node
+              operator: In
+              values:
+                - zone-c

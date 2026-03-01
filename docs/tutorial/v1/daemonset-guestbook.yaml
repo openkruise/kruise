@@ -1,0 +1,26 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: DaemonSet
+metadata:
+  name: guestbook-ds
+spec:
+  selector:
+    matchLabels:
+      app: guestbook-daemon
+  template:
+    metadata:
+      labels:
+        app: guestbook-daemon
+    spec:
+      containers:
+        - name: daemon
+          image: openkruise/guestbook:v1
+          resources:
+            limits:
+              cpu: "100m"
+              memory: "200Mi"
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+      partition: 0
+      rollingUpdateType: Standard
+    type: RollingUpdate

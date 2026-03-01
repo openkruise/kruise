@@ -1,0 +1,15 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: BroadcastJob
+metadata:
+  name: broadcastjob-active-deadline
+spec:
+  template:
+    spec:
+      containers:
+        - name: sleep
+          image: busybox
+          command: ["sleep",  "50000"]
+      restartPolicy: Never
+  completionPolicy:
+    type: Always
+    activeDeadlineSeconds: 200

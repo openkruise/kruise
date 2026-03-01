@@ -1,0 +1,22 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: CloneSet
+metadata:
+  labels:
+    app: sample
+  name: sample
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: sample
+  template:
+    metadata:
+      labels:
+        app: sample
+    spec:
+      containers:
+      - name: main
+        image: nginx:alpine
+  updateStrategy:
+    type: InPlaceIfPossible
+    maxUnavailable: 2

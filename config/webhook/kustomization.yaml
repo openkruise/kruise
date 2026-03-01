@@ -1,0 +1,12 @@
+# Adds namespace to all resources.
+namespace: kruise-system
+
+resources:
+- manifests.yaml
+- service.yaml
+
+patchesStrategicMerge:
+- patch_manifests.yaml
+
+configurations:
+- kustomizeconfig.yaml

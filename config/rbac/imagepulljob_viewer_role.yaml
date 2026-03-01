@@ -1,0 +1,20 @@
+# permissions for end users to view imagepulljobs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: imagepulljob-viewer-role
+rules:
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - imagepulljobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - imagepulljobs/status
+  verbs:
+  - get

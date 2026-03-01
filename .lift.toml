@@ -1,0 +1,4 @@
+# Ignore results from vendor directories
+ignoreFiles = """
+vendor/
+"""

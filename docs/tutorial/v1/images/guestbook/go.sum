@@ -1,0 +1,5 @@
+github.com/codegangsta/negroni v1.0.0/go.mod h1:v0y3T5G7Y1UlFfyxFn/QLRU4a2EuNau2iZY63YTKWo0=
+github.com/gomodule/redigo v2.0.0+incompatible/go.mod h1:B4C85qUVwatsJoIUNIfCRsp7qO0iAmpGFZ4EELWSbC4=
+github.com/gorilla/mux v1.8.0/go.mod h1:DVbg23sWSpFRCP0SfiEN6jmj59UnW/n46BH5rLB71So=
+github.com/xyproto/pinterface v0.0.0-20200201214933-70763765f31f/go.mod h1:X5B5pKE49ak7SpyDh5QvJvLH9cC9XuZNDcl5hEyYc34=
+github.com/xyproto/simpleredis v0.0.0-20200201215242-1ff0da2967b4/go.mod h1:U/ZOQqa0ggBGPs+d0y7r50BY6FyFTh5WhWf7F8f1MBM=

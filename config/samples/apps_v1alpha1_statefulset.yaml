@@ -1,0 +1,26 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: StatefulSet
+metadata:
+  name: sample
+spec:
+  replicas: 10
+  serviceName: fake-service
+  selector:
+    matchLabels:
+      app: sample
+  template:
+    metadata:
+      labels:
+        app: sample
+    spec:
+      readinessGates:
+        - conditionType: InPlaceUpdateReady
+      containers:
+        - name: main
+          image: nginx:alpine
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      podUpdatePolicy: InPlaceIfPossible
+      maxUnavailable: 2

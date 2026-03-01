@@ -1,0 +1,5 @@
+# Ignore results from test and vendor directories
+ignoreFiles = """
+vendor/
+test/
+"""

@@ -1,0 +1,277 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - events
+  - persistentvolumeclaims
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/ephemeralcontainers
+  - pods/resize
+  - pods/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - '*'
+  resources:
+  - '*'
+  verbs:
+  - list
+- apiGroups:
+  - '*'
+  resources:
+  - '*/scale'
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - controllerrevisions
+  - deployments
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments/status
+  - statefulsets/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps
+  resources:
+  - replicasets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - replicasets/status
+  verbs:
+  - get
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - advancedcronjobs
+  - broadcastjobs
+  - clonesets
+  - containerrecreaterequests
+  - daemonsets
+  - imagelistpulljobs
+  - imagepulljobs
+  - nodeimages
+  - nodepodprobes
+  - persistentpodstates
+  - podprobemarkers
+  - sidecarsets
+  - statefulsets
+  - uniteddeployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - advancedcronjobs/finalizers
+  - broadcastjobs/finalizers
+  - clonesets/finalizers
+  - containerrecreaterequests/finalizers
+  - daemonsets/finalizers
+  - imagelistpulljobs/finalizers
+  - imagepulljobs/finalizers
+  - nodeimages/finalizers
+  - nodepodprobes/finalizers
+  - persistentpodstates/finalizers
+  - podprobemarkers/finalizers
+  - resourcedistributions/finalizers
+  - sidecarsets/finalizers
+  - statefulsets/finalizers
+  - uniteddeployments/finalizers
+  - workloadspreads/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - advancedcronjobs/status
+  - broadcastjobs/status
+  - clonesets/status
+  - containerrecreaterequests/status
+  - daemonsets/status
+  - ephemeraljobs/finalizers
+  - ephemeraljobs/status
+  - imagelistpulljobs/status
+  - imagepulljobs/status
+  - nodeimages/status
+  - nodepodprobes/status
+  - persistentpodstates/status
+  - podprobemarkers/status
+  - resourcedistributions/status
+  - sidecarsets/status
+  - statefulsets/status
+  - uniteddeployments/status
+  - workloadspreads/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - ephemeraljobs
+  verbs:
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - resourcedistributions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - workloadspreads
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - policy.kruise.io
+  resources:
+  - podunavailablebudgets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - policy.kruise.io
+  resources:
+  - podunavailablebudgets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - policy.kruise.io
+  resources:
+  - podunavailablebudgets/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - get
+  - list
+  - watch

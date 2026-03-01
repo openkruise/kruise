@@ -1,0 +1,117 @@
+domain: kruise.io
+layout:
+- go.kubebuilder.io/v3
+multigroup: true
+projectName: kruise
+repo: github.com/openkruise/kruise
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kruise.io
+  group: apps
+  kind: AdvancedCronJob
+  path: github.com/openkruise/kruise/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kruise.io
+  group: apps
+  kind: BroadcastJob
+  path: github.com/openkruise/kruise/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kruise.io
+  group: apps
+  kind: CloneSet
+  path: github.com/openkruise/kruise/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kruise.io
+  group: apps
+  kind: ContainerRecreateRequest
+  path: github.com/openkruise/kruise/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kruise.io
+  group: apps
+  kind: DaemonSet
+  path: github.com/openkruise/kruise/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kruise.io
+  group: apps
+  kind: ImagePullJob
+  path: github.com/openkruise/kruise/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  domain: kruise.io
+  group: apps
+  kind: NodeImage
+  path: github.com/openkruise/kruise/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  domain: kruise.io
+  group: apps
+  kind: ResourceDistribution
+  path: github.com/openkruise/kruise/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  domain: kruise.io
+  group: apps
+  kind: SidecarSet
+  path: github.com/openkruise/kruise/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kruise.io
+  group: apps
+  kind: StatefulSet
+  path: github.com/openkruise/kruise/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kruise.io
+  group: apps
+  kind: UnitedDeployment
+  path: github.com/openkruise/kruise/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kruise.io
+  group: apps
+  kind: WorkloadSpread
+  path: github.com/openkruise/kruise/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kruise.io
+  group: apps
+  kind: StatefulSet
+  path: github.com/openkruise/kruise/apis/apps/v1beta1
+  version: v1beta1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kruise.io
+  group: policy
+  kind: PodUnavailableBudget
+  path: github.com/openkruise/kruise/apis/policy/v1alpha1
+  version: v1alpha1
+version: "3"

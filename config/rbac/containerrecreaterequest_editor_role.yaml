@@ -1,0 +1,24 @@
+# permissions for end users to edit containerrecreaterequests.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: containerrecreaterequest-editor-role
+rules:
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - containerrecreaterequests
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kruise.io
+  resources:
+  - containerrecreaterequests/status
+  verbs:
+  - get

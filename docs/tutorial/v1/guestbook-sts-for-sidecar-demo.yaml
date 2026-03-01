@@ -1,0 +1,36 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: StatefulSet
+metadata:
+  name: guestbook-with-sidecar
+  labels:
+    app: guestbook
+    version: "1.0"
+spec:
+  replicas: 20
+  serviceName: guestbook-with-sidecar
+  selector:
+    matchLabels:
+      app.kubernetes.io/name:  guestbook-with-sidecar
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name:  guestbook-with-sidecar
+        version: "1.0"
+    spec:
+      readinessGates:
+        # A new condition that ensures the pod remains at NotReady state while the in-place update is happening
+        - conditionType: InPlaceUpdateReady
+      containers:
+      - name: guestbook
+        image: openkruise/guestbook:v1
+        ports:
+        - name: http-server
+          containerPort: 3000
+  podManagementPolicy: Parallel  # allow parallel updates, works together with maxUnavailable
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Do in-place update if possible, currently only image update is supported for in-place update
+      podUpdatePolicy: InPlaceIfPossible
+      # Allow parallel updates with max number of unavailable instances equals to 2
+      maxUnavailable: 3

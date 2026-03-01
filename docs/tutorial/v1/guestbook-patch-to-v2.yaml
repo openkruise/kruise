@@ -1,0 +1,41 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: StatefulSet
+metadata:
+  name: demo-v1-guestbook-kruise
+  labels:
+    app.kubernetes.io/name: guestbook-kruise
+    helm.sh/chart: guestbook-kruise-0.3.0
+    app.kubernetes.io/instance: demo-v1
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 20
+  serviceName: demo-v1-guestbook-kruise
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: guestbook-kruise
+      app.kubernetes.io/instance: demo-v1
+  podManagementPolicy: Parallel  # allow parallel updates, works together with maxUnavailable
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Do in-place update if possible, currently only image update is supported for in-place update
+      podUpdatePolicy: InPlaceIfPossible
+      # Allow parallel updates with max number of unavailable instances equals to 2
+      maxUnavailable: 3
+      partition: 15
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: guestbook-kruise
+        app.kubernetes.io/instance: demo-v1
+    spec:
+      readinessGates:
+        # A new condition must be added to ensure the pod remain at NotReady state while the in-place update is happening
+      - conditionType: InPlaceUpdateReady
+      containers:
+      - name: guestbook-kruise
+        image: openkruise/guestbook:v2
+        imagePullPolicy: Always
+        ports:
+        - name: http-server
+          containerPort: 3000

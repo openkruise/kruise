@@ -1,0 +1,61 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: mutating-webhook-configuration
+webhooks:
+- name: mpod.kb.io
+  namespaceSelector:
+    matchExpressions:
+    - key: control-plane
+      operator: DoesNotExist
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: validating-webhook-configuration
+webhooks:
+- name: vbuiltindeployment.kb.io
+  objectSelector:
+    matchExpressions:
+    - key: policy.kruise.io/delete-protection
+      operator: Exists
+- name: vbuiltinreplicaset.kb.io
+  objectSelector:
+    matchExpressions:
+    - key: policy.kruise.io/delete-protection
+      operator: Exists
+- name: vbuiltinstatefulset.kb.io
+  objectSelector:
+    matchExpressions:
+    - key: policy.kruise.io/delete-protection
+      operator: Exists
+- name: vcustomresourcedefinition.kb.io
+  objectSelector:
+    matchExpressions:
+    - key: policy.kruise.io/delete-protection
+      operator: Exists
+- name: vnamespace.kb.io
+  objectSelector:
+    matchExpressions:
+    - key: policy.kruise.io/delete-protection
+      operator: Exists
+- name: vservice.kb.io
+  objectSelector:
+    matchExpressions:
+      - key: policy.kruise.io/delete-protection
+        operator: Exists
+- name: vingress.kb.io
+  objectSelector:
+    matchExpressions:
+      - key: policy.kruise.io/delete-protection
+        operator: Exists
+- name: vpod.kb.io
+  namespaceSelector:
+    matchExpressions:
+      - key: control-plane
+        operator: DoesNotExist
+- name: vpodeviction.kb.io
+  namespaceSelector:
+    matchExpressions:
+      - key: control-plane
+        operator: DoesNotExist
