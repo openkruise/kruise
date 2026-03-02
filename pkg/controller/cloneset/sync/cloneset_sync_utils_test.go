@@ -937,7 +937,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 			// pods: 1 available old-rev + 2 unavailable old-rev (node death)
 			// totalUnavailable=2 → scaleUpLimit=max(1-2,0)=0
 			// raw formula: 1 + 3 - 5 = -1 → clamped to 0
-			name: "update not blocked when scaleUpLimit=0 leaves cluster under-replicated",
+			name: "updateMaxUnavailable clamped to zero (not negative) when cluster is under-replicated",
 			set: setScaleStrategy(
 				createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
 				intstr.FromInt(1),
