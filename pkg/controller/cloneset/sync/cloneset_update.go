@@ -382,7 +382,13 @@ func limitUpdateIndexes(coreControl clonesetcore.Control, minReadySeconds int32,
 	for _, i := range waitUpdateIndexes {
 		// Make sure unavailable pods in target revision should not be more than maxUnavailable.
 		if targetRevisionUnavailableCount+canUpdateCount >= diffRes.updateMaxUnavailable {
-			break
+			// When updateMaxUnavailable is zero (raw formula was negative and was clamped),
+			// an already-unavailable pod may still be updated because doing so does not
+			// increase the cluster's unavailability. A zero budget only blocks transitions
+			// from available to unavailable.
+			if diffRes.updateMaxUnavailable != 0 || IsPodAvailable(coreControl, pods[i], minReadySeconds) {
+				break
+			}
 		}
 
 		// Make sure unavailable pods in all revisions should not be more than maxUnavailable.
