@@ -204,8 +204,16 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 	if crr.Spec.ActiveDeadlineSeconds != nil {
 		leftTime := time.Duration(*crr.Spec.ActiveDeadlineSeconds)*time.Second - time.Since(crr.CreationTimestamp.Time)
 		if leftTime <= 0 {
+			msg := "recreating has exceeded the activeDeadlineSeconds"
+			for i := range crr.Status.ContainerRecreateStates {
+				state := &crr.Status.ContainerRecreateStates[i]
+				if state.Phase != appsv1alpha1.ContainerRecreateRequestSucceeded && state.Phase != appsv1alpha1.ContainerRecreateRequestFailed {
+					state.Phase = appsv1alpha1.ContainerRecreateRequestFailed
+					state.Message = msg
+				}
+			}
 			klog.InfoS("Completed CRR as failure for recreating has exceeded the activeDeadlineSeconds", "containerRecreateRequest", klog.KObj(crr))
-			return reconcile.Result{}, r.completeCRR(crr, "recreating has exceeded the activeDeadlineSeconds")
+			return reconcile.Result{}, r.completeCRR(crr, msg)
 		}
 		duration.Update(leftTime)
 	}
