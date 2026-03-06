@@ -494,6 +494,9 @@ func TestSyncCloneSet(t *testing.T) {
 						appsv1.ControllerRevisionHashLabelKey: revision,
 					},
 				})
+				if err != nil {
+					t.Fatal(err)
+				}
 				opts := &client.ListOptions{
 					LabelSelector: selector,
 				}

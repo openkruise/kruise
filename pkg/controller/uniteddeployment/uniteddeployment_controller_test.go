@@ -482,11 +482,13 @@ func TestCalculateSubsetsStatusForReservedAdaptiveStrategy(t *testing.T) {
 			if status == nil {
 				t.Logf("case %s failed: SubsetStatus not found", c.name)
 				t.Fail()
+				return
 			}
 			condition := status.GetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable)
 			if condition == nil {
 				t.Logf("case %s failed: Condition not found", c.name)
 				t.Fail()
+				return
 			}
 			if condition.Status != corev1.ConditionTrue && !c.unschedulable {
 				t.Logf("case %s failed: expect unschedulable false, but got true", c.name)
