@@ -139,6 +139,11 @@ func validateRollingUpdateDaemonSet(rollingUpdate *appsv1alpha1.RollingUpdateDae
 		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*rollingUpdate.Partition, fldPath.Child("rollingUpdate").Child("partition"))...)
 	}
 
+	_, err := metav1.LabelSelectorAsSelector(rollingUpdate.Selector)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), rollingUpdate.Selector, "`selector` is invalid"))
+	}
+
 	return allErrs
 }
 
@@ -285,6 +290,15 @@ func validateRollingUpdateDaemonSetV1beta1(rollingUpdate *appsv1beta1.RollingUpd
 	if rollingUpdate.Partition != nil {
 		allErrs = append(allErrs, validateNonnegativeIntOrPercent(*rollingUpdate.Partition, fldPath.Child("rollingUpdate").Child("partition"))...)
 		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*rollingUpdate.Partition, fldPath.Child("rollingUpdate").Child("partition"))...)
+	}
+
+	_, err := metav1.LabelSelectorAsSelector(rollingUpdate.Selector)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), rollingUpdate.Selector, "`selector` is invalid"))
+	}
+	_, err = metav1.LabelSelectorAsSelector(rollingUpdate.ExemptNodesFromMaxUnavailable)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("exemptNodesFromMaxUnavailable"), rollingUpdate.ExemptNodesFromMaxUnavailable, "`exemptNodesFromMaxUnavailable` is invalid"))
 	}
 
 	return allErrs
