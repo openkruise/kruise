@@ -333,35 +333,43 @@ func GetInjectedVolumeMountsAndEnvs(control SidecarControl, sidecarContainer *ap
 	var injectedMounts []corev1.VolumeMount
 	// injected EnvVar
 	var injectedEnvs []corev1.EnvVar
-	for _, appContainer := range pod.Spec.Containers {
-		// ignore the injected sidecar container
-		if IsInjectedSidecarContainerInPod(&appContainer) {
-			continue
-		}
 
-		for _, volumeMount := range appContainer.VolumeMounts {
-			if !control.NeedToInjectVolumeMount(volumeMount) {
+	// Helper to process containers
+	processContainers := func(containers []corev1.Container) {
+		for _, container := range containers {
+			// ignore the injected sidecar container
+			if IsInjectedSidecarContainerInPod(&container) {
 				continue
 			}
-			injectedMounts = append(injectedMounts, volumeMount)
-			// If volumeMounts.SubPathExpr contains expansions, copy environment
-			// for example: SubPathExpr=foo/$(ODD_NAME)/$(POD_NAME), we need copy environment ODD_NAME、POD_NAME
-			// envs = [$(ODD_NAME) $(POD_NAME)]
-			envs := SubPathExprEnvReg.FindAllString(volumeMount.SubPathExpr, -1)
-			for _, env := range envs {
-				// $(ODD_NAME) -> ODD_NAME
-				envName := env[2 : len(env)-1]
-				// get envVar in container
-				eVar := util.GetContainerEnvVar(&appContainer, envName)
-				if eVar == nil {
-					klog.InfoS("Pod container got nil env", "pod", klog.KObj(pod), "containerName", appContainer.Name, "env", envName)
+
+			for _, volumeMount := range container.VolumeMounts {
+				if !control.NeedToInjectVolumeMount(volumeMount) {
 					continue
 				}
-				injectedEnvs = append(injectedEnvs, *eVar)
+				injectedMounts = append(injectedMounts, volumeMount)
+				// If volumeMounts.SubPathExpr contains expansions, copy environment
+				// for example: SubPathExpr=foo/$(ODD_NAME)/$(POD_NAME), we need copy environment ODD_NAME、POD_NAME
+				// envs = [$(ODD_NAME) $(POD_NAME)]
+				envs := SubPathExprEnvReg.FindAllString(volumeMount.SubPathExpr, -1)
+				for _, env := range envs {
+					// $(ODD_NAME) -> ODD_NAME
+					envName := env[2 : len(env)-1]
+					// get envVar in container
+					eVar := util.GetContainerEnvVar(&container, envName)
+					if eVar == nil {
+						klog.InfoS("Pod container got nil env", "pod", klog.KObj(pod), "containerName", container.Name, "env", envName)
+						continue
+					}
+					injectedEnvs = append(injectedEnvs, *eVar)
+				}
 			}
 		}
 	}
-	// TODO: share pod.spec.initContainers[*].volumeMounts
+
+	processContainers(pod.Spec.Containers)
+	// App container volume mounts take precedence over init container mounts when conflicts exist.
+	processContainers(pod.Spec.InitContainers)
+
 	return injectedMounts, injectedEnvs
 }
 
@@ -379,17 +387,23 @@ func GetInjectedVolumeDevices(sidecarContainer *appsv1beta1.SidecarContainer, po
 
 	// injected volumeDevices
 	var volumeDevices []corev1.VolumeDevice
-	for _, appContainer := range pod.Spec.Containers {
-		// ignore the injected sidecar container
-		if IsInjectedSidecarContainerInPod(&appContainer) {
-			continue
-		}
 
-		for _, volumeDevice := range appContainer.VolumeDevices {
-			volumeDevices = append(volumeDevices, volumeDevice)
+	processContainers := func(containers []corev1.Container) {
+		for _, container := range containers {
+			// ignore the injected sidecar container
+			if IsInjectedSidecarContainerInPod(&container) {
+				continue
+			}
+
+			for _, volumeDevice := range container.VolumeDevices {
+				volumeDevices = append(volumeDevices, volumeDevice)
+			}
 		}
 	}
-	// TODO: share pod.spec.initContainers[*].volumeDevices
+
+	processContainers(pod.Spec.Containers)
+	processContainers(pod.Spec.InitContainers)
+
 	return volumeDevices
 }
 
