@@ -19,7 +19,11 @@ package controllerfinder
 import (
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	fakediscovery "k8s.io/client-go/discovery/fake"
+	fakeclientset "k8s.io/client-go/kubernetes/fake"
 )
 
 func Test_getSpecReplicas(t *testing.T) {
@@ -78,6 +82,94 @@ func Test_getSpecReplicas(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("getSpecReplicas() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_implementsScale(t *testing.T) {
+	tests := []struct {
+		name           string
+		gvk            schema.GroupVersionKind
+		setupDiscovery func() *fakediscovery.FakeDiscovery
+		want           bool
+	}{
+		{
+			name: "Deployment supports scale",
+			gvk:  schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
+			setupDiscovery: func() *fakediscovery.FakeDiscovery {
+				client := fakeclientset.NewSimpleClientset()
+				fakeDiscovery := client.Discovery().(*fakediscovery.FakeDiscovery)
+				fakeDiscovery.Resources = []*metav1.APIResourceList{
+					{
+						GroupVersion: "apps/v1",
+						APIResources: []metav1.APIResource{
+							{Name: "deployments", Kind: "Deployment"},
+							{Name: "deployments/scale", Kind: "Scale"},
+						},
+					},
+				}
+				return fakeDiscovery
+			},
+			want: true,
+		},
+		{
+			name: "ConfigMap does not support scale",
+			gvk:  schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"},
+			setupDiscovery: func() *fakediscovery.FakeDiscovery {
+				client := fakeclientset.NewSimpleClientset()
+				fakeDiscovery := client.Discovery().(*fakediscovery.FakeDiscovery)
+				fakeDiscovery.Resources = []*metav1.APIResourceList{
+					{
+						GroupVersion: "v1",
+						APIResources: []metav1.APIResource{
+							{Name: "configmaps", Kind: "ConfigMap"},
+						},
+					},
+				}
+				return fakeDiscovery
+			},
+			want: false,
+		},
+		{
+			name: "nil discovery client returns true",
+			gvk:  schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
+			setupDiscovery: func() *fakediscovery.FakeDiscovery {
+				return nil
+			},
+			want: true,
+		},
+		{
+			name: "Kind not found in API group",
+			gvk:  schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Unknown"},
+			setupDiscovery: func() *fakediscovery.FakeDiscovery {
+				client := fakeclientset.NewSimpleClientset()
+				fakeDiscovery := client.Discovery().(*fakediscovery.FakeDiscovery)
+				fakeDiscovery.Resources = []*metav1.APIResourceList{
+					{
+						GroupVersion: "apps/v1",
+						APIResources: []metav1.APIResource{
+							{Name: "deployments", Kind: "Deployment"},
+						},
+					},
+				}
+				return fakeDiscovery
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			finder := &ControllerFinder{}
+			discovery := tt.setupDiscovery()
+			if discovery != nil {
+				finder.discoveryClient = discovery
+			}
+
+			got := finder.implementsScale(tt.gvk)
+			if got != tt.want {
+				t.Errorf("implementsScale() = %v, want %v", got, tt.want)
 			}
 		})
 	}
