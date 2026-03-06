@@ -70,7 +70,9 @@ type fakePatchAdapter struct {
 
 func (f *fakePatchAdapter) PatchPod(pod *corev1.Pod, _ client.Patch) (*corev1.Pod, error) {
 	f.patchCalled = true
+	f.updateCalled = true
 	f.patchedPod = pod
+	f.updatedPod = pod
 	return pod, f.err
 }
 func (f *fakePatchAdapter) PatchPodResource(pod *corev1.Pod, _ client.Patch) (*corev1.Pod, error) {
@@ -590,7 +592,7 @@ func Test_realControl_UpdatePodLifecycle(t *testing.T) {
 	t.Run("error from executePodNotReadyPolicy", func(t *testing.T) {
 		silenceKlogForTest(t)
 		rc := &realControl{
-			adp: &fakeAdapter{},
+			adp: &fakePatchAdapter{},
 			podReadinessControl: &fakePodReadinessControl{
 				err: errors.New("readiness error"),
 			},
@@ -609,7 +611,7 @@ func Test_realControl_UpdatePodLifecycle(t *testing.T) {
 
 	t.Run("no-op if already in target state", func(t *testing.T) {
 		rc := &realControl{
-			adp:                 &fakeAdapter{},
+			adp:                 &fakePatchAdapter{},
 			podReadinessControl: &fakePodReadinessControl{},
 		}
 		pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{
@@ -641,7 +643,7 @@ func Test_realControl_UpdatePodLifecycle(t *testing.T) {
 	})
 
 	t.Run("fallback to UpdatePod if no PatchPod", func(t *testing.T) {
-		adp := &fakeAdapter{}
+		adp := &fakePatchAdapter{}
 		rc := &realControl{
 			adp:                 adp,
 			podReadinessControl: &fakePodReadinessControl{},
@@ -660,7 +662,7 @@ func Test_realControl_UpdatePodLifecycle(t *testing.T) {
 func Test_realControl_UpdatePodLifecycleWithHandler(t *testing.T) {
 	t.Run("empty handler or empty pod", func(t *testing.T) {
 		rc := &realControl{
-			adp:                 &fakeAdapter{},
+			adp:                 &fakePatchAdapter{},
 			podReadinessControl: &fakePodReadinessControl{},
 		}
 		handler := &appspub.LifecycleHook{}
@@ -677,7 +679,7 @@ func Test_realControl_UpdatePodLifecycleWithHandler(t *testing.T) {
 	t.Run("error from executePodNotReadyPolicy", func(t *testing.T) {
 		silenceKlogForTest(t)
 		rc := &realControl{
-			adp: &fakeAdapter{},
+			adp: &fakePatchAdapter{},
 			podReadinessControl: &fakePodReadinessControl{
 				err: errors.New("readiness error"),
 			},
@@ -699,7 +701,7 @@ func Test_realControl_UpdatePodLifecycleWithHandler(t *testing.T) {
 
 	t.Run("no-op if already in target state", func(t *testing.T) {
 		rc := &realControl{
-			adp:                 &fakeAdapter{},
+			adp:                 &fakePatchAdapter{},
 			podReadinessControl: &fakePodReadinessControl{},
 		}
 		handler := &appspub.LifecycleHook{
@@ -739,7 +741,7 @@ func Test_realControl_UpdatePodLifecycleWithHandler(t *testing.T) {
 	})
 
 	t.Run("fallback to UpdatePod if no PatchPod", func(t *testing.T) {
-		adp := &fakeAdapter{}
+		adp := &fakePatchAdapter{}
 		rc := &realControl{
 			adp:                 adp,
 			podReadinessControl: &fakePodReadinessControl{},
