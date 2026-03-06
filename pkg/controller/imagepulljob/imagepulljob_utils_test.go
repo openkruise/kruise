@@ -17,6 +17,7 @@ limitations under the License.
 package imagepulljob
 
 import (
+	"fmt"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -189,5 +190,62 @@ func TestGetSourceSecretWithEmptyAnnotation(t *testing.T) {
 	// If we reach here without panic, the function didn't behave as expected
 	if result.Name != "" || result.Namespace != "" {
 		t.Errorf("Expected panic for empty annotation, but got %+v", result)
+	}
+}
+
+func TestDefaultGenerateRandomString(t *testing.T) {
+	result := defaultGenerateRandomString()
+
+	// Should return a 6-character hex string
+	if len(result) != 6 {
+		t.Errorf("Expected 6 character string, got %d characters: %s", len(result), result)
+	}
+
+	// Should be valid hex
+	for _, c := range result {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			t.Errorf("Expected hex string, got non-hex character: %c in %s", c, result)
+		}
+	}
+
+	// Should generate different values (test multiple times)
+	seen := make(map[string]bool)
+	for i := 0; i < 10; i++ {
+		s := defaultGenerateRandomString()
+		seen[s] = true
+	}
+	// With 10 random strings, we should see at least 2 different values
+	if len(seen) < 2 {
+		t.Errorf("Expected random strings to be different, but got same value multiple times")
+	}
+}
+
+// failingReader is a reader that always returns an error
+type failingReader struct{}
+
+func (f failingReader) Read(p []byte) (n int, err error) {
+	return 0, fmt.Errorf("simulated read failure")
+}
+
+func TestDefaultGenerateRandomStringFallback(t *testing.T) {
+	// Save original reader and restore after test
+	oldReader := randReader
+	defer func() { randReader = oldReader }()
+
+	// Replace with failing reader to trigger fallback
+	randReader = failingReader{}
+
+	result := defaultGenerateRandomString()
+
+	// Should still return a 6-character hex string (using fallback)
+	if len(result) != 6 {
+		t.Errorf("Expected 6 character string from fallback, got %d characters: %s", len(result), result)
+	}
+
+	// Should be valid hex
+	for _, c := range result {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			t.Errorf("Expected hex string from fallback, got non-hex character: %c in %s", c, result)
+		}
 	}
 }

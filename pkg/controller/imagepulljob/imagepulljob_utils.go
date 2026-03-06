@@ -17,10 +17,13 @@ limitations under the License.
 package imagepulljob
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
+	"io"
+	mathrand "math/rand"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -54,7 +57,7 @@ func getTTLSecondsForAlways(job *appsv1beta1.ImagePullJob) *int32 {
 		}
 		ret = timeoutSeconds * backoffLimit
 	}
-	ret += util.GetDefaultTtlsecondsForAlwaysNodeimage() + rand.Int31n(300)
+	ret += util.GetDefaultTtlsecondsForAlwaysNodeimage() + mathrand.Int31n(300)
 	return &ret
 }
 
@@ -86,7 +89,7 @@ func getImagePullPolicy(job *appsv1beta1.ImagePullJob) *appsv1beta1.ImageTagPull
 
 func getTTLSecondsForNever() *int32 {
 	// 24h +- 10min
-	var ret = defaultTTLSecondsForNever + rand.Int31n(1200) - 600
+	var ret = defaultTTLSecondsForNever + mathrand.Int31n(1200) - 600
 	return &ret
 }
 
@@ -152,11 +155,16 @@ func getSourceSecret(secret *v1.Secret) appsv1beta1.ReferenceObject {
 	return *appsv1beta1.ParseReferenceObject(secret.Annotations[SecretAnnotationSourceSecretKey])
 }
 
+// randReader is a variable that can be replaced in tests to simulate failures
+var randReader io.Reader = rand.Reader
+
 // Generate a six-character random string
 func defaultGenerateRandomString() string {
 	bytes := make([]byte, 3)
-	if _, err := rand.Read(bytes); err != nil {
-		panic(err)
+	if _, err := randReader.Read(bytes); err != nil {
+		// Fallback to timestamp-based random string if rand.Read fails
+		klog.Warningf("Failed to generate random bytes: %v, using fallback", err)
+		return fmt.Sprintf("%06x", time.Now().UnixNano()%0xFFFFFF)
 	}
 	return hex.EncodeToString(bytes)[:6]
 }
