@@ -33,7 +33,7 @@ import (
 type Interface interface {
 	Scale(
 		currentCS, updateCS *appsv1beta1.CloneSet,
-		currentRevision, updateRevision string,
+		currentRevision, updateRevision *apps.ControllerRevision,
 		pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 	) (bool, error)
 
