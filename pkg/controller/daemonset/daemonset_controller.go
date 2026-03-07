@@ -110,6 +110,11 @@ const (
 	// This annotation will be added to DaemonSet when it is created, and removed if partition is set to 0.
 	ProgressiveCreatePod = "daemonset.kruise.io/progressive-create-pod"
 
+	// IgnoreNotReadyNodes indicates that pods on NotReady nodes should be ignored during rolling update.
+	// When this annotation is set to "true", pods on NotReady nodes will not be counted in numUnavailable,
+	// and these pods will be deleted to allow new pods to be created when nodes become ready.
+	IgnoreNotReadyNodes = "daemonset.kruise.io/ignore-notready-nodes"
+
 	// BackoffGCInterval is the time that has to pass before next iteration of backoff GC is run
 	BackoffGCInterval = 1 * time.Minute
 )
@@ -1107,4 +1112,13 @@ func (dsc *ReconcileDaemonSet) hasPodExpectationsSatisfied(ctx context.Context, 
 		}
 	}
 	return true
+}
+
+// shouldIgnoreNodeNotReadyPods returns true when the DaemonSet has the annotation to ignore
+// pods on NotReady nodes during rolling update (they are not counted in numUnavailable and will be deleted).
+func shouldIgnoreNodeNotReadyPods(ds *appsv1beta1.DaemonSet) bool {
+	if ds.Annotations == nil {
+		return false
+	}
+	return ds.Annotations[IgnoreNotReadyNodes] == "true"
 }
