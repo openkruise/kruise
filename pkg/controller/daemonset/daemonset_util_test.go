@@ -273,6 +273,11 @@ func TestGetPodRevision(t *testing.T) {
 }
 
 func newNode(name string, label map[string]string) *corev1.Node {
+	if label == nil {
+		label = make(map[string]string)
+	}
+	label["kubernetes.io/hostname"] = name
+	
 	return &corev1.Node{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
@@ -294,6 +299,24 @@ func newNode(name string, label map[string]string) *corev1.Node {
 func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]string) {
 	for i := startIndex; i < startIndex+numNodes; i++ {
 		nodeStore.Add(newNode(fmt.Sprintf("node-%d", i), label))
+	}
+}
+
+// setNodesNotReady updates the given nodes in the store to have NodeReady=False.
+func setNodesNotReady(nodeStore cache.Store, nodeNames ...string) {
+	for _, name := range nodeNames {
+		obj, exists, _ := nodeStore.GetByKey(name)
+		if !exists {
+			continue
+		}
+		node := obj.(*corev1.Node).DeepCopy()
+		for i := range node.Status.Conditions {
+			if node.Status.Conditions[i].Type == corev1.NodeReady {
+				node.Status.Conditions[i].Status = corev1.ConditionFalse
+				break
+			}
+		}
+		_ = nodeStore.Update(node)
 	}
 }
 

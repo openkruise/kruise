@@ -39,6 +39,31 @@ import (
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
+//func (dsc *ReconcileDaemonSet) deleteNotReadyNodePods(ds *appsv1beta1.DaemonSet, nodeName string, pods []*corev1.Pod) (bool, []string) {
+//	if shouldIgnoreNodeNotReadyPods(ds) { // todo 刨除 不符合条件的node
+//		return false, []string{}
+//	}
+//
+//	var podNames []string
+//	for _, pod := range pods {
+//		podNames = append(podNames, pod.Name)
+//	}
+//
+//	node, err := dsc.nodeLister.Get(nodeName)
+//	if err != nil {
+//		if errors.IsNotFound(err) {
+//			return true, podNames
+//		}
+//		return true, []string{}
+//	}
+//
+//	wantToRun, _ := nodeShouldRunDaemonPod(node, ds)
+//	if !wantToRun {
+//		return true, podNames
+//	}
+//	return false, []string{}
+//}
+
 // rollingUpdate identifies the set of old pods to in-place update, delete, or additional pods to create on nodes,
 // remaining within the constraints imposed by the update strategy.
 func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1beta1.DaemonSet, nodeList []*corev1.Node, curRevision *apps.ControllerRevision, oldRevisions []*apps.ControllerRevision) error {
@@ -77,6 +102,11 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1beta
 		var allowedReplacementPods []string
 		var candidatePodsToDelete []string
 		for nodeName, pods := range nodeToDaemonPods {
+			//if ok, podNames := dsc.deleteNotReadyNodePods(ds, nodeName, pods); ok {
+			//	candidatePodsToDelete = append(candidatePodsToDelete, podNames...)
+			//	continue
+			//}
+
 			newPod, oldPod, ok := findUpdatedPodsOnNode(ds, pods, hash)
 			if !ok {
 				// let the manage loop clean up this node, and treat it as an unavailable node
@@ -235,11 +265,13 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1beta
 // updatedDesiredNodeCounts calculates the true number of allowed unavailable or surge pods and
 // updates the nodeToDaemonPods array to include an empty array for every node that is not scheduled.
 func (dsc *ReconcileDaemonSet) updatedDesiredNodeCounts(ds *appsv1beta1.DaemonSet, nodeList []*corev1.Node, nodeToDaemonPods map[string][]*corev1.Pod) (int, int, error) {
+	var unexpectedPodCount int
 	var desiredNumberScheduled int
 	for i := range nodeList {
 		node := nodeList[i]
 		wantToRun, _ := nodeShouldRunDaemonPod(node, ds)
 		if !wantToRun {
+			unexpectedPodCount += len(nodeToDaemonPods[node.Name])
 			continue
 		}
 		desiredNumberScheduled++
@@ -265,6 +297,11 @@ func (dsc *ReconcileDaemonSet) updatedDesiredNodeCounts(ds *appsv1beta1.DaemonSe
 		klog.InfoS("DaemonSet was not configured for surge or unavailability, defaulting to accepting unavailability", "daemonSet", klog.KObj(ds))
 		maxUnavailable = 1
 	}
+	if shouldIgnoreNodeNotReadyPods(ds) {
+		maxUnavailable += unexpectedPodCount
+		klog.V(5).InfoS("DaemonSet with ignore annotations", "daemonSet", klog.KObj(ds), "unexpectedPodCount", unexpectedPodCount)
+	}
+
 	klog.V(5).InfoS("DaemonSet with maxSurge and maxUnavailable", "daemonSet", klog.KObj(ds), "maxSurge", maxSurge, "maxUnavailable", maxUnavailable)
 	return maxSurge, maxUnavailable, nil
 }

@@ -30,7 +30,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/informers"
@@ -314,11 +316,17 @@ func expectSyncDaemonSets(t *testing.T, manager *daemonSetsController, ds *appsv
 	}
 }
 
-func markPodsReady(store cache.Store) {
+func markPodsReady(store cache.Store, options []func(*corev1.Pod) bool) {
 	// mark pods as ready
 	for _, obj := range store.List() {
 		pod := obj.(*corev1.Pod)
-		markPodReady(pod)
+		handle := true
+		for _, option := range options {
+			handle = handle && option(pod)
+		}
+		if handle {
+			markPodReady(pod)
+		}
 	}
 }
 
@@ -408,4 +416,108 @@ func Test_isControlledByDaemonSet(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestManageDeletesPodsOnNotReadyNodesWhenIgnoreAnnotation(t *testing.T) {
+	ds := newDaemonSet("foo")
+	if ds.Annotations == nil {
+		ds.Annotations = make(map[string]string)
+	}
+	ds.Annotations[IgnoreNotReadyNodes] = "true"
+	ds.Spec.UpdateStrategy = appsv1beta1.DaemonSetUpdateStrategy{
+		Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+			MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+		},
+	}
+	manager, podControl, _, err := newTestController(ds)
+	if err != nil {
+		t.Fatalf("error creating DaemonSets controller: %v", err)
+	}
+
+	// 5 nodes, initial sync creates one pod per node.
+	addNodes(manager.nodeStore, 0, 5, nil)
+	notReadyNodeSets := sets.NewString("node-0", "node-1")
+	setPodReady := func(all bool) {
+		markPodsReady(podControl.podStore, []func(*corev1.Pod) bool{func(pod *corev1.Pod) bool {
+			if all {
+				return true
+			}
+			nodeName, _ := util.GetTargetNodeName(pod)
+			if notReadyNodeSets.Has(nodeName) {
+				return false
+			}
+			return true
+		}})
+	}
+
+	clearExpectations(t, manager, ds, podControl)
+	manager.dsStore.Add(ds)
+	expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
+	setPodReady(true)
+
+	// Mark two nodes NotReady and expect manage() NOT to delete pods on those nodes
+	// because IgnoreNotReadyNodes annotation is set.
+	clearExpectations(t, manager, ds, podControl)
+	setNodesNotReady(manager.nodeStore, notReadyNodeSets.List()...)
+	expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
+
+	ds.Spec.Template.Spec.Affinity = &corev1.Affinity{
+		NodeAffinity: &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "kubernetes.io/hostname",
+								Operator: corev1.NodeSelectorOpNotIn,
+								Values:   notReadyNodeSets.List(),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	ds.Spec.Template.Spec.Containers[0].Image = "bar2"
+	ds.Generation++
+	manager.dsStore.Update(ds)
+	// manage 2  update 1
+	clearExpectations(t, manager, ds, podControl)
+	expectSyncDaemonSets(t, manager, ds, podControl, 0, 3, 0)
+
+	clearExpectations(t, manager, ds, podControl)
+	expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
+
+	clearExpectations(t, manager, ds, podControl)
+	setPodReady(false)
+	expectSyncDaemonSets(t, manager, ds, podControl, 0, 1, 0)
+
+	clearExpectations(t, manager, ds, podControl)
+	setPodReady(false)
+	expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
+
+	clearExpectations(t, manager, ds, podControl)
+	setPodReady(false)
+	expectSyncDaemonSets(t, manager, ds, podControl, 0, 1, 0)
+
+	clearExpectations(t, manager, ds, podControl)
+	setPodReady(false)
+	expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
+
+	nodeSeen := make(map[string]bool)
+
+	for _, _pod := range podControl.podStore.List() {
+		pod := _pod.(*corev1.Pod)
+		nodeName, _ := util.GetTargetNodeName(pod)
+		if notReadyNodeSets.Has(nodeName) {
+			t.Fatalf("pod %s should not exists", nodeName)
+		}
+		nodeSeen[nodeName] = true
+	}
+	if len(nodeSeen) != 3 {
+		t.Fatalf("expect 3 nodes to be seen %v", nodeSeen)
+	}
+
 }

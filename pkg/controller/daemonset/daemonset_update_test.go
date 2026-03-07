@@ -47,7 +47,7 @@ func TestDaemonSetUpdatesPods(t *testing.T) {
 	addNodes(manager.nodeStore, 0, 5, nil)
 	manager.dsStore.Add(ds)
 	expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
-	markPodsReady(podControl.podStore)
+	markPodsReady(podControl.podStore, nil)
 
 	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
 	ds.Spec.UpdateStrategy.Type = appsv1beta1.RollingUpdateDaemonSetStrategyType
@@ -59,19 +59,19 @@ func TestDaemonSetUpdatesPods(t *testing.T) {
 	expectSyncDaemonSets(t, manager, ds, podControl, 0, maxUnavailable, 0)
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, maxUnavailable, 0, 0)
-	markPodsReady(podControl.podStore)
+	markPodsReady(podControl.podStore, nil)
 
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, 0, maxUnavailable, 0)
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, maxUnavailable, 0, 0)
-	markPodsReady(podControl.podStore)
+	markPodsReady(podControl.podStore, nil)
 
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, 0, 1, 0)
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
-	markPodsReady(podControl.podStore)
+	markPodsReady(podControl.podStore, nil)
 
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
@@ -87,7 +87,7 @@ func TestDaemonSetUpdatesPodsWithMaxSurge(t *testing.T) {
 	addNodes(manager.nodeStore, 0, 5, nil)
 	manager.dsStore.Add(ds)
 	expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
-	markPodsReady(podControl.podStore)
+	markPodsReady(podControl.podStore, nil)
 
 	// surge is the controlling amount
 	maxSurge := 2
@@ -99,19 +99,19 @@ func TestDaemonSetUpdatesPodsWithMaxSurge(t *testing.T) {
 	expectSyncDaemonSets(t, manager, ds, podControl, maxSurge, 0, 0)
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
-	markPodsReady(podControl.podStore)
+	markPodsReady(podControl.podStore, nil)
 
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, maxSurge, maxSurge, 0)
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
-	markPodsReady(podControl.podStore)
+	markPodsReady(podControl.podStore, nil)
 
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, 5%maxSurge, maxSurge, 0)
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
-	markPodsReady(podControl.podStore)
+	markPodsReady(podControl.podStore, nil)
 
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, 0, 5%maxSurge, 0)
@@ -132,7 +132,7 @@ func TestDaemonSetUpdatesWhenNewPosIsNotReady(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
-	markPodsReady(podControl.podStore)
+	markPodsReady(podControl.podStore, nil)
 
 	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
 	ds.Spec.UpdateStrategy.Type = appsv1beta1.RollingUpdateDaemonSetStrategyType
@@ -884,6 +884,69 @@ func TestFilterDaemonPodsNodeToUpdate(t *testing.T) {
 	for i := range tests {
 		t.Run(tests[i].name, func(t *testing.T) {
 			testFn(&tests[i], t)
+		})
+	}
+}
+
+// TestDaemonSetIgnoreNotReadyNodesWhenUpdating verifies that when the ignore-notready-nodes
+// annotation is set, pods on NotReady nodes are not counted in numUnavailable and are deleted,
+// so rollout can proceed on ready nodes even when NotReady count > maxUnavailable.
+func TestDaemonSetIgnoreNotReadyNodesWhenUpdating(t *testing.T) {
+	ds := newDaemonSet("foo")
+	if ds.Annotations == nil {
+		ds.Annotations = make(map[string]string)
+	}
+	ds.Annotations[IgnoreNotReadyNodes] = "true"
+
+	manager, podControl, _, err := newTestController(ds)
+	if err != nil {
+		t.Fatalf("error creating DaemonSets controller: %v", err)
+	}
+	addNodes(manager.nodeStore, 0, 5, nil)
+	manager.dsStore.Add(ds)
+	expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
+	markPodsReady(podControl.podStore, nil)
+
+	// Make 3 nodes NotReady. Without the annotation, numUnavailable would be 3 >= maxUnavailable(2)
+	// and rollout would be blocked. With the annotation, pods on NotReady nodes are not counted
+	// and are deleted; we can also delete 2 more from ready nodes (maxUnavailable).
+	clearExpectations(t, manager, ds, podControl)
+	setNodesNotReady(manager.nodeStore, "node-0", "node-1", "node-2")
+
+	// First sync after update:
+	// - manage: deletes 3 pods on NotReady nodes (node-0, node-1, node-2)
+	// - rollingUpdate: deletes 2 pods on ready nodes (node-3, node-4) per maxUnavailable
+	// Total: 0 creates, 5 deletes
+
+	// Update image and set rolling update with maxUnavailable=2 and enable ignore-notready-nodes.
+	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
+	ds.Spec.UpdateStrategy.Type = appsv1beta1.RollingUpdateDaemonSetStrategyType
+	intStr := intstr.FromInt(2)
+	ds.Spec.UpdateStrategy.RollingUpdate = &appsv1beta1.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	clearExpectations(t, manager, ds, podControl)
+	manager.dsStore.Update(ds)
+	expectSyncDaemonSets(t, manager, ds, podControl, 0, 2, 0)
+
+	clearExpectations(t, manager, ds, podControl)
+	expectSyncDaemonSets(t, manager, ds, podControl, 2, 0, 0)
+
+}
+
+func TestShouldIgnoreNodeNotReadyPods(t *testing.T) {
+	tests := []struct {
+		name string
+		ds   *appsv1beta1.DaemonSet
+		want bool
+	}{
+		{"annotation not set", &appsv1beta1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Name: "ds"}}, false},
+		{"annotation false", &appsv1beta1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{IgnoreNotReadyNodes: "false"}}}, false},
+		{"annotation true", &appsv1beta1.DaemonSet{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{IgnoreNotReadyNodes: "true"}}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldIgnoreNodeNotReadyPods(tt.ds); got != tt.want {
+				t.Errorf("shouldIgnoreNodeNotReadyPods() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }
