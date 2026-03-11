@@ -740,7 +740,7 @@ func TestScale(t *testing.T) {
 			for _, pod := range pods {
 				err := fClient.Create(context.TODO(), pod)
 				if err != nil {
-					t.Fatalf(err.Error())
+					t.Fatal(err)
 				}
 			}
 			rControl := &realControl{
@@ -749,7 +749,7 @@ func TestScale(t *testing.T) {
 			}
 			modified, err := rControl.Scale(cs.getCloneSets()[0], cs.getCloneSets()[1], cs.getRevisions()[0], cs.getRevisions()[1], pods, nil)
 			if err != nil {
-				t.Fatalf(err.Error())
+				t.Fatal(err)
 			}
 			if cs.expectedModified != modified {
 				t.Fatalf("expect(%v), but get(%v)", cs.expectedModified, modified)
@@ -757,7 +757,7 @@ func TestScale(t *testing.T) {
 			podList := &v1.PodList{}
 			err = fClient.List(context.TODO(), podList, &client.ListOptions{})
 			if err != nil {
-				t.Fatalf(err.Error())
+				t.Fatal(err)
 			}
 			actives := 0
 			for _, pod := range podList.Items {

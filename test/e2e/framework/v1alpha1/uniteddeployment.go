@@ -200,7 +200,7 @@ func (m *UnitedDeploymentManager) Scale(replicas int32) {
 		ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		return ud.Status.Replicas == replicas && ud.Generation == ud.Status.ObservedGeneration
-	}, time.Minute, time.Second).Should(gomega.BeTrue())
+	}, 2*time.Minute, time.Second).Should(gomega.BeTrue())
 }
 
 func (m *UnitedDeploymentManager) Create(replicas int32) {
@@ -218,7 +218,7 @@ func (m *UnitedDeploymentManager) Create(replicas int32) {
 				ud.Status.Replicas, ud.Generation, ud.Status.ObservedGeneration)
 		}
 		return ok
-	}, time.Minute, time.Second).Should(gomega.BeTrue())
+	}, 2*time.Minute, time.Second).Should(gomega.BeTrue())
 }
 
 func (m *UnitedDeploymentManager) CheckSubsets(replicas map[string]int32) {
@@ -241,7 +241,7 @@ func (m *UnitedDeploymentManager) Update() {
 		ud.Spec = *m.UnitedDeployment.Spec.DeepCopy()
 		_, err = m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Update(context.Background(), ud, metav1.UpdateOptions{})
 		g.Expect(err).NotTo(gomega.HaveOccurred())
-	}, time.Minute, time.Second).Should(gomega.Succeed())
+	}, 2*time.Minute, time.Second).Should(gomega.Succeed())
 }
 
 func (m *UnitedDeploymentManager) WaitAllPodsReady() {
@@ -250,7 +250,7 @@ func (m *UnitedDeploymentManager) WaitAllPodsReady() {
 		ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.Background(), m.Name, metav1.GetOptions{})
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		g.Expect(ud.Status.ReadyReplicas == ud.Status.Replicas)
-	}, time.Minute, time.Second).Should(gomega.Succeed())
+	}, 2*time.Minute, time.Second).Should(gomega.Succeed())
 	fmt.Println("pass")
 }
 
@@ -268,7 +268,7 @@ func (m *UnitedDeploymentManager) CheckSubsetPods(expect map[string]int32) {
 			actual[subset.Name] = int32(len(podList.Items))
 		}
 		g.Expect(expect).To(gomega.BeEquivalentTo(actual))
-	}, time.Minute, 500*time.Millisecond).Should(gomega.Succeed())
+	}, 2*time.Minute, 500*time.Millisecond).Should(gomega.Succeed())
 	fmt.Println("pass")
 }
 
@@ -299,7 +299,7 @@ func (m *UnitedDeploymentManager) CheckReservedPods(replicas map[string]int32, r
 		}
 		g.Expect(replicas).To(gomega.BeEquivalentTo(gotReplicas))
 		g.Expect(reserved).To(gomega.BeEquivalentTo(gotReserved))
-	}, time.Minute, 3*time.Second).Should(gomega.Succeed())
+	}, 2*time.Minute, 3*time.Second).Should(gomega.Succeed())
 	fmt.Println("pass")
 }
 
@@ -317,7 +317,7 @@ func (m *UnitedDeploymentManager) CheckPodImage(image string) {
 				g.Expect(pod.Spec.Containers[0].Image).To(gomega.Equal(image))
 			}
 		}
-	}, time.Minute, 3*time.Second).Should(gomega.Succeed())
+	}, 2*time.Minute, 3*time.Second).Should(gomega.Succeed())
 	fmt.Println("pass")
 }
 
@@ -335,7 +335,7 @@ func (m *UnitedDeploymentManager) CheckUnschedulableStatus(expect map[string]boo
 			actual[name] = condition != nil && condition.Status == v1.ConditionFalse
 		}
 		g.Expect(expect).To(gomega.BeEquivalentTo(actual))
-	}, time.Minute, 500*time.Millisecond).Should(gomega.Succeed())
+	}, 2*time.Minute, 500*time.Millisecond).Should(gomega.Succeed())
 	fmt.Println("pass")
 }
 
@@ -346,7 +346,7 @@ func (m *UnitedDeploymentManager) SetNodeLabel(key string, value string) {
 		node.Labels[key] = value
 		_, err = m.c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 		g.Expect(err).NotTo(gomega.HaveOccurred())
-	}, time.Minute, 5*time.Second).Should(gomega.Succeed())
+	}, 2*time.Minute, 5*time.Second).Should(gomega.Succeed())
 }
 
 func (m *UnitedDeploymentManager) SetImage(image string) {

@@ -1270,3 +1270,73 @@ func TestValidateReserveOrdinals(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateMaxUnavailableField(t *testing.T) {
+	maxUnavailable1 := intstr.FromInt(1)
+	maxUnavailable2 := intstr.FromInt(2)
+	maxUnavailablePercent := intstr.FromString("50%")
+
+	tests := []struct {
+		name                string
+		maxUnavailable      *intstr.IntOrString
+		podManagementPolicy apps.PodManagementPolicyType
+		expectErr           bool
+	}{
+		{
+			name:                "maxUnavailable=1 with Parallel policy",
+			maxUnavailable:      &maxUnavailable1,
+			podManagementPolicy: apps.ParallelPodManagement,
+			expectErr:           false,
+		},
+		{
+			name:                "maxUnavailable=2 with Parallel policy",
+			maxUnavailable:      &maxUnavailable2,
+			podManagementPolicy: apps.ParallelPodManagement,
+			expectErr:           false,
+		},
+		{
+			name:                "maxUnavailable=1 with OrderedReady policy",
+			maxUnavailable:      &maxUnavailable1,
+			podManagementPolicy: apps.OrderedReadyPodManagement,
+			expectErr:           false,
+		},
+		{
+			name:                "maxUnavailable=2 with OrderedReady policy (with feature gate enabled)",
+			maxUnavailable:      &maxUnavailable2,
+			podManagementPolicy: apps.OrderedReadyPodManagement,
+			// With MaxUnavailableStatefulSet feature gate enabled (default true),
+			// maxUnavailable > 1 should be allowed with OrderedReady policy
+			expectErr: false,
+		},
+		{
+			name:                "maxUnavailable percent with Parallel policy",
+			maxUnavailable:      &maxUnavailablePercent,
+			podManagementPolicy: apps.ParallelPodManagement,
+			expectErr:           false,
+		},
+		{
+			name:                "maxUnavailable percent with OrderedReady policy",
+			maxUnavailable:      &maxUnavailablePercent,
+			podManagementPolicy: apps.OrderedReadyPodManagement,
+			// With MaxUnavailableStatefulSet feature gate enabled (default true),
+			// maxUnavailable percent should be allowed with OrderedReady policy
+			expectErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := &appsv1beta1.StatefulSetSpec{
+				PodManagementPolicy: tt.podManagementPolicy,
+			}
+			fldPath := field.NewPath("spec").Child("updateStrategy").Child("rollingUpdate").Child("maxUnavailable")
+			errs := validateMaxUnavailableField(tt.maxUnavailable, spec, fldPath)
+			if tt.expectErr && len(errs) == 0 {
+				t.Errorf("expected error but got none")
+			}
+			if !tt.expectErr && len(errs) > 0 {
+				t.Errorf("expected no error but got: %v", errs)
+			}
+		})
+	}
+}

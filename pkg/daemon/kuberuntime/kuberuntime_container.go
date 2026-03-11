@@ -146,7 +146,7 @@ func (m *genericRuntimeManager) KillContainer(pod *v1.Pod, containerID kubeletco
 	if len(message) == 0 {
 		message = fmt.Sprintf("Stopping container %s", containerSpec.Name)
 	}
-	m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeNormal, events.KillingContainer, message)
+	m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeNormal, events.KillingContainer, "%s", message)
 
 	// From this point, pod and container must be non-nil.
 	gracePeriod := int64(minimumGracePeriodInSeconds)
@@ -238,7 +238,7 @@ func (m *genericRuntimeManager) executePreStopHook(pod *v1.Pod, containerID kube
 		defer utilruntime.HandleCrash()
 		if msg, err := m.runner.Run(context.TODO(), containerID, pod, containerSpec, containerSpec.Lifecycle.PreStop); err != nil {
 			klog.ErrorS(err, "preStop hook for container failed", "name", containerSpec.Name)
-			m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeWarning, events.FailedPreStopHook, msg)
+			m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeWarning, events.FailedPreStopHook, "%s", msg)
 		}
 	}()
 

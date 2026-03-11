@@ -1126,3 +1126,122 @@ func TestValidateDaemonSetSpecV1beta1(t *testing.T) {
 		})
 	}
 }
+
+func TestGetDaemonSetWarnings(t *testing.T) {
+	maxSurge1 := intstr.FromInt(1)
+	maxSurge0 := intstr.FromInt(0)
+	maxSurgePercent := intstr.FromString("25%")
+
+	tests := []struct {
+		name           string
+		spec           *corev1.PodSpec
+		maxSurge       *intstr.IntOrString
+		expectWarnings bool
+	}{
+		{
+			name: "no hostPort, no maxSurge",
+			spec: &corev1.PodSpec{
+				Containers: []corev1.Container{
+					{Name: "test", Image: "nginx"},
+				},
+			},
+			maxSurge:       nil,
+			expectWarnings: false,
+		},
+		{
+			name: "hostPort with maxSurge > 0",
+			spec: &corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "test",
+						Image: "nginx",
+						Ports: []corev1.ContainerPort{
+							{HostPort: 8080, ContainerPort: 80},
+						},
+					},
+				},
+			},
+			maxSurge:       &maxSurge1,
+			expectWarnings: true,
+		},
+		{
+			name: "hostPort with maxSurge = 0",
+			spec: &corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "test",
+						Image: "nginx",
+						Ports: []corev1.ContainerPort{
+							{HostPort: 8080, ContainerPort: 80},
+						},
+					},
+				},
+			},
+			maxSurge:       &maxSurge0,
+			expectWarnings: false,
+		},
+		{
+			name: "hostPort with maxSurge percent",
+			spec: &corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "test",
+						Image: "nginx",
+						Ports: []corev1.ContainerPort{
+							{HostPort: 8080, ContainerPort: 80},
+						},
+					},
+				},
+			},
+			maxSurge:       &maxSurgePercent,
+			expectWarnings: true,
+		},
+		{
+			name: "hostPort in initContainer with maxSurge > 0",
+			spec: &corev1.PodSpec{
+				InitContainers: []corev1.Container{
+					{
+						Name:  "init",
+						Image: "busybox",
+						Ports: []corev1.ContainerPort{
+							{HostPort: 9090, ContainerPort: 90},
+						},
+					},
+				},
+				Containers: []corev1.Container{
+					{Name: "test", Image: "nginx"},
+				},
+			},
+			maxSurge:       &maxSurge1,
+			expectWarnings: true,
+		},
+		{
+			name: "no hostPort with maxSurge > 0",
+			spec: &corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "test",
+						Image: "nginx",
+						Ports: []corev1.ContainerPort{
+							{ContainerPort: 80}, // No HostPort
+						},
+					},
+				},
+			},
+			maxSurge:       &maxSurge1,
+			expectWarnings: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			warnings := GetDaemonSetWarnings(tt.spec, tt.maxSurge)
+			if tt.expectWarnings && len(warnings) == 0 {
+				t.Errorf("expected warnings but got none")
+			}
+			if !tt.expectWarnings && len(warnings) > 0 {
+				t.Errorf("expected no warnings but got: %v", warnings)
+			}
+		})
+	}
+}

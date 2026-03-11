@@ -362,7 +362,7 @@ func (r *ReconcileResourceDistribution) handleErrors(errLists ...[]*UnexpectedEr
 		switch conditions[i].Type {
 		case appsv1alpha1.ResourceDistributionConflictOccurred, appsv1alpha1.ResourceDistributionNamespaceNotExists:
 		default:
-			errList = append(errList, field.InternalError(field.NewPath(string(conditions[i].Type)), fmt.Errorf(conditions[i].Reason)))
+			errList = append(errList, field.InternalError(field.NewPath(string(conditions[i].Type)), fmt.Errorf("%s", conditions[i].Reason)))
 		}
 	}
 	return conditions, errList

@@ -382,6 +382,7 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 			UpdateEnvFromMetadata: spec.UpdateEnvFromMetadata,
 			UpdateImages:          len(spec.ContainerImages) > 0,
 			UpdateResources:       len(spec.ContainerResources) > 0,
+			ObservedPodGeneration: clone.Generation,
 		}
 		inPlaceUpdateStateJSON, _ := json.Marshal(inPlaceUpdateState)
 		clone.Annotations[appspub.InPlaceUpdateStateKey] = string(inPlaceUpdateStateJSON)
@@ -488,4 +489,16 @@ func hasEqualCondition(pod *v1.Pod, newCondition *v1.PodCondition) bool {
 	isEqual := oldCondition != nil && oldCondition.Status == newCondition.Status &&
 		oldCondition.Reason == newCondition.Reason && oldCondition.Message == newCondition.Message
 	return isEqual
+}
+
+// IsUpdateProcessedByKubelet checks if kubelet has processed the in-place update
+// by comparing the current pod generation with the observed generation.
+// Available for K8s 1.34+ where pod.status.observedGeneration is available.
+func IsUpdateProcessedByKubelet(pod *v1.Pod, state *appspub.InPlaceUpdateState) bool {
+	if state.ObservedPodGeneration == 0 {
+		// Legacy state without generation tracking
+		return true
+	}
+	// Pod generation increments when spec changes
+	return pod.Status.ObservedGeneration >= state.ObservedPodGeneration
 }

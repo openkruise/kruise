@@ -1212,7 +1212,10 @@ func TestWorkloadSpreadMutatingPod(t *testing.T) {
 				t.Logf("expect ws status: %+v", expectWS.Status.VersionedSubsetStatuses)
 				t.Fatalf("workloadSpread DeepEqual failed")
 			}
-			_ = util.GlobalCache.Delete(workloadSpreadIn)
+			// Clear the entire cache to avoid stale entries.
+			// The simple Delete doesn't work because the cached object may have a different
+			// GVK (empty) than workloadSpreadIn (has TypeMeta), causing key mismatch.
+			_ = util.GlobalCache.Replace(nil, "")
 		})
 	}
 }

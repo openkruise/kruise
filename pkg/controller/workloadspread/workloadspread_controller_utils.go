@@ -148,7 +148,7 @@ func podPreferredScore(subset *appsv1alpha1.WorkloadSpreadSubset, pod *corev1.Po
 func matchesSubsetRequiredAndToleration(pod *corev1.Pod, node *corev1.Node, subset *appsv1alpha1.WorkloadSpreadSubset) (bool, error) {
 	// check toleration
 	tolerations := append(pod.Spec.Tolerations, subset.Tolerations...)
-	if _, hasUntoleratedTaint := schedulecorev1.FindMatchingUntoleratedTaint(node.Spec.Taints, tolerations, nil); hasUntoleratedTaint {
+	if _, hasUntoleratedTaint := schedulecorev1.FindMatchingUntoleratedTaint(node.Spec.Taints, tolerations, func(t *corev1.Taint) bool { return true }); hasUntoleratedTaint {
 		return false, nil
 	}
 

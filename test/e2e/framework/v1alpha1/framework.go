@@ -251,7 +251,7 @@ func (f *Framework) AfterEach() {
 			for namespaceKey, namespaceErr := range nsDeletionErrors {
 				messages = append(messages, fmt.Sprintf("Couldn't delete ns: %q: %s (%#v)", namespaceKey, namespaceErr, namespaceErr))
 			}
-			common.Failf(strings.Join(messages, ","))
+			common.Failf("%s", strings.Join(messages, ","))
 		}
 	}()
 

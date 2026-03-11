@@ -44,6 +44,8 @@ func (bj *BroadcastJob) ConvertTo(dst conversion.Hub) error {
 				Type:         v1beta1.FailurePolicyType(bj.Spec.FailurePolicy.Type),
 				RestartLimit: bj.Spec.FailurePolicy.RestartLimit,
 			},
+			PodFailurePolicy:     convertPodFailurePolicyToV1Beta1(bj.Spec.PodFailurePolicy),
+			PodReplacementPolicy: convertPodReplacementPolicyToV1Beta1(bj.Spec.PodReplacementPolicy),
 		}
 
 		// status
@@ -85,6 +87,8 @@ func (bj *BroadcastJob) ConvertFrom(src conversion.Hub) error {
 				Type:         FailurePolicyType(bjv1beta1.Spec.FailurePolicy.Type),
 				RestartLimit: bjv1beta1.Spec.FailurePolicy.RestartLimit,
 			},
+			PodFailurePolicy:     convertPodFailurePolicyToV1Alpha1(bjv1beta1.Spec.PodFailurePolicy),
+			PodReplacementPolicy: convertPodReplacementPolicyToV1Alpha1(bjv1beta1.Spec.PodReplacementPolicy),
 		}
 
 		// status
@@ -139,4 +143,104 @@ func convertJobConditionsToV1Alpha1(conditions []v1beta1.JobCondition) []JobCond
 		}
 	}
 	return result
+}
+
+func convertPodFailurePolicyToV1Beta1(policy *PodFailurePolicy) *v1beta1.PodFailurePolicy {
+	if policy == nil {
+		return nil
+	}
+	result := &v1beta1.PodFailurePolicy{
+		Rules: make([]v1beta1.PodFailurePolicyRule, len(policy.Rules)),
+	}
+	for i, rule := range policy.Rules {
+		result.Rules[i] = v1beta1.PodFailurePolicyRule{
+			Action:          v1beta1.PodFailurePolicyAction(rule.Action),
+			OnExitCodes:     convertOnExitCodesToV1Beta1(rule.OnExitCodes),
+			OnPodConditions: convertOnPodConditionsToV1Beta1(rule.OnPodConditions),
+		}
+	}
+	return result
+}
+
+func convertOnExitCodesToV1Beta1(req *PodFailurePolicyOnExitCodesRequirement) *v1beta1.PodFailurePolicyOnExitCodesRequirement {
+	if req == nil {
+		return nil
+	}
+	return &v1beta1.PodFailurePolicyOnExitCodesRequirement{
+		ContainerName: req.ContainerName,
+		Operator:      v1beta1.PodFailurePolicyOnExitCodesOperator(req.Operator),
+		Values:        req.Values,
+	}
+}
+
+func convertOnPodConditionsToV1Beta1(conditions []PodFailurePolicyOnPodConditionsPattern) []v1beta1.PodFailurePolicyOnPodConditionsPattern {
+	if conditions == nil {
+		return nil
+	}
+	result := make([]v1beta1.PodFailurePolicyOnPodConditionsPattern, len(conditions))
+	for i, c := range conditions {
+		result[i] = v1beta1.PodFailurePolicyOnPodConditionsPattern{
+			Type:   c.Type,
+			Status: c.Status,
+		}
+	}
+	return result
+}
+
+func convertPodFailurePolicyToV1Alpha1(policy *v1beta1.PodFailurePolicy) *PodFailurePolicy {
+	if policy == nil {
+		return nil
+	}
+	result := &PodFailurePolicy{
+		Rules: make([]PodFailurePolicyRule, len(policy.Rules)),
+	}
+	for i, rule := range policy.Rules {
+		result.Rules[i] = PodFailurePolicyRule{
+			Action:          PodFailurePolicyAction(rule.Action),
+			OnExitCodes:     convertOnExitCodesToV1Alpha1(rule.OnExitCodes),
+			OnPodConditions: convertOnPodConditionsToV1Alpha1(rule.OnPodConditions),
+		}
+	}
+	return result
+}
+
+func convertOnExitCodesToV1Alpha1(req *v1beta1.PodFailurePolicyOnExitCodesRequirement) *PodFailurePolicyOnExitCodesRequirement {
+	if req == nil {
+		return nil
+	}
+	return &PodFailurePolicyOnExitCodesRequirement{
+		ContainerName: req.ContainerName,
+		Operator:      PodFailurePolicyOnExitCodesOperator(req.Operator),
+		Values:        req.Values,
+	}
+}
+
+func convertOnPodConditionsToV1Alpha1(conditions []v1beta1.PodFailurePolicyOnPodConditionsPattern) []PodFailurePolicyOnPodConditionsPattern {
+	if conditions == nil {
+		return nil
+	}
+	result := make([]PodFailurePolicyOnPodConditionsPattern, len(conditions))
+	for i, c := range conditions {
+		result[i] = PodFailurePolicyOnPodConditionsPattern{
+			Type:   c.Type,
+			Status: c.Status,
+		}
+	}
+	return result
+}
+
+func convertPodReplacementPolicyToV1Beta1(policy *PodReplacementPolicy) *v1beta1.PodReplacementPolicy {
+	if policy == nil {
+		return nil
+	}
+	result := v1beta1.PodReplacementPolicy(*policy)
+	return &result
+}
+
+func convertPodReplacementPolicyToV1Alpha1(policy *v1beta1.PodReplacementPolicy) *PodReplacementPolicy {
+	if policy == nil {
+		return nil
+	}
+	result := PodReplacementPolicy(*policy)
+	return &result
 }

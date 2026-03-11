@@ -110,7 +110,145 @@ func validateBroadcastJobSpec(spec *appsv1beta1.BroadcastJobSpec, fldPath *field
 				fmt.Sprintf("\"%s\" and \"%s\" are not allowed to preset in pod labels", broadcastjob.JobNameLabelKey, broadcastjob.ControllerUIDLabelKey)))
 		}
 	}
-	return append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions)...)
+	allErrs = append(allErrs, corevalidation.ValidatePodTemplateSpec(coreTemplate, fldPath.Child("template"), webhookutil.DefaultPodValidationOptions)...)
+
+	// Validate PodFailurePolicy if present
+	if spec.PodFailurePolicy != nil {
+		allErrs = append(allErrs, validatePodFailurePolicy(spec.PodFailurePolicy, fldPath.Child("podFailurePolicy"))...)
+	}
+
+	// Validate PodReplacementPolicy if present
+	if spec.PodReplacementPolicy != nil {
+		allErrs = append(allErrs, validatePodReplacementPolicy(spec.PodReplacementPolicy, fldPath.Child("podReplacementPolicy"))...)
+	}
+
+	return allErrs
+}
+
+func validatePodReplacementPolicy(policy *appsv1beta1.PodReplacementPolicy, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	switch *policy {
+	case appsv1beta1.TerminatingOrFailed, appsv1beta1.Failed:
+		// valid values
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath, *policy,
+			[]string{string(appsv1beta1.TerminatingOrFailed), string(appsv1beta1.Failed)}))
+	}
+
+	return allErrs
+}
+
+func validatePodFailurePolicy(policy *appsv1beta1.PodFailurePolicy, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(policy.Rules) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("rules"), "must have at least one rule"))
+		return allErrs
+	}
+	if len(policy.Rules) > 20 {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("rules"), len(policy.Rules), 20))
+	}
+
+	for i, rule := range policy.Rules {
+		rulePath := fldPath.Child("rules").Index(i)
+		allErrs = append(allErrs, validatePodFailurePolicyRule(&rule, rulePath)...)
+	}
+
+	return allErrs
+}
+
+func validatePodFailurePolicyRule(rule *appsv1beta1.PodFailurePolicyRule, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// Validate action
+	switch rule.Action {
+	case appsv1beta1.PodFailurePolicyActionFailJob, appsv1beta1.PodFailurePolicyActionIgnore, appsv1beta1.PodFailurePolicyActionCount:
+		// valid
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("action"), rule.Action,
+			[]string{string(appsv1beta1.PodFailurePolicyActionFailJob), string(appsv1beta1.PodFailurePolicyActionIgnore), string(appsv1beta1.PodFailurePolicyActionCount)}))
+	}
+
+	// Must have exactly one of onExitCodes or onPodConditions
+	hasOnExitCodes := rule.OnExitCodes != nil
+	hasOnPodConditions := len(rule.OnPodConditions) > 0
+
+	if !hasOnExitCodes && !hasOnPodConditions {
+		allErrs = append(allErrs, field.Required(fldPath, "must specify one of onExitCodes or onPodConditions"))
+	}
+	if hasOnExitCodes && hasOnPodConditions {
+		allErrs = append(allErrs, field.Invalid(fldPath, rule, "cannot specify both onExitCodes and onPodConditions"))
+	}
+
+	// Validate onExitCodes if present
+	if rule.OnExitCodes != nil {
+		allErrs = append(allErrs, validatePodFailurePolicyOnExitCodes(rule.OnExitCodes, fldPath.Child("onExitCodes"))...)
+	}
+
+	// Validate onPodConditions if present
+	if len(rule.OnPodConditions) > 0 {
+		if len(rule.OnPodConditions) > 20 {
+			allErrs = append(allErrs, field.TooMany(fldPath.Child("onPodConditions"), len(rule.OnPodConditions), 20))
+		}
+		for j, condition := range rule.OnPodConditions {
+			conditionPath := fldPath.Child("onPodConditions").Index(j)
+			if condition.Type == "" {
+				allErrs = append(allErrs, field.Required(conditionPath.Child("type"), "must specify condition type"))
+			}
+			switch condition.Status {
+			case v1.ConditionTrue, v1.ConditionFalse, v1.ConditionUnknown:
+				// valid
+			default:
+				allErrs = append(allErrs, field.NotSupported(conditionPath.Child("status"), condition.Status,
+					[]string{string(v1.ConditionTrue), string(v1.ConditionFalse), string(v1.ConditionUnknown)}))
+			}
+		}
+	}
+
+	return allErrs
+}
+
+func validatePodFailurePolicyOnExitCodes(req *appsv1beta1.PodFailurePolicyOnExitCodesRequirement, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// Validate operator
+	switch req.Operator {
+	case appsv1beta1.PodFailurePolicyOnExitCodesOpIn, appsv1beta1.PodFailurePolicyOnExitCodesOpNotIn:
+		// valid
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("operator"), req.Operator,
+			[]string{string(appsv1beta1.PodFailurePolicyOnExitCodesOpIn), string(appsv1beta1.PodFailurePolicyOnExitCodesOpNotIn)}))
+	}
+
+	// Validate values
+	if len(req.Values) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("values"), "must specify at least one exit code value"))
+	}
+	if len(req.Values) > 255 {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("values"), len(req.Values), 255))
+	}
+
+	// Check for 0 in values when operator is In (exit code 0 means success)
+	if req.Operator == appsv1beta1.PodFailurePolicyOnExitCodesOpIn {
+		for i, val := range req.Values {
+			if val == 0 {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("values").Index(i), val,
+					"exit code 0 cannot be used with 'In' operator as it indicates success"))
+			}
+		}
+	}
+
+	// Check for duplicates
+	seen := make(map[int32]bool)
+	for i, val := range req.Values {
+		if seen[val] {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Child("values").Index(i), val))
+		}
+		seen[val] = true
+	}
+
+	return allErrs
 }
 
 func validateBroadcastJobName(name string, prefix bool) (allErrs []string) {

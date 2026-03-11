@@ -118,7 +118,7 @@ func TestConvertToRegistryAuths(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			keyring = credentialprovider.NewDockerKeyring()
+			keyring = &credentialprovider.BasicDockerKeyring{}
 
 			result, err := ConvertToRegistryAuths(tt.pullSecrets, tt.repo)
 

@@ -173,6 +173,36 @@ func getPercentValue(intOrStringValue intstr.IntOrString) (int, bool) {
 	return value, true
 }
 
+// hasHostPort checks if any container in the pod spec uses HostPort
+func hasHostPort(spec *corev1.PodSpec) bool {
+	for _, container := range spec.Containers {
+		for _, port := range container.Ports {
+			if port.HostPort > 0 {
+				return true
+			}
+		}
+	}
+	for _, container := range spec.InitContainers {
+		for _, port := range container.Ports {
+			if port.HostPort > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// GetDaemonSetWarnings returns warnings for DaemonSet configurations that may cause issues.
+// This checks for known problematic combinations like HostPort with maxSurge > 0.
+// See: https://github.com/kubernetes/kubernetes/issues/106417
+func GetDaemonSetWarnings(spec *corev1.PodSpec, maxSurge *intstr.IntOrString) []string {
+	var warnings []string
+	if maxSurge != nil && getIntOrPercentValue(*maxSurge) > 0 && hasHostPort(spec) {
+		warnings = append(warnings, "spec.updateStrategy.rollingUpdate.maxSurge is set with a HostPort container, which can cause port conflicts when old and new pods run simultaneously during rolling updates. See https://github.com/kubernetes/kubernetes/issues/106417")
+	}
+	return warnings
+}
+
 // V1beta1 validation functions
 func validatingDaemonSetFnV1beta1(ctx context.Context, obj *appsv1beta1.DaemonSet) (bool, string, error) {
 	allErrs := validateDaemonSetV1beta1(obj)

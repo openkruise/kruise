@@ -13,10 +13,10 @@ permissions: read-all
 
 env:
   # Common versions
-  GO_VERSION: '1.23'
-  KIND_VERSION: 'v0.18.0'
-  KIND_IMAGE: 'kindest/node:v1.26.3'
-  KIND_CLUSTER_NAME: 'ci-testing'
+  GO_VERSION: "1.24"
+  KIND_VERSION: "v0.18.0"
+  KIND_IMAGE: "kindest/node:v1.26.3"
+  KIND_CLUSTER_NAME: "ci-testing"
 
 jobs:
   astatefulset-storage:
@@ -38,7 +38,7 @@ jobs:
           version: ${{ env.KIND_VERSION }}
       - name: Install-CSI
         run: |
-         make install-csi
+          make install-csi
 
       - name: Build image
         run: |

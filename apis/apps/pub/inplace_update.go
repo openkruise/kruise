@@ -83,6 +83,11 @@ type InPlaceUpdateState struct {
 
 	// ContainerBatchesRecord records the update batches that have patched in this revision.
 	ContainerBatchesRecord []InPlaceUpdateContainerBatch `json:"containerBatchesRecord,omitempty"`
+
+	// ObservedPodGeneration is the pod's metadata.generation when the update was initiated.
+	// This allows tracking whether kubelet has processed the spec change (K8s 1.34+).
+	// +optional
+	ObservedPodGeneration int64 `json:"observedPodGeneration,omitempty"`
 }
 
 // InPlaceUpdatePreCheckBeforeNext contains the pre-check that must pass before the next containers can be in-place update.

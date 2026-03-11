@@ -75,6 +75,10 @@ func TestHandle(t *testing.T) {
 
 	expectedPatches := []jsonpatch.JsonPatchOperation{
 		{
+			Operation: "remove",
+			Path:      "/metadata/creationTimestamp",
+		},
+		{
 			Operation: "add",
 			Path:      "/spec/completionPolicy",
 			Value:     map[string]interface{}{"type": string(appsv1beta1.Always)},
@@ -87,6 +91,10 @@ func TestHandle(t *testing.T) {
 		{
 			Operation: "remove",
 			Path:      "/spec/paused",
+		},
+		{
+			Operation: "remove",
+			Path:      "/spec/template/metadata/creationTimestamp",
 		},
 	}
 	// The response order is not deterministic

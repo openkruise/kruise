@@ -146,7 +146,8 @@ const (
 	EnableSortSidecarContainerByName featuregate.Feature = "EnableSortSidecarContainerByName"
 
 	// Enabling this feature means that the Kubernetes cluster has activated the in-place pod resize
-	// feature (https://kubernetes.io/blog/2025/05/16/kubernetes-v1-33-in-place-pod-resize-beta/).
+	// feature which is beta in Kubernetes 1.33 (enabled by default).
+	// See: https://kubernetes.io/docs/tasks/configure-pod-container/resize-container-resources/
 	// Under this feature, kruise will think all legal pod-vertical-scaling actions must success.
 	// PodUnavailableBudget will specifically protect the resize actions of individual Pods.
 	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
@@ -156,6 +157,12 @@ const (
 	// Enabling this means a default will be assigned even to embeddedPodSpecs
 	// (e.g. in a CloneSet,Advanced DaemonSet), which is the historical default.
 	DefaultHostNetworkHostPortsInPodTemplates featuregate.Feature = "DefaultHostNetworkHostPortsInPodTemplates"
+
+    // MaxUnavailableStatefulSet enables the maxUnavailable field for StatefulSet with
+	// OrderedReady pod management policy, allowing multiple pods to be unavailable during
+	// rolling updates. This matches the upstream Kubernetes feature gate behavior.
+	// See: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
+	MaxUnavailableStatefulSet featuregate.Feature = "MaxUnavailableStatefulSet"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -197,6 +204,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	EnableSortSidecarContainerByName:          {Default: false, PreRelease: featuregate.Alpha},
 	InPlacePodVerticalScaling:                 {Default: false, PreRelease: featuregate.Alpha},
 	DefaultHostNetworkHostPortsInPodTemplates: {Default: false, PreRelease: featuregate.Alpha},
+    MaxUnavailableStatefulSet:                 {Default: true, PreRelease: featuregate.Beta},
 }
 
 func init() {

@@ -366,6 +366,8 @@ func (r *ReconcileAdvancedCronJob) reconcileImageListPullJob(ctx context.Context
 			job.Annotations[k] = v
 		}
 		job.Annotations[scheduledTimeAnnotation] = scheduledTime.Format(time.RFC3339)
+		// Add upstream Kubernetes CronJob scheduled timestamp annotation for compatibility (GA in k8s 1.32)
+		job.Annotations[cronJobScheduledTimestampAnnotation] = scheduledTime.Format(time.RFC3339)
 		for k, v := range advancedCronJob.Spec.Template.ImageListPullJobTemplate.Labels {
 			job.Labels[k] = v
 		}

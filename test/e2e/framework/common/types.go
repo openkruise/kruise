@@ -22,19 +22,19 @@ import (
 )
 
 var (
-	// WebserverImage is the fully qualified URI to the Httpd image
-	WebserverImage = imageutils.GetE2EImage(imageutils.Httpd)
+	// WebserverImage is the fully qualified URI to the Nginx image
+	WebserverImage = imageutils.GetE2EImage(imageutils.Nginx)
 
-	// NewWebserverImage is the fully qualified URI to the HttpdNew image
-	NewWebserverImage = imageutils.GetE2EImage(imageutils.HttpdNew)
+	// NewWebserverImage is the fully qualified URI to the NginxNew image
+	NewWebserverImage = imageutils.GetE2EImage(imageutils.NginxNew)
 
 	// AgnhostImage is the fully qualified URI to the Agnhost image
 	AgnhostImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
-	// NginxImage gets a Niginx image
+	// NginxImage gets a Nginx image
 	NginxImage = imageutils.GetE2EImage(imageutils.Nginx)
 
-	// NewNginxImage gets a Niginx image
+	// NewNginxImage gets a Nginx image
 	NewNginxImage = imageutils.GetE2EImage(imageutils.NginxNew)
 
 	// BusyboxImage gets a Busybox image
@@ -43,6 +43,6 @@ var (
 	// InvalidImage is the fully qualified URI to the invalid image
 	InvalidImage = imageutils.GetE2EImage(imageutils.InvalidRegistryImage)
 
-	// RedisImage is the fully qualified URI to the Redis image
-	RedisImage = imageutils.GetE2EImage(imageutils.Redis)
+	// RedisImage is the fully qualified URI to the Agnhost image
+	RedisImage = imageutils.GetE2EImage(imageutils.Agnhost)
 )

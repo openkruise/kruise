@@ -120,7 +120,7 @@ func TestMatchRegistryAuths(t *testing.T) {
 	// however, only images with "registry.plugin.com" will return a fake credential,
 	// other images will be denied by the plugin and an error will be raised,
 	// this is to test whether kruise could get expected auths if plugin fails to run
-	err := plugin.RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir)
+	err := plugin.RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir, nil, nil)
 	if err != nil {
 		klog.ErrorS(err, "Failed to register credential provider plugins")
 	}

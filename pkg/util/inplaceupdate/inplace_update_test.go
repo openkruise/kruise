@@ -255,6 +255,73 @@ func TestCheckInPlaceUpdateCompleted(t *testing.T) {
 	}
 }
 
+func TestIsUpdateProcessedByKubelet(t *testing.T) {
+	cases := []struct {
+		name     string
+		pod      *v1.Pod
+		state    *appspub.InPlaceUpdateState
+		expected bool
+	}{
+		{
+			name: "legacy state without generation tracking",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{
+					ObservedGeneration: 5,
+				},
+			},
+			state: &appspub.InPlaceUpdateState{
+				ObservedPodGeneration: 0, // Legacy: no generation tracked
+			},
+			expected: true,
+		},
+		{
+			name: "pod generation matches observed",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{
+					ObservedGeneration: 10,
+				},
+			},
+			state: &appspub.InPlaceUpdateState{
+				ObservedPodGeneration: 10,
+			},
+			expected: true,
+		},
+		{
+			name: "pod generation greater than observed",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{
+					ObservedGeneration: 15,
+				},
+			},
+			state: &appspub.InPlaceUpdateState{
+				ObservedPodGeneration: 10,
+			},
+			expected: true,
+		},
+		{
+			name: "pod generation less than observed (not processed yet)",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{
+					ObservedGeneration: 5,
+				},
+			},
+			state: &appspub.InPlaceUpdateState{
+				ObservedPodGeneration: 10,
+			},
+			expected: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := IsUpdateProcessedByKubelet(tc.pod, tc.state)
+			if result != tc.expected {
+				t.Errorf("expected %v, got %v", tc.expected, result)
+			}
+		})
+	}
+}
+
 func TestRefresh(t *testing.T) {
 	aHourAgo := metav1.NewTime(time.Unix(time.Now().Add(-time.Hour).Unix(), 0))
 	tenSecondsAgo := metav1.NewTime(time.Now().Add(-time.Second * 10))

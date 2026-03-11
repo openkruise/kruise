@@ -191,6 +191,10 @@ var _ = ginkgo.Describe("PodProbeMarker", ginkgo.Label("PodProbeMarker", "operat
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			tester.WaitForPodProbeMarkerProcessed(ppm2)
 
+			ginkgo.By("wait for NodePodProbe specs to be updated with new probe commands")
+			tester.WaitForNodePodProbesUpdated(ns, "ppm-nginx#healthy", []string{"/bin/sh", "-c", "failed /"})
+			tester.WaitForNodePodProbesUpdated(ns, "ppm-main#check", []string{"/bin/sh", "-c", "failed -ef"})
+
 			ginkgo.By("wait for pods become unhealth")
 			tester.WaitForPodLabeled(ns, "nginx", "")
 			tester.WaitForPodAnnotated(ns, "controller.kubernetes.io/pod-deletion-cost", "-10")

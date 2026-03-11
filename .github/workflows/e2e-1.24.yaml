@@ -13,11 +13,11 @@ permissions: read-all
 
 env:
   # Common versions
-  GO_VERSION: '1.23'
-  KIND_ACTION_VERSION: 'v1.3.0'
-  KIND_VERSION: 'v0.14.0'
-  KIND_IMAGE: 'kindest/node:v1.24.6'
-  KIND_CLUSTER_NAME: 'ci-testing'
+  GO_VERSION: "1.24"
+  KIND_ACTION_VERSION: "v1.3.0"
+  KIND_VERSION: "v0.14.0"
+  KIND_IMAGE: "kindest/node:v1.24.6"
+  KIND_CLUSTER_NAME: "ci-testing"
 
 jobs:
   astatefulset-storage:
@@ -236,7 +236,6 @@ jobs:
         run: |
           export KUBECONFIG=/home/runner/.kube/config
           tools/hack/run-kruise-e2e-test.sh --focus '(EphemeralJob|BroadcastJob|AdvancedCronJob)' --print-info
-
 
   policy:
     runs-on: ubuntu-24.04

@@ -58,6 +58,24 @@ func ConvertCoreVolumes(volumes []v1.Volume) ([]core.Volume, error) {
 	return coreVolumes, nil
 }
 
+// VolumesFromVolumeClaimTemplates creates placeholder volumes for VolumeClaimTemplates.
+// This is needed for validation because volume mounts may reference VolumeClaimTemplates
+// which aren't actual volumes in the pod template spec.
+func VolumesFromVolumeClaimTemplates(templates []v1.PersistentVolumeClaim) []core.Volume {
+	volumes := make([]core.Volume, 0, len(templates))
+	for i := range templates {
+		volumes = append(volumes, core.Volume{
+			Name: templates[i].Name,
+			VolumeSource: core.VolumeSource{
+				PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
+					ClaimName: templates[i].Name,
+				},
+			},
+		})
+	}
+	return volumes
+}
+
 func ConvertEphemeralContainer(ecs []v1.EphemeralContainer) ([]core.EphemeralContainer, error) {
 	coreEphemeralContainers := []core.EphemeralContainer{}
 	for _, ec := range ecs {

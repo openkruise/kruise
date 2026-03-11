@@ -23,7 +23,9 @@ import (
 	"runtime"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +36,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
@@ -47,6 +50,9 @@ var c client.Client
 var cfg *rest.Config
 
 func TestMain(m *testing.M) {
+	// Initialize controller-runtime logger to avoid "log.SetLogger(...) was never called" warning
+	log.SetLogger(logr.Discard())
+
 	runtime.GOMAXPROCS(4)
 	t := &envtest.Environment{
 		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
@@ -175,6 +181,23 @@ func TestAll(t *testing.T) {
 	mgr, err := manager.New(cfg, manager.Options{Metrics: metricsserver.Options{BindAddress: "0"}})
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	_ = fieldindex.RegisterFieldIndexes(mgr.GetCache())
+
+	// Start the manager first
+	ctx, cancel := context.WithCancel(context.Background())
+	mgrStopped := StartTestManager(ctx, mgr, g)
+	defer func() {
+		cancel()
+		mgrStopped.Wait()
+	}()
+
+	// Wait for cache to sync with a timeout
+	syncCtx, syncCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer syncCancel()
+	if !mgr.GetCache().WaitForCacheSync(syncCtx) {
+		t.Fatal("timeout waiting for cache sync")
+	}
+
+	// Now create test objects using the manager's client
 	c = utilclient.NewClientFromManager(mgr, "test-nodeimage-utils")
 
 	for _, o := range initialNodeImages {
@@ -205,13 +228,37 @@ func TestAll(t *testing.T) {
 		}
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	mgrStopped := StartTestManager(ctx, mgr, g)
-	defer func() {
-		cancel()
-		mgrStopped.Wait()
-	}()
-	mgr.GetCache().WaitForCacheSync(ctx)
+	// Wait for all created objects to be visible in the cache using Eventually
+	// This is more reliable than time.Sleep as it actively checks the cache state
+	g.Eventually(func() bool {
+		var nodeImages appsv1beta1.NodeImageList
+		if err := c.List(context.TODO(), &nodeImages); err != nil {
+			return false
+		}
+		if len(nodeImages.Items) != len(initialNodeImages) {
+			return false
+		}
+
+		var pods v1.PodList
+		// List pods across all namespaces
+		if err := c.List(context.TODO(), &pods, client.InNamespace("")); err != nil {
+			return false
+		}
+		if len(pods.Items) < len(initialPods) {
+			return false
+		}
+
+		var jobs appsv1beta1.ImagePullJobList
+		if err := c.List(context.TODO(), &jobs); err != nil {
+			return false
+		}
+		// All jobs should be visible (including job6 which is being deleted but has a finalizer)
+		if len(jobs.Items) != len(initialJobs) {
+			return false
+		}
+
+		return true
+	}, 30*time.Second, 100*time.Millisecond).Should(gomega.BeTrue(), "timeout waiting for objects to be visible in cache")
 
 	// Test GetNodeImagesForJob
 	testGetNodeImagesForJob(g)

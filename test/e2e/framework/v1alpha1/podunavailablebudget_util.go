@@ -103,7 +103,7 @@ func (s *PodUnavailableBudgetTester) NewBaseDeployment(namespace string) *apps.D
 					Containers: []corev1.Container{
 						{
 							Name:            "main",
-							Image:           imageutils.GetE2EImage(imageutils.Httpd),
+							Image:           imageutils.GetE2EImage(imageutils.Nginx),
 							ImagePullPolicy: corev1.PullIfNotPresent,
 						},
 					},
@@ -155,7 +155,7 @@ func (s *PodUnavailableBudgetTester) NewBaseCloneSet(namespace string) *appsv1al
 					Containers: []corev1.Container{
 						{
 							Name:            "main",
-							Image:           imageutils.GetE2EImage(imageutils.Httpd),
+							Image:           imageutils.GetE2EImage(imageutils.Nginx),
 							ImagePullPolicy: corev1.PullIfNotPresent,
 						},
 					},

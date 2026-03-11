@@ -38,6 +38,7 @@ import (
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	v1affinityhelper "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
+	kubeschedulerframework "k8s.io/kube-scheduler/framework"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	daemonsetutil "k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -236,7 +237,7 @@ func (r *ReconcileBroadcastJob) Reconcile(_ context.Context, request reconcile.R
 	for i := range podList.Items {
 		pod := &podList.Items[i]
 		controllerRef := metav1.GetControllerOf(pod)
-		if controllerRef != nil && controllerRef.Kind == job.Kind && controllerRef.UID == job.UID {
+		if controllerRef != nil && controllerRef.Kind == controllerKind.Kind && controllerRef.UID == job.UID {
 			pods = append(pods, pod)
 		}
 	}
@@ -598,11 +599,11 @@ func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
 	nodeInfo.SetNode(node)
 
 	if len(pod.Spec.NodeName) != 0 && pod.Spec.NodeName != node.Name {
-		return logPredicateFailedReason(node, framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason))
+		return logPredicateFailedReason(node, kubeschedulerframework.NewStatus(kubeschedulerframework.UnschedulableAndUnresolvable, nodename.ErrReason))
 	}
 
 	if fitsNodeAffinity, _ := v1affinityhelper.GetRequiredNodeAffinity(pod).Match(node); !fitsNodeAffinity {
-		return logPredicateFailedReason(node, framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeaffinity.ErrReasonPod))
+		return logPredicateFailedReason(node, kubeschedulerframework.NewStatus(kubeschedulerframework.UnschedulableAndUnresolvable, nodeaffinity.ErrReasonPod))
 	}
 
 	filterPredicate := func(t *corev1.Taint) bool {
@@ -613,7 +614,7 @@ func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
 	if isUntolerated {
 		errReason := fmt.Sprintf("node(s) had taint {%s: %s}, that the pod didn't tolerate",
 			taint.Key, taint.Value)
-		return logPredicateFailedReason(node, framework.NewStatus(framework.UnschedulableAndUnresolvable, errReason))
+		return logPredicateFailedReason(node, kubeschedulerframework.NewStatus(kubeschedulerframework.UnschedulableAndUnresolvable, errReason))
 	}
 
 	// If pod tolerate unschedulable taint, it's also tolerate `node.Spec.Unschedulable`.
@@ -622,7 +623,7 @@ func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
 		Effect: corev1.TaintEffectNoSchedule,
 	})
 	if nodeInfo.Node().Spec.Unschedulable && !podToleratesUnschedulable {
-		return logPredicateFailedReason(node, framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable))
+		return logPredicateFailedReason(node, kubeschedulerframework.NewStatus(kubeschedulerframework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable))
 	}
 
 	insufficientResources := noderesources.Fits(pod, nodeInfo, noderesources.ResourceRequestsOptions{})
@@ -632,18 +633,18 @@ func checkNodeFitness(pod *corev1.Pod, node *corev1.Node) (bool, error) {
 		for _, r := range insufficientResources {
 			failureReasons = append(failureReasons, r.Reason)
 		}
-		return logPredicateFailedReason(node, framework.NewStatus(framework.Unschedulable, failureReasons...))
+		return logPredicateFailedReason(node, kubeschedulerframework.NewStatus(kubeschedulerframework.Unschedulable, failureReasons...))
 	}
 
 	return true, nil
 }
 
-func logPredicateFailedReason(node *corev1.Node, status *framework.Status) (bool, error) {
+func logPredicateFailedReason(node *corev1.Node, status *kubeschedulerframework.Status) (bool, error) {
 	if status.IsSuccess() {
 		return true, nil
 	}
 	for _, reason := range status.Reasons() {
-		klog.ErrorS(fmt.Errorf(reason), "Failed to predicate on node", "nodeName", node.Name)
+		klog.ErrorS(fmt.Errorf("%s", reason), "Failed to predicate on node", "nodeName", node.Name)
 	}
 	return status.IsSuccess(), status.AsError()
 }

@@ -139,7 +139,7 @@ func (s *SidecarSetTester) NewBaseDeployment(namespace string) *apps.Deployment 
 					Containers: []corev1.Container{
 						{
 							Name:    "main",
-							Image:   "busybox:latest",
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"/bin/sh", "-c", "sleep 10000000"},
 						},
 					},

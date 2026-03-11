@@ -120,6 +120,10 @@ type Clock interface {
 
 var (
 	scheduledTimeAnnotation = "apps.kruise.io/scheduled-at"
+	// CronJobScheduledTimestampAnnotation is the standard Kubernetes annotation for CronJob scheduled timestamp.
+	// Added for compatibility with upstream tooling that expects this annotation (GA in Kubernetes 1.32).
+	// See: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/
+	cronJobScheduledTimestampAnnotation = "batch.kubernetes.io/cronjob-scheduled-timestamp"
 )
 
 var _ reconcile.Reconciler = &ReconcileAdvancedCronJob{}

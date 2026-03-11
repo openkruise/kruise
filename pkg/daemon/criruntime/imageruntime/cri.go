@@ -208,7 +208,7 @@ func (c *commonCRIImageService) listImagesV1(ctx context.Context) ([]ImageInfo, 
 			ID:          img.GetId(),
 			RepoTags:    img.GetRepoTags(),
 			RepoDigests: img.GetRepoDigests(),
-			Size:        int64(img.GetSize_()),
+			Size:        int64(img.GetSize()),
 		})
 	}
 	return collection, nil
@@ -328,7 +328,7 @@ func (c *commonCRIImageService) listImagesV1alpha2(ctx context.Context) ([]Image
 			ID:          img.GetId(),
 			RepoTags:    img.GetRepoTags(),
 			RepoDigests: img.GetRepoDigests(),
-			Size:        int64(img.GetSize_()),
+			Size:        int64(img.GetSize()),
 		})
 	}
 	return collection, nil

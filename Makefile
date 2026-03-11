@@ -17,7 +17,7 @@ GOOS ?= $(shell go env GOOS)
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 # Run `setup-envtest list` to list available versions.
-ENVTEST_K8S_VERSION ?= 1.32.0
+ENVTEST_K8S_VERSION ?= 1.34.1
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
@@ -118,7 +118,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
 
-# controller-gen@v0.17.3 comply with k8s.io/api v0.32.x
+# controller-gen@v0.17.3 comply with k8s.io/api v0.34.x
 ifeq ("$(shell $(CONTROLLER_GEN) --version 2> /dev/null)", "Version: v0.17.3")
 else
 	rm -rf $(CONTROLLER_GEN)
@@ -130,7 +130,7 @@ kustomize: ## Download kustomize locally if necessary.
 
 GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
-	$(call go-get-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2)
+	$(call go-get-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.8.0)
 
 GINKGO = $(shell pwd)/bin/ginkgo
 ginkgo: ## Download ginkgo locally if necessary.

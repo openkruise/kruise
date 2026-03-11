@@ -271,8 +271,19 @@ func (e *nodeEventHandler) Update(ctx context.Context, evt event.TypedUpdateEven
 		ds := &dsList.Items[i]
 		oldShouldRun, oldShouldContinueRunning := nodeShouldRunDaemonPod(oldNode, ds)
 		currentShouldRun, currentShouldContinueRunning := nodeShouldRunDaemonPod(curNode, ds)
-		if (oldShouldRun != currentShouldRun) || (oldShouldContinueRunning != currentShouldContinueRunning) ||
-			(NodeShouldUpdateBySelector(oldNode, ds) != NodeShouldUpdateBySelector(curNode, ds)) {
+		// Enqueue DaemonSet for sync when:
+		// 1. Node scheduling eligibility changed (oldShouldRun != currentShouldRun)
+		// 2. Pod continuation eligibility changed (oldShouldContinueRunning != currentShouldContinueRunning)
+		// 3. Node selector matching changed
+		// 4. Node can now run pods AND has misscheduled count > 0 - this fixes a bug where
+		//    pods scheduled before node became unready/tainted were incorrectly marked as
+		//    misscheduled and the status wasn't updated when the node became ready again.
+		//    See: https://github.com/kubernetes/kubernetes/pull/132477
+		shouldEnqueue := (oldShouldRun != currentShouldRun) ||
+			(oldShouldContinueRunning != currentShouldContinueRunning) ||
+			(NodeShouldUpdateBySelector(oldNode, ds) != NodeShouldUpdateBySelector(curNode, ds)) ||
+			(currentShouldRun && ds.Status.NumberMisscheduled > 0)
+		if shouldEnqueue {
 			klog.V(6).InfoS("Update node triggers DaemonSet to reconcile", "nodeName", curNode.Name, "daemonSet", klog.KObj(ds))
 			q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
 				Name:      ds.GetName(),

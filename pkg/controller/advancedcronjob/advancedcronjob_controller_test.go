@@ -135,6 +135,8 @@ func TestReconcileAdvancedJobCreateBroadcastJob(t *testing.T) {
 		},
 	}
 
+	// Step the clock forward to trigger job creation
+	fakeClock.Step(5 * time.Minute)
 	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
 	retrievedJob := &appsv1beta1.AdvancedCronJob{}
@@ -146,6 +148,10 @@ func TestReconcileAdvancedJobCreateBroadcastJob(t *testing.T) {
 	listOptions := client.InNamespace(request.Namespace)
 	err = reconcileJob.List(context.TODO(), brJobList, listOptions)
 	assert.NoError(t, err)
+	// Verify BroadcastJob was created with scheduled timestamp annotations
+	assert.Equal(t, 1, len(brJobList.Items))
+	assert.NotEmpty(t, brJobList.Items[0].Annotations[scheduledTimeAnnotation])
+	assert.NotEmpty(t, brJobList.Items[0].Annotations[cronJobScheduledTimestampAnnotation])
 }
 
 func TestReconcileAdvancedJobCreateJob(t *testing.T) {
@@ -173,6 +179,8 @@ func TestReconcileAdvancedJobCreateJob(t *testing.T) {
 		},
 	}
 
+	// Step the clock forward to trigger job creation
+	fakeClock.Step(5 * time.Minute)
 	_, err := reconcileJob.Reconcile(context.TODO(), request)
 	assert.NoError(t, err)
 	retrievedJob := &appsv1beta1.AdvancedCronJob{}
@@ -184,6 +192,10 @@ func TestReconcileAdvancedJobCreateJob(t *testing.T) {
 	listOptions := client.InNamespace(request.Namespace)
 	err = reconcileJob.List(context.TODO(), brJobList, listOptions)
 	assert.NoError(t, err)
+	// Verify Job was created with scheduled timestamp annotations
+	assert.Equal(t, 1, len(brJobList.Items))
+	assert.NotEmpty(t, brJobList.Items[0].Annotations[scheduledTimeAnnotation])
+	assert.NotEmpty(t, brJobList.Items[0].Annotations[cronJobScheduledTimestampAnnotation])
 }
 
 func createReconcileJobWithBroadcastJobIndex(scheme *runtime.Scheme, initObjs ...client.Object) ReconcileAdvancedCronJob {
@@ -203,6 +215,7 @@ func createReconcileJobWithBroadcastJobIndex(scheme *runtime.Scheme, initObjs ..
 		Client:   fakeClient,
 		scheme:   scheme,
 		recorder: recorder,
+		Clock:    fakeClock,
 	}
 	return reconcileJob
 }
@@ -224,6 +237,7 @@ func createReconcileJobWithBatchJobIndex(scheme *runtime.Scheme, initObjs ...cli
 		Client:   fakeClient,
 		scheme:   scheme,
 		recorder: recorder,
+		Clock:    fakeClock,
 	}
 	return reconcileJob
 }
@@ -327,6 +341,9 @@ func TestReconcileAdvancedJobCreateImageListPullJob(t *testing.T) {
 	err = reconcileJob.List(context.TODO(), jobList, listOptions)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(jobList.Items))
+	// Verify ImageListPullJob was created with scheduled timestamp annotations
+	assert.NotEmpty(t, jobList.Items[0].Annotations[scheduledTimeAnnotation])
+	assert.NotEmpty(t, jobList.Items[0].Annotations[cronJobScheduledTimestampAnnotation])
 }
 
 // Test scenario:

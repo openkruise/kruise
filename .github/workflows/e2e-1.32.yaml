@@ -13,10 +13,10 @@ permissions: read-all
 
 env:
   # Common versions
-  GO_VERSION: '1.23'
-  KIND_VERSION: 'v0.22.0'
-  KIND_IMAGE: 'kindest/node:v1.32.0'
-  KIND_CLUSTER_NAME: 'ci-testing'
+  GO_VERSION: "1.24"
+  KIND_VERSION: "v0.22.0"
+  KIND_IMAGE: "kindest/node:v1.32.0"
+  KIND_CLUSTER_NAME: "ci-testing"
 
 jobs:
   astatefulset-storage:
