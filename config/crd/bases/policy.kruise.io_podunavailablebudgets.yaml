@@ -125,7 +125,7 @@ spec:
                 x-kubernetes-map-type: atomic
               targetRef:
                 description: |-
-                  TargetReference contains enough information to let you identify an workload for PodUnavailableBudget
+                  TargetReference contains enough information to let you identify a workload for PodUnavailableBudget
                   Selector and TargetReference are mutually exclusive, TargetReference is priority to take effect
                 properties:
                   apiVersion:
