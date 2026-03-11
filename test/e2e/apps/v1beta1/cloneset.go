@@ -1784,6 +1784,86 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 		ginkgo.It(`change resource and qos -> succeed to recreate`, func() {
 			testChangePodQOS(tester, randStr, c)
 		})
+
+		ginkgo.It("in-place update with maxSurge should not create surge pods", func() {
+			replicas := int32(3)
+			cs := tester.NewCloneSet("clone-"+randStr, replicas, appsv1beta1.CloneSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateCloneSetUpdateStrategyType,
+				RollingUpdate: &appsv1beta1.RollingUpdateCloneSetStrategy{
+					PodUpdatePolicy: appsv1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType,
+					MaxUnavailable:  &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+					MaxSurge:        &intstr.IntOrString{Type: intstr.Int, IntVal: 2},
+				},
+			})
+			imageConfig := imageutils.GetConfig(imageutils.Nginx)
+			imageConfig.SetRegistry("docker.io/library")
+			imageConfig.SetVersion("alpine")
+			cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
+			cs.Spec.MinReadySeconds, cs.Spec.ProgressDeadlineSeconds = 10, &tenMinutes
+			cs, err = tester.CreateCloneSet(cs)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Wait for all pods ready")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.ReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(replicas))
+
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1beta1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
+
+			ginkgo.By("Record original pod UIDs")
+			pods, err := tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).Should(gomega.Equal(int(replicas)))
+			originalUIDs := sets.NewString()
+			for _, pod := range pods {
+				originalUIDs.Insert(string(pod.UID))
+			}
+
+			ginkgo.By("Update image (in-place updatable change)")
+			imageConfig.SetVersion("mainline-alpine")
+			err = tester.UpdateCloneSet(cs.Name, func(cs *appsv1beta1.CloneSet) {
+				cs.Spec.Template.Spec.Containers[0].Image = imageConfig.GetE2EImage()
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Wait for CloneSet generation consistent")
+			gomega.Eventually(func() bool {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Generation == cs.Status.ObservedGeneration
+			}, 10*time.Second, 3*time.Second).Should(gomega.BeTrue())
+
+			ginkgo.By("Verify no surge pods created (pod count stays at replicas)")
+			gomega.Consistently(func() int {
+				pods, err = tester.ListPodsForCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return len(pods)
+			}, 10*time.Second, time.Second).Should(gomega.Equal(int(replicas)))
+
+			ginkgo.By("Wait for all pods updated and ready")
+			gomega.Eventually(func() int32 {
+				cs, err = tester.GetCloneSet(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return cs.Status.UpdatedReadyReplicas
+			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(replicas))
+
+			ginkgo.By("Verify pods were updated in-place (UIDs unchanged)")
+			pods, err = tester.ListPodsForCloneSet(cs.Name)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(len(pods)).Should(gomega.Equal(int(replicas)))
+			currentUIDs := sets.NewString()
+			for _, pod := range pods {
+				currentUIDs.Insert(string(pod.UID))
+			}
+			gomega.Expect(currentUIDs).Should(gomega.Equal(originalUIDs))
+		})
 	})
 
 	ginkgo.Context("CloneSet pre-download images", func() {

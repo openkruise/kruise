@@ -43,6 +43,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		pods               []*v1.Pod
 		revisionConsistent bool
 		disableFeatureGate bool
+		canInPlaceUpdate   bool
 		isPodUpdate        IsPodUpdateFunc
 		expectResult       expectationDiffs
 	}{
@@ -965,6 +966,45 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 			},
 			expectResult: expectationDiffs{scaleDownNum: 3, scaleDownNumOldRevision: 3},
 		},
+		{
+			name: "in-place update with maxSurge should not create surge pods",
+			set:  createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(3)),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			canInPlaceUpdate: true,
+			expectResult:     expectationDiffs{updateNum: 5, updateMaxUnavailable: 1},
+		},
+		{
+			name: "recreate update with maxSurge should still create surge pods",
+			set:  createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(3)),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			canInPlaceUpdate: false,
+			expectResult:     expectationDiffs{scaleUpNum: 3, useSurge: 3, updateNum: 5, updateMaxUnavailable: 1, scaleUpLimit: 3},
+		},
+		{
+			name: "in-place update without maxSurge should not change behavior",
+			set:  createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			canInPlaceUpdate: true,
+			expectResult:     expectationDiffs{updateNum: 5, updateMaxUnavailable: 1},
+		},
 	}
 
 	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreparingUpdateAsUpdate, true)()
@@ -980,7 +1020,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 			if cases[i].revisionConsistent {
 				current = newRevision
 			}
-			res := calculateDiffsWithExpectation(cases[i].set, cases[i].pods, current, newRevision, cases[i].isPodUpdate)
+			res := calculateDiffsWithExpectation(cases[i].set, cases[i].pods, current, newRevision, cases[i].canInPlaceUpdate, cases[i].isPodUpdate)
 			if !reflect.DeepEqual(res, cases[i].expectResult) {
 				t.Errorf("got %#v, expect %#v", res, cases[i].expectResult)
 			}
