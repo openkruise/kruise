@@ -26,13 +26,13 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
-	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruisecontrollerutil "github.com/openkruise/kruise/pkg/controller/util"
 )
 
 var _ handler.TypedEventHandler[*appsalphav1.NodePodProbe, reconcile.Request] = &enqueueRequestForNodePodProbe{}
@@ -172,7 +172,7 @@ func (e *enqueueRequestForNode) nodeCreate(node *corev1.Node, q workqueue.TypedR
 		if errors.IsNotFound(err) {
 			klog.InfoS("Node created event for nodePodProbe", "nodeName", node.Name)
 			namespacedName := types.NamespacedName{Name: node.Name}
-			if !isNodeReady(node) {
+			if !kruisecontrollerutil.IsNodeReady(node) {
 				klog.InfoS("Skipped to enqueue Node with not nodePodProbe, for not ready yet", "nodeName", node.Name)
 				return
 			}
@@ -190,12 +190,4 @@ func (e *enqueueRequestForNode) nodeDelete(node *corev1.Node, q workqueue.TypedR
 		return
 	}
 	q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: node.Name}})
-}
-
-func isNodeReady(node *corev1.Node) bool {
-	_, condition := nodeutil.GetNodeCondition(&node.Status, corev1.NodeReady)
-	if condition == nil || condition.Status != corev1.ConditionTrue {
-		return false
-	}
-	return true
 }
