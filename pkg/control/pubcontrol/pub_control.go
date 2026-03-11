@@ -38,6 +38,7 @@ import (
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -239,7 +240,7 @@ func hash(data string) string {
 // return two parameters
 // 1. podList
 // 2. expectedCount, the default is workload.Replicas
-func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) ([]*corev1.Pod, int32, error) {
+func (c *commonControl) GetPodsForPub(pub *policyv1beta1.PodUnavailableBudget) ([]*corev1.Pod, int32, error) {
 	// if targetReference isn't nil, priority to take effect
 	var listOptions *client.ListOptions
 	if pub.Spec.TargetReference != nil {
@@ -323,12 +324,12 @@ func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
 	return true
 }
 
-func (c *commonControl) GetPubForPod(pod *corev1.Pod) (*policyv1alpha1.PodUnavailableBudget, error) {
+func (c *commonControl) GetPubForPod(pod *corev1.Pod) (*policyv1beta1.PodUnavailableBudget, error) {
 	if len(pod.Annotations) == 0 || pod.Annotations[PodRelatedPubAnnotation] == "" {
 		return nil, nil
 	}
 	pubName := pod.Annotations[PodRelatedPubAnnotation]
-	pub := &policyv1alpha1.PodUnavailableBudget{}
+	pub := &policyv1beta1.PodUnavailableBudget{}
 	err := c.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: pubName}, pub)
 	if err != nil {
 		if errors.IsNotFound(err) {
