@@ -84,19 +84,34 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1beta
 				numUnavailable++
 				continue
 			}
+
+			var exempt bool
+			if ds.Spec.UpdateStrategy.RollingUpdate != nil && ds.Spec.UpdateStrategy.RollingUpdate.ExemptNodesFromMaxUnavailable != nil {
+				node, err := dsc.nodeLister.Get(nodeName)
+				if err != nil {
+					klog.ErrorS(err, "get node failed", "node", nodeName, "ds", klog.KObj(ds))
+					return err
+				}
+				exempt, _ = isNodeExemptFromMaxUnavailable(node, ds.Spec.UpdateStrategy.RollingUpdate.ExemptNodesFromMaxUnavailable)
+				if exempt {
+					klog.V(3).InfoS("node will be excluded from the maxUnavailable calculation during DaemonSet rolling updates", "node", nodeName, "ds", klog.KObj(ds))
+				}
+			}
 			switch {
 			case isPodNilOrPreDeleting(oldPod) && isPodNilOrPreDeleting(newPod), !isPodNilOrPreDeleting(oldPod) && !isPodNilOrPreDeleting(newPod):
 				// the manage loop will handle creating or deleting the appropriate pod, consider this unavailable
-				numUnavailable++
-				klog.V(5).InfoS("DaemonSet found no pods (or pre-deleting) on node", "daemonSet", klog.KObj(ds), "nodeName", nodeName)
+				if !exempt {
+					numUnavailable++
+					klog.V(5).InfoS("DaemonSet found no pods (or pre-deleting) on node", "daemonSet", klog.KObj(ds), "nodeName", nodeName)
+				}
 			case newPod != nil:
 				// this pod is up to date, check its availability
-				if !podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
+				if !exempt && !podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
 					// an unavailable new pod is counted against maxUnavailable
 					numUnavailable++
 					klog.V(5).InfoS("DaemonSet pod on node was new and unavailable", "daemonSet", klog.KObj(ds), "pod", klog.KObj(newPod), "nodeName", nodeName)
 				}
-				if isPodPreDeleting(newPod) {
+				if !exempt && isPodPreDeleting(newPod) {
 					// a pre-deleting new pod is counted against maxUnavailable
 					numUnavailable++
 					klog.V(5).InfoS("DaemonSet pod on node was pre-deleting", "daemonSet", klog.KObj(ds), "pod", klog.KObj(newPod), "nodeName", nodeName)
@@ -175,6 +190,19 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1beta
 			numSurge++
 			continue
 		}
+
+		var exempt bool
+		if ds.Spec.UpdateStrategy.RollingUpdate != nil && ds.Spec.UpdateStrategy.RollingUpdate.ExemptNodesFromMaxUnavailable != nil {
+			node, err := dsc.nodeLister.Get(nodeName)
+			if err != nil {
+				klog.ErrorS(err, "get node failed", "node", nodeName, "ds", klog.KObj(ds))
+				return err
+			}
+			exempt, _ = isNodeExemptFromMaxUnavailable(node, ds.Spec.UpdateStrategy.RollingUpdate.ExemptNodesFromMaxUnavailable)
+			if exempt {
+				klog.V(3).InfoS("node will be excluded from the maxUnavailable calculation during DaemonSet rolling updates", "node", nodeName, "ds", klog.KObj(ds))
+			}
+		}
 		switch {
 		case isPodNilOrPreDeleting(oldPod):
 			// we don't need to do anything to this node, the manage loop will handle it
@@ -202,12 +230,12 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1beta
 			}
 		default:
 			// we have already surged onto this node, determine our state
-			if !podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
+			if !exempt && !podutil.IsPodAvailable(newPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}) {
 				// we're waiting to go available here
 				numSurge++
 				continue
 			}
-			if isPodPreDeleting(newPod) {
+			if !exempt && isPodPreDeleting(newPod) {
 				numSurge++
 				continue
 			}
