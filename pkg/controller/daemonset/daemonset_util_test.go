@@ -719,3 +719,222 @@ func newStandardRollingUpdateStrategy(matchLabels map[string]string) appsv1beta1
 	}
 	return strategy
 }
+
+func TestApplyNodePatches(t *testing.T) {
+	baseTemplate := func() *corev1.PodTemplateSpec {
+		return &corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{"app": "test"},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "nydusd",
+						Image: "nydus:latest",
+						Env: []corev1.EnvVar{
+							{Name: "LOCAL_CACHE_SIZE", Value: "500Gi"},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	largeNode := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "large-node",
+			Labels: map[string]string{"node-role/nydus-storage": "large"},
+		},
+	}
+	smallNode := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "small-node",
+			Labels: map[string]string{"node-role/nydus-storage": "small"},
+		},
+	}
+
+	largePatch := appsv1beta1.DaemonSetNodePatch{
+		Selector: &metav1.LabelSelector{
+			MatchLabels: map[string]string{"node-role/nydus-storage": "large"},
+		},
+		Patch: appsv1beta1.DaemonSetNodeTemplatePatch{
+			Metadata: &appsv1beta1.DaemonSetNodePatchObjectMeta{
+				Labels:      map[string]string{"nydus/cache": "large"},
+				Annotations: map[string]string{"nydus/annotated": "yes"},
+			},
+			Spec: &appsv1beta1.DaemonSetNodePatchPodSpec{
+				Containers: []appsv1beta1.DaemonSetNodePatchContainer{
+					{
+						Name: "nydusd",
+						Env: []corev1.EnvVar{
+							{Name: "LOCAL_CACHE_SIZE", Value: "2Ti"},
+							{Name: "FEATURE_GATE_LARGE_DISK", Value: "true"},
+						},
+						Resources: &corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU: resource.MustParse("2"),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		template *corev1.PodTemplateSpec
+		node     *corev1.Node
+		patches  []appsv1beta1.DaemonSetNodePatch
+		check    func(t *testing.T, tmpl *corev1.PodTemplateSpec)
+	}{
+		{
+			name:     "no patches — template unchanged",
+			template: baseTemplate(),
+			node:     largeNode,
+			patches:  nil,
+			check: func(t *testing.T, tmpl *corev1.PodTemplateSpec) {
+				if val := tmpl.Spec.Containers[0].Env[0].Value; val != "500Gi" {
+					t.Errorf("expected 500Gi, got %s", val)
+				}
+			},
+		},
+		{
+			name:     "selector mismatch — template unchanged",
+			template: baseTemplate(),
+			node:     smallNode,
+			patches:  []appsv1beta1.DaemonSetNodePatch{largePatch},
+			check: func(t *testing.T, tmpl *corev1.PodTemplateSpec) {
+				if val := tmpl.Spec.Containers[0].Env[0].Value; val != "500Gi" {
+					t.Errorf("expected 500Gi, got %s", val)
+				}
+				if _, ok := tmpl.Labels["nydus/cache"]; ok {
+					t.Error("expected no nydus/cache label on non-matching node")
+				}
+			},
+		},
+		{
+			name:     "selector matches — labels and annotations applied",
+			template: baseTemplate(),
+			node:     largeNode,
+			patches:  []appsv1beta1.DaemonSetNodePatch{largePatch},
+			check: func(t *testing.T, tmpl *corev1.PodTemplateSpec) {
+				if tmpl.Labels["nydus/cache"] != "large" {
+					t.Errorf("expected nydus/cache=large, got %s", tmpl.Labels["nydus/cache"])
+				}
+				if tmpl.Annotations["nydus/annotated"] != "yes" {
+					t.Errorf("expected nydus/annotated=yes, got %s", tmpl.Annotations["nydus/annotated"])
+				}
+			},
+		},
+		{
+			name:     "selector matches — existing env var overridden",
+			template: baseTemplate(),
+			node:     largeNode,
+			patches:  []appsv1beta1.DaemonSetNodePatch{largePatch},
+			check: func(t *testing.T, tmpl *corev1.PodTemplateSpec) {
+				envMap := map[string]string{}
+				for _, e := range tmpl.Spec.Containers[0].Env {
+					envMap[e.Name] = e.Value
+				}
+				if envMap["LOCAL_CACHE_SIZE"] != "2Ti" {
+					t.Errorf("expected LOCAL_CACHE_SIZE=2Ti, got %s", envMap["LOCAL_CACHE_SIZE"])
+				}
+				if envMap["FEATURE_GATE_LARGE_DISK"] != "true" {
+					t.Errorf("expected FEATURE_GATE_LARGE_DISK=true, got %s", envMap["FEATURE_GATE_LARGE_DISK"])
+				}
+			},
+		},
+		{
+			name:     "selector matches — resources overridden",
+			template: baseTemplate(),
+			node:     largeNode,
+			patches:  []appsv1beta1.DaemonSetNodePatch{largePatch},
+			check: func(t *testing.T, tmpl *corev1.PodTemplateSpec) {
+				cpu := tmpl.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]
+				if cpu.Cmp(resource.MustParse("2")) != 0 {
+					t.Errorf("expected CPU 2, got %s", cpu.String())
+				}
+			},
+		},
+		{
+			name: "nil selector — patch skipped",
+			template: baseTemplate(),
+			node:     largeNode,
+			patches: []appsv1beta1.DaemonSetNodePatch{
+				{Selector: nil, Patch: appsv1beta1.DaemonSetNodeTemplatePatch{
+					Metadata: &appsv1beta1.DaemonSetNodePatchObjectMeta{
+						Labels: map[string]string{"should": "not-apply"},
+					},
+				}},
+			},
+			check: func(t *testing.T, tmpl *corev1.PodTemplateSpec) {
+				if _, ok := tmpl.Labels["should"]; ok {
+					t.Error("patch with nil selector must be skipped")
+				}
+			},
+		},
+		{
+			name:     "patch for unknown container — no crash, other container unchanged",
+			template: baseTemplate(),
+			node:     largeNode,
+			patches: []appsv1beta1.DaemonSetNodePatch{
+				{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"node-role/nydus-storage": "large"}},
+					Patch: appsv1beta1.DaemonSetNodeTemplatePatch{
+						Spec: &appsv1beta1.DaemonSetNodePatchPodSpec{
+							Containers: []appsv1beta1.DaemonSetNodePatchContainer{
+								{
+									Name: "does-not-exist",
+									Env:  []corev1.EnvVar{{Name: "X", Value: "y"}},
+								},
+							},
+						},
+					},
+				},
+			},
+			check: func(t *testing.T, tmpl *corev1.PodTemplateSpec) {
+				if len(tmpl.Spec.Containers[0].Env) != 1 || tmpl.Spec.Containers[0].Env[0].Value != "500Gi" {
+					t.Error("unrelated container env should be unchanged")
+				}
+			},
+		},
+		{
+			name:     "multiple patches, later one wins on conflict",
+			template: baseTemplate(),
+			node:     largeNode,
+			patches: []appsv1beta1.DaemonSetNodePatch{
+				largePatch,
+				{
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"node-role/nydus-storage": "large"}},
+					Patch: appsv1beta1.DaemonSetNodeTemplatePatch{
+						Spec: &appsv1beta1.DaemonSetNodePatchPodSpec{
+							Containers: []appsv1beta1.DaemonSetNodePatchContainer{
+								{
+									Name: "nydusd",
+									Env:  []corev1.EnvVar{{Name: "LOCAL_CACHE_SIZE", Value: "4Ti"}},
+								},
+							},
+						},
+					},
+				},
+			},
+			check: func(t *testing.T, tmpl *corev1.PodTemplateSpec) {
+				envMap := map[string]string{}
+				for _, e := range tmpl.Spec.Containers[0].Env {
+					envMap[e.Name] = e.Value
+				}
+				if envMap["LOCAL_CACHE_SIZE"] != "4Ti" {
+					t.Errorf("later patch should win: expected LOCAL_CACHE_SIZE=4Ti, got %s", envMap["LOCAL_CACHE_SIZE"])
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			applyNodePatches(tt.template, tt.node, tt.patches)
+			tt.check(t, tt.template)
+		})
+	}
+}
