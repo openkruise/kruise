@@ -643,7 +643,7 @@ func logPredicateFailedReason(node *corev1.Node, status *framework.Status) (bool
 		return true, nil
 	}
 	for _, reason := range status.Reasons() {
-		klog.ErrorS(fmt.Errorf(reason), "Failed to predicate on node", "nodeName", node.Name)
+		klog.ErrorS(fmt.Errorf("%s", reason), "Failed to predicate on node", "nodeName", node.Name)
 	}
 	return status.IsSuccess(), status.AsError()
 }
