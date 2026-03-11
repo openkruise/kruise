@@ -275,7 +275,14 @@ func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, cur
 		res.updateNum = 0 - updateNewDiff
 	}
 	if res.updateNum != 0 {
-		res.updateMaxUnavailable = maxUnavailable + len(pods) - replicas
+		// updateMaxUnavailable is the budget passed to limitUpdateIndexes that
+		// controls how many available pods may be made unavailable during an update.
+		// When len(pods) < replicas the formula can go negative; clamp to zero so
+		// the value is always non-negative. limitUpdateIndexes skips the budget
+		// checks for already-unavailable pods (updating them does not increase
+		// unavailability), so a zero budget still allows those pods to be updated
+		// while blocking updates to available pods.
+		res.updateMaxUnavailable = integer.IntMax(maxUnavailable+len(pods)-replicas, 0)
 	}
 
 	return
