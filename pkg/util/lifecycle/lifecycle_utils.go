@@ -175,23 +175,31 @@ func (c *realControl) UpdatePodLifecycleWithHandler(pod *v1.Pod, state appspub.L
 
 	pod = pod.DeepCopy()
 	if adp, ok := c.adp.(podadapter.AdapterWithPatch); ok {
-		var labelsHandler, finalizersHandler string
+		var labelsHandler string
 		for k, v := range inPlaceUpdateHandler.LabelsHandler {
 			labelsHandler = fmt.Sprintf(`%s,"%s":"%s"`, labelsHandler, k, v)
 		}
-		for _, v := range inPlaceUpdateHandler.FinalizersHandler {
-			finalizersHandler = fmt.Sprintf(`%s,"%s"`, finalizersHandler, v)
+
+		// Only include finalizers in the patch if there are finalizers to add.
+		// If we include an empty array "finalizers":[], the strategic merge patch
+		// will DELETE all existing finalizers from the pod, which is not intended.
+		var finalizersPatch string
+		if len(inPlaceUpdateHandler.FinalizersHandler) > 0 {
+			var finalizersHandler string
+			for _, v := range inPlaceUpdateHandler.FinalizersHandler {
+				finalizersHandler = fmt.Sprintf(`%s,"%s"`, finalizersHandler, v)
+			}
+			finalizersPatch = fmt.Sprintf(`,"finalizers":[%s]`, strings.TrimLeft(finalizersHandler, ","))
 		}
-		finalizersHandler = fmt.Sprintf(`[%s]`, strings.TrimLeft(finalizersHandler, ","))
 
 		body := fmt.Sprintf(
-			`{"metadata":{"labels":{"%s":"%s"%s},"annotations":{"%s":"%s"},"finalizers":%s}}`,
+			`{"metadata":{"labels":{"%s":"%s"%s},"annotations":{"%s":"%s"}%s}}`,
 			appspub.LifecycleStateKey,
 			string(state),
 			labelsHandler,
 			appspub.LifecycleTimestampKey,
 			time.Now().Format(time.RFC3339),
-			finalizersHandler,
+			finalizersPatch,
 		)
 		gotPod, err = adp.PatchPod(pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
 	} else {

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -66,11 +67,15 @@ type fakePatchAdapter struct {
 	patchedPod          *corev1.Pod
 	patchCalled         bool
 	patchResourceCalled bool
+	lastPatchData       []byte
 }
 
-func (f *fakePatchAdapter) PatchPod(pod *corev1.Pod, _ client.Patch) (*corev1.Pod, error) {
+func (f *fakePatchAdapter) PatchPod(pod *corev1.Pod, patch client.Patch) (*corev1.Pod, error) {
 	f.patchCalled = true
 	f.patchedPod = pod
+	if patch != nil {
+		f.lastPatchData, _ = patch.Data(pod)
+	}
 	return pod, f.err
 }
 func (f *fakePatchAdapter) PatchPodResource(pod *corev1.Pod, _ client.Patch) (*corev1.Pod, error) {
@@ -756,6 +761,84 @@ func Test_realControl_UpdatePodLifecycleWithHandler(t *testing.T) {
 		}
 		if gotPod == nil {
 			t.Errorf("expected gotPod to be non-nil")
+		}
+	})
+
+	// Test that empty FinalizersHandler does NOT include finalizers in patch.
+	// This is critical: if we include "finalizers":[] in the patch, it will
+	// DELETE all existing finalizers from the pod via strategic merge patch.
+	t.Run("empty FinalizersHandler should not include finalizers in patch", func(t *testing.T) {
+		adp := &fakePatchAdapter{}
+		rc := &realControl{
+			adp:                 adp,
+			podReadinessControl: &fakePodReadinessControl{},
+		}
+		handler := &appspub.LifecycleHook{
+			MarkPodNotReady:   true,
+			LabelsHandler:     map[string]string{"kruise.io/unready-blocker": "true"},
+			FinalizersHandler: nil, // Empty - should NOT include finalizers in patch
+		}
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "test-pod",
+				Namespace:  "default",
+				Finalizers: []string{"existing-finalizer"},
+			},
+		}
+		updated, gotPod, err := rc.UpdatePodLifecycleWithHandler(pod, appspub.LifecycleStatePreparingUpdate, handler)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !updated {
+			t.Errorf("expected updated=true")
+		}
+		if gotPod == nil {
+			t.Errorf("expected gotPod to be non-nil")
+		}
+		if !adp.patchCalled {
+			t.Errorf("expected patch to be called")
+		}
+		// Critical assertion: patch should NOT contain "finalizers":[]
+		// If it does, the strategic merge patch would delete all existing finalizers
+		patchStr := string(adp.lastPatchData)
+		if strings.Contains(patchStr, `"finalizers":[]`) {
+			t.Errorf("patch should NOT contain empty finalizers array, but got: %s", patchStr)
+		}
+		if strings.Contains(patchStr, `"finalizers":[`) {
+			t.Errorf("patch should NOT contain finalizers field when FinalizersHandler is empty, but got: %s", patchStr)
+		}
+	})
+
+	t.Run("non-empty FinalizersHandler should include finalizers in patch", func(t *testing.T) {
+		adp := &fakePatchAdapter{}
+		rc := &realControl{
+			adp:                 adp,
+			podReadinessControl: &fakePodReadinessControl{},
+		}
+		handler := &appspub.LifecycleHook{
+			MarkPodNotReady:   false,
+			FinalizersHandler: []string{"kruise.io/test-finalizer"},
+		}
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-pod",
+				Namespace: "default",
+			},
+		}
+		updated, _, err := rc.UpdatePodLifecycleWithHandler(pod, appspub.LifecycleStatePreparingUpdate, handler)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !updated {
+			t.Errorf("expected updated=true")
+		}
+		if !adp.patchCalled {
+			t.Errorf("expected patch to be called")
+		}
+		// Verify finalizers ARE included when FinalizersHandler is set
+		patchStr := string(adp.lastPatchData)
+		if !strings.Contains(patchStr, `"finalizers":["kruise.io/test-finalizer"]`) {
+			t.Errorf("patch should contain finalizers when FinalizersHandler is set, but got: %s", patchStr)
 		}
 	})
 }
