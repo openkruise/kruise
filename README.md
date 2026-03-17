@@ -10,106 +10,110 @@
 [![Gurubase](https://img.shields.io/badge/Gurubase-Ask%20Kruise%20Guru-006BFF)](https://gurubase.io/g/kruise)
 
 English | [简体中文](./README-zh_CN.md)
-
 ## Introduction
 
-OpenKruise  (official site: [https://openkruise.io](https://openkruise.io)) is a CNCF([Cloud Native Computing Foundation](https://cncf.io/)) incubating project.
-It consists of several controllers which extend and complement the [Kubernetes core controllers](https://kubernetes.io/docs/concepts/overview/what-is-kubernetes/) for workload and application management.
+OpenKruise (official site: https://openkruise.io) is a CNCF (Cloud Native Computing Foundation) incubating project.  
+It consists of several controllers that extend and complement Kubernetes core controllers for workload and application management.
+
+---
 
 ## Key Features
 
-- **Advance Workloads**
+- **Advanced Workloads**
 
-  Advance Workloads can help you manage applications of stateless, stateful, daemon and job.
+  Advanced Workloads help manage stateless, stateful, daemon, and batch applications.
 
-  They all support not only the basic features which are similar to the original Workloads in Kubernetes, but also more advanced abilities like **in-place update**, **configurable scale/upgrade strategies**, **parallel operations**.
+  They support not only basic Kubernetes workload features but also advanced capabilities such as:
+  - In-place updates
+  - Configurable scaling and upgrade strategies
+  - Parallel operations
 
   - [**CloneSet** for stateless applications](https://openkruise.io/docs/user-manuals/cloneset/)
   - [**Advanced StatefulSet** for stateful applications](https://openkruise.io/docs/user-manuals/advancedstatefulset)
   - [**Advanced DaemonSet** for daemon applications](https://openkruise.io/docs/user-manuals/advanceddaemonset)
-  - [**BroadcastJob** for deploying jobs over specific nodes](https://openkruise.io/docs/user-manuals/broadcastjob)
-  - [**AdvancedCronJob** for creating Job or BroadcastJob periodically](https://openkruise.io/docs/user-manuals/advancedcronjob)
+  - [**BroadcastJob** for distributed jobs](https://openkruise.io/docs/user-manuals/broadcastjob)
+  - [**AdvancedCronJob** for scheduled jobs](https://openkruise.io/docs/user-manuals/advancedcronjob)
 
-- **Sidecar container Management**
+---
 
-  Kruise simplifies sidecar injection and enables sidecar in-place update. Kruise also enhances the sidecar startup and termination control.
+- **Sidecar Container Management**
 
-  - [**SidecarSet** for defining and upgrading your own sidecars](https://openkruise.io/docs/user-manuals/sidecarset)
-  - [**Container Launch Priority** to control the container startup orders](https://openkruise.io/docs/user-manuals/containerlaunchpriority)
-  - [**Sidecar Job Terminator** terminates sidecar containers for such job-type Pods when its main containers completed.](https://openkruise.io/docs/user-manuals/jobsidecarterminator)
+  Kruise simplifies sidecar injection and enables in-place updates. It also improves startup and termination control.
+
+  - [**SidecarSet** for managing sidecars](https://openkruise.io/docs/user-manuals/sidecarset)
+  - [**Container Launch Priority** to control startup order](https://openkruise.io/docs/user-manuals/containerlaunchpriority)
+  - [**Sidecar Job Terminator** for cleaning up sidecars](https://openkruise.io/docs/user-manuals/jobsidecarterminator)
+
+---
 
 - **Multi-domain Management**
 
-  This can help you manage applications over nodes with multiple domains,
-  such as different node pools, available zones, architectures(x86 & arm) or node types(kubelet & virtual kubelet).
+  Manage applications across multiple domains such as:
+  - Node pools
+  - Availability zones
+  - Architectures (x86 & ARM)
+  - Node types (kubelet & virtual kubelet)
 
-  Here we provide two different ways:
+  - [**WorkloadSpread** for flexible pod distribution](https://openkruise.io/docs/user-manuals/workloadspread)
+  - [**UnitedDeployment** for managing multiple sub-workloads](https://openkruise.io/docs/user-manuals/uniteddeployment)
 
-  - [**WorkloadSpread** for bypass distributing pods in workloads](https://openkruise.io/docs/user-manuals/workloadspread)
-  - [**UnitedDeployment**, a new workload to manage multiple sub-workloads](https://openkruise.io/docs/user-manuals/uniteddeployment)
+---
 
 - **Enhanced Operations**
 
-  - [**ContainerRecreateRequest** provides a way to let users restart/recreate containers in a running pod](https://openkruise.io/docs/user-manuals/containerrecreaterequest)
-  - [**ImagePullJob** pre-download images on specific nodes](https://openkruise.io/docs/user-manuals/imagepulljob)
-  - [**ResourceDistribution** support Secret & ConfigMap resource distribution across namespaces](https://openkruise.io/docs/user-manuals/resourcedistribution)
-  - [**PersistentPodState** is able to persistent states of the Pod, such as "IP Retention"](https://openkruise.io/docs/user-manuals/persistentpodstate)
-  - [**PodProbeMarker** provides the ability to customize the Probe and return the result to the Pod](https://openkruise.io/docs/user-manuals/podprobemarker)
+  - [**ContainerRecreateRequest** to restart containers](https://openkruise.io/docs/user-manuals/containerrecreaterequest)
+  - [**ImagePullJob** for pre-downloading images](https://openkruise.io/docs/user-manuals/imagepulljob)
+  - [**ResourceDistribution** for sharing resources across namespaces](https://openkruise.io/docs/user-manuals/resourcedistribution)
+  - [**PersistentPodState** for retaining pod states](https://openkruise.io/docs/user-manuals/persistentpodstate)
+  - [**PodProbeMarker** for custom probe handling](https://openkruise.io/docs/user-manuals/podprobemarker)
+
+---
 
 - **Application Protection**
 
-  - [Protect Kubernetes resources and applications' availability from the cascading deletion](https://openkruise.io/docs/user-manuals/deletionprotection)
-  - [**PodUnavailableBudget** for achieving the effect of preventing application disruption or SLA degradation](https://openkruise.io/docs/user-manuals/podunavailablebudget)
+  - Prevent cascading deletion of resources
+  - [**PodUnavailableBudget** to maintain application availability](https://openkruise.io/docs/user-manuals/podunavailablebudget)
+
+---
 
 ## Quick Start
 
-You can view the full documentation from the [OpenKruise website](https://openkruise.io/docs/).
+You can view full documentation at: https://openkruise.io/docs/
 
-- Install or upgrade Kruise with [the stable version](https://openkruise.io/docs/installation).
-- Install or upgrade Kruise with [the latest version including alpha/beta/rc](https://openkruise.io/docs/next/installation).
+### Prerequisites
 
-### Get Your Own Demo with Alibaba Cloud
+Before getting started, ensure you have:
+- Kubernetes cluster (Minikube or Kind recommended)
+- kubectl installed
+- Docker installed
 
-- install Kruise on a Serverless K8S cluster in 3 minutes, try:
+### Basic Setup Example
 
-  <a href="https://acs.console.aliyun.com/quick-deploy?repo=openkruise/charts&branch=master&paths=%5B%22versions/kruise/1.8.0%22%5D" target="_blank">
-    <img src="https://img.alicdn.com/imgextra/i1/O1CN01aiPSuA1Wiz7wkgF5u_!!6000000002823-55-tps-399-70.svg" width="200" alt="Deploy on Alibaba Cloud">
-  </a>
+Deploy OpenKruise CRDs:
 
-## Users
+```bash
+kubectl apply -f https://raw.githubusercontent.com/openkruise/kruise/master/config/crd/bases/apps.kruise.io_clonesets.yaml
+````
 
-Registration: [Who is using Kruise](https://github.com/openkruise/kruise/issues/289)
+### Installation
 
-- Alibaba Group, Ant Group, DouyuTV, Sto, Boss直聘
-- hangyinxiaofei, vanyitech, Dmall, Bringg, 佐疆科技
-- Lyft, Ctrip, 享住智慧, VIPKID, zhangmen
-- xiaohongshu, bixin, 永辉科技中心, 跟谁学, 哈啰出行
-- Spectro Cloud, ihomefnt, Arkane Systems, Deepexi, 火花思维
-- OPPO, Suning.cn, joyy, Mobvista, 深圳凤凰木网络有限公司
-- xiaomi, Netease, MeiTuan Finance, Shopee, Esign
-- LinkedIn, 雪球, 兴盛优选, Wholee, LilithGames, Baidu
-- Bilibili, 冠赢互娱, MeiTuan, 同城
+* Install stable version: [https://openkruise.io/docs/installation](https://openkruise.io/docs/installation)
+* Install latest version: [https://openkruise.io/docs/next/installation](https://openkruise.io/docs/next/installation)
+
+---
 
 ## Contributing
 
-You are warmly welcome to hack on Kruise. We have prepared a detailed guide [CONTRIBUTING.md](CONTRIBUTING.md).
+We welcome contributions! Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
 
 ## Community
 
-Active communication channels:
+* Slack: OpenKruise channel (Kubernetes Slack)
+* Community meetings and discussions available in docs
 
-- Slack: [OpenKruise channel](https://kubernetes.slack.com/channels/openkruise) (*English*)
-- DingTalk：Search GroupID `23330762` (*Chinese*)
-- WeChat: Search User `openkruise` and let the robot invite you (*Chinese*)
-- Bi-weekly Community Meeting (APAC, *Chinese*):
-  - Thursday 19:30 GMT+8 (Asia/Shanghai), [Calendar](https://calendar.google.com/calendar/u/2?cid=MjdtbDZucXA2bjVpNTFyYTNpazV2dW8ybHNAZ3JvdXAuY2FsZW5kYXIuZ29vZ2xlLmNvbQ)
-  - Join Meeting(DingTalk): Search GroupID `23330762` (*Chinese*)
-  - [Notes and agenda](https://shimo.im/docs/gXqmeQOYBehZ4vqo)
-- Bi-weekly Community Meeting (*English*): TODO
-  - [Meeting Link(zoom)](https://us02web.zoom.us/j/87059136652?pwd=NlI4UThFWXVRZkxIU0dtR1NINncrQT09)
-
-## Security
-Please report vulnerabilities by email to kubernetes-security@service.aliyun.com. Also see our [SECURITY.md](SECURITY.md) file for details.
+---
 
 ## License
 
