@@ -10,9 +10,10 @@
 [![Gurubase](https://img.shields.io/badge/Gurubase-Ask%20Kruise%20Guru-006BFF)](https://gurubase.io/g/kruise)
 
 English | [简体中文](./README-zh_CN.md)
+
 ## Introduction
 
-OpenKruise (official site: https://openkruise.io) is a CNCF (Cloud Native Computing Foundation) incubating project.  
+OpenKruise (official site: https://openkruise.io) is a [CNCF (Cloud Native Computing Foundation)](https://www.cncf.io/) incubating project.  
 It consists of several controllers that extend and complement Kubernetes core controllers for workload and application management.
 
 ---
@@ -89,16 +90,18 @@ Before getting started, ensure you have:
 
 ### Basic Setup Example
 
-Deploy OpenKruise CRDs:
+Install OpenKruise using Helm (recommended):
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/openkruise/kruise/master/config/crd/bases/apps.kruise.io_clonesets.yaml
-````
+helm repo add openkruise https://openkruise.github.io/charts/
+helm repo update
+helm install kruise openkruise/kruise --namespace kruise-system --create-namespace
 
+```
 ### Installation
 
-* Install stable version: [https://openkruise.io/docs/installation](https://openkruise.io/docs/installation)
-* Install latest version: [https://openkruise.io/docs/next/installation](https://openkruise.io/docs/next/installation)
+- Install stable version: https://openkruise.io/docs/installation  
+- Install latest version: https://openkruise.io/docs/next/installation  
 
 ---
 
@@ -110,8 +113,15 @@ We welcome contributions! Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) for
 
 ## Community
 
-* Slack: OpenKruise channel (Kubernetes Slack)
-* Community meetings and discussions available in docs
+- Slack: [#openkruise](https://kubernetes.slack.com/messages/openkruise) on [Kubernetes Slack](https://slack.k8s.io)  
+- Community meetings and discussions: see the Community section at https://openkruise.io/docs  
+
+---
+
+## Security
+
+For information about supported versions and how to report security vulnerabilities, please see [SECURITY.md](./SECURITY.md).  
+Please follow the reporting process described there (including contacts in [SECURITY_CONTACTS.md](./SECURITY_CONTACTS.md)).
 
 ---
 
