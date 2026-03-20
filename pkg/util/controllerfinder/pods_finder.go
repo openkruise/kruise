@@ -132,11 +132,11 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, acti
 		matchedPods = append(matchedPods, pods...)
 	}
 
+	selector, _ := metav1.LabelSelectorAsSelector(labelSelector)
 	// For such workloads like Deployment that do not manage the Pods directly,
 	// Pods' ownerReferences do not contain the workload, so we have to retry
 	// to use the label selector to list the Pods.
-	if labelSelector != nil && len(matchedPods) == 0 {
-		selector, _ := metav1.LabelSelectorAsSelector(labelSelector)
+	if labelSelector != nil && len(matchedPods) == 0 && !selector.Empty() {
 		listOption := client.ListOptions{
 			Namespace:     ns,
 			LabelSelector: selector,

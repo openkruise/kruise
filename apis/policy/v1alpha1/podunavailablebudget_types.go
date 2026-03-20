@@ -62,6 +62,10 @@ type PodUnavailableBudgetSpec struct {
 	// Selector and TargetReference are mutually exclusive, TargetReference is priority to take effect
 	TargetReference *TargetReference `json:"targetRef,omitempty"`
 
+	// PodGroupPolicy defines the policy for grouping pods and calculating
+	// availability at the group level. When nil, legacy per-pod semantics apply.
+	PodGroupPolicy *PodUnavailableBudgetPodGroupPolicy `json:"podGroupPolicy,omitempty"`
+
 	// Delete pod, evict pod or update pod specification is allowed if at most "maxUnavailable" pods selected by
 	// "selector" or "targetRef"  are unavailable after the above operation for pod.
 	// MaxUnavailable and MinAvailable are mutually exclusive, MaxUnavailable is priority to take effect
@@ -70,6 +74,19 @@ type PodUnavailableBudgetSpec struct {
 	// Delete pod, evict pod or update pod specification is allowed if at least "minAvailable" pods selected by
 	// "selector" or "targetRef" will still be available after the above operation for pod.
 	MinAvailable *intstr.IntOrString `json:"minAvailable,omitempty"`
+}
+
+type PodUnavailableBudgetPodGroupPolicy struct {
+	// GroupLabelKey specifies the label key used to group Pods.
+	// Pods with the same value belong to the same group.
+	// Example: "leaderworkerset.sigs.k8s.io/group-index"
+	GroupLabelKey string `json:"groupLabelKey"`
+
+	// GroupSize is the number of pods required for a group to be considered Available.
+	// A group is available only when all pods belonging to the same group are
+	// consistent and ready, and the group has at least GroupSize pods.
+	// Default (when nil) is 2. Must be greater than 0 if specified.
+	GroupSize *int32 `json:"groupSize,omitempty"`
 }
 
 // TargetReference contains enough information to let you identify a workload for PodUnavailableBudget
@@ -98,6 +115,12 @@ type PodUnavailableBudgetStatus struct {
 	// once pod is available(consistent and ready) again, it will be removed from the list.
 	// +optional
 	UnavailablePods map[string]metav1.Time `json:"unavailablePods,omitempty"`
+
+	// UnavailablePodGroups contains information about pod groups that are currently
+	// considered unavailable. A group is keyed by its group label value. Once all pods
+	// in the group become consistent and ready, the group is removed from this map.
+	// +optional
+	UnavailablePodGroups map[string]metav1.Time `json:"unavailablePodGroups,omitempty"`
 
 	// UnavailableAllowed number of pod unavailable that are currently allowed
 	UnavailableAllowed int32 `json:"unavailableAllowed"`

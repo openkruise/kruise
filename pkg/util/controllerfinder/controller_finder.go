@@ -458,7 +458,7 @@ func getSpecReplicas(workload *unstructured.Unstructured) (int32, error) {
 }
 
 func (r *ControllerFinder) getScaleController(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
-	if isValidGroupVersionKind(ref.APIVersion, ref.Kind) {
+	if IsValidGroupVersionKind(ref.APIVersion, ref.Kind) {
 		return nil, nil
 	}
 	gv, err := schema.ParseGroupVersion(ref.APIVersion)
@@ -545,7 +545,7 @@ func verifyGroupKind(apiVersion, kind string, gvk schema.GroupVersionKind) (bool
 	return gv.Group == gvk.Group && kind == gvk.Kind, nil
 }
 
-func isValidGroupVersionKind(apiVersion, kind string) bool {
+func IsValidGroupVersionKind(apiVersion, kind string) bool {
 	for _, gvk := range validWorkloadList {
 		valid, err := verifyGroupKind(apiVersion, kind, gvk)
 		if err != nil {

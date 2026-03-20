@@ -131,8 +131,10 @@ func validatePodUnavailableBudgetSpec(obj *policyv1alpha1.PodUnavailableBudget, 
 
 	if spec.Selector == nil && spec.TargetReference == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("selector, targetRef"), "no selector or targetRef defined in PodUnavailableBudget"))
-	} else if spec.Selector != nil && spec.TargetReference != nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("selector, targetRef"), "selector and targetRef are mutually exclusive"))
+	} else if spec.PodGroupPolicy == nil && (spec.Selector != nil && spec.TargetReference != nil) {
+		allErrs = append(allErrs, field.Required(fldPath.Child("selector, targetRef"), "selector and targetRef are mutually exclusive if podGroupPolicy is empty"))
+	} else if spec.PodGroupPolicy != nil && (spec.Selector == nil || spec.TargetReference == nil) {
+		allErrs = append(allErrs, field.Required(fldPath.Child("selector, targetRef"), "both selector and targetRef must be defined if podGroupPolicy is defined"))
 	} else if spec.TargetReference != nil {
 		if spec.TargetReference.APIVersion == "" || spec.TargetReference.Name == "" || spec.TargetReference.Kind == "" {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("TargetReference"), spec.TargetReference, "empty TargetReference is not valid for PodUnavailableBudget."))
@@ -149,6 +151,15 @@ func validatePodUnavailableBudgetSpec(obj *policyv1alpha1.PodUnavailableBudget, 
 		_, err := metav1.LabelSelectorAsSelector(spec.Selector)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, ""))
+		}
+	}
+
+	if spec.PodGroupPolicy != nil {
+		if spec.PodGroupPolicy.GroupLabelKey == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Child("podGroupPolicy.groupLabelKey"), "podGroupPolicy.groupLabelKey is required"))
+		}
+		if spec.PodGroupPolicy.GroupSize != nil && *spec.PodGroupPolicy.GroupSize <= 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("podGroupPolicy.groupSize"), spec.PodGroupPolicy.GroupSize, "podGroupPolicy.groupSize must be greater than 0"))
 		}
 	}
 
