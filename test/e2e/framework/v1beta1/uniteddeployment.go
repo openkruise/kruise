@@ -1,4 +1,4 @@
-package v1alpha1
+package v1beta1
 
 import (
 	"context"
@@ -16,7 +16,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment"
@@ -73,12 +72,12 @@ func (t *UnitedDeploymentTester) NewUnitedDeploymentManager(name string, statele
 	} else {
 		kind = TemplateKind(rand.IntN(4))
 	}
-	ud := &appsv1alpha1.UnitedDeployment{
+	ud := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: t.ns,
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": name,
@@ -89,8 +88,8 @@ func (t *UnitedDeploymentTester) NewUnitedDeploymentManager(name string, statele
 	switch kind {
 	case KindDeployment:
 		fmt.Println("kind is Deployment")
-		ud.Spec.Template = appsv1alpha1.SubsetTemplate{
-			DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+		ud.Spec.Template = appsv1beta1.SubsetTemplate{
+			DeploymentTemplate: &appsv1beta1.DeploymentTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app": name,
@@ -108,8 +107,8 @@ func (t *UnitedDeploymentTester) NewUnitedDeploymentManager(name string, statele
 		}
 	case KindStatefulSet:
 		fmt.Println("kind is StatefulSet")
-		ud.Spec.Template = appsv1alpha1.SubsetTemplate{
-			StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+		ud.Spec.Template = appsv1beta1.SubsetTemplate{
+			StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app": name,
@@ -127,8 +126,8 @@ func (t *UnitedDeploymentTester) NewUnitedDeploymentManager(name string, statele
 		}
 	case KindCloneSet:
 		fmt.Println("kind is CloneSet")
-		ud.Spec.Template = appsv1alpha1.SubsetTemplate{
-			CloneSetTemplate: &appsv1alpha1.CloneSetTemplateSpec{
+		ud.Spec.Template = appsv1beta1.SubsetTemplate{
+			CloneSetTemplate: &appsv1beta1.CloneSetTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app": name,
@@ -146,8 +145,8 @@ func (t *UnitedDeploymentTester) NewUnitedDeploymentManager(name string, statele
 		}
 	case KindASTS:
 		fmt.Println("kind is AdvancedStatefulSet")
-		ud.Spec.Template = appsv1alpha1.SubsetTemplate{
-			AdvancedStatefulSetTemplate: &appsv1alpha1.AdvancedStatefulSetTemplateSpec{
+		ud.Spec.Template = appsv1beta1.SubsetTemplate{
+			AdvancedStatefulSetTemplate: &appsv1beta1.AdvancedStatefulSetTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app": name,
@@ -176,13 +175,13 @@ func (t *UnitedDeploymentTester) NewUnitedDeploymentManager(name string, statele
 
 type UnitedDeploymentManager struct {
 	kind TemplateKind
-	*appsv1alpha1.UnitedDeployment
+	*appsv1beta1.UnitedDeployment
 	kc kruiseclientset.Interface
 	c  clientset.Interface
 }
 
 func (m *UnitedDeploymentManager) AddSubset(name string, replicas, minReplicas, maxReplicas *intstr.IntOrString) {
-	m.Spec.Topology.Subsets = append(m.Spec.Topology.Subsets, appsv1alpha1.Subset{
+	m.Spec.Topology.Subsets = append(m.Spec.Topology.Subsets, appsv1beta1.Subset{
 		Name:        name,
 		Replicas:    replicas,
 		MinReplicas: minReplicas,
@@ -192,12 +191,12 @@ func (m *UnitedDeploymentManager) AddSubset(name string, replicas, minReplicas, 
 
 func (m *UnitedDeploymentManager) Scale(replicas int32) {
 	m.Spec.Replicas = pointer.Int32(replicas)
-	_, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Patch(context.TODO(), m.Name, types.MergePatchType,
+	_, err := m.kc.AppsV1beta1().UnitedDeployments(m.Namespace).Patch(context.TODO(), m.Name, types.MergePatchType,
 		[]byte(fmt.Sprintf(`{"spec":{"replicas":%d}}`, replicas)), metav1.PatchOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	gomega.Eventually(func() bool {
-		ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
+		ud, err := m.kc.AppsV1beta1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		return ud.Status.Replicas == replicas && ud.Generation == ud.Status.ObservedGeneration
 	}, time.Minute, time.Second).Should(gomega.BeTrue())
@@ -205,12 +204,12 @@ func (m *UnitedDeploymentManager) Scale(replicas int32) {
 
 func (m *UnitedDeploymentManager) Create(replicas int32) {
 	m.Spec.Replicas = pointer.Int32(replicas)
-	_, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Create(context.TODO(), m.UnitedDeployment, metav1.CreateOptions{})
+	_, err := m.kc.AppsV1beta1().UnitedDeployments(m.Namespace).Create(context.TODO(), m.UnitedDeployment, metav1.CreateOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	time.Sleep(3 * time.Second)
 	gomega.Eventually(func() bool {
-		ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
+		ud, err := m.kc.AppsV1beta1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		ok := ud.Status.Replicas == replicas && ud.Generation == ud.Status.ObservedGeneration
 		if !ok {
@@ -223,12 +222,13 @@ func (m *UnitedDeploymentManager) Create(replicas int32) {
 
 func (m *UnitedDeploymentManager) CheckSubsets(replicas map[string]int32) {
 	gomega.Eventually(func() bool {
-		ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
+		ud, err := m.kc.AppsV1beta1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		ok := ud.GetGeneration() == ud.Status.ObservedGeneration && *ud.Spec.Replicas == ud.Status.Replicas && reflect.DeepEqual(replicas, ud.Status.SubsetReplicas)
+		actualReplicas := subsetStatusReplicas(ud.Status.SubsetStatuses)
+		ok := ud.GetGeneration() == ud.Status.ObservedGeneration && *ud.Spec.Replicas == ud.Status.Replicas && reflect.DeepEqual(replicas, actualReplicas)
 		if !ok {
-			fmt.Printf("UnitedDeploymentManager.CheckSubsets failed\nud.GetGeneration(): %d, ud.Status.ObservedGeneration: %d, *ud.Spec.Replicas: %d, ud.Status.Replicas: %d, ud.Status.SubsetReplicas: %v\n", ud.GetGeneration(),
-				ud.Status.ObservedGeneration, *ud.Spec.Replicas, ud.Status.Replicas, ud.Status.SubsetReplicas)
+			fmt.Printf("UnitedDeploymentManager.CheckSubsets failed\nud.GetGeneration(): %d, ud.Status.ObservedGeneration: %d, *ud.Spec.Replicas: %d, ud.Status.Replicas: %d, subsetStatusReplicas: %v\n", ud.GetGeneration(),
+				ud.Status.ObservedGeneration, *ud.Spec.Replicas, ud.Status.Replicas, actualReplicas)
 		}
 		return ok
 	}, 3*time.Minute, time.Second).Should(gomega.BeTrue())
@@ -236,10 +236,10 @@ func (m *UnitedDeploymentManager) CheckSubsets(replicas map[string]int32) {
 
 func (m *UnitedDeploymentManager) Update() {
 	gomega.Eventually(func(g gomega.Gomega) {
-		ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.Background(), m.Name, metav1.GetOptions{})
+		ud, err := m.kc.AppsV1beta1().UnitedDeployments(m.Namespace).Get(context.Background(), m.Name, metav1.GetOptions{})
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		ud.Spec = *m.UnitedDeployment.Spec.DeepCopy()
-		_, err = m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Update(context.Background(), ud, metav1.UpdateOptions{})
+		_, err = m.kc.AppsV1beta1().UnitedDeployments(m.Namespace).Update(context.Background(), ud, metav1.UpdateOptions{})
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 	}, time.Minute, time.Second).Should(gomega.Succeed())
 }
@@ -247,7 +247,7 @@ func (m *UnitedDeploymentManager) Update() {
 func (m *UnitedDeploymentManager) WaitAllPodsReady() {
 	fmt.Print("WaitSubsetPodsReady ")
 	gomega.Eventually(func(g gomega.Gomega) {
-		ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.Background(), m.Name, metav1.GetOptions{})
+		ud, err := m.kc.AppsV1beta1().UnitedDeployments(m.Namespace).Get(context.Background(), m.Name, metav1.GetOptions{})
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		g.Expect(ud.Status.ReadyReplicas == ud.Status.Replicas)
 	}, time.Minute, time.Second).Should(gomega.Succeed())
@@ -256,7 +256,7 @@ func (m *UnitedDeploymentManager) WaitAllPodsReady() {
 
 func (m *UnitedDeploymentManager) CheckSubsetPods(expect map[string]int32) {
 	fmt.Print("CheckSubsetPods ")
-	ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
+	ud, err := m.kc.AppsV1beta1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	gomega.Eventually(func(g gomega.Gomega) {
 		actual := map[string]int32{}
@@ -274,7 +274,7 @@ func (m *UnitedDeploymentManager) CheckSubsetPods(expect map[string]int32) {
 
 func (m *UnitedDeploymentManager) CheckReservedPods(replicas map[string]int32, reserved map[string]int32) {
 	fmt.Print("CheckReservedPods ")
-	ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
+	ud, err := m.kc.AppsV1beta1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	gomega.Eventually(func(g gomega.Gomega) {
 		gotReplicas := map[string]int32{}
@@ -305,7 +305,7 @@ func (m *UnitedDeploymentManager) CheckReservedPods(replicas map[string]int32, r
 
 func (m *UnitedDeploymentManager) CheckPodImage(image string) {
 	fmt.Print("CheckPodImage ")
-	ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
+	ud, err := m.kc.AppsV1beta1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	gomega.Eventually(func(g gomega.Gomega) {
 		for _, subset := range ud.Spec.Topology.Subsets {
@@ -324,14 +324,14 @@ func (m *UnitedDeploymentManager) CheckPodImage(image string) {
 func (m *UnitedDeploymentManager) CheckUnschedulableStatus(expect map[string]bool) {
 	fmt.Print("CheckUnschedulableStatus ")
 	gomega.Eventually(func(g gomega.Gomega) {
-		ud, err := m.kc.AppsV1alpha1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
+		ud, err := m.kc.AppsV1beta1().UnitedDeployments(m.Namespace).Get(context.TODO(), m.Name, metav1.GetOptions{})
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		g.Expect(ud.Status.SubsetStatuses != nil).To(gomega.BeTrue())
 		actual := map[string]bool{}
 		for name := range expect {
 			status := ud.Status.GetSubsetStatus(name)
 			g.Expect(status != nil).To(gomega.BeTrue())
-			condition := status.GetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable)
+			condition := status.GetCondition(appsv1beta1.UnitedDeploymentSubsetSchedulable)
 			actual[name] = condition != nil && condition.Status == v1.ConditionFalse
 		}
 		g.Expect(expect).To(gomega.BeEquivalentTo(actual))
@@ -366,6 +366,17 @@ func (m *UnitedDeploymentManager) getWorkerNodeName() (string, error) {
 		return node.Name, nil
 	}
 	return "", fmt.Errorf("no worker node found")
+}
+
+func subsetStatusReplicas(statuses []appsv1beta1.UnitedDeploymentSubsetStatus) map[string]int32 {
+	replicas := make(map[string]int32, len(statuses))
+	for _, status := range statuses {
+		if status.Name == "" {
+			continue
+		}
+		replicas[status.Name] = status.Replicas
+	}
+	return replicas
 }
 
 func (m *UnitedDeploymentManager) SetImage(image string) {

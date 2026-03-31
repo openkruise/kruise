@@ -39,7 +39,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
 	utilcontroller "github.com/openkruise/kruise/pkg/controller/util"
@@ -56,7 +55,7 @@ func init() {
 
 var (
 	concurrentReconciles = 3
-	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("UnitedDeployment")
+	controllerKind       = appsv1beta1.SchemeGroupVersion.WithKind("UnitedDeployment")
 	durationStore        = requeueduration.DurationStore{}
 )
 
@@ -118,31 +117,31 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to UnitedDeployment
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.UnitedDeployment{}, &eventHandler{}))
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.UnitedDeployment{}, &eventHandler{}))
 	if err != nil {
 		return err
 	}
 
 	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.StatefulSet{}, handler.TypedEnqueueRequestForOwner[*appsv1.StatefulSet](
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner())))
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1beta1.UnitedDeployment{}, handler.OnlyControllerOwner())))
 	if err != nil {
 		return err
 	}
 
 	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.StatefulSet{}, handler.TypedEnqueueRequestForOwner[*appsv1beta1.StatefulSet](
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner())))
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1beta1.UnitedDeployment{}, handler.OnlyControllerOwner())))
 	if err != nil {
 		return err
 	}
 
 	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.CloneSet{}, handler.TypedEnqueueRequestForOwner[*appsv1beta1.CloneSet](
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner())))
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1beta1.UnitedDeployment{}, handler.OnlyControllerOwner())))
 	if err != nil {
 		return err
 	}
 
 	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1.Deployment{}, handler.TypedEnqueueRequestForOwner[*appsv1.Deployment](
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.UnitedDeployment{}, handler.OnlyControllerOwner())))
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1beta1.UnitedDeployment{}, handler.OnlyControllerOwner())))
 	if err != nil {
 		return err
 	}
@@ -176,7 +175,7 @@ type ReconcileUnitedDeployment struct {
 func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
 	klog.V(4).InfoS("Reconcile UnitedDeployment", "unitedDeployment", request)
 	// Fetch the UnitedDeployment instance
-	instance := &appsv1alpha1.UnitedDeployment{}
+	instance := &appsv1beta1.UnitedDeployment{}
 	now := time.Now()
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
@@ -285,7 +284,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 
 // getExistingSubsets fetches all subset workloads in cluster managed by this UnitedDeployment
 // if adaptive scheduling strategy is used, existing subset unschedulable status will be set true here (newly created subsets are default false)
-func (r *ReconcileUnitedDeployment) getExistingSubsets(instance *appsv1alpha1.UnitedDeployment, control ControlInterface, expectedRevision string) (existingSubsets map[string]*Subset, err error) {
+func (r *ReconcileUnitedDeployment) getExistingSubsets(instance *appsv1beta1.UnitedDeployment, control ControlInterface, expectedRevision string) (existingSubsets map[string]*Subset, err error) {
 	subSets, err := control.GetAllSubsets(instance, expectedRevision)
 	if err != nil {
 		r.recorder.Event(instance, corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeFindSubsets), err.Error())
@@ -304,17 +303,17 @@ func (r *ReconcileUnitedDeployment) getExistingSubsets(instance *appsv1alpha1.Un
 	return existingSubsets, nil
 }
 
-func setUpdatedCondition(status *appsv1alpha1.UnitedDeploymentStatus, currentRevision, expectedRevision string, now time.Time) {
+func setUpdatedCondition(status *appsv1beta1.UnitedDeploymentStatus, currentRevision, expectedRevision string, now time.Time) {
 	var newStatus corev1.ConditionStatus
 	if currentRevision != expectedRevision {
 		newStatus = corev1.ConditionFalse
 	} else {
 		newStatus = corev1.ConditionTrue
 	}
-	oldCondition := GetUnitedDeploymentCondition(status, appsv1alpha1.UnitedDeploymentUpdated)
+	oldCondition := GetUnitedDeploymentCondition(status, appsv1beta1.UnitedDeploymentUpdated)
 	if oldCondition == nil || oldCondition.Status != newStatus {
-		newCondition := &appsv1alpha1.UnitedDeploymentCondition{
-			Type:               appsv1alpha1.UnitedDeploymentUpdated,
+		newCondition := &appsv1beta1.UnitedDeploymentCondition{
+			Type:               appsv1beta1.UnitedDeploymentUpdated,
 			Status:             newStatus,
 			LastTransitionTime: metav1.NewTime(now),
 		}
@@ -330,7 +329,7 @@ func setUpdatedCondition(status *appsv1alpha1.UnitedDeploymentStatus, currentRev
 }
 
 // calculateSubsetsStatusForDefaultAdaptiveStrategy manages subset unschedulable status and store them in the Subset.Status.UnschedulableStatus field.
-func calculateSubsetsStatusForDefaultAdaptiveStrategy(name string, subset *Subset, ud *appsv1alpha1.UnitedDeployment) {
+func calculateSubsetsStatusForDefaultAdaptiveStrategy(name string, subset *Subset, ud *appsv1beta1.UnitedDeployment) {
 	now := time.Now()
 	unitedDeploymentKey := getUnitedDeploymentKey(ud)
 	status := ud.Status.GetSubsetStatus(name)
@@ -338,7 +337,7 @@ func calculateSubsetsStatusForDefaultAdaptiveStrategy(name string, subset *Subse
 		klog.ErrorS(nil, "SubsetStatus not found", "subset", name, "unitedDeployment", klog.KObj(ud))
 		return
 	}
-	condition := status.GetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable)
+	condition := status.GetCondition(appsv1beta1.UnitedDeploymentSubsetSchedulable)
 	// process with existing condition
 	if condition != nil && condition.Status == corev1.ConditionFalse {
 		// The unschedulable state of a subset lasts for at least 5 minutes.
@@ -350,7 +349,7 @@ func calculateSubsetsStatusForDefaultAdaptiveStrategy(name string, subset *Subse
 			subset.Status.UnschedulableStatus.Unschedulable = true
 		} else {
 			klog.InfoS("unschedulable subset recovered", "subset", name, "unitedDeployment", klog.KObj(ud))
-			status.SetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable, corev1.ConditionTrue, "recover",
+			status.SetCondition(appsv1beta1.UnitedDeploymentSubsetSchedulable, corev1.ConditionTrue, "recover",
 				fmt.Sprintf("unschedulable subset recovered after %f seconds", ud.Spec.Topology.ScheduleStrategy.GetUnschedulableDuration().Seconds()))
 		}
 	}
@@ -373,7 +372,7 @@ func calculateSubsetsStatusForDefaultAdaptiveStrategy(name string, subset *Subse
 			klog.InfoS("subset has pending pods", "subset", subset.Name,
 				"pendingPods", subset.Status.UnschedulableStatus.PendingPods, "unitedDeployment", klog.KObj(ud))
 			subset.Status.UnschedulableStatus.Unschedulable = true
-			status.SetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable, corev1.ConditionFalse, "reschedule",
+			status.SetCondition(appsv1beta1.UnitedDeploymentSubsetSchedulable, corev1.ConditionFalse, "reschedule",
 				"timeout pending pods found")
 			durationStore.Push(unitedDeploymentKey, ud.Spec.Topology.ScheduleStrategy.GetUnschedulableDuration())
 		}
@@ -381,14 +380,14 @@ func calculateSubsetsStatusForDefaultAdaptiveStrategy(name string, subset *Subse
 	klog.InfoS("subset status", "status", status, "unitedDeployment", klog.KObj(ud))
 }
 
-func calculateSubsetsStatusForReservedAdaptiveStrategy(name string, subset *Subset, ud *appsv1alpha1.UnitedDeployment, now time.Time) (podsToPatch []podToPatchReservedLabel) {
+func calculateSubsetsStatusForReservedAdaptiveStrategy(name string, subset *Subset, ud *appsv1beta1.UnitedDeployment, now time.Time) (podsToPatch []podToPatchReservedLabel) {
 	unitedDeploymentKey := getUnitedDeploymentKey(ud)
 	status := ud.Status.GetSubsetStatus(name)
 	if status == nil {
 		klog.ErrorS(nil, "SubsetStatus not found", "subset", name, "unitedDeployment", klog.KObj(ud))
 		return
 	}
-	if condition := status.GetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable); condition != nil {
+	if condition := status.GetCondition(appsv1beta1.UnitedDeploymentSubsetSchedulable); condition != nil {
 		subset.Status.UnschedulableStatus.MarkedAsUnschedulable = condition.Status == corev1.ConditionFalse
 	}
 	var requeueAfter time.Duration = math.MaxInt64
@@ -405,7 +404,7 @@ func calculateSubsetsStatusForReservedAdaptiveStrategy(name string, subset *Subs
 				requeueAfter = unschedulableDuration
 			}
 		} else {
-			reserved, checkAfter = CheckPodReallyInReservedStatus(pod, subset, GetUnitedDeploymentCondition(&ud.Status, appsv1alpha1.UnitedDeploymentUpdated),
+			reserved, checkAfter = CheckPodReallyInReservedStatus(pod, subset, GetUnitedDeploymentCondition(&ud.Status, appsv1beta1.UnitedDeploymentUpdated),
 				ud.Spec.Topology.ScheduleStrategy.GetRescheduleCriticalDuration(), unschedulableDuration, now)
 			if reserved {
 				klog.V(5).InfoS("pod is reserved", "pod", klog.KObj(pod), "unitedDeployment", klog.KObj(ud), "subset", name)
@@ -428,19 +427,19 @@ func calculateSubsetsStatusForReservedAdaptiveStrategy(name string, subset *Subs
 			"reservedPods", subset.Status.UnschedulableStatus.ReservedPods,
 			"totalPods", len(subset.Spec.SubsetPods), "unitedDeployment", klog.KObj(ud))
 		subset.Status.UnschedulableStatus.Unschedulable = true
-		status.SetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable, corev1.ConditionFalse, "reschedule",
+		status.SetCondition(appsv1beta1.UnitedDeploymentSubsetSchedulable, corev1.ConditionFalse, "reschedule",
 			"reserved pods found")
 	} else {
 		klog.V(5).InfoS("subset has no reserved pod", "subset", name,
 			"totalPods", len(subset.Spec.SubsetPods), "unitedDeployment", klog.KObj(ud))
 		subset.Status.UnschedulableStatus.Unschedulable = false
-		status.SetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable, corev1.ConditionTrue, "reschedule",
+		status.SetCondition(appsv1beta1.UnitedDeploymentSubsetSchedulable, corev1.ConditionTrue, "reschedule",
 			"no reserved pods")
 	}
 	return
 }
 
-func postProcessSubsetStatusForReservedAdaptiveStrategy(name string, subset *Subset, ud *appsv1alpha1.UnitedDeployment, nextReplicas int32) {
+func postProcessSubsetStatusForReservedAdaptiveStrategy(name string, subset *Subset, ud *appsv1beta1.UnitedDeployment, nextReplicas int32) {
 	status := ud.Status.GetSubsetStatus(name)
 	if !subset.Status.UnschedulableStatus.Unschedulable &&
 		subset.Status.UnschedulableStatus.MarkedAsUnschedulable &&
@@ -452,7 +451,7 @@ func postProcessSubsetStatusForReservedAdaptiveStrategy(name string, subset *Sub
 		// reserved after they are created, and then delete the temporary Pods after they are truly healthy.
 		klog.V(5).InfoS("subset just recovered scaled up", "subset", name,
 			"unitedDeployment", klog.KObj(ud), "old", subset.Spec.Replicas, "new", nextReplicas)
-		status.SetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable, corev1.ConditionFalse, "reschedule",
+		status.SetCondition(appsv1beta1.UnitedDeploymentSubsetSchedulable, corev1.ConditionFalse, "reschedule",
 			"subset just recovered scaled up")
 	}
 }
@@ -479,16 +478,16 @@ func (r *ReconcileUnitedDeployment) patchReservedStatusChangedPods(podsToPatch [
 
 func (r *ReconcileUnitedDeployment) patchPodReservedLabel(pod *corev1.Pod, value string) error {
 	patchStr := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`,
-		appsv1alpha1.ReservedPodLabelKey, value)
+		appsv1beta1.ReservedPodLabelKey, value)
 	patch := utilcontroller.GetEmptyObjectWithKey(pod)
 	return r.Patch(context.TODO(), patch, client.RawPatch(types.StrategicMergePatchType, []byte(patchStr)))
 }
 
-func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas map[string]int32) map[string]int32 {
+func calcNextPartitions(ud *appsv1beta1.UnitedDeployment, nextReplicas map[string]int32) map[string]int32 {
 	partitions := map[string]int32{}
 	for _, subset := range ud.Spec.Topology.Subsets {
 		var subsetPartition int32
-		if ud.Spec.UpdateStrategy.Type == appsv1alpha1.ManualUpdateStrategyType && ud.Spec.UpdateStrategy.ManualUpdate != nil && ud.Spec.UpdateStrategy.ManualUpdate.Partitions != nil {
+		if ud.Spec.UpdateStrategy.Type == appsv1beta1.ManualUpdateStrategyType && ud.Spec.UpdateStrategy.ManualUpdate != nil && ud.Spec.UpdateStrategy.ManualUpdate.Partitions != nil {
 			if partition, exist := ud.Spec.UpdateStrategy.ManualUpdate.Partitions[subset.Name]; exist {
 				subsetPartition = partition
 			}
@@ -504,7 +503,7 @@ func calcNextPartitions(ud *appsv1alpha1.UnitedDeployment, nextReplicas map[stri
 	return partitions
 }
 
-func getNextUpdate(ud *appsv1alpha1.UnitedDeployment, nextReplicas map[string]int32, nextPartitions map[string]int32) map[string]SubsetUpdate {
+func getNextUpdate(ud *appsv1beta1.UnitedDeployment, nextReplicas map[string]int32, nextPartitions map[string]int32) map[string]SubsetUpdate {
 	next := make(map[string]SubsetUpdate)
 	for _, subset := range ud.Spec.Topology.Subsets {
 		t := SubsetUpdate{}
@@ -541,7 +540,7 @@ func (r *ReconcileUnitedDeployment) deleteDupSubset(allSubsets map[string][]*Sub
 	return existingSubsets, nil
 }
 
-func (r *ReconcileUnitedDeployment) getSubsetControls(instance *appsv1alpha1.UnitedDeployment) (ControlInterface, subSetType) {
+func (r *ReconcileUnitedDeployment) getSubsetControls(instance *appsv1beta1.UnitedDeployment) (ControlInterface, subSetType) {
 	if instance.Spec.Template.StatefulSetTemplate != nil {
 		return r.subSetControls[statefulSetSubSetType], statefulSetSubSetType
 	}
@@ -577,7 +576,7 @@ func (r *ReconcileUnitedDeployment) classifySubsetBySubsetName(subsets []*Subset
 	return mapping
 }
 
-func (r *ReconcileUnitedDeployment) updateStatus(instance *appsv1alpha1.UnitedDeployment, newStatus, oldStatus *appsv1alpha1.UnitedDeploymentStatus) error {
+func (r *ReconcileUnitedDeployment) updateStatus(instance *appsv1beta1.UnitedDeployment, newStatus, oldStatus *appsv1beta1.UnitedDeploymentStatus) error {
 	newObj, err := r.updateUnitedDeployment(instance, oldStatus, newStatus)
 	if err == nil && newObj != nil {
 		ResourceVersionExpectation.Expect(newObj)
@@ -586,10 +585,10 @@ func (r *ReconcileUnitedDeployment) updateStatus(instance *appsv1alpha1.UnitedDe
 	return err
 }
 
-var extraStatusSelector = fmt.Sprintf(",%s=false", appsv1alpha1.ReservedPodLabelKey)
+var extraStatusSelector = fmt.Sprintf(",%s=false", appsv1beta1.ReservedPodLabelKey)
 
-func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.UnitedDeploymentStatus, existingSubsets map[string]*Subset,
-	nextReplicas, nextPartition map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, control ControlInterface) *appsv1alpha1.UnitedDeploymentStatus {
+func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1beta1.UnitedDeploymentStatus, existingSubsets map[string]*Subset,
+	nextReplicas, nextPartition map[string]int32, currentRevision, updatedRevision *appsv1.ControllerRevision, control ControlInterface) *appsv1beta1.UnitedDeploymentStatus {
 	expectedRevision := currentRevision.Name
 	if updatedRevision != nil {
 		expectedRevision = updatedRevision.Name
@@ -610,14 +609,11 @@ func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.Unit
 		newStatus.UpdatedReplicas += subsetUpdatedReplicas
 		newStatus.UpdatedReadyReplicas += subsetUpdatedReadyReplicas
 		ss := newStatus.GetSubsetStatus(name)
-		ss.Replicas = subset.Status.Replicas
+		ss.Replicas = nextReplicas[name]
 		ss.ReadyReplicas = subset.Status.ReadyReplicas
 		ss.Partition = nextPartition[name]
 		ss.ReservedPods = subset.Status.UnschedulableStatus.ReservedPods
 	}
-
-	// Legacy field "SubsetReplicas" status still exists in ud status, consider remove them in v1beta1.
-	newStatus.SubsetReplicas = nextReplicas
 
 	if newStatus.CurrentRevision == "" {
 		// init with current revision
@@ -625,7 +621,7 @@ func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.Unit
 	}
 
 	if newStatus.UpdateStatus == nil {
-		newStatus.UpdateStatus = &appsv1alpha1.UpdateStatus{}
+		newStatus.UpdateStatus = &appsv1beta1.UpdateStatus{}
 	}
 
 	newStatus.UpdateStatus.UpdatedRevision = expectedRevision
@@ -645,9 +641,9 @@ func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1alpha1.Unit
 	}
 
 	if subsetFailure == nil {
-		RemoveUnitedDeploymentCondition(newStatus, appsv1alpha1.SubsetFailure)
+		RemoveUnitedDeploymentCondition(newStatus, appsv1beta1.SubsetFailure)
 	} else {
-		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1alpha1.SubsetFailure, corev1.ConditionTrue, "Error", *subsetFailure))
+		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1beta1.SubsetFailure, corev1.ConditionTrue, "Error", *subsetFailure))
 	}
 
 	return newStatus
@@ -661,7 +657,7 @@ func replicasStatus(subset *Subset) (replicas, readyReplicas, updatedReplicas, u
 	return
 }
 
-func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1alpha1.UnitedDeployment, oldStatus, newStatus *appsv1alpha1.UnitedDeploymentStatus) (*appsv1alpha1.UnitedDeployment, error) {
+func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1beta1.UnitedDeployment, oldStatus, newStatus *appsv1beta1.UnitedDeploymentStatus) (*appsv1beta1.UnitedDeployment, error) {
 	if oldStatus.Replicas == newStatus.Replicas &&
 		oldStatus.ReadyReplicas == newStatus.ReadyReplicas &&
 		oldStatus.UpdatedReplicas == newStatus.UpdatedReplicas &&
@@ -670,7 +666,6 @@ func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1alpha1.Unit
 		oldStatus.CollisionCount == newStatus.CollisionCount &&
 		oldStatus.LabelSelector == newStatus.LabelSelector &&
 		ud.Generation == newStatus.ObservedGeneration &&
-		reflect.DeepEqual(oldStatus.SubsetReplicas, newStatus.SubsetReplicas) &&
 		reflect.DeepEqual(oldStatus.UpdateStatus, newStatus.UpdateStatus) &&
 		reflect.DeepEqual(oldStatus.Conditions, newStatus.Conditions) &&
 		reflect.DeepEqual(oldStatus.SubsetStatuses, newStatus.SubsetStatuses) {
@@ -700,7 +695,7 @@ func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1alpha1.Unit
 		if i >= updateRetries {
 			break
 		}
-		tmpObj := &appsv1alpha1.UnitedDeployment{}
+		tmpObj := &appsv1beta1.UnitedDeployment{}
 		if getErr = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: obj.Namespace, Name: obj.Name}, tmpObj); getErr != nil {
 			return nil, getErr
 		}

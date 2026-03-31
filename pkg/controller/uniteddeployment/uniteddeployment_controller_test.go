@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
 )
 
@@ -43,20 +43,20 @@ var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Nam
 func TestReconcile(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": "foo",
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": "foo",
@@ -81,8 +81,8 @@ func TestReconcile(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -137,7 +137,7 @@ func TestReconcile(t *testing.T) {
 
 func TestDefaultAdaptiveStrategy(t *testing.T) {
 	subsetName := "subset-1"
-	baseEnvFactory := func() (*corev1.Pod, *Subset, *appsv1alpha1.UnitedDeployment) {
+	baseEnvFactory := func() (*corev1.Pod, *Subset, *appsv1beta1.UnitedDeployment) {
 		pod := &corev1.Pod{
 			Status: corev1.PodStatus{
 				Phase: corev1.PodPending,
@@ -165,24 +165,24 @@ func TestDefaultAdaptiveStrategy(t *testing.T) {
 				SubsetPods: []*corev1.Pod{pod},
 			},
 		}
-		return pod, subset, &appsv1alpha1.UnitedDeployment{
-			Status: appsv1alpha1.UnitedDeploymentStatus{
-				SubsetStatuses: []appsv1alpha1.UnitedDeploymentSubsetStatus{
+		return pod, subset, &appsv1beta1.UnitedDeployment{
+			Status: appsv1beta1.UnitedDeploymentStatus{
+				SubsetStatuses: []appsv1beta1.UnitedDeploymentSubsetStatus{
 					{
 						Name: subsetName,
-						Conditions: []appsv1alpha1.UnitedDeploymentSubsetCondition{
+						Conditions: []appsv1beta1.UnitedDeploymentSubsetCondition{
 							{
-								Type:   appsv1alpha1.UnitedDeploymentSubsetSchedulable,
+								Type:   appsv1beta1.UnitedDeploymentSubsetSchedulable,
 								Status: corev1.ConditionTrue,
 							},
 						},
 					},
 				},
 			},
-			Spec: appsv1alpha1.UnitedDeploymentSpec{
-				Topology: appsv1alpha1.Topology{
-					ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
-						Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
+			Spec: appsv1beta1.UnitedDeploymentSpec{
+				Topology: appsv1beta1.Topology{
+					ScheduleStrategy: appsv1beta1.UnitedDeploymentScheduleStrategy{
+						Type: appsv1beta1.AdaptiveUnitedDeploymentScheduleStrategyType,
 					},
 				},
 			},
@@ -191,7 +191,7 @@ func TestDefaultAdaptiveStrategy(t *testing.T) {
 
 	cases := []struct {
 		name              string
-		envFactory        func() (*Subset, *appsv1alpha1.UnitedDeployment)
+		envFactory        func() (*Subset, *appsv1beta1.UnitedDeployment)
 		expectPendingPods int32
 		requeueUpperLimit time.Duration
 		requeueLowerLimit time.Duration
@@ -199,37 +199,37 @@ func TestDefaultAdaptiveStrategy(t *testing.T) {
 	}{
 		{
 			name: "Not timeouted yet",
-			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+			envFactory: func() (*Subset, *appsv1beta1.UnitedDeployment) {
 				_, subset, ud := baseEnvFactory()
 				return subset, ud
 			},
 			expectPendingPods: 0,
-			requeueUpperLimit: appsv1alpha1.DefaultRescheduleCriticalDuration - 15*time.Second + 100*time.Millisecond,
-			requeueLowerLimit: appsv1alpha1.DefaultRescheduleCriticalDuration - 15*time.Second - 100*time.Millisecond,
+			requeueUpperLimit: appsv1beta1.DefaultRescheduleCriticalDuration - 15*time.Second + 100*time.Millisecond,
+			requeueLowerLimit: appsv1beta1.DefaultRescheduleCriticalDuration - 15*time.Second - 100*time.Millisecond,
 			unschedulable:     false,
 		},
 		{
 			name: "Timeouted",
-			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+			envFactory: func() (*Subset, *appsv1beta1.UnitedDeployment) {
 				pod, subset, ud := baseEnvFactory()
 				pod.CreationTimestamp = metav1.NewTime(time.Now().Add(-31 * time.Second))
 				return subset, ud
 			},
 			expectPendingPods: 1,
-			requeueUpperLimit: appsv1alpha1.DefaultUnschedulableStatusLastDuration,
-			requeueLowerLimit: appsv1alpha1.DefaultUnschedulableStatusLastDuration,
+			requeueUpperLimit: appsv1beta1.DefaultUnschedulableStatusLastDuration,
+			requeueLowerLimit: appsv1beta1.DefaultUnschedulableStatusLastDuration,
 			unschedulable:     true,
 		},
 		{
 			name: "During unschedulable status",
-			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+			envFactory: func() (*Subset, *appsv1beta1.UnitedDeployment) {
 				_, subset, ud := baseEnvFactory()
-				ud.Status.SubsetStatuses = []appsv1alpha1.UnitedDeploymentSubsetStatus{
+				ud.Status.SubsetStatuses = []appsv1beta1.UnitedDeploymentSubsetStatus{
 					{
 						Name: subset.Name,
-						Conditions: []appsv1alpha1.UnitedDeploymentSubsetCondition{
+						Conditions: []appsv1beta1.UnitedDeploymentSubsetCondition{
 							{
-								Type:               appsv1alpha1.UnitedDeploymentSubsetSchedulable,
+								Type:               appsv1beta1.UnitedDeploymentSubsetSchedulable,
 								Status:             corev1.ConditionFalse,
 								LastTransitionTime: metav1.Time{Time: time.Now().Add(-time.Minute)},
 							},
@@ -241,22 +241,22 @@ func TestDefaultAdaptiveStrategy(t *testing.T) {
 				return subset, ud
 			},
 			expectPendingPods: 0,
-			requeueUpperLimit: appsv1alpha1.DefaultUnschedulableStatusLastDuration - time.Minute + time.Second,
-			requeueLowerLimit: appsv1alpha1.DefaultUnschedulableStatusLastDuration - time.Minute - time.Second,
+			requeueUpperLimit: appsv1beta1.DefaultUnschedulableStatusLastDuration - time.Minute + time.Second,
+			requeueLowerLimit: appsv1beta1.DefaultUnschedulableStatusLastDuration - time.Minute - time.Second,
 			unschedulable:     true,
 		},
 		{
 			name: "After status reset",
-			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+			envFactory: func() (*Subset, *appsv1beta1.UnitedDeployment) {
 				pod, subset, ud := baseEnvFactory()
-				ud.Status.SubsetStatuses = []appsv1alpha1.UnitedDeploymentSubsetStatus{
+				ud.Status.SubsetStatuses = []appsv1beta1.UnitedDeploymentSubsetStatus{
 					{
 						Name: subset.Name,
-						Conditions: []appsv1alpha1.UnitedDeploymentSubsetCondition{
+						Conditions: []appsv1beta1.UnitedDeploymentSubsetCondition{
 							{
-								Type:               appsv1alpha1.UnitedDeploymentSubsetSchedulable,
+								Type:               appsv1beta1.UnitedDeploymentSubsetSchedulable,
 								Status:             corev1.ConditionFalse,
-								LastTransitionTime: metav1.Time{Time: time.Now().Add(-time.Minute - appsv1alpha1.DefaultUnschedulableStatusLastDuration)},
+								LastTransitionTime: metav1.Time{Time: time.Now().Add(-time.Minute - appsv1beta1.DefaultUnschedulableStatusLastDuration)},
 							},
 						},
 					},
@@ -334,10 +334,10 @@ func TestCalculateSubsetsStatusForReservedAdaptiveStrategy(t *testing.T) {
 		}
 		pod.CreationTimestamp = metav1.NewTime(creationTime)
 		if patch != "" {
-			pod.Labels[appsv1alpha1.ReservedPodLabelKey] = patch
+			pod.Labels[appsv1beta1.ReservedPodLabelKey] = patch
 		}
 	}
-	baseEnvFactory := func(subsetUnschedulableStatus corev1.ConditionStatus) (*Subset, *appsv1alpha1.UnitedDeployment, *corev1.Pod) {
+	baseEnvFactory := func(subsetUnschedulableStatus corev1.ConditionStatus) (*Subset, *appsv1beta1.UnitedDeployment, *corev1.Pod) {
 		pod := &corev1.Pod{}
 		pod.Labels = make(map[string]string)
 		subset := &Subset{
@@ -348,25 +348,25 @@ func TestCalculateSubsetsStatusForReservedAdaptiveStrategy(t *testing.T) {
 				SubsetPods: []*corev1.Pod{pod},
 			},
 		}
-		return subset, &appsv1alpha1.UnitedDeployment{
-			Status: appsv1alpha1.UnitedDeploymentStatus{
-				SubsetStatuses: []appsv1alpha1.UnitedDeploymentSubsetStatus{
+		return subset, &appsv1beta1.UnitedDeployment{
+			Status: appsv1beta1.UnitedDeploymentStatus{
+				SubsetStatuses: []appsv1beta1.UnitedDeploymentSubsetStatus{
 					{
 						Name: subsetName,
-						Conditions: []appsv1alpha1.UnitedDeploymentSubsetCondition{
+						Conditions: []appsv1beta1.UnitedDeploymentSubsetCondition{
 							{
-								Type:   appsv1alpha1.UnitedDeploymentSubsetSchedulable,
+								Type:   appsv1beta1.UnitedDeploymentSubsetSchedulable,
 								Status: subsetUnschedulableStatus,
 							},
 						},
 					},
 				},
 			},
-			Spec: appsv1alpha1.UnitedDeploymentSpec{
-				Topology: appsv1alpha1.Topology{
-					ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
-						Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
-						Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
+			Spec: appsv1beta1.UnitedDeploymentSpec{
+				Topology: appsv1beta1.Topology{
+					ScheduleStrategy: appsv1beta1.UnitedDeploymentScheduleStrategy{
+						Type: appsv1beta1.AdaptiveUnitedDeploymentScheduleStrategyType,
+						Adaptive: &appsv1beta1.AdaptiveUnitedDeploymentStrategy{
 							ReserveUnschedulablePods:  true,
 							RescheduleCriticalSeconds: ptr.To[int32](10),
 							UnschedulableDuration:     ptr.To[int32](30),
@@ -379,7 +379,7 @@ func TestCalculateSubsetsStatusForReservedAdaptiveStrategy(t *testing.T) {
 
 	cases := []struct {
 		name               string
-		envFactory         func() (*Subset, *appsv1alpha1.UnitedDeployment)
+		envFactory         func() (*Subset, *appsv1beta1.UnitedDeployment)
 		requeueAfter       time.Duration
 		expectReservedPods int32
 		unschedulable      bool
@@ -389,7 +389,7 @@ func TestCalculateSubsetsStatusForReservedAdaptiveStrategy(t *testing.T) {
 		// UnschedulableDuration = 30s
 		{
 			name: "Pod just created, pending",
-			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+			envFactory: func() (*Subset, *appsv1beta1.UnitedDeployment) {
 				subset, ud, pod := baseEnvFactory(corev1.ConditionTrue)
 				// create -> 1s check
 				modifyPod(pod, now, now.Add(-1*time.Second), true, "")
@@ -402,7 +402,7 @@ func TestCalculateSubsetsStatusForReservedAdaptiveStrategy(t *testing.T) {
 		},
 		{
 			name: "Pod created, running within RescheduleCriticalSeconds",
-			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+			envFactory: func() (*Subset, *appsv1beta1.UnitedDeployment) {
 				subset, ud, pod := baseEnvFactory(corev1.ConditionTrue)
 				// create -> 5s ready -> 3s check
 				modifyPod(pod, now.Add(-5*time.Second), now.Add(-8*time.Second), false, "false")
@@ -415,7 +415,7 @@ func TestCalculateSubsetsStatusForReservedAdaptiveStrategy(t *testing.T) {
 		},
 		{
 			name: "Pod created, pending until timeout",
-			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+			envFactory: func() (*Subset, *appsv1beta1.UnitedDeployment) {
 				subset, ud, pod := baseEnvFactory(corev1.ConditionTrue)
 				// create -> 13s check
 				modifyPod(pod, now.Add(-13*time.Second), now.Add(-13*time.Second), true, "false")
@@ -428,7 +428,7 @@ func TestCalculateSubsetsStatusForReservedAdaptiveStrategy(t *testing.T) {
 		},
 		{
 			name: "Pod recovered, but not long enough",
-			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+			envFactory: func() (*Subset, *appsv1beta1.UnitedDeployment) {
 				subset, ud, pod := baseEnvFactory(corev1.ConditionTrue)
 				// create -> 15s check as reserved -> 10s running, check
 				modifyPod(pod, now.Add(-10*time.Second), now.Add(-25*time.Second), false, "true")
@@ -441,7 +441,7 @@ func TestCalculateSubsetsStatusForReservedAdaptiveStrategy(t *testing.T) {
 		},
 		{
 			name: "Pod recovered, long enough",
-			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+			envFactory: func() (*Subset, *appsv1beta1.UnitedDeployment) {
 				subset, ud, pod := baseEnvFactory(corev1.ConditionTrue)
 				// create -> 15s check as reserved -> 35s running
 				modifyPod(pod, now.Add(-35*time.Second), now.Add(-50*time.Second), false, "true")
@@ -454,7 +454,7 @@ func TestCalculateSubsetsStatusForReservedAdaptiveStrategy(t *testing.T) {
 		},
 		{
 			name: "Pod created in a previously unschedulable subset",
-			envFactory: func() (*Subset, *appsv1alpha1.UnitedDeployment) {
+			envFactory: func() (*Subset, *appsv1beta1.UnitedDeployment) {
 				subset, ud, pod := baseEnvFactory(corev1.ConditionFalse)
 				// create -> 1s check
 				modifyPod(pod, now, now.Add(-1*time.Second), true, "")
@@ -483,7 +483,7 @@ func TestCalculateSubsetsStatusForReservedAdaptiveStrategy(t *testing.T) {
 				t.Logf("case %s failed: SubsetStatus not found", c.name)
 				t.Fail()
 			}
-			condition := status.GetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable)
+			condition := status.GetCondition(appsv1beta1.UnitedDeploymentSubsetSchedulable)
 			if condition == nil {
 				t.Logf("case %s failed: Condition not found", c.name)
 				t.Fail()
@@ -532,14 +532,14 @@ func TestPostProcessSubsetStatusForReservedAdaptiveStrategy(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ud := &appsv1alpha1.UnitedDeployment{
-				Status: appsv1alpha1.UnitedDeploymentStatus{
-					SubsetStatuses: []appsv1alpha1.UnitedDeploymentSubsetStatus{
+			ud := &appsv1beta1.UnitedDeployment{
+				Status: appsv1beta1.UnitedDeploymentStatus{
+					SubsetStatuses: []appsv1beta1.UnitedDeploymentSubsetStatus{
 						{
 							Name: "subset-1",
-							Conditions: []appsv1alpha1.UnitedDeploymentSubsetCondition{
+							Conditions: []appsv1beta1.UnitedDeploymentSubsetCondition{
 								{
-									Type:   appsv1alpha1.UnitedDeploymentSubsetSchedulable,
+									Type:   appsv1beta1.UnitedDeploymentSubsetSchedulable,
 									Status: corev1.ConditionTrue,
 								},
 							},
@@ -558,7 +558,7 @@ func TestPostProcessSubsetStatusForReservedAdaptiveStrategy(t *testing.T) {
 				},
 			}
 			postProcessSubsetStatusForReservedAdaptiveStrategy("subset-1", subset, ud, tt.next)
-			cond := ud.Status.GetSubsetStatus("subset-1").GetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable)
+			cond := ud.Status.GetSubsetStatus("subset-1").GetCondition(appsv1beta1.UnitedDeploymentSubsetSchedulable)
 			if (cond.Status == corev1.ConditionFalse) != tt.unschedulable {
 				t.Errorf("expected unschedulable true, but got false")
 			}
@@ -603,9 +603,20 @@ func TestPatchStagingChangedPods(t *testing.T) {
 				{pod, tt.reserved},
 			})
 			_ = cli.Get(context.Background(), client.ObjectKeyFromObject(pod), pod)
-			if pod.Labels[appsv1alpha1.ReservedPodLabelKey] != tt.expectedLabel {
-				t.Errorf("expected reserved %s, but got %s", tt.expectedLabel, pod.Labels[appsv1alpha1.ReservedPodLabelKey])
+			if pod.Labels[appsv1beta1.ReservedPodLabelKey] != tt.expectedLabel {
+				t.Errorf("expected reserved %s, but got %s", tt.expectedLabel, pod.Labels[appsv1beta1.ReservedPodLabelKey])
 			}
 		})
 	}
+}
+
+func subsetStatusReplicas(statuses []appsv1beta1.UnitedDeploymentSubsetStatus) map[string]int32 {
+	replicas := make(map[string]int32, len(statuses))
+	for _, status := range statuses {
+		if status.Name == "" {
+			continue
+		}
+		replicas[status.Name] = status.Replicas
+	}
+	return replicas
 }

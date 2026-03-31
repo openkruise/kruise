@@ -63,6 +63,10 @@ func (c *FakeAppsV1beta1) StatefulSets(namespace string) v1beta1.StatefulSetInte
 	return newFakeStatefulSets(c, namespace)
 }
 
+func (c *FakeAppsV1beta1) UnitedDeployments(namespace string) v1beta1.UnitedDeploymentInterface {
+	return newFakeUnitedDeployments(c, namespace)
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeAppsV1beta1) RESTClient() rest.Interface {

@@ -2,43 +2,35 @@ apiVersion: apps.kruise.io/v1beta1
 kind: UnitedDeployment
 metadata:
   labels:
-    app.kubernetes.io/name: guestbook-kruise
-    app.kubernetes.io/instance: demo
-  name: demo-guestbook-kruise
+    controller-tools.k8s.io: "1.0"
+  name: uniteddeployment-sample
 spec:
-  replicas: 10
+  replicas: 6
   revisionHistoryLimit: 10
   selector:
     matchLabels:
-      app.kubernetes.io/name: guestbook-kruise
-      app.kubernetes.io/instance: demo
+      app: foo
   template:
     statefulSetTemplate:
       metadata:
         labels:
-          app.kubernetes.io/name: guestbook-kruise
-          app.kubernetes.io/instance: demo
+          app: foo
       spec:
         template:
           metadata:
             labels:
-              app.kubernetes.io/name: guestbook-kruise
-              app.kubernetes.io/instance: demo
+              app: foo
           spec:
             containers:
-              - name: guestbook-kruise
-                image: openkruise/guestbook:v1
-                imagePullPolicy: Always
-                ports:
-                  - name: http-server
-                    containerPort: 3000
+              - name: nginx
+                image: nginx
   topology:
     subsets:
       - name: subset-a
-        replicas: 2
+        replicas: 1
         nodeSelectorTerm:
           matchExpressions:
-            - key: az
+            - key: node
               operator: In
               values:
                 - zone-a
@@ -46,14 +38,14 @@ spec:
         replicas: 50%
         nodeSelectorTerm:
           matchExpressions:
-            - key: az
+            - key: node
               operator: In
               values:
                 - zone-b
       - name: subset-c
         nodeSelectorTerm:
           matchExpressions:
-            - key: az
+            - key: node
               operator: In
               values:
                 - zone-c
