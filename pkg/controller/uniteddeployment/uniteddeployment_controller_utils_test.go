@@ -7,7 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func TestCheckPodReserved(t *testing.T) {
@@ -114,7 +114,7 @@ func TestCheckPodReserved(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					CreationTimestamp: metav1.Time{Time: now.Add(-100 * time.Second)},
 					Labels: map[string]string{
-						appsv1alpha1.ReservedPodLabelKey: "true",
+						appsv1beta1.ReservedPodLabelKey: "true",
 					},
 				},
 			},
@@ -143,7 +143,7 @@ func TestCheckPodReserved(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					CreationTimestamp: metav1.Time{Time: now.Add(-100 * time.Second)},
 					Labels: map[string]string{
-						appsv1alpha1.ReservedPodLabelKey: "true",
+						appsv1beta1.ReservedPodLabelKey: "true",
 					},
 				},
 			},
@@ -172,7 +172,7 @@ func TestCheckPodReserved(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					CreationTimestamp: metav1.Time{Time: now.Add(-100 * time.Second)},
 					Labels: map[string]string{
-						appsv1alpha1.ReservedPodLabelKey: "true",
+						appsv1beta1.ReservedPodLabelKey: "true",
 					},
 				},
 			},
@@ -201,8 +201,8 @@ func TestCheckPodReserved(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					CreationTimestamp: metav1.Time{Time: now.Add(-1 * time.Second)},
 					Labels: map[string]string{
-						appsv1alpha1.ControllerRevisionHashLabelKey: "old-revision",
-						appsv1alpha1.ReservedPodLabelKey:            "false", // even is marked as not reserved
+						appsv1beta1.ControllerRevisionHashLabelKey: "old-revision",
+						appsv1beta1.ReservedPodLabelKey:            "false", // even is marked as not reserved
 					},
 				},
 			},
@@ -234,7 +234,7 @@ func TestCheckPodReserved(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					CreationTimestamp: metav1.Time{Time: now.Add(-1 * time.Second)},
 					Labels: map[string]string{
-						appsv1alpha1.ControllerRevisionHashLabelKey: "old-revision",
+						appsv1beta1.ControllerRevisionHashLabelKey: "old-revision",
 					},
 				},
 			},
@@ -281,8 +281,8 @@ func TestCheckPodReserved(t *testing.T) {
 			subset := &Subset{
 				Status: SubsetStatus{UpdatedRevision: tt.updatedRevision},
 			}
-			updatedCondition := &appsv1alpha1.UnitedDeploymentCondition{
-				Type:               appsv1alpha1.UnitedDeploymentUpdated,
+			updatedCondition := &appsv1beta1.UnitedDeploymentCondition{
+				Type:               appsv1beta1.UnitedDeploymentUpdated,
 				Status:             corev1.ConditionFalse,
 				LastTransitionTime: metav1.NewTime(tt.updatedTime),
 			}

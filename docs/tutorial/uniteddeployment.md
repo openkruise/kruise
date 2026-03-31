@@ -2,6 +2,8 @@
 
 This tutorial walks you through an example to manage a group of pods spread across multiple domains.
 
+The examples below use `apps.kruise.io/v1beta1`. In this promotion pass, the `UnitedDeployment` beta API is field-compatible with the current alpha API.
+
 ## Prepare nodes
 
 Let's say there are three nodes, each of which has a unique label to identify its domain. For example,
@@ -102,10 +104,19 @@ status:
   observedGeneration: 1
   readyReplicas: 10
   replicas: 10
-  subsetReplicas:
-    subset-a: 2
-    subset-b: 5
-    subset-c: 3
+  subsetStatuses:
+  - name: subset-a
+    replicas: 2
+    readyReplicas: 2
+    partition: 0
+  - name: subset-b
+    replicas: 5
+    readyReplicas: 5
+    partition: 0
+  - name: subset-c
+    replicas: 3
+    readyReplicas: 3
+    partition: 0
   updateStatus:
     currentPartitions:
       subset-a: 0
@@ -264,10 +275,19 @@ status:
 ...
 + currentRevision: demo-guestbook-kruise-55f9dbcb4b
   ...
-  subsetReplicas:
-    subset-a: 3
-    subset-b: 3
-    subset-c: 4
+  subsetStatuses:
+  - name: subset-a
+    replicas: 3
+    readyReplicas: 2
+    partition: 1
+  - name: subset-b
+    replicas: 3
+    readyReplicas: 1
+    partition: 2
+  - name: subset-c
+    replicas: 4
+    readyReplicas: 4
+    partition: 0
   updateStatus:
     currentPartitions:
       subset-a: 1

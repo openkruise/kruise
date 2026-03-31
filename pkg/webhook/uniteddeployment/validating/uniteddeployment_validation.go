@@ -35,6 +35,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	udctrl "github.com/openkruise/kruise/pkg/controller/uniteddeployment"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
@@ -112,12 +113,30 @@ func validateUnitedDeploymentSpec(spec *appsv1alpha1.UnitedDeploymentSpec, fldPa
 		}
 	}
 
-	if spec.UpdateStrategy.ManualUpdate != nil {
-		for subset := range spec.UpdateStrategy.ManualUpdate.Partitions {
-			if !subSetNames.Has(subset) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("updateStrategy", "partitions"), spec.UpdateStrategy.ManualUpdate.Partitions, fmt.Sprintf("subset %s does not exist", subset)))
+	allErrs = append(allErrs, validateUnitedDeploymentUpdateStrategy(&spec.UpdateStrategy, subSetNames, fldPath.Child("updateStrategy"))...)
+
+	return allErrs
+}
+
+func validateUnitedDeploymentUpdateStrategy(strategy *appsv1alpha1.UnitedDeploymentUpdateStrategy, subsetNames sets.String, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	effectiveType := strategy.Type
+	if effectiveType == "" {
+		effectiveType = appsv1alpha1.ManualUpdateStrategyType
+	}
+
+	switch effectiveType {
+	case appsv1alpha1.ManualUpdateStrategyType:
+		if strategy.ManualUpdate != nil {
+			for subset := range strategy.ManualUpdate.Partitions {
+				if !subsetNames.Has(subset) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("manualUpdate", "partitions"), strategy.ManualUpdate.Partitions, fmt.Sprintf("subset %s does not exist", subset)))
+				}
 			}
 		}
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), strategy.Type, []string{string(appsv1alpha1.ManualUpdateStrategyType), ""}))
 	}
 
 	return allErrs
@@ -160,7 +179,7 @@ func validateSubsetReplicas(expectedReplicas *int32, subsets []appsv1alpha1.Subs
 			hasCapacitySettings = true
 			minReplicas, err = udctrl.ParseSubsetReplicas(*expectedReplicas, *subset.MinReplicas)
 			if err != nil {
-				errList = append(errList, field.Invalid(fldPath.Index(i).Child("minReplicas"), subset.MaxReplicas, err.Error()))
+				errList = append(errList, field.Invalid(fldPath.Index(i).Child("minReplicas"), subset.MinReplicas, err.Error()))
 			}
 		}
 		sumMinReplicas += int64(minReplicas)
@@ -171,14 +190,14 @@ func validateSubsetReplicas(expectedReplicas *int32, subsets []appsv1alpha1.Subs
 			hasCapacitySettings = true
 			maxReplicas, err = udctrl.ParseSubsetReplicas(*expectedReplicas, *subset.MaxReplicas)
 			if err != nil {
-				errList = append(errList, field.Invalid(fldPath.Index(i).Child("minReplicas"), subset.MaxReplicas, err.Error()))
+				errList = append(errList, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, err.Error()))
 			}
 		}
 		sumMaxReplicas += int64(maxReplicas)
 
 		if minReplicas > maxReplicas {
-			errList = append(errList, field.Invalid(fldPath.Index(i).Child("minReplicas"), subset.MaxReplicas,
-				fmt.Sprintf("subset[%d].minReplicas must be more than or equal to maxReplicas", i)))
+			errList = append(errList, field.Invalid(fldPath.Index(i).Child("minReplicas"), subset.MinReplicas,
+				fmt.Sprintf("subset[%d].minReplicas must be less than or equal to maxReplicas", i)))
 		}
 	}
 
@@ -436,6 +455,427 @@ func validateAdvancedStatefulSetUpdate(statefulSet, oldStatefulSet *appsv1alpha1
 }
 
 func validateDeploymentUpdate(deployment, oldDeployment *appsv1alpha1.DeploymentTemplateSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if deployment.Spec.Replicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*deployment.Spec.Replicas), fldPath.Child("spec", "replicas"))...)
+	}
+
+	return allErrs
+}
+
+// validateUnitedDeploymentSpecV1beta1 tests if required fields in the v1beta1 UnitedDeployment spec are set.
+func validateUnitedDeploymentSpecV1beta1(spec *appsv1beta1.UnitedDeploymentSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if spec.Replicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Replicas), fldPath.Child("replicas"))...)
+	}
+	if spec.Selector == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), ""))
+	} else {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, unversionedvalidation.LabelSelectorValidationOptions{}, fldPath.Child("selector"))...)
+		if len(spec.Selector.MatchLabels)+len(spec.Selector.MatchExpressions) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "empty selector is invalid for statefulset"))
+		}
+	}
+
+	if spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() &&
+		(spec.Template.AdvancedStatefulSetTemplate != nil || spec.Template.StatefulSetTemplate != nil) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "scheduleStrategy"), spec.Topology.ScheduleStrategy,
+			"only stateless workloads (Deployment and CloneSet) are supported by reserved rescheduling"))
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(spec.Selector)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, ""))
+	} else {
+		allErrs = append(allErrs, validateSubsetTemplateV1beta1(&spec.Template, selector, fldPath.Child("template"))...)
+	}
+
+	allErrs = append(allErrs, validateSubsetReplicasV1beta1(spec.Replicas, spec.Topology.Subsets, fldPath.Child("topology", "subsets"))...)
+
+	subSetNames := sets.String{}
+	for i, subset := range spec.Topology.Subsets {
+		if len(subset.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("topology", "subsets").Index(i).Child("name"), ""))
+		}
+
+		if subSetNames.Has(subset.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets").Index(i).Child("name"), subset.Name, fmt.Sprintf("duplicated subset name %s", subset.Name)))
+		}
+
+		subSetNames.Insert(subset.Name)
+
+		if errs := apimachineryvalidation.NameIsDNSLabel(subset.Name, false); len(errs) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets").Index(i).Child("name"), subset.Name, fmt.Sprintf("invalid subset name %s", strings.Join(errs, ", "))))
+		}
+
+		coreNodeSelectorTerm := &core.NodeSelectorTerm{}
+		if err := corev1.Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm(subset.NodeSelectorTerm.DeepCopy(), coreNodeSelectorTerm, nil); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets").Index(i).Child("nodeSelectorTerm"), subset.NodeSelectorTerm, fmt.Sprintf("Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm failed: %v", err)))
+		} else {
+			allErrs = append(allErrs, apivalidation.ValidateNodeSelectorTerm(*coreNodeSelectorTerm, true, fldPath.Child("topology", "subsets").Index(i).Child("nodeSelectorTerm"))...)
+		}
+
+		if subset.Tolerations != nil {
+			var coreTolerations []core.Toleration
+			for i, toleration := range subset.Tolerations {
+				coreToleration := &core.Toleration{}
+				if err := corev1.Convert_v1_Toleration_To_core_Toleration(&toleration, coreToleration, nil); err != nil {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("topology", "subsets").Index(i).Child("tolerations"), subset.Tolerations, fmt.Sprintf("Convert_v1_Toleration_To_core_Toleration failed: %v", err)))
+				} else {
+					coreTolerations = append(coreTolerations, *coreToleration)
+				}
+			}
+			allErrs = append(allErrs, apivalidation.ValidateTolerations(coreTolerations, fldPath.Child("topology", "subsets").Index(i).Child("tolerations"))...)
+		}
+
+		if subset.Replicas != nil && spec.Topology.ScheduleStrategy.IsAdaptive() {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("topology", "subsets").Index(i).Child("replicas"), "specify replicas use minReplicas/maxReplicas to enable adaptive strategy"))
+		}
+	}
+
+	allErrs = append(allErrs, validateUnitedDeploymentUpdateStrategyV1beta1(&spec.UpdateStrategy, subSetNames, fldPath.Child("updateStrategy"))...)
+
+	return allErrs
+}
+
+func validateUnitedDeploymentUpdateStrategyV1beta1(strategy *appsv1beta1.UnitedDeploymentUpdateStrategy, subsetNames sets.String, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	effectiveType := strategy.Type
+	if effectiveType == "" {
+		effectiveType = appsv1beta1.ManualUpdateStrategyType
+	}
+
+	switch effectiveType {
+	case appsv1beta1.ManualUpdateStrategyType:
+		if strategy.ManualUpdate != nil {
+			for subset := range strategy.ManualUpdate.Partitions {
+				if !subsetNames.Has(subset) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("manualUpdate", "partitions"), strategy.ManualUpdate.Partitions, fmt.Sprintf("subset %s does not exist", subset)))
+				}
+			}
+		}
+	default:
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), strategy.Type, []string{string(appsv1beta1.ManualUpdateStrategyType), ""}))
+	}
+
+	return allErrs
+}
+
+func validateSubsetReplicasV1beta1(expectedReplicas *int32, subsets []appsv1beta1.Subset, fldPath *field.Path) field.ErrorList {
+	var (
+		sumReplicas    = int64(0)
+		sumMinReplicas = int64(0)
+		sumMaxReplicas = int64(0)
+
+		countReplicas    = 0
+		countMaxReplicas = 0
+
+		hasReplicasSettings = false
+		hasCapacitySettings = false
+
+		err     error
+		errList field.ErrorList
+	)
+
+	if expectedReplicas == nil {
+		expectedReplicas = pointer.Int32(-1)
+	}
+
+	for i, subset := range subsets {
+		replicas := int32(0)
+		if subset.Replicas != nil {
+			countReplicas++
+			hasReplicasSettings = true
+			replicas, err = udctrl.ParseSubsetReplicas(*expectedReplicas, *subset.Replicas)
+			if err != nil {
+				errList = append(errList, field.Invalid(fldPath.Index(i).Child("replicas"), subset.Replicas, err.Error()))
+			}
+		}
+		sumReplicas += int64(replicas)
+
+		minReplicas := int32(0)
+		if subset.MinReplicas != nil {
+			hasCapacitySettings = true
+			minReplicas, err = udctrl.ParseSubsetReplicas(*expectedReplicas, *subset.MinReplicas)
+			if err != nil {
+				errList = append(errList, field.Invalid(fldPath.Index(i).Child("minReplicas"), subset.MinReplicas, err.Error()))
+			}
+		}
+		sumMinReplicas += int64(minReplicas)
+
+		maxReplicas := int32(1000000)
+		if subset.MaxReplicas != nil {
+			countMaxReplicas++
+			hasCapacitySettings = true
+			maxReplicas, err = udctrl.ParseSubsetReplicas(*expectedReplicas, *subset.MaxReplicas)
+			if err != nil {
+				errList = append(errList, field.Invalid(fldPath.Index(i).Child("maxReplicas"), subset.MaxReplicas, err.Error()))
+			}
+		}
+		sumMaxReplicas += int64(maxReplicas)
+
+		if minReplicas > maxReplicas {
+			errList = append(errList, field.Invalid(fldPath.Index(i).Child("minReplicas"), subset.MinReplicas,
+				fmt.Sprintf("subset[%d].minReplicas must be less than or equal to maxReplicas", i)))
+		}
+	}
+
+	if hasReplicasSettings && hasCapacitySettings {
+		errList = append(errList, field.Invalid(fldPath, subsets, "subset.Replicas and subset.MinReplicas/subset.MaxReplicas are mutually exclusive in a UnitedDeployment"))
+		return errList
+	}
+
+	if hasCapacitySettings {
+		if *expectedReplicas == -1 {
+			errList = append(errList, field.Invalid(fldPath, expectedReplicas, "spec.replicas must be not empty if you set subset.minReplicas/maxReplicas"))
+		}
+		if countMaxReplicas >= len(subsets) {
+			errList = append(errList, field.Invalid(fldPath, countMaxReplicas, "at least one subset.maxReplicas must be empty"))
+		}
+		if sumMinReplicas > sumMaxReplicas {
+			errList = append(errList, field.Invalid(fldPath, sumMinReplicas, "sum of indicated subset.minReplicas should not be greater than sum of indicated subset.maxReplicas"))
+		}
+	} else {
+		if *expectedReplicas != -1 {
+			if sumReplicas > int64(*expectedReplicas) {
+				errList = append(errList, field.Invalid(fldPath, sumReplicas, fmt.Sprintf("sum of indicated subset replicas %d should not be greater than UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
+			}
+			if countReplicas > 0 && countReplicas == len(subsets) && sumReplicas != int64(*expectedReplicas) {
+				errList = append(errList, field.Invalid(fldPath, sumReplicas, fmt.Sprintf("if replicas of all subsets are provided, the sum of indicated subset replicas %d should equal UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
+			}
+		} else if countReplicas != len(subsets) {
+			errList = append(errList, field.Invalid(fldPath, sumReplicas, "if UnitedDeployment replicas is not provided, replicas of all subsets should be provided"))
+		}
+	}
+	return errList
+}
+
+// validateUnitedDeploymentV1beta1 validates a v1beta1 UnitedDeployment.
+func validateUnitedDeploymentV1beta1(unitedDeployment *appsv1beta1.UnitedDeployment) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&unitedDeployment.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateUnitedDeploymentSpecV1beta1(&unitedDeployment.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateUnitedDeploymentUpdateV1beta1 tests if required fields in the v1beta1 UnitedDeployment are set.
+func ValidateUnitedDeploymentUpdateV1beta1(unitedDeployment, oldUnitedDeployment *appsv1beta1.UnitedDeployment) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&unitedDeployment.ObjectMeta, &oldUnitedDeployment.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateUnitedDeploymentSpecUpdateV1beta1(&unitedDeployment.Spec, &oldUnitedDeployment.Spec, field.NewPath("spec"))...)
+	if unitedDeployment.Spec.Replicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*unitedDeployment.Spec.Replicas), field.NewPath("spec", "replicas"))...)
+	}
+	return allErrs
+}
+
+func validateUnitedDeploymentSpecUpdateV1beta1(spec, oldSpec *appsv1beta1.UnitedDeploymentSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, validateSubsetTemplateUpdateV1beta1(&spec.Template, &oldSpec.Template, fldPath.Child("template"))...)
+	allErrs = append(allErrs, validateUnitedDeploymentTopologyV1beta1(&spec.Topology, &oldSpec.Topology, fldPath.Child("topology"))...)
+
+	return allErrs
+}
+
+func validateUnitedDeploymentTopologyV1beta1(topology, oldTopology *appsv1beta1.Topology, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if topology == nil || oldTopology == nil {
+		return allErrs
+	}
+
+	oldSubsets := map[string]*appsv1beta1.Subset{}
+	for i, subset := range oldTopology.Subsets {
+		oldSubsets[subset.Name] = &oldTopology.Subsets[i]
+	}
+
+	for i, subset := range topology.Subsets {
+		if oldSubset, exist := oldSubsets[subset.Name]; exist {
+			if !apiequality.Semantic.DeepEqual(oldSubset.NodeSelectorTerm, subset.NodeSelectorTerm) {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("subsets").Index(i).Child("nodeSelectorTerm"), "may not be changed in an update"))
+			}
+			if !apiequality.Semantic.DeepEqual(oldSubset.Tolerations, subset.Tolerations) {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("subsets").Index(i).Child("tolerations"), "may not be changed in an update"))
+			}
+		}
+	}
+
+	for i, subset := range topology.Subsets {
+		if oldSubset, exist := oldSubsets[subset.Name]; exist {
+			if !apiequality.Semantic.DeepEqual(oldSubset.Tolerations, subset.Tolerations) {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("subsets").Index(i).Child("tolerations"), "may not be changed in an update"))
+			}
+		}
+	}
+
+	return allErrs
+}
+
+func validateSubsetTemplateUpdateV1beta1(template, oldTemplate *appsv1beta1.SubsetTemplate, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if template.StatefulSetTemplate != nil && oldTemplate.StatefulSetTemplate != nil {
+		allErrs = append(allErrs, validateStatefulSetUpdateV1beta1(template.StatefulSetTemplate, oldTemplate.StatefulSetTemplate, fldPath.Child("statefulSetTemplate"))...)
+	} else if template.AdvancedStatefulSetTemplate != nil && oldTemplate.AdvancedStatefulSetTemplate != nil {
+		allErrs = append(allErrs, validateAdvancedStatefulSetUpdateV1beta1(template.AdvancedStatefulSetTemplate, oldTemplate.AdvancedStatefulSetTemplate, fldPath.Child("advancedStatefulSetTemplate"))...)
+	} else if template.DeploymentTemplate != nil && oldTemplate.DeploymentTemplate != nil {
+		allErrs = append(allErrs, validateDeploymentUpdateV1beta1(template.DeploymentTemplate, oldTemplate.DeploymentTemplate, fldPath.Child("deploymentTemplate"))...)
+	}
+
+	return allErrs
+}
+
+func validateSubsetTemplateV1beta1(template *appsv1beta1.SubsetTemplate, selector labels.Selector, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	var templateCount int
+	if template.StatefulSetTemplate != nil {
+		templateCount++
+	}
+	if template.AdvancedStatefulSetTemplate != nil {
+		templateCount++
+	}
+	if template.CloneSetTemplate != nil {
+		templateCount++
+	}
+	if template.DeploymentTemplate != nil {
+		templateCount++
+	}
+	if templateCount < 1 {
+		allErrs = append(allErrs, field.Required(fldPath, "should provide one of statefulSetTemplate, advancedStatefulSetTemplate, cloneSetTemplate, or deploymentTemplate"))
+	} else if templateCount > 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath, template, "should provide only one of statefulSetTemplate, advancedStatefulSetTemplate, cloneSetTemplate, or deploymentTemplate"))
+	}
+
+	if template.StatefulSetTemplate != nil {
+		labels := labels.Set(template.StatefulSetTemplate.Labels)
+		if !selector.Matches(labels) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("statefulSetTemplate", "metadata", "labels"), template.StatefulSetTemplate.Labels, "`selector` does not match template `labels`"))
+		}
+		allErrs = append(allErrs, validateStatefulSetV1beta1(template.StatefulSetTemplate, fldPath.Child("statefulSetTemplate"))...)
+		podTemplate := template.StatefulSetTemplate.Spec.Template
+		coreTemplate, err := convertor.ConvertPodTemplateSpec(&podTemplate)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Root(), podTemplate, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
+			return allErrs
+		}
+		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, selector, fldPath.Child("statefulSetTemplate", "spec", "template"), webhookutil.DefaultPodValidationOptions)...)
+	} else if template.AdvancedStatefulSetTemplate != nil {
+		labels := labels.Set(template.AdvancedStatefulSetTemplate.Labels)
+		if !selector.Matches(labels) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("statefulSetTemplate", "metadata", "labels"), template.AdvancedStatefulSetTemplate.Labels, "`selector` does not match template `labels`"))
+		}
+		allErrs = append(allErrs, validateAdvancedStatefulSetV1beta1(template.AdvancedStatefulSetTemplate, fldPath.Child("advancedStatefulSetTemplate"))...)
+		podTemplate := template.AdvancedStatefulSetTemplate.Spec.Template
+		coreTemplate, err := convertor.ConvertPodTemplateSpec(&podTemplate)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Root(), podTemplate, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
+			return allErrs
+		}
+		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForStatefulSet(coreTemplate, selector, fldPath.Child("advancedStatefulSetTemplate", "spec", "template"), webhookutil.DefaultPodValidationOptions)...)
+	} else if template.DeploymentTemplate != nil {
+		labels := labels.Set(template.DeploymentTemplate.Labels)
+		if !selector.Matches(labels) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("deploymentTemplate", "metadata", "labels"), template.DeploymentTemplate.Labels, "`selector` does not match template `labels`"))
+		}
+		allErrs = append(allErrs, validateDeploymentV1beta1(template.DeploymentTemplate, fldPath.Child("deploymentTemplate"))...)
+		podTemplate := template.DeploymentTemplate.Spec.Template
+		coreTemplate, err := convertor.ConvertPodTemplateSpec(&podTemplate)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Root(), podTemplate, fmt.Sprintf("Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec failed: %v", err)))
+			return allErrs
+		}
+		allErrs = append(allErrs, appsvalidation.ValidatePodTemplateSpecForReplicaSet(coreTemplate, selector, 0, fldPath.Child("deploymentTemplate", "spec", "template"), webhookutil.DefaultPodValidationOptions)...)
+	}
+
+	return allErrs
+}
+
+func validateStatefulSetV1beta1(statefulSet *appsv1beta1.StatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if statefulSet.Spec.Replicas != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "replicas"), *statefulSet.Spec.Replicas, "replicas in statefulSetTemplate will not be used"))
+	}
+	if statefulSet.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType &&
+		statefulSet.Spec.UpdateStrategy.RollingUpdate != nil &&
+		statefulSet.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "updateStrategy", "rollingUpdate", "partition"), *statefulSet.Spec.UpdateStrategy.RollingUpdate.Partition, "partition in statefulSetTemplate will not be used"))
+	}
+	return allErrs
+}
+
+func validateAdvancedStatefulSetV1beta1(statefulSet *appsv1beta1.AdvancedStatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if statefulSet.Spec.Replicas != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "replicas"), *statefulSet.Spec.Replicas, "replicas in advancedStatefulSetTemplate will not be used"))
+	}
+	if statefulSet.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType &&
+		statefulSet.Spec.UpdateStrategy.RollingUpdate != nil &&
+		statefulSet.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "updateStrategy", "rollingUpdate", "partition"), *statefulSet.Spec.UpdateStrategy.RollingUpdate.Partition, "partition in advancedStatefulSetTemplate will not be used"))
+	}
+
+	return allErrs
+}
+
+func validateDeploymentV1beta1(deployment *appsv1beta1.DeploymentTemplateSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if deployment.Spec.Replicas != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("spec", "replicas"), *deployment.Spec.Replicas, "replicas in deploymentTemplate will not be used"))
+	}
+
+	return allErrs
+}
+
+func validateStatefulSetUpdateV1beta1(statefulSet, oldStatefulSet *appsv1beta1.StatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	restoreReplicas := statefulSet.Spec.Replicas
+	statefulSet.Spec.Replicas = oldStatefulSet.Spec.Replicas
+
+	restoreTemplate := statefulSet.Spec.Template
+	statefulSet.Spec.Template = oldStatefulSet.Spec.Template
+
+	restoreStrategy := statefulSet.Spec.UpdateStrategy
+	statefulSet.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy
+
+	if !apiequality.Semantic.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("spec"), "updates to statefulsetTemplate spec for fields other than 'template', and 'updateStrategy' are forbidden"))
+	}
+	statefulSet.Spec.Replicas = restoreReplicas
+	statefulSet.Spec.Template = restoreTemplate
+	statefulSet.Spec.UpdateStrategy = restoreStrategy
+
+	if statefulSet.Spec.Replicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*statefulSet.Spec.Replicas), fldPath.Child("spec", "replicas"))...)
+	}
+	return allErrs
+}
+
+func validateAdvancedStatefulSetUpdateV1beta1(statefulSet, oldStatefulSet *appsv1beta1.AdvancedStatefulSetTemplateSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	restoreReplicas := statefulSet.Spec.Replicas
+	statefulSet.Spec.Replicas = oldStatefulSet.Spec.Replicas
+
+	restoreTemplate := statefulSet.Spec.Template
+	statefulSet.Spec.Template = oldStatefulSet.Spec.Template
+
+	restoreStrategy := statefulSet.Spec.UpdateStrategy
+	statefulSet.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy
+
+	if !apiequality.Semantic.DeepEqual(statefulSet.Spec, oldStatefulSet.Spec) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("spec"), "updates to advancedStatefulsetTemplate spec for fields other than 'template', and 'updateStrategy' are forbidden"))
+	}
+	statefulSet.Spec.Replicas = restoreReplicas
+	statefulSet.Spec.Template = restoreTemplate
+	statefulSet.Spec.UpdateStrategy = restoreStrategy
+
+	if statefulSet.Spec.Replicas != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*statefulSet.Spec.Replicas), fldPath.Child("spec", "replicas"))...)
+	}
+	return allErrs
+}
+
+func validateDeploymentUpdateV1beta1(deployment, oldDeployment *appsv1beta1.DeploymentTemplateSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if deployment.Spec.Replicas != nil {

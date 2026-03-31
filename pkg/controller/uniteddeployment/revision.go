@@ -32,14 +32,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
 )
 
 // ControllerRevisionHashLabel is the label used to indicate the hash value of a ControllerRevision's Data.
 const ControllerRevisionHashLabel = "controller.kubernetes.io/hash"
 
-func (r *ReconcileUnitedDeployment) controlledHistories(ud *appsalphav1.UnitedDeployment) ([]*apps.ControllerRevision, error) {
+func (r *ReconcileUnitedDeployment) controlledHistories(ud *appsv1beta1.UnitedDeployment) ([]*apps.ControllerRevision, error) {
 	// List all histories to include those that don't match the selector anymore
 	// but have a ControllerRef pointing to the controller.
 	selector, err := metav1.LabelSelectorAsSelector(ud.Spec.Selector)
@@ -76,7 +76,7 @@ func (r *ReconcileUnitedDeployment) controlledHistories(ud *appsalphav1.UnitedDe
 	return claimHistories, nil
 }
 
-func (r *ReconcileUnitedDeployment) constructUnitedDeploymentRevisions(ud *appsalphav1.UnitedDeployment) (*apps.ControllerRevision, *apps.ControllerRevision, *[]*apps.ControllerRevision, int32, error) {
+func (r *ReconcileUnitedDeployment) constructUnitedDeploymentRevisions(ud *appsv1beta1.UnitedDeployment) (*apps.ControllerRevision, *apps.ControllerRevision, *[]*apps.ControllerRevision, int32, error) {
 	var currentRevision, updateRevision *apps.ControllerRevision
 	// Use a local copy of ud.Status.CollisionCount to avoid modifying ud.Status directly.
 	var collisionCount int32
@@ -143,7 +143,7 @@ func (r *ReconcileUnitedDeployment) constructUnitedDeploymentRevisions(ud *appsa
 	return currentRevision, updateRevision, &revisions, collisionCount, nil
 }
 
-func (r *ReconcileUnitedDeployment) cleanExpiredRevision(ud *appsalphav1.UnitedDeployment, sortedRevisions *[]*apps.ControllerRevision) (*[]*apps.ControllerRevision, error) {
+func (r *ReconcileUnitedDeployment) cleanExpiredRevision(ud *appsv1beta1.UnitedDeployment, sortedRevisions *[]*apps.ControllerRevision) (*[]*apps.ControllerRevision, error) {
 	exceedNum := len(*sortedRevisions) - int(*ud.Spec.RevisionHistoryLimit)
 	if exceedNum <= 0 {
 		return sortedRevisions, nil
@@ -210,7 +210,7 @@ func (r *ReconcileUnitedDeployment) createControllerRevision(parent metav1.Objec
 // The Revision of the returned ControllerRevision is set to revision. If the returned error is nil, the returned
 // ControllerRevision is valid. StatefulSet revisions are stored as patches that re-apply the current state of set
 // to a new StatefulSet using a strategic merge patch to replace the saved state of the new StatefulSet.
-func (r *ReconcileUnitedDeployment) newRevision(ud *appsalphav1.UnitedDeployment, revision int64, collisionCount *int32) (*apps.ControllerRevision, error) {
+func (r *ReconcileUnitedDeployment) newRevision(ud *appsv1beta1.UnitedDeployment, revision int64, collisionCount *int32) (*apps.ControllerRevision, error) {
 	patch, err := getUnitedDeploymentPatch(ud)
 	if err != nil {
 		return nil, err
@@ -255,7 +255,7 @@ func nextRevision(revisions []*apps.ControllerRevision) int64 {
 	return revisions[count-1].Revision + 1
 }
 
-func getUnitedDeploymentPatch(ud *appsalphav1.UnitedDeployment) ([]byte, error) {
+func getUnitedDeploymentPatch(ud *appsv1beta1.UnitedDeployment) ([]byte, error) {
 	dsBytes, err := json.Marshal(ud)
 	if err != nil {
 		return nil, err

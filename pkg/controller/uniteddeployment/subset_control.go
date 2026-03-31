@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
 )
@@ -40,7 +40,7 @@ type SubsetControl struct {
 }
 
 // GetAllSubsets returns all subsets owned by the UnitedDeployment.
-func (m *SubsetControl) GetAllSubsets(ud *alpha1.UnitedDeployment, updatedRevision string) (subSets []*Subset, err error) {
+func (m *SubsetControl) GetAllSubsets(ud *beta1.UnitedDeployment, updatedRevision string) (subSets []*Subset, err error) {
 	selector, err := metav1.LabelSelectorAsSelector(ud.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (m *SubsetControl) GetAllSubsets(ud *alpha1.UnitedDeployment, updatedRevisi
 }
 
 // CreateSubset creates the Subset depending on the inputs.
-func (m *SubsetControl) CreateSubset(ud *alpha1.UnitedDeployment, subsetName string, revision string, replicas, partition int32) error {
+func (m *SubsetControl) CreateSubset(ud *beta1.UnitedDeployment, subsetName string, revision string, replicas, partition int32) error {
 	set := m.adapter.NewResourceObject()
 	if err := m.adapter.ApplySubsetTemplate(ud, subsetName, revision, replicas, partition, set); err != nil {
 		return err
@@ -89,7 +89,7 @@ func (m *SubsetControl) CreateSubset(ud *alpha1.UnitedDeployment, subsetName str
 }
 
 // UpdateSubset is used to update the subset. The target Subset workload can be found with the input subset.
-func (m *SubsetControl) UpdateSubset(subset *Subset, ud *alpha1.UnitedDeployment, revision string, replicas, partition int32) error {
+func (m *SubsetControl) UpdateSubset(subset *Subset, ud *beta1.UnitedDeployment, revision string, replicas, partition int32) error {
 	workload := m.adapter.NewResourceObject()
 	var updateError error
 	for i := 0; i < updateRetries; i++ {

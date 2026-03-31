@@ -14,7 +14,6 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller/uniteddeployment/adapter"
@@ -35,8 +34,8 @@ func TestSubsetControl_convertToSubset(t *testing.T) {
 		"foo": "bar",
 	}
 	subsetLabels := map[string]string{
-		appsv1alpha1.ControllerRevisionHashLabelKey: v2,
-		appsv1alpha1.SubSetNameLabelKey:             "subset-1",
+		appsv1beta1.ControllerRevisionHashLabelKey: v2,
+		appsv1beta1.SubSetNameLabelKey:             "subset-1",
 	}
 	getPod := func(revision string) *corev1.Pod {
 		pod := &corev1.Pod{
@@ -54,11 +53,11 @@ func TestSubsetControl_convertToSubset(t *testing.T) {
 			},
 		}
 		pod = pod.DeepCopy()
-		pod.Labels[appsv1alpha1.ControllerRevisionHashLabelKey] = revision
+		pod.Labels[appsv1beta1.ControllerRevisionHashLabelKey] = revision
 		return pod
 	}
 	scheme := runtime.NewScheme()
-	_ = appsv1alpha1.AddToScheme(scheme)
+	_ = appsv1beta1.AddToScheme(scheme)
 	_ = v1beta1.AddToScheme(scheme)
 	_ = appsv1.AddToScheme(scheme)
 	selector := &metav1.LabelSelector{

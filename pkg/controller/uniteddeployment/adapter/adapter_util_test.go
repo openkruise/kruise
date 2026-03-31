@@ -23,7 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func TestGetCurrentPartitionForStrategyOnDelete(t *testing.T) {
@@ -77,7 +77,7 @@ func buildPodList(ordinals []int, revisions []string, t *testing.T) []*corev1.Po
 		}
 		if revisions[i] != "" {
 			pod.Labels = map[string]string{
-				appsv1alpha1.ControllerRevisionHashLabelKey: revisions[i],
+				appsv1beta1.ControllerRevisionHashLabelKey: revisions[i],
 			}
 		}
 		pods = append(pods, pod)
@@ -99,7 +99,7 @@ func mockPodList(updatedRevision string, replicas int32, readyReplicas int32) []
 		pods[i] = &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
-					appsv1alpha1.ControllerRevisionHashLabelKey: updatedRevision,
+					appsv1beta1.ControllerRevisionHashLabelKey: updatedRevision,
 				},
 			},
 			Status: corev1.PodStatus{
