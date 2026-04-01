@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/openkruise/kruise/apis"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
@@ -72,6 +73,35 @@ func TestUnitedDeploymentCreateUpdateHandlerHandleV1beta1CreateAllowsValidDeploy
 			Resource: metav1.GroupVersionResource{
 				Group:    appsv1beta1.GroupVersion.Group,
 				Version:  appsv1beta1.GroupVersion.Version,
+				Resource: "uniteddeployments",
+			},
+			Object: runtime.RawExtension{Raw: raw},
+		},
+	})
+
+	require.True(t, resp.Allowed)
+	require.NotNil(t, resp.Result)
+	require.Equal(t, int32(http.StatusOK), resp.Result.Code)
+}
+
+func TestUnitedDeploymentCreateUpdateHandlerHandleV1alpha1CreateAllowsValidDeploymentWorkload(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, apis.AddToScheme(scheme))
+
+	handler := &UnitedDeploymentCreateUpdateHandler{
+		Decoder: admission.NewDecoder(scheme),
+	}
+
+	obj := newAlphaDeploymentUnitedDeploymentForValidation(t)
+	raw, err := json.Marshal(obj)
+	require.NoError(t, err)
+
+	resp := handler.Handle(context.Background(), admission.Request{
+		AdmissionRequest: admissionv1.AdmissionRequest{
+			Operation: admissionv1.Create,
+			Resource: metav1.GroupVersionResource{
+				Group:    appsv1alpha1.GroupVersion.Group,
+				Version:  appsv1alpha1.GroupVersion.Version,
 				Resource: "uniteddeployments",
 			},
 			Object: runtime.RawExtension{Raw: raw},
@@ -152,6 +182,41 @@ func TestUnitedDeploymentCreateUpdateHandlerHandleV1beta1UpdateAllowsReplicaChan
 	require.True(t, resp.Allowed)
 	require.NotNil(t, resp.Result)
 	require.Equal(t, int32(http.StatusOK), resp.Result.Code)
+}
+
+func TestUnitedDeploymentCreateUpdateHandlerHandleV1alpha1UpdateRejectsNodeSelectorMutation(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, apis.AddToScheme(scheme))
+
+	handler := &UnitedDeploymentCreateUpdateHandler{
+		Decoder: admission.NewDecoder(scheme),
+	}
+
+	oldObj := newAlphaDeploymentUnitedDeploymentForValidation(t)
+	newObj := oldObj.DeepCopy()
+	newObj.Spec.Topology.Subsets[0].NodeSelectorTerm.MatchExpressions[0].Values = []string{"zone-b"}
+
+	oldRaw, err := json.Marshal(oldObj)
+	require.NoError(t, err)
+	newRaw, err := json.Marshal(newObj)
+	require.NoError(t, err)
+
+	resp := handler.Handle(context.Background(), admission.Request{
+		AdmissionRequest: admissionv1.AdmissionRequest{
+			Operation: admissionv1.Update,
+			Resource: metav1.GroupVersionResource{
+				Group:    appsv1alpha1.GroupVersion.Group,
+				Version:  appsv1alpha1.GroupVersion.Version,
+				Resource: "uniteddeployments",
+			},
+			Object:    runtime.RawExtension{Raw: newRaw},
+			OldObject: runtime.RawExtension{Raw: oldRaw},
+		},
+	})
+
+	require.False(t, resp.Allowed)
+	require.NotNil(t, resp.Result)
+	require.Equal(t, int32(http.StatusUnprocessableEntity), resp.Result.Code)
 }
 
 func newBetaDeploymentUnitedDeploymentForValidation() *appsv1beta1.UnitedDeployment {
@@ -252,4 +317,12 @@ func newBetaStatefulUnitedDeployment() *appsv1beta1.UnitedDeployment {
 			},
 		},
 	}
+}
+
+func newAlphaDeploymentUnitedDeploymentForValidation(t *testing.T) *appsv1alpha1.UnitedDeployment {
+	t.Helper()
+
+	alphaObj := &appsv1alpha1.UnitedDeployment{}
+	require.NoError(t, alphaObj.ConvertFrom(newBetaDeploymentUnitedDeploymentForValidation()))
+	return alphaObj
 }
