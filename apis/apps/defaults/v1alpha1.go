@@ -185,7 +185,7 @@ func SetDefaultsAdvancedCronJob(obj *v1alpha1.AdvancedCronJob, injectTemplateDef
 func SetDefaultsConfigMapSet(obj *v1alpha1.ConfigMapSet) {
 	partitionValue := int32(0) // 默认partition为0
 	maxUnavailableValue := intstr.FromInt32(1)
-	if obj.Spec.UpdateStrategy.Partition == nil && len(obj.Spec.UpdateStrategy.Distributions) == 0 {
+	if obj.Spec.UpdateStrategy.Partition == nil {
 		v := intstr.FromInt32(partitionValue)
 		obj.Spec.UpdateStrategy.Partition = &v
 	}

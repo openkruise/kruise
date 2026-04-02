@@ -17,17 +17,17 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - description: Number of matched pods
-      jsonPath: .status.matchedPods
-      name: MatchedPods
+    - description: Number of replicas
+      jsonPath: .status.replicas
+      name: Replicas
       type: integer
-    - description: Number of updated pods
-      jsonPath: .status.updatedPods
-      name: UpdatedPods
+    - description: Number of updated replicas
+      jsonPath: .status.updatedReplicas
+      name: UpdatedReplicas
       type: integer
-    - description: Number of ready pods
-      jsonPath: .status.readyPods
-      name: ReadyPods
+    - description: Number of ready replicas
+      jsonPath: .status.readyReplicas
+      name: ReadyReplicas
       type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
@@ -56,23 +56,16 @@ spec:
           spec:
             description: ConfigMapSetSpec defines the desired state of ConfigMapSet
             properties:
-              customVersion:
-                description: 当前版本的别名
-                type: string
-              data:
-                additionalProperties:
-                  type: string
-                description: Data 存放的是配置与内容的映射
-                type: object
-              injectUpdateOrder:
-                description: InjectUpdateOrder 为 true 表示采用仅注入策略, controller为需要重启的pod打上标签
-                  configmapset.cms1/updateOrder=1
-                type: boolean
-              injectedContainers:
-                description: InjectedContainers 表示的是需要被注入配置的容器
+              containers:
+                description: Containers 表示的是需要被注入配置的容器
                 items:
                   properties:
-                    NameFrom:
+                    mountPath:
+                      description: MountPath 容器内挂载路径
+                      type: string
+                    name:
+                      type: string
+                    nameFrom:
                       properties:
                         fieldRef:
                           description: ObjectFieldSelector selects an APIVersioned
@@ -93,16 +86,130 @@ spec:
                       required:
                       - fieldRef
                       type: object
-                    mountPath:
-                      type: string
-                    name:
-                      type: string
                   required:
                   - mountPath
                   type: object
                 type: array
+              customVersion:
+                description: 当前版本的别名
+                type: string
+              data:
+                additionalProperties:
+                  type: string
+                description: Data 存放的是配置与内容的映射
+                type: object
+              effectPolicy:
+                description: EffectPolicy 定义了配置更新的生效策略
+                properties:
+                  postHook:
+                    properties:
+                      exec:
+                        description: ExecAction describes a "run in container" action.
+                        properties:
+                          command:
+                            description: |-
+                              Command is the command line to execute inside the container, the working directory for the
+                              command  is root ('/') in the container's filesystem. The command is simply exec'd, it is
+                              not run inside a shell, so traditional shell instructions ('|', etc) won't work. To use
+                              a shell, you need to explicitly call out to that shell.
+                              Exit status of 0 is treated as live/healthy and non-zero is unhealthy.
+                            items:
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: atomic
+                        type: object
+                    type: object
+                  type:
+                    description: EffectPolicyType 定义配置生效方式
+                    type: string
+                required:
+                - type
+                type: object
+              reloadSidecarConfig:
+                description: ReloadSidecarConfig 定义了reload容器的注入方式和配置
+                properties:
+                  config:
+                    properties:
+                      command:
+                        items:
+                          type: string
+                        type: array
+                      configMapRef:
+                        description: 对应 customer 方式
+                        properties:
+                          apiVersion:
+                            description: API version of the referent.
+                            type: string
+                          fieldPath:
+                            description: |-
+                              If referring to a piece of an object instead of an entire object, this string
+                              should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                              For example, if the object reference is to a container within a pod, this would take on a value like:
+                              "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                              the event) or if no container name is specified "spec.containers[2]" (container with
+                              index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                              referencing a part of an object.
+                            type: string
+                          kind:
+                            description: |-
+                              Kind of the referent.
+                              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                            type: string
+                          name:
+                            description: |-
+                              Name of the referent.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                          namespace:
+                            description: |-
+                              Namespace of the referent.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                            type: string
+                          resourceVersion:
+                            description: |-
+                              Specific resourceVersion to which this reference is made, if any.
+                              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                            type: string
+                          uid:
+                            description: |-
+                              UID of the referent.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      image:
+                        type: string
+                      name:
+                        description: 对应 k8s-config 方式
+                        type: string
+                      restartPolicy:
+                        description: |-
+                          ContainerRestartPolicy is the restart policy for a single container.
+                          This may only be set for init containers and only allowed value is "Always".
+                        type: string
+                      sidecarSetRef:
+                        description: 对应 SidecarSet 方式
+                        properties:
+                          containerName:
+                            type: string
+                          name:
+                            type: string
+                          namespace:
+                            type: string
+                        required:
+                        - containerName
+                        - name
+                        - namespace
+                        type: object
+                    type: object
+                  type:
+                    description: ReloadSidecarType 定义 ReloadSidecar 注入类型
+                    type: string
+                required:
+                - type
+                type: object
               revisionHistoryLimit:
-                description: RevisionHistoryLimit 用于描述 最多在RMC中维护多少个版本的数据
+                description: RevisionHistoryLimit 用于描述最多在RMC中维护多少个版本的数据
                 format: int32
                 type: integer
               selector:
@@ -154,22 +261,6 @@ spec:
               updateStrategy:
                 description: UpdateStrategy 指定更新策略, 详见结构体定义
                 properties:
-                  distributions:
-                    items:
-                      properties:
-                        customVersion:
-                          type: string
-                        preferred:
-                          type: boolean
-                        reserved:
-                          format: int32
-                          type: integer
-                        revision:
-                          type: string
-                      required:
-                      - reserved
-                      type: object
-                    type: array
                   maxUnavailable:
                     anyOf:
                     - type: integer
@@ -180,19 +271,30 @@ spec:
                     - type: integer
                     - type: string
                     x-kubernetes-int-or-string: true
-                  restartInjectedContainers:
-                    type: boolean
                 type: object
             required:
+            - containers
             - data
-            - injectedContainers
             - selector
             type: object
           status:
             description: ConfigMapSetStatus 定义观测状态
             properties:
-              currentRevision:
+              collisionCount:
+                description: CollisionCount 用于解决 Hash 碰撞导致的版本更新卡住问题
+                format: int32
+                type: integer
+              currentCustomVersion:
+                description: CurrentCustomVersion indicates the custom version of
+                  ConfigMapSet that most pods are using
                 type: string
+              currentRevision:
+                description: CurrentRevision indicates the version of ConfigMapSet
+                  that most pods are using
+                type: string
+              expectedUpdatedReplicas:
+                format: int32
+                type: integer
               lastContainersHash:
                 type: string
               lastContainersTimestamp:
@@ -203,32 +305,35 @@ spec:
               lastSpecTimestamp:
                 format: date-time
                 type: string
-              matchedPods:
-                format: int32
-                type: integer
               observedGeneration:
+                description: ObservedGeneration 用于防止控制器基于旧缓存做出更新决策（解决幻读）
                 format: int64
                 type: integer
-              readyPods:
+              readyReplicas:
                 format: int32
                 type: integer
-              updateRevision:
+              replicas:
+                format: int32
+                type: integer
+              updateCustomVersion:
+                description: UpdateCustomVersion indicates the custom version of ConfigMapSet
+                  that the controller is rolling out
                 type: string
-              updatedPods:
+              updateRevision:
+                description: UpdateRevision indicates the version of ConfigMapSet
+                  that the controller is rolling out
+                type: string
+              updatedReadyReplicas:
                 format: int32
                 type: integer
-              updatedReadyPods:
+              updatedReplicas:
                 format: int32
                 type: integer
             required:
-            - lastContainersHash
-            - lastContainersTimestamp
-            - lastSpecHash
-            - lastSpecTimestamp
-            - matchedPods
-            - readyPods
-            - updatedPods
-            - updatedReadyPods
+            - readyReplicas
+            - replicas
+            - updatedReadyReplicas
+            - updatedReplicas
             type: object
         type: object
     served: true

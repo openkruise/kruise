@@ -20,12 +20,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/fieldpath"
 	"net/http"
 	"strconv"
 	"time"
+
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/fieldpath"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -202,7 +203,7 @@ func (h *PodCreateHandler) injectSidecar4Pod(ctx context.Context, pod *corev1.Po
 	updateStrategy := cms.Spec.UpdateStrategy
 	var updateRevision, updateCustomVersion string
 	var updateInfo *configmapset.UpdateInfo
-	var distributions []appsv1alpha1.Distribution
+	var distributions []configmapset.Distribution
 	pods = append(pods, pod) // 模拟分配
 	// 定义了partition的情形
 	if updateStrategy.Partition != nil {
@@ -212,8 +213,8 @@ func (h *PodCreateHandler) injectSidecar4Pod(ctx context.Context, pod *corev1.Po
 			klog.Errorf("failed to transform partition : %v", err)
 			return fmt.Errorf("failed to transform partition : %v", err)
 		}
-	} else if len(updateStrategy.Distributions) > 0 { // 使用distribution的情形
-		distributions = cms.Spec.UpdateStrategy.Distributions
+	} else { // 理论上不会出现，因为有默认值
+		return fmt.Errorf("updateStrategy.Partition is nil")
 	}
 	updateInfo, err = configmapset.FetchUpdateInfoByDistribution(distributions, re, pods, revisionKeys)
 	if err != nil {
@@ -254,30 +255,71 @@ func (h *PodCreateHandler) injectSidecar4Pod(ctx context.Context, pod *corev1.Po
 	pod.Annotations[revisionKeys.CurrentCustomVersionKey] = updateCustomVersion
 
 	// 创建sidecar容器
-	newSidecar := corev1.Container{
-		Name:  sidecarName,
-		Image: "hub.bilibili.co/infra-caster/kratos-demo-wuhao18:reload-sidecar",
-		Env: []corev1.EnvVar{
-			{
-				Name: "REVISION",
-				ValueFrom: &corev1.EnvVarSource{ // 可以支持原地升级
-					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath: fmt.Sprintf("metadata.annotations['%s']", revisionKeys.TargetRevisionKey),
-					},
-				},
-			},
-		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      configMapName + "-volume", // 挂载名为obj.Name-hub的configmap
-				MountPath: "/etc/config",             // 挂载路径
-			},
-			{
-				Name:      cms.Name + "-volume",
-				MountPath: "/etc/cms",
-			},
-		},
+	newSidecar := corev1.Container{}
+
+	if cms.Spec.ReloadSidecarConfig != nil {
+		if cms.Spec.ReloadSidecarConfig.Type == appsv1alpha1.K8sConfigReloadSidecarType {
+			if cms.Spec.ReloadSidecarConfig.Config != nil {
+				newSidecar.Name = cms.Spec.ReloadSidecarConfig.Config.Name
+				newSidecar.Image = cms.Spec.ReloadSidecarConfig.Config.Image
+				if len(cms.Spec.ReloadSidecarConfig.Config.Command) > 0 {
+					newSidecar.Command = cms.Spec.ReloadSidecarConfig.Config.Command
+				}
+				if cms.Spec.ReloadSidecarConfig.Config.RestartPolicy != "" {
+					newSidecar.RestartPolicy = &cms.Spec.ReloadSidecarConfig.Config.RestartPolicy
+				}
+				// 强制为 Always 的逻辑通常由用户配置，或者这里不覆盖，这里遵循 ConfigMapSet 声明
+			}
+		} else if cms.Spec.ReloadSidecarConfig.Type == appsv1alpha1.CustomerReloadSidecarType {
+			// customer 类型从 ConfigMap 读取
+			// 由于此处为 mutator 阶段，且在 webhook 中读取 configmap 可能会增加耗时，
+			// 若实现需从 webhook Client 尝试 Get ConfigMap 并 Unmarshal 为 Container
+			// 为简化流程或遵循现有设计，这里给出获取 customer sidecar 的占位逻辑
+			if cms.Spec.ReloadSidecarConfig.Config != nil && cms.Spec.ReloadSidecarConfig.Config.ConfigMapRef != nil {
+				cmRef := cms.Spec.ReloadSidecarConfig.Config.ConfigMapRef
+				customerCM := &corev1.ConfigMap{}
+				if err := h.Client.Get(ctx, types.NamespacedName{Name: cmRef.Name, Namespace: cmRef.Namespace}, customerCM); err == nil {
+					// 解析 custom sidecar configuration
+					for _, v := range customerCM.Data {
+						if unmarshalErr := json.Unmarshal([]byte(v), &newSidecar); unmarshalErr == nil {
+							break
+						}
+					}
+				} else {
+					klog.Errorf("failed to get customer sidecar configmap %s/%s: %v", cmRef.Namespace, cmRef.Name, err)
+				}
+			}
+		} else if cms.Spec.ReloadSidecarConfig.Type == appsv1alpha1.SidecarSetReloadSidecarType {
+			// 引用 SidecarSet 对象，由 SidecarSet 负责注入和管理，ConfigMapSet webhook 中不进行注入
+			klog.Infof("pod %s/%s will be injected by SidecarSet, skip sidecar injection in ConfigMapSet webhook", pod.Namespace, pod.Name)
+			return nil
+		}
 	}
+
+	// 补充默认值或覆盖必要的值
+	if newSidecar.Name == "" {
+		newSidecar.Name = sidecarName
+	}
+	if newSidecar.Image == "" {
+		newSidecar.Image = "hub.bilibili.co/infra-caster/kratos-demo-wuhao18:reload-sidecar"
+	}
+
+	newSidecar.Env = append(newSidecar.Env, corev1.EnvVar{
+		Name: "REVISION",
+		ValueFrom: &corev1.EnvVarSource{ // 可以支持原地升级
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: fmt.Sprintf("metadata.annotations['%s']", revisionKeys.TargetRevisionKey),
+			},
+		},
+	})
+
+	newSidecar.VolumeMounts = append(newSidecar.VolumeMounts, corev1.VolumeMount{
+		Name:      configMapName + "-volume", // 挂载名为obj.Name-hub的configmap
+		MountPath: "/etc/config",             // 挂载路径
+	}, corev1.VolumeMount{
+		Name:      cms.Name + "-volume",
+		MountPath: "/etc/cms",
+	})
 
 	// 查找是否已有相同的 Sidecar 容器
 	existingIdx := -1
@@ -356,7 +398,7 @@ func (h *PodCreateHandler) injectEmptyDir4Pod(pod *corev1.Pod, cms *appsv1alpha1
 	}
 
 	templateContainers := pod.Spec.Containers
-	for _, v := range cms.Spec.InjectedContainers {
+	for _, v := range cms.Spec.Containers {
 		for j := range templateContainers {
 			c := &templateContainers[j] // 直接获取指针
 			if c == nil || c.Name == "" {
@@ -402,7 +444,7 @@ func (h *PodCreateHandler) injectEmptyDir4Pod(pod *corev1.Pod, cms *appsv1alpha1
 	return nil
 }
 
-func (h *PodCreateHandler) applyVM4Container(c *corev1.Container, v appsv1alpha1.InjectedContainerSpec, volumeName string) {
+func (h *PodCreateHandler) applyVM4Container(c *corev1.Container, v appsv1alpha1.ContainerInjectSpec, volumeName string) {
 	// 检查c里面是否已经有同名的volumeMount了
 	for i := range c.VolumeMounts {
 		if c.VolumeMounts[i].Name == volumeName {

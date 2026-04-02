@@ -15,65 +15,131 @@ type ConfigMapSetSpec struct {
 	Selector *metav1.LabelSelector `json:"selector"`
 	// Data 存放的是配置与内容的映射
 	Data map[string]string `json:"data"`
-	// InjectedContainers 表示的是需要被注入配置的容器
-	InjectedContainers []InjectedContainerSpec `json:"injectedContainers"`
-	// RevisionHistoryLimit 用于描述 最多在RMC中维护多少个版本的数据
+	// Containers 表示的是需要被注入配置的容器
+	Containers []ContainerInjectSpec `json:"containers"`
+	// ReloadSidecarConfig 定义了reload容器的注入方式和配置
+	// +optional
+	ReloadSidecarConfig *ReloadSidecarConfig `json:"reloadSidecarConfig,omitempty"`
+	// EffectPolicy 定义了配置更新的生效策略
+	// +optional
+	EffectPolicy *EffectPolicy `json:"effectPolicy,omitempty"`
+	// RevisionHistoryLimit 用于描述最多在RMC中维护多少个版本的数据
 	// +optional
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty"`
-	// InjectUpdateOrder 为 true 表示采用仅注入策略, controller为需要重启的pod打上标签 configmapset.cms1/updateOrder=1
-	// +optional
-	InjectUpdateOrder bool `json:"injectUpdateOrder,omitempty"`
 	// UpdateStrategy 指定更新策略, 详见结构体定义
 	// +optional
 	UpdateStrategy ConfigMapSetUpdateStrategy `json:"updateStrategy,omitempty"`
 }
 
-type InjectedContainerSpec struct {
+type ContainerInjectSpec struct {
 	// +optional
 	Name string `json:"name,omitempty"` // 需要挂载配置的容器名(静态注入)
 	// +optional
-	NameFrom  *ValueFromSource `json:"NameFrom,omitempty"` // 从pod中获取(动态注入), 如metadata.labels['cName']
-	MountPath string           `json:"mountPath"`          // 容器内挂载路径
+	NameFrom *ValueFromSource `json:"nameFrom,omitempty"` // 从pod中获取(动态注入), 如metadata.labels['cName']
+	// MountPath 容器内挂载路径
+	MountPath string `json:"mountPath"`
 }
 
 type ValueFromSource struct {
 	FieldRef corev1.ObjectFieldSelector `json:"fieldRef"`
 }
 
-type Distribution struct {
+// ReloadSidecarType 定义 ReloadSidecar 注入类型
+type ReloadSidecarType string
+
+const (
+	// K8sConfigReloadSidecarType 直接在ConfigMapSet中配置
+	K8sConfigReloadSidecarType ReloadSidecarType = "k8s-config"
+	// SidecarSetReloadSidecarType 引用外部的SidecarSet
+	SidecarSetReloadSidecarType ReloadSidecarType = "SidecarSet"
+	// CustomerReloadSidecarType 引用自定义ConfigMap
+	CustomerReloadSidecarType ReloadSidecarType = "customer"
+)
+
+type ReloadSidecarConfig struct {
+	Type ReloadSidecarType `json:"type"`
 	// +optional
-	Revision string `json:"revision,omitempty"` // 版本hash
+	Config *ReloadSidecarReference `json:"config,omitempty"`
+}
+
+type ReloadSidecarReference struct {
+	// 对应 k8s-config 方式
 	// +optional
-	CustomVersion string `json:"customVersion,omitempty"` // caster上的版本别名
-	Reserved      int32  `json:"reserved"`                // 需要多少个该版本的实例
+	Name string `json:"name,omitempty"`
 	// +optional
-	Preferred bool `json:"preferred,omitempty"` // 当设置为true时, 如果所有distribution的数量加起来小于pod总数, 则其他的pod都使用该版本
+	Image string `json:"image,omitempty"`
+	// +optional
+	RestartPolicy corev1.ContainerRestartPolicy `json:"restartPolicy,omitempty"`
+	// +optional
+	Command []string `json:"command,omitempty"`
+
+	// 对应 SidecarSet 方式
+	// +optional
+	SidecarSetRef *SidecarSetReference `json:"sidecarSetRef,omitempty"`
+
+	// 对应 customer 方式
+	// +optional
+	ConfigMapRef *corev1.ObjectReference `json:"configMapRef,omitempty"`
+}
+
+type SidecarSetReference struct {
+	Namespace     string `json:"namespace"`
+	Name          string `json:"name"`
+	ContainerName string `json:"containerName"`
+}
+
+// EffectPolicyType 定义配置生效方式
+type EffectPolicyType string
+
+const (
+	ReStartEffectPolicyType   EffectPolicyType = "ReStart"
+	PostHookEffectPolicyType  EffectPolicyType = "PostHook"
+	HotUpdateEffectPolicyType EffectPolicyType = "HotUpdate"
+)
+
+type EffectPolicy struct {
+	Type EffectPolicyType `json:"type"`
+	// +optional
+	PostHook *PostHookConfig `json:"postHook,omitempty"`
+}
+
+type PostHookConfig struct {
+	// +optional
+	Exec *corev1.ExecAction `json:"exec,omitempty"`
 }
 
 type ConfigMapSetUpdateStrategy struct {
 	// +optional
-	Distributions []Distribution `json:"distributions,omitempty"`
-	// +optional
-	Partition *intstr.IntOrString `json:"partition,omitempty"` // 旧版本的比例, 多个旧版本的情况不做区分
-	// +optional
-	RestartInjectedContainers bool `json:"restartInjectedContainers,omitempty"` // 开启该选项后, 被注入最新配置的容器发生重启
+	Partition *intstr.IntOrString `json:"partition,omitempty"` // 旧版本的比例
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"` // 最大同时不可用实例数
 }
 
 // ConfigMapSetStatus 定义观测状态
 type ConfigMapSetStatus struct {
-	ObservedGeneration      int64        `json:"observedGeneration,omitempty"`
-	CurrentRevision         string       `json:"currentRevision,omitempty"` // 当前版本hash, 即partition中最新的版本
-	UpdateRevision          string       `json:"updateRevision,omitempty"`  // 目标版本hash, 即partition以外的版本
-	MatchedPods             int32        `json:"matchedPods"`               // 根据标签匹配到的pod数量(不含terminating的)
-	UpdatedPods             int32        `json:"updatedPods"`               // 已经最新的pod数量
-	ReadyPods               int32        `json:"readyPods"`                 // 所有pod里面ready的数量
-	UpdatedReadyPods        int32        `json:"updatedReadyPods"`          // 已经最新的pod里面ready的数量
-	LastContainersTimestamp *metav1.Time `json:"lastContainersTimestamp"`   // spec.containers最后一次更新时间, 用于冷启动决策
-	LastContainersHash      string       `json:"lastContainersHash"`        // 上一个cms版本spec.containers的hash值
-	LastSpecTimestamp       *metav1.Time `json:"lastSpecTimestamp"`         // spec最后一次更新时间
-	LastSpecHash            string       `json:"lastSpecHash"`              // 上一个cms版本spec的hash值
+	// ObservedGeneration 用于防止控制器基于旧缓存做出更新决策（解决幻读）
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	// CollisionCount 用于解决 Hash 碰撞导致的版本更新卡住问题
+	// +optional
+	CollisionCount *int32 `json:"collisionCount,omitempty"`
+	// CurrentRevision indicates the version of ConfigMapSet that most pods are using
+	CurrentRevision string `json:"currentRevision,omitempty"`
+	// CurrentCustomVersion indicates the custom version of ConfigMapSet that most pods are using
+	CurrentCustomVersion string `json:"currentCustomVersion,omitempty"`
+	// UpdateRevision indicates the version of ConfigMapSet that the controller is rolling out
+	UpdateRevision string `json:"updateRevision,omitempty"`
+	// UpdateCustomVersion indicates the custom version of ConfigMapSet that the controller is rolling out
+	UpdateCustomVersion string `json:"updateCustomVersion,omitempty"`
+
+	Replicas                int32        `json:"replicas"`                          // 关联Pod数量
+	UpdatedReplicas         int32        `json:"updatedReplicas"`                   // 更新完成Pod数量
+	ReadyReplicas           int32        `json:"readyReplicas"`                     // 健康Pod数量
+	UpdatedReadyReplicas    int32        `json:"updatedReadyReplicas"`              // 健康且更新完成Pod数量
+	ExpectedUpdatedReplicas int32        `json:"expectedUpdatedReplicas,omitempty"` // 期望更新的Pod数量
+	LastContainersTimestamp *metav1.Time `json:"lastContainersTimestamp,omitempty"` // spec.containers最后一次更新时间, 用于冷启动决策
+	LastContainersHash      string       `json:"lastContainersHash,omitempty"`      // 上一个cms版本spec.containers的hash值
+	LastSpecTimestamp       *metav1.Time `json:"lastSpecTimestamp,omitempty"`       // spec最后一次更新时间
+	LastSpecHash            string       `json:"lastSpecHash,omitempty"`            // 上一个cms版本spec的hash值
 }
 
 // +genclient
@@ -82,9 +148,9 @@ type ConfigMapSetStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=cms,singular=configmapset,path=configmapsets,scope=Namespaced
-// +kubebuilder:printcolumn:name="MatchedPods",type=integer,JSONPath=`.status.matchedPods`,description="Number of matched pods"
-// +kubebuilder:printcolumn:name="UpdatedPods",type=integer,JSONPath=`.status.updatedPods`,description="Number of updated pods"
-// +kubebuilder:printcolumn:name="ReadyPods",type=integer,JSONPath=`.status.readyPods`,description="Number of ready pods"
+// +kubebuilder:printcolumn:name="Replicas",type=integer,JSONPath=`.status.replicas`,description="Number of replicas"
+// +kubebuilder:printcolumn:name="UpdatedReplicas",type=integer,JSONPath=`.status.updatedReplicas`,description="Number of updated replicas"
+// +kubebuilder:printcolumn:name="ReadyReplicas",type=integer,JSONPath=`.status.readyReplicas`,description="Number of ready replicas"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 type ConfigMapSet struct {

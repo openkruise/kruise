@@ -24,13 +24,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/google/uuid"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-	"github.com/openkruise/kruise/pkg/util/expectations"
-	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -43,17 +43,19 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-	"math"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	"github.com/openkruise/kruise/pkg/util/expectations"
+	"github.com/openkruise/kruise/pkg/util/ratelimiter"
 )
 
 func init() {
@@ -70,12 +72,13 @@ type RevisionKeys struct {
 }
 
 type SpecForHash struct {
-	CustomVersion        string                               `json:"customVersion,omitempty"`
-	Selector             *metav1.LabelSelector                `json:"selector"`
-	Data                 map[string]string                    `json:"data"`
-	InjectedContainers   []appsv1alpha1.InjectedContainerSpec `json:"injectedContainers"`
-	RevisionHistoryLimit *int32                               `json:"revisionHistoryLimit,omitempty"`
-	InjectUpdateOrder    bool                                 `json:"injectUpdateOrder,omitempty"`
+	CustomVersion        string                             `json:"customVersion,omitempty"`
+	Selector             *metav1.LabelSelector              `json:"selector"`
+	Data                 map[string]string                  `json:"data"`
+	Containers           []appsv1alpha1.ContainerInjectSpec `json:"containers"`
+	ReloadSidecarConfig  *appsv1alpha1.ReloadSidecarConfig  `json:"reloadSidecarConfig,omitempty"`
+	EffectPolicy         *appsv1alpha1.EffectPolicy         `json:"effectPolicy,omitempty"`
+	RevisionHistoryLimit *int32                             `json:"revisionHistoryLimit,omitempty"`
 }
 
 type UpdateInfo struct {
@@ -92,7 +95,7 @@ const (
 	AnnotationCurrentRevisionTimeStampSuffix = ".currentRevisionTimestamp"
 	AnnotationTargetCustomVersionSuffix      = ".customVersion"
 	AnnotationCurrentCustomVersionSuffix     = ".currentCustomVersion"
-	ConfigMapFinalizerName                   = "finalizer.configmapset.bilibili.co"
+	ConfigMapFinalizerName                   = "finalizer.configmapset.kruise.io"
 )
 
 var (
@@ -206,6 +209,7 @@ func (r *ReconcileConfigMapSet) Reconcile(ctx context.Context, request reconcile
 	// 如果正在被删除
 	if cms.DeletionTimestamp != nil && !cms.DeletionTimestamp.IsZero() {
 		if containsString(cms.Finalizers, ConfigMapFinalizerName) {
+			// TODO 清理关联的ConfigMap之前，还需要等待相关联Pod已不再使用cms
 			if err := r.cleanupConfigMap(ctx, cms); err != nil {
 				return reconcile.Result{}, fmt.Errorf("cleanupConfigMap failed for cms %s/%s: %w", cms.Namespace, cms.Name, err)
 			}
@@ -249,10 +253,17 @@ func (r *ReconcileConfigMapSet) Reconcile(ctx context.Context, request reconcile
 
 	hashChangedFlag := false
 
+	// 解决幻读问题
+	if cms.Generation != cms.Status.ObservedGeneration {
+		klog.V(4).Infof("ConfigMapSet %s/%s Generation (%d) != ObservedGeneration (%d), wait for next reconcile",
+			cms.Namespace, cms.Name, cms.Generation, cms.Status.ObservedGeneration)
+		// 不能直接 return nil，需要走后面的 updateStatus 逻辑去更新 ObservedGeneration
+	}
+
 	// 冷启动状态处理
 	// 对spec.containers做hash
 	// 如果和status.lastContainersHash不一致, 说明更新了
-	newContainersHash, err := CalculateHash(cms.Spec.InjectedContainers)
+	newContainersHash, err := CalculateHash(cms.Spec.Containers)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("failed to compute spec.containers hash for cms %s/%s: %w", cms.Namespace, cms.Name, err)
 	}
@@ -477,16 +488,19 @@ func (r *ReconcileConfigMapSet) SyncPods(ctx context.Context, client client.Clie
 		return r.UpdateByDistribution(ctx, client, cms, distributions, re, pods, revisionKeys)
 	}
 
-	// 使用distribution的情形
-	if len(updateStrategy.Distributions) > 0 {
-		return r.UpdateByDistribution(ctx, client, cms, cms.Spec.UpdateStrategy.Distributions, re, pods, revisionKeys)
-	}
-
 	// 都没有定义的情况理论上不会出现(webhook会拦截)
 	return fmt.Errorf("updateStrategy is not defined"), false
 }
 
-func TransformPartition2Distribution(cms *appsv1alpha1.ConfigMapSet, re []RevisionEntry, pods []*corev1.Pod) ([]appsv1alpha1.Distribution, error) {
+// Distribution is used internally in controller now
+type Distribution struct {
+	Revision      string `json:"revision,omitempty"`
+	CustomVersion string `json:"customVersion,omitempty"`
+	Reserved      int32  `json:"reserved"`
+	Preferred     bool   `json:"preferred,omitempty"`
+}
+
+func TransformPartition2Distribution(cms *appsv1alpha1.ConfigMapSet, re []RevisionEntry, pods []*corev1.Pod) ([]Distribution, error) {
 	// 总副本数 = 传入的pod数
 	replicas := len(pods)
 	var updateCustomVersion, currentCustomVersion string
@@ -506,8 +520,8 @@ func TransformPartition2Distribution(cms *appsv1alpha1.ConfigMapSet, re []Revisi
 	// 特殊情况1: 只有一个版本的时候, 一定是全量
 	// 特殊情况2: 回滚的场景, 而上一次升级并没有升级完, 就可能会变成 updateRevision == currentRevision 的情形
 	if len(re) == 1 || updateRevision == cms.Status.CurrentRevision {
-		distributions := make([]appsv1alpha1.Distribution, 1)
-		distributions[0] = appsv1alpha1.Distribution{
+		distributions := make([]Distribution, 1)
+		distributions[0] = Distribution{
 			Revision:      updateRevision,
 			Reserved:      int32(replicas),
 			Preferred:     true,
@@ -546,14 +560,14 @@ func TransformPartition2Distribution(cms *appsv1alpha1.ConfigMapSet, re []Revisi
 		}
 	}
 	// 构造distribution
-	distributions := make([]appsv1alpha1.Distribution, 2)
-	distributions[0] = appsv1alpha1.Distribution{
+	distributions := make([]Distribution, 2)
+	distributions[0] = Distribution{
 		Revision:      updateRevision,
 		Reserved:      int32(newReplicas),
 		Preferred:     true,
 		CustomVersion: updateCustomVersion,
 	}
-	distributions[1] = appsv1alpha1.Distribution{
+	distributions[1] = Distribution{
 		Revision:      cms.Status.CurrentRevision,
 		Reserved:      int32(replicas - newReplicas),
 		CustomVersion: currentCustomVersion,
@@ -563,9 +577,9 @@ func TransformPartition2Distribution(cms *appsv1alpha1.ConfigMapSet, re []Revisi
 	return distributions, nil
 }
 
-func FetchUpdateInfoByDistribution(distributions []appsv1alpha1.Distribution, re []RevisionEntry, pods []*corev1.Pod, revisionKeys *RevisionKeys) (*UpdateInfo, error) {
+func FetchUpdateInfoByDistribution(distributions []Distribution, re []RevisionEntry, pods []*corev1.Pod, revisionKeys *RevisionKeys) (*UpdateInfo, error) {
 	//distributions := cms.Spec.UpdateStrategy.Distributions
-	distributionsCopy := make([]appsv1alpha1.Distribution, len(distributions))
+	distributionsCopy := make([]Distribution, len(distributions))
 	copy(distributionsCopy, distributions)
 	// 构建 revision 索引，提高查询性能
 	rmcIndexMap := make(map[string]int, len(re))
@@ -608,7 +622,7 @@ func FetchUpdateInfoByDistribution(distributions []appsv1alpha1.Distribution, re
 	// 为了防止重启多个实例
 	for _, peerPods := range revisionToPods {
 		sort.Slice(peerPods, func(i, j int) bool {
-			return peerPods[i].Name < peerPods[j].Name
+			return peerPods[i].CreationTimestamp.After(peerPods[j].CreationTimestamp.Time)
 		})
 	}
 
@@ -653,7 +667,7 @@ func FetchUpdateInfoByDistribution(distributions []appsv1alpha1.Distribution, re
 	}, nil
 }
 
-func fetchPodsMoreThanReserved(totalPods int32, reservedCount int32, distributionsCopy []appsv1alpha1.Distribution, preferredRevision string, revisionCount map[string]int32, podsToUpdate []*v1.Pod, revisionToPods map[string][]*v1.Pod, revisionKeys *RevisionKeys, targetRevisions []string, targetCustomVersions []string) ([]*v1.Pod, []string, []string) {
+func fetchPodsMoreThanReserved(totalPods int32, reservedCount int32, distributionsCopy []Distribution, preferredRevision string, revisionCount map[string]int32, podsToUpdate []*v1.Pod, revisionToPods map[string][]*v1.Pod, revisionKeys *RevisionKeys, targetRevisions []string, targetCustomVersions []string) ([]*v1.Pod, []string, []string) {
 	extra := totalPods - reservedCount
 	for i := range distributionsCopy {
 		if distributionsCopy[i].Revision == preferredRevision {
@@ -739,7 +753,7 @@ func fetchPodsMoreThanReserved(totalPods int32, reservedCount int32, distributio
 	return podsToUpdate, targetRevisions, targetCustomVersions
 }
 
-func fetchPodsLessThanReserved(podsToUpdate []*v1.Pod, totalPods int32, distributionsCopy []appsv1alpha1.Distribution, rmcIndexMap map[string]int, targetRevisions []string, targetCustomVersions []string, revisionToPods map[string][]*v1.Pod) ([]*v1.Pod, []string, []string) {
+func fetchPodsLessThanReserved(podsToUpdate []*v1.Pod, totalPods int32, distributionsCopy []Distribution, rmcIndexMap map[string]int, targetRevisions []string, targetCustomVersions []string, revisionToPods map[string][]*v1.Pod) ([]*v1.Pod, []string, []string) {
 	// 这种情况, 我们更新所有pod
 	podsToUpdate = make([]*corev1.Pod, totalPods)
 	// 对distributionsCopy排序
@@ -812,7 +826,7 @@ func fetchPodsLessThanReserved(podsToUpdate []*v1.Pod, totalPods int32, distribu
 	return podsToUpdate, targetRevisions, targetCustomVersions
 }
 
-func (r *ReconcileConfigMapSet) UpdateByDistribution(ctx context.Context, c client.Client, cms *appsv1alpha1.ConfigMapSet, distributions []appsv1alpha1.Distribution, re []RevisionEntry, pods []*corev1.Pod, revisionKeys *RevisionKeys) (error, bool) {
+func (r *ReconcileConfigMapSet) UpdateByDistribution(ctx context.Context, c client.Client, cms *appsv1alpha1.ConfigMapSet, distributions []Distribution, re []RevisionEntry, pods []*corev1.Pod, revisionKeys *RevisionKeys) (error, bool) {
 
 	updateInfo, err := FetchUpdateInfoByDistribution(distributions, re, pods, revisionKeys)
 	if err != nil {
@@ -969,12 +983,12 @@ func updatePod(p *corev1.Pod, revisionKeys *RevisionKeys, tsMap map[string]*meta
 	if p.Annotations[revisionKeys.CurrentRevisionKey] == targetRevision {
 		// 不做标记
 	} else {
-		if cms.Spec.InjectUpdateOrder {
-			if p.Labels == nil {
-				p.Labels = make(map[string]string)
-			}
-			p.Labels[asyncUpdateLabel] = "1"
-		}
+		// // if cms.Spec.InjectUpdateOrder {
+		// // 	if p.Labels == nil {
+		// // 		p.Labels = make(map[string]string)
+		// // 	}
+		// // 	p.Labels[asyncUpdateLabel] = "1"
+		// // }
 	}
 	return nil
 }
@@ -1008,12 +1022,12 @@ func rollbackPod(ctx context.Context, c client.Client, newPod *v1.Pod, cms *apps
 	}
 
 	if newPod.Annotations[revisionKeys.CurrentRevisionKey] != newRevision {
-		if cms.Spec.InjectUpdateOrder {
-			if newPod.Labels == nil {
-				newPod.Labels = make(map[string]string)
-			}
-			delete(newPod.Labels, asyncUpdateLabel)
-		}
+		// if cms.Spec.InjectUpdateOrder {
+		// 	if newPod.Labels == nil {
+		// 		newPod.Labels = make(map[string]string)
+		// 	}
+		// 	delete(newPod.Labels, asyncUpdateLabel)
+		// }
 	}
 	return nil
 }
@@ -1217,10 +1231,10 @@ func (r *ReconcileConfigMapSet) updateContainers2Restart(pod *v1.Pod, cms *appsv
 	// 现在确定可以重启
 	// reload-sidecar需要重启
 	needToRestart = append(needToRestart, reloadSidecarCS.Name) // 重启reload-sidecar
-	// 判断cms是否开启了injectedContainers
-	if cms.Spec.UpdateStrategy.RestartInjectedContainers {
+	// 判断cms是否开启了effectPolicy
+	if cms.Spec.EffectPolicy != nil && cms.Spec.EffectPolicy.Type == appsv1alpha1.ReStartEffectPolicyType {
 		// 要把相关容器全都重启
-		for _, c := range cms.Spec.InjectedContainers {
+		for _, c := range cms.Spec.Containers {
 			found := false
 			klog.Infof("judging whether to restart container %s in pod %s/%s for cms %s", c.Name, pod.Namespace, pod.Name, cms.Name)
 			for _, cs := range pod.Status.ContainerStatuses {
@@ -1300,9 +1314,9 @@ func HandleUpdatedPod(ctx context.Context, c client.Client, revisionKeys *Revisi
 		return nil, true
 	}
 
-	// 如果没有设置RestartInjectedContainers, 可以不用管, 已经是预期状态了
-	if !cms.Spec.UpdateStrategy.RestartInjectedContainers {
-		klog.Infof("pod %s/%s has not set RestartInjectedContainers, skip", p.Namespace, p.Name)
+	// 如果没有设置RestartInjectedContainers (ReStartEffectPolicy), 可以不用管, 已经是预期状态了
+	if cms.Spec.EffectPolicy == nil || cms.Spec.EffectPolicy.Type != appsv1alpha1.ReStartEffectPolicyType {
+		klog.Infof("pod %s/%s has not set ReStartEffectPolicyType, skip", p.Namespace, p.Name)
 		return nil, false
 	}
 
@@ -1313,7 +1327,7 @@ func HandleUpdatedPod(ctx context.Context, c client.Client, revisionKeys *Revisi
 	allContainersRestarted := true
 
 	// 判断相关容器的重启时间
-	for _, injectedContainer := range cms.Spec.InjectedContainers {
+	for _, injectedContainer := range cms.Spec.Containers {
 		// 在pod中找同名容器 container
 		for _, containerStatus := range podStatus.ContainerStatuses {
 			if containerStatus.Name == injectedContainer.Name {
@@ -1409,7 +1423,7 @@ func HandleUpdatedPod(ctx context.Context, c client.Client, revisionKeys *Revisi
 	return nil, false
 }
 
-func notExistInDistribution(rev string, distributionsCopy []appsv1alpha1.Distribution) bool {
+func notExistInDistribution(rev string, distributionsCopy []Distribution) bool {
 	for _, d := range distributionsCopy {
 		if d.Revision == rev {
 			return false
@@ -1456,10 +1470,10 @@ func (r *ReconcileConfigMapSet) updateStatus(ctx context.Context, request reconc
 
 	if cms.Status.ObservedGeneration == cms.Generation &&
 		cms.Status.UpdateRevision == updateRevision &&
-		cms.Status.ReadyPods == readyPodsNum &&
-		cms.Status.MatchedPods == int32(len(pods)) &&
-		cms.Status.UpdatedPods == updatedPodsNum &&
-		cms.Status.UpdatedReadyPods == updatedReadyPodsNum && !hashChanged {
+		cms.Status.ReadyReplicas == readyPodsNum &&
+		cms.Status.Replicas == int32(len(pods)) &&
+		cms.Status.UpdatedReplicas == updatedPodsNum &&
+		cms.Status.UpdatedReadyReplicas == updatedReadyPodsNum && !hashChanged {
 		klog.Infof("No change in status for ConfigMapSet %s/%s, skipping update", cms.Namespace, cms.Name)
 		return nil
 	}
@@ -1469,15 +1483,34 @@ func (r *ReconcileConfigMapSet) updateStatus(ctx context.Context, request reconc
 	// 如果cms是第一次发版, 就使用当前版本
 	if updatedReadyPodsNum == int32(len(pods)) || cms.Status.CurrentRevision == "" {
 		cms.Status.CurrentRevision = updateRevision
+		cms.Status.CurrentCustomVersion = cms.Spec.CustomVersion
 		// 仅在所有pod都更新到一个版本以后进行版本维护
 		err = r.cleanHistoryRevision(ctx, cms)
 	}
 	cms.Status.ObservedGeneration = cms.Generation
 	cms.Status.UpdateRevision = updateRevision
-	cms.Status.MatchedPods = int32(len(pods))
-	cms.Status.ReadyPods = readyPodsNum
-	cms.Status.UpdatedPods = updatedPodsNum
-	cms.Status.UpdatedReadyPods = updatedReadyPodsNum
+	cms.Status.UpdateCustomVersion = cms.Spec.CustomVersion
+	cms.Status.Replicas = int32(len(pods))
+	cms.Status.ReadyReplicas = readyPodsNum
+	cms.Status.UpdatedReplicas = updatedPodsNum
+	cms.Status.UpdatedReadyReplicas = updatedReadyPodsNum
+	// 根据更新策略计算 ExpectedUpdatedReplicas
+	expected := int32(len(pods))
+	if cms.Spec.UpdateStrategy.Partition != nil {
+		partitionStr := cms.Spec.UpdateStrategy.Partition.String()
+		if strings.HasSuffix(partitionStr, "%") {
+			percentStr := strings.TrimSuffix(partitionStr, "%")
+			if percent, err := strconv.Atoi(percentStr); err == nil && percent >= 0 && percent <= 100 {
+				expected = int32(len(pods)) - int32(math.Ceil(float64(percent)/100.0*float64(len(pods))))
+			}
+		} else if count, err := strconv.Atoi(partitionStr); err == nil && count >= 0 {
+			expected = int32(len(pods)) - int32(count)
+		}
+		if expected < 0 {
+			expected = 0
+		}
+	}
+	cms.Status.ExpectedUpdatedReplicas = expected
 
 	// 将更新同步到 etcd
 	klog.Infof("Updating cms %s status %#v", cms.Name, cms.Status)

@@ -20,6 +20,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+
 	"github.com/openkruise/kruise/pkg/controller/configmapset"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
@@ -29,11 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
-	"net/http"
-	"regexp"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
-	"strings"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -115,40 +116,26 @@ func (h *ConfigMapSetCreateUpdateHandler) validateConfigMapSetSpec(name, namespa
 			"invalid maxUnavailable value"))
 	}
 
-	// 禁止同时定义distribution 和 partition
-	if len(strategy.Distributions) > 0 && strategy.Partition != nil {
-		return append(allErrs, field.Invalid(fldPath.Child("updateStrategy"),
-			spec.UpdateStrategy,
-			"distributions and partition cannot be set at the same time"))
-	}
-	// 都不定义也不行
-	if len(strategy.Distributions) == 0 && strategy.Partition == nil {
-		return append(allErrs, field.Invalid(fldPath.Child("updateStrategy"),
-			spec.UpdateStrategy,
-			"at least one of distributions or partition must be set"))
-	}
-	cnt := 0
-
-	for _, distribution := range strategy.Distributions {
-		if distribution.Reserved <= 0 {
-			return append(allErrs, field.Invalid(fldPath.Child("updateStrategy"),
-				spec.UpdateStrategy,
-				"reserved must be greater than 0"))
-		}
-		if distribution.Preferred { // 所有distribution 里面, Preferred有且只能有一个为true
-			cnt++
-			if cnt > 1 {
-				return append(allErrs, field.Invalid(fldPath.Child("updateStrategy"),
-					spec.UpdateStrategy,
-					"only one preferred distribution is allowed"))
+	// validate ReloadSidecarConfig
+	if spec.ReloadSidecarConfig != nil {
+		reloadConfigPath := fldPath.Child("reloadSidecarConfig")
+		if spec.ReloadSidecarConfig.Type == appsv1alpha1.K8sConfigReloadSidecarType {
+			if spec.ReloadSidecarConfig.Config == nil || spec.ReloadSidecarConfig.Config.Name == "" {
+				allErrs = append(allErrs, field.Invalid(reloadConfigPath.Child("config", "name"), "", "name must be set when type is k8s-config"))
 			}
+		} else if spec.ReloadSidecarConfig.Type == appsv1alpha1.SidecarSetReloadSidecarType {
+			if spec.ReloadSidecarConfig.Config == nil || spec.ReloadSidecarConfig.Config.SidecarSetRef == nil {
+				allErrs = append(allErrs, field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef"), "", "sidecarSetRef must be set when type is SidecarSet"))
+			}
+		} else if spec.ReloadSidecarConfig.Type == appsv1alpha1.CustomerReloadSidecarType {
+			if spec.ReloadSidecarConfig.Config == nil || spec.ReloadSidecarConfig.Config.ConfigMapRef == nil {
+				allErrs = append(allErrs, field.Invalid(reloadConfigPath.Child("config", "configMapRef"), "", "configMapRef must be set when type is customer"))
+			}
+		} else {
+			allErrs = append(allErrs, field.Invalid(reloadConfigPath.Child("type"), spec.ReloadSidecarConfig.Type, "invalid type, must be k8s-config, SidecarSet or customer"))
 		}
 	}
-	if len(strategy.Distributions) > 0 && cnt == 0 {
-		return append(allErrs, field.Invalid(fldPath.Child("updateStrategy"),
-			spec.UpdateStrategy,
-			"at least one preferred distribution must be set"))
-	}
+
 	return allErrs
 }
 
