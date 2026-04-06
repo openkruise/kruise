@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -37,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -239,15 +238,14 @@ func hash(data string) string {
 // return two parameters
 // 1. podList
 // 2. expectedCount, the default is workload.Replicas
-func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) ([]*corev1.Pod, int32, error) {
+func (c *commonControl) GetPodsForPub(pub *policyv1beta1.PodUnavailableBudget) ([]*corev1.Pod, int32, error) {
 	// if targetReference isn't nil, priority to take effect
 	var listOptions *client.ListOptions
 	if pub.Spec.TargetReference != nil {
 		ref := pub.Spec.TargetReference
 		matchedPods, expectedCount, err := c.controllerFinder.GetPodsForRef(ref.APIVersion, ref.Kind, pub.Namespace, ref.Name, true)
-		if value, _ := pub.Annotations[policyv1alpha1.PubProtectTotalReplicasAnnotation]; value != "" {
-			count, _ := strconv.ParseInt(value, 10, 32)
-			expectedCount = int32(count)
+		if totalReplicas := getPubProtectTotalReplicas(pub); totalReplicas != nil {
+			expectedCount = *totalReplicas
 		}
 		return matchedPods, expectedCount, err
 	} else if pub.Spec.Selector == nil {
@@ -272,9 +270,8 @@ func (c *commonControl) GetPodsForPub(pub *policyv1alpha1.PodUnavailableBudget) 
 			matchedPods = append(matchedPods, pod)
 		}
 	}
-	if value, _ := pub.Annotations[policyv1alpha1.PubProtectTotalReplicasAnnotation]; value != "" {
-		expectedCount, _ := strconv.ParseInt(value, 10, 32)
-		return matchedPods, int32(expectedCount), nil
+	if totalReplicas := getPubProtectTotalReplicas(pub); totalReplicas != nil {
+		return matchedPods, *totalReplicas, nil
 	}
 	expectedCount, err := c.controllerFinder.GetExpectedScaleForPods(matchedPods)
 	if err != nil {
@@ -323,12 +320,12 @@ func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
 	return true
 }
 
-func (c *commonControl) GetPubForPod(pod *corev1.Pod) (*policyv1alpha1.PodUnavailableBudget, error) {
-	if len(pod.Annotations) == 0 || pod.Annotations[PodRelatedPubAnnotation] == "" {
+func (c *commonControl) GetPubForPod(pod *corev1.Pod) (*policyv1beta1.PodUnavailableBudget, error) {
+	pubName := GetPodRelatedPubName(pod)
+	if pubName == "" {
 		return nil, nil
 	}
-	pubName := pod.Annotations[PodRelatedPubAnnotation]
-	pub := &policyv1alpha1.PodUnavailableBudget{}
+	pub := &policyv1beta1.PodUnavailableBudget{}
 	err := c.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: pubName}, pub)
 	if err != nil {
 		if errors.IsNotFound(err) {

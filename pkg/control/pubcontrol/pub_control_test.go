@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openkruise/kruise/apis/apps/pub"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 )
 
@@ -340,7 +340,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 		name      string
 		getOldPod func() *corev1.Pod
 		getNewPod func() *corev1.Pod
-		getPub    func() *policyv1alpha1.PodUnavailableBudget
+		getPub    func() *policyv1beta1.PodUnavailableBudget
 		expect    bool
 	}{
 		{
@@ -354,7 +354,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				demo.Annotations["add"] = "annotations"
 				return demo
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
@@ -371,7 +371,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				demo.Annotations["add"] = "annotations"
 				return demo
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
@@ -388,7 +388,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				demo.Labels[fmt.Sprintf("%sdata", pub.PubUnavailablePodLabelPrefix)] = "true"
 				return demo
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
@@ -405,7 +405,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 				demo.Spec.Containers[0].Image = "nginx:v2"
 				return demo
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				return pub
 			},
@@ -416,7 +416,7 @@ func TestIsPodUnavailableChanged(t *testing.T) {
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs.getPub()).
-				WithStatusSubresource(&policyv1alpha1.PodUnavailableBudget{}).Build()
+				WithStatusSubresource(&policyv1beta1.PodUnavailableBudget{}).Build()
 			finder := &controllerfinder.ControllerFinder{Client: fakeClient}
 			control := commonControl{
 				Client:           fakeClient,
