@@ -648,3 +648,60 @@ func TestRefresh(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdateNextBatchReadsFromClone(t *testing.T) {
+	aHourAgo := metav1.NewTime(time.Unix(time.Now().Add(-time.Hour).Unix(), 0))
+	Clock = testingclock.NewFakeClock(aHourAgo.Time)
+
+	// storedPod is the pod in the fake client (what GetPod returns as "clone").
+	// It does NOT have the InPlaceUpdateState annotation.
+	storedPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod-stale-test",
+			Labels: map[string]string{
+				apps.StatefulSetRevisionLabel: "new-revision",
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers:     []v1.Container{{Name: "c1", Image: "c1-img2"}, {Name: "c2", Image: "c2-img1"}},
+			ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{Name: "c1", ImageID: "c1-img2-ID"},
+				{Name: "c2", ImageID: "c2-img1-ID"},
+			},
+		},
+	}
+
+	// stalePod is what gets passed to Refresh — it's a stale snapshot that still
+	// has the InPlaceUpdateState annotation with NextContainerImages.
+	// Before the fix, updateNextBatch would read from this stale pod.
+	// After the fix, it reads from the clone (storedPod) which has no annotation.
+	stalePod := storedPod.DeepCopy()
+	stalePod.Annotations = map[string]string{
+		appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
+			Revision:            "new-revision",
+			UpdateTimestamp:     aHourAgo,
+			NextContainerImages: map[string]string{"c2": "c2-img2"},
+		}),
+	}
+
+	cli := fake.NewClientBuilder().WithObjects(storedPod).Build()
+	ctrl := New(cli, revisionadapter.NewDefaultImpl())
+
+	res := ctrl.Refresh(stalePod, nil)
+	if res.RefreshErr != nil {
+		t.Fatalf("Refresh should not fail, got: %v", res.RefreshErr)
+	}
+
+	// Verify the stored pod was NOT modified — updateNextBatch should have
+	// returned early because the clone has no InPlaceUpdateState annotation.
+	got := &v1.Pod{}
+	if err := cli.Get(context.TODO(), types.NamespacedName{Name: storedPod.Name}, got); err != nil {
+		t.Fatalf("failed to get pod: %v", err)
+	}
+	if got.Spec.Containers[1].Image != "c2-img1" {
+		t.Fatalf("expected c2 image to remain c2-img1 (unchanged), got %s", got.Spec.Containers[1].Image)
+	}
+}
