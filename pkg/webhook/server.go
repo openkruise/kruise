@@ -133,10 +133,16 @@ func Checker(req *http.Request) error {
 	return health.Checker(req)
 }
 
-func WaitReady() error {
+func WaitReady(ctx context.Context) error {
 	startTS := time.Now()
 	var err error
 	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("context canceled while waiting for webhook ready: %w", ctx.Err())
+		default:
+		}
+
 		duration := time.Since(startTS)
 		if err = Checker(nil); err == nil {
 			return nil
@@ -147,5 +153,4 @@ func WaitReady() error {
 		}
 		time.Sleep(time.Second * 2)
 	}
-
 }

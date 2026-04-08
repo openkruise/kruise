@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"net/http"
 	_ "net/http/pprof"
@@ -164,7 +165,9 @@ func main() {
 		})
 	}
 
-	ctx := ctrl.SetupSignalHandler()
+	signalCtx := ctrl.SetupSignalHandler()
+	ctx, cancel := context.WithCancel(signalCtx)
+	defer cancel()
 	cfg := ctrl.GetConfigOrDie()
 	setRestConfig(cfg)
 	cfg.UserAgent = "kruise-manager"
@@ -256,15 +259,17 @@ func main() {
 
 	go func() {
 		setupLog.Info("wait webhook ready")
-		if err = webhook.WaitReady(); err != nil {
+		if err := webhook.WaitReady(ctx); err != nil {
 			setupLog.Error(err, "unable to wait webhook ready")
-			os.Exit(1)
+			cancel()
+			return
 		}
 
 		setupLog.Info("setup controllers")
-		if err = controller.SetupWithManager(mgr); err != nil {
+		if err := controller.SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to setup controllers")
-			os.Exit(1)
+			cancel()
+			return
 		}
 	}()
 
