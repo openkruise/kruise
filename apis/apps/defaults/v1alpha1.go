@@ -181,7 +181,7 @@ func SetDefaultsAdvancedCronJob(obj *v1alpha1.AdvancedCronJob, injectTemplateDef
 	}
 }
 
-// SetDefaults_ConfigMapSet set default values for BroadcastJob.
+// SetDefaults_ConfigMapSet set default values for ConfigMapSet.
 func SetDefaultsConfigMapSet(obj *v1alpha1.ConfigMapSet) {
 	partitionValue := int32(0) // 默认partition为0
 	maxUnavailableValue := intstr.FromInt32(1)
