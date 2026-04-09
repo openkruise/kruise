@@ -23,12 +23,12 @@ import (
 	"github.com/openkruise/kruise/pkg/webhook/types"
 )
 
-// +kubebuilder:webhook:path=/validate-apps-kruise-io-v1alpha1-nodeimage,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=nodeimages,verbs=create;update,versions=v1alpha1,name=vnodeimage.kb.io
+// +kubebuilder:webhook:path=/validate-apps-kruise-io-nodeimage,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=nodeimages,verbs=create;update,versions=v1alpha1;v1beta1,name=vnodeimage.kb.io
 
 var (
 	// HandlerGetterMap contains admission webhook handlers
 	HandlerGetterMap = map[string]types.HandlerGetter{
-		"validate-apps-kruise-io-v1alpha1-nodeimage": func(mgr manager.Manager) admission.Handler {
+		"validate-apps-kruise-io-nodeimage": func(mgr manager.Manager) admission.Handler {
 			return &NodeImageCreateUpdateHandler{Decoder: admission.NewDecoder(mgr.GetScheme())}
 		},
 	}

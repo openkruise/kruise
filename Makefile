@@ -38,10 +38,13 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
 
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./apis/..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./apis/..." paths="./pkg/..." output:crd:artifacts:config=config/crd/bases
 
 fmt: go_check ## Run go fmt against code.
 	go fmt $(shell go list ./... | grep -v /vendor/)
+
+fmt-imports: go_check ## Run goimports to format and organize imports.
+	./hack/fmt-imports.sh
 
 vet: ## Run go vet against code.
 	go vet $(shell go list ./... | grep -v /vendor/)
@@ -115,8 +118,8 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
 
-# controller-gen@v0.16.5 comply with k8s.io/api v0.30.x
-ifeq ("$(shell $(CONTROLLER_GEN) --version 2> /dev/null)", "Version: v0.16.5")
+# controller-gen@v0.17.3 comply with k8s.io/api v0.32.x
+ifeq ("$(shell $(CONTROLLER_GEN) --version 2> /dev/null)", "Version: v0.17.3")
 else
 	rm -rf $(CONTROLLER_GEN)
 	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.3)
@@ -131,7 +134,7 @@ golangci-lint: ## Download golangci-lint locally if necessary.
 
 GINKGO = $(shell pwd)/bin/ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
-	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/ginkgo@v1.16.4)
+	$(call go-get-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@latest)
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -189,11 +192,11 @@ kube-load-image: $(tools/kind)
 .PHONY: install-kruise
 install-kruise:
 	kubectl create namespace kruise-system;
-ifeq ($(DISABLE_E2E_CONFIG), true)
-	@echo "Skipping e2e config application...";
-else
+ifeq ($(ENABLE_E2E_CONFIG), true)
 	@echo "Applying e2e config...";
 	kubectl apply -f test/kruise-e2e-config.yaml;
+else
+	@echo "Skipping e2e config application...";
 endif
 	tools/hack/install-kruise.sh $(IMG)
 

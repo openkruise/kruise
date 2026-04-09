@@ -43,7 +43,7 @@ type WorkloadSpreadSpec struct {
 	ScheduleStrategy WorkloadSpreadScheduleStrategy `json:"scheduleStrategy,omitempty"`
 }
 
-// TargetReference contains enough information to let you identify an workload
+// TargetReference contains enough information to let you identify a workload
 type TargetReference struct {
 	// API version of the referent.
 	APIVersion string `json:"apiVersion"`

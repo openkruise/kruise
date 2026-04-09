@@ -20,14 +20,15 @@ import (
 	"context"
 	"sync"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
 )
 
 const (
@@ -69,6 +70,12 @@ func RegisterFieldIndexes(c cache.Cache) error {
 		if err = c.IndexField(context.TODO(), &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
 			return
 		}
+		// ImagePullJob ownerReference for v1beta1
+		if utildiscovery.DiscoverObject(&appsv1beta1.ImagePullJob{}) {
+			if err = c.IndexField(context.TODO(), &appsv1beta1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
+				return
+			}
+		}
 
 		// pod name
 		if err = indexPodNodeName(c); err != nil {
@@ -84,15 +91,39 @@ func RegisterFieldIndexes(c cache.Cache) error {
 				return
 			}
 		}
+		// broadcastjob owner for v1beta1
+		if utildiscovery.DiscoverObject(&appsv1beta1.BroadcastJob{}) {
+			if err = indexBroadcastCronJobV1Beta1(c); err != nil {
+				return
+			}
+		}
 		// imagepulljob active
 		if utildiscovery.DiscoverObject(&appsv1alpha1.ImagePullJob{}) {
 			if err = indexImagePullJobActive(c); err != nil {
 				return
 			}
 		}
+		// imagepulljob active for v1beta1
+		if utildiscovery.DiscoverObject(&appsv1beta1.ImagePullJob{}) {
+			if err = indexImagePullJobActiveV1Beta1(c); err != nil {
+				return
+			}
+		}
+		// imageListPullJob owner for v1beta1
+		if utildiscovery.DiscoverObject(&appsv1beta1.ImageListPullJob{}) {
+			if err = indexImageListPullJobV1Beta1(c); err != nil {
+				return
+			}
+		}
 		// sidecar spec namespaces
 		if utildiscovery.DiscoverObject(&appsv1alpha1.SidecarSet{}) {
 			if err = indexSidecarSet(c); err != nil {
+				return
+			}
+		}
+		// sidecar spec namespaces for v1beta1
+		if utildiscovery.DiscoverObject(&appsv1beta1.SidecarSet{}) {
+			if err = indexSidecarSetV1Beta1(c); err != nil {
 				return
 			}
 		}
@@ -122,8 +153,9 @@ func indexJob(c cache.Cache) error {
 			return nil
 		}
 
-		// ...make sure it's a AdvancedCronJob...
-		if owner.APIVersion != apiGVStr || owner.Kind != appsv1alpha1.AdvancedCronJobKind {
+		// ...make sure it's a AdvancedCronJob (v1alpha1 or v1beta1)...
+		if (owner.APIVersion != apiGVStr && owner.APIVersion != appsv1beta1.SchemeGroupVersion.String()) ||
+			(owner.Kind != appsv1alpha1.AdvancedCronJobKind && owner.Kind != appsv1beta1.AdvancedCronJobKind) {
 			return nil
 		}
 
@@ -151,6 +183,44 @@ func indexBroadcastCronJob(c cache.Cache) error {
 	})
 }
 
+func indexBroadcastCronJobV1Beta1(c cache.Cache) error {
+	return c.IndexField(context.TODO(), &appsv1beta1.BroadcastJob{}, IndexNameForController, func(rawObj client.Object) []string {
+		// grab the job object, extract the owner...
+		job := rawObj.(*appsv1beta1.BroadcastJob)
+		owner := metav1.GetControllerOf(job)
+		if owner == nil {
+			return nil
+		}
+
+		// ...make sure it's a AdvancedCronJob...
+		if owner.APIVersion != appsv1beta1.SchemeGroupVersion.String() || owner.Kind != appsv1beta1.AdvancedCronJobKind {
+			return nil
+		}
+
+		// ...and if so, return it
+		return []string{owner.Name}
+	})
+}
+
+func indexImageListPullJobV1Beta1(c cache.Cache) error {
+	return c.IndexField(context.TODO(), &appsv1beta1.ImageListPullJob{}, IndexNameForController, func(rawObj client.Object) []string {
+		// grab the job object, extract the owner...
+		job := rawObj.(*appsv1beta1.ImageListPullJob)
+		owner := metav1.GetControllerOf(job)
+		if owner == nil {
+			return nil
+		}
+
+		// ...make sure it's a v1beta1 AdvancedCronJob...
+		if owner.APIVersion != appsv1beta1.SchemeGroupVersion.String() || owner.Kind != appsv1beta1.AdvancedCronJobKind {
+			return nil
+		}
+
+		// ...and if so, return it
+		return []string{owner.Name}
+	})
+}
+
 func indexImagePullJobActive(c cache.Cache) error {
 	return c.IndexField(context.TODO(), &appsv1alpha1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
 		obj := rawObj.(*appsv1alpha1.ImagePullJob)
@@ -160,6 +230,21 @@ func indexImagePullJobActive(c cache.Cache) error {
 		}
 		return []string{isActive}
 	})
+}
+
+func indexImagePullJobActiveV1Beta1(c cache.Cache) error {
+	return c.IndexField(context.TODO(), &appsv1beta1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
+		return IndexImagePullJob(rawObj)
+	})
+}
+
+func IndexImagePullJob(rawObj client.Object) []string {
+	obj := rawObj.(*appsv1beta1.ImagePullJob)
+	isActive := "false"
+	if obj.DeletionTimestamp == nil && obj.Status.CompletionTime == nil {
+		isActive = "true"
+	}
+	return []string{isActive}
 }
 
 func IndexSidecarSet(rawObj client.Object) []string {
@@ -188,5 +273,32 @@ func IndexSidecarSet(rawObj client.Object) []string {
 func indexSidecarSet(c cache.Cache) error {
 	return c.IndexField(context.TODO(), &appsv1alpha1.SidecarSet{}, IndexNameForSidecarSetNamespace, func(rawObj client.Object) []string {
 		return IndexSidecarSet(rawObj)
+	})
+}
+
+func IndexSidecarSetV1Beta1(rawObj client.Object) []string {
+	obj := rawObj.(*appsv1beta1.SidecarSet)
+	if obj == nil {
+		return nil
+	}
+	// v1beta1 uses NamespaceSelector
+	if obj.Spec.NamespaceSelector != nil {
+		if obj.Spec.NamespaceSelector.MatchLabels != nil {
+			if v, ok := obj.Spec.NamespaceSelector.MatchLabels[LabelMetadataName]; ok {
+				return []string{v}
+			}
+		}
+		for _, item := range obj.Spec.NamespaceSelector.MatchExpressions {
+			if item.Key == LabelMetadataName && item.Operator == metav1.LabelSelectorOpIn {
+				return item.Values
+			}
+		}
+	}
+	return []string{IndexValueSidecarSetClusterScope}
+}
+
+func indexSidecarSetV1Beta1(c cache.Cache) error {
+	return c.IndexField(context.TODO(), &appsv1beta1.SidecarSet{}, IndexNameForSidecarSetNamespace, func(rawObj client.Object) []string {
+		return IndexSidecarSetV1Beta1(rawObj)
 	})
 }

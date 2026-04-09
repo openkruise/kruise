@@ -80,7 +80,7 @@
 - Remove Docker runtime dependency ([#1870](https://github.com/openkruise/kruise/pull/1870),[@furykerry](https://github.com/furykerry))
 - Improve test parallelism and reliability ([#1743](https://github.com/openkruise/kruise/pull/1743), [@MichaelRren](https://github.com/MichaelRren))
 - Enhance WorkloadSpread validation logic ([#1740](https://github.com/openkruise/kruise/pull/1740), [@AiRanthem](https://github.com/AiRanthem))
-- Launche Kruise Guru on Gurubase.io ([#1800](https://github.com/openkruise/kruise/pull/1800), [@kursataktas](https://github.com/kursataktas))
+- Launch Kruise Guru on Gurubase.io ([#1800](https://github.com/openkruise/kruise/pull/1800), [@kursataktas](https://github.com/kursataktas))
 - Improve documentation accuracy ([#1824](https://github.com/openkruise/kruise/pull/1824), [@furykerry](https://github.com/furykerry))
 - Fix KIND installation issues ([#1688](https://github.com/openkruise/kruise/pull/1688),[@ABNER-1](https://github.com/ABNER-1))
 - Avoid overriding namespace config after deploying ([#1772](https://github.com/openkruise/kruise/pull/1772),[@hantmac](https://github.com/hantmac))
@@ -107,7 +107,7 @@
 - Support specified-delete in AdvancedStatefulSet and handle specified deleted pod under maxUnavailable constrain. ([#1734](https://github.com/openkruise/kruise/pull/1734), [@ABNER-1](https://github.com/ABNER-1))
 
 ## v1.5.5
-> Chang log since v1.5.4
+> Change log since v1.5.4
 
 ### Advanced Workload
 - Support specified-delete in AdvancedStatefulSet and handle specified deleted pod under maxUnavailable constrain. ([#1734](https://github.com/openkruise/kruise/pull/1734), [@ABNER-1](https://github.com/ABNER-1))
@@ -178,7 +178,7 @@
 - Fix new version of Pods released by cloneSet that doesn't match spec.updateStrategy.partition. ([#1549](https://github.com/openkruise/kruise/pull/1549), [@qswksp](https://github.com/qswksp))
 
 ## v1.5.4
-> Chang log since v1.5.3
+> Change log since v1.5.3
 
 ### CloneSet
 - Fix new version of Pods released by cloneSet that doesn't match spec.updateStrategy.partition. ([#1549](https://github.com/openkruise/kruise/pull/1549), [@qswksp](https://github.com/qswksp))
@@ -200,7 +200,7 @@
 - Fix when StatefulSet reserveOrdinals exist and whenScaled=Delete, scale down pvc failed. ([#1531](https://github.com/openkruise/kruise/pull/1531), [@zmberg](https://github.com/zmberg))
 
 ## v1.5.3
-> Chang log since v1.5.2
+> Change log since v1.5.2
 
 ### Advanced Workload
 - Fix when StatefulSet reserveOrdinals exist and whenScaled=Delete, scale down pvc failed. ([#1531](https://github.com/openkruise/kruise/pull/1531), [@zmberg](https://github.com/zmberg))
@@ -260,15 +260,15 @@
   - Fix unnecessary use of fmt.Sprintf. ([#1403](https://github.com/openkruise/kruise/pull/1403), [testwill](https://github.com/testwill))
 
 ## v1.5.2
-> Chang log since v1.5.1
+> Change log since v1.5.1
 
 ### CVE FIX: Enhance kruise-daemon security ([#1482](https://github.com/openkruise/kruise/pull/1482), [veophi](https://github.com/veophi))
 
 ### Start kruise-manager as a non-root user
-We start kruise-manger with a non-root user to further enhance the security of kruise-manager. ([#1491](https://github.com/openkruise/kruise/pull/1491), [@zmberg](https://github.com/zmberg))
+We start kruise-manager with a non-root user to further enhance the security of kruise-manager. ([#1491](https://github.com/openkruise/kruise/pull/1491), [@zmberg](https://github.com/zmberg))
 
 ## v1.5.1
-> Chang log since v1.5.0
+> Change log since v1.5.0
 
 In version 1.5.1, the focus was on enhancing UnitedDeployment and addressing various bug fixes:
 
@@ -441,13 +441,13 @@ For more detail, please refer to its [documentation](https://openkruise.io/docs/
 - Optimize event handler performance for PodUnavailableBudget. ([#1027](https://github.com/openkruise/kruise/pull/1027), [@FillZpp](https://github.com/FillZpp))
 
 ### Advanced DaemonSet
-- Allow optional filed max unavilable in ads, and set default value 1. ([#1007](https://github.com/openkruise/kruise/pull/1007), [@ABNER-1](https://github.com/ABNER-1))
+- Allow optional field max unavailable in ads, and set default value 1. ([#1007](https://github.com/openkruise/kruise/pull/1007), [@ABNER-1](https://github.com/ABNER-1))
 - Fix DaemonSet surging with minReadySeconds. ([#1014](https://github.com/openkruise/kruise/pull/1014), [@FillZpp](https://github.com/FillZpp))
 - Optimize Advanced DaemonSet internal new pod for imitating scheduling. ([#1011](https://github.com/openkruise/kruise/pull/1011), [@FillZpp](https://github.com/FillZpp))
 - Advanced DaemonSet support pre-download image. ([#1057](https://github.com/openkruise/kruise/pull/1057), [@ABNER-1](https://github.com/ABNER-1))
 
 ### Advanced StatefulSet
-- Fix panic cased by statefulset pvc auto deletion. ([#999](https://github.com/openkruise/kruise/pull/999), [@veophi](https://github.com/veophi))
+- Fix panic caused by statefulset pvc auto deletion. ([#999](https://github.com/openkruise/kruise/pull/999), [@veophi](https://github.com/veophi))
 
 ### Others
 - Optimize performance of LabelSelector conversion. ([#1068](https://github.com/openkruise/kruise/pull/1068), [@FillZpp](https://github.com/FillZpp))

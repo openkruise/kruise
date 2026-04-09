@@ -19,11 +19,22 @@ package defaults
 import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 // SetDefaultPodSpec sets default pod spec
 func SetDefaultPodSpec(in *corev1.PodSpec) {
 	v1.SetDefaults_PodSpec(in)
+	// DefaultHostNetworkHostPortsInPodTemplates defaults to true before k8s 1.28, and defaults to false starting from 1.28.
+	// For compatibility of kruise users, kruise exposes the DefaultHostNetworkHostPortsInPodTemplates featureGate.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DefaultHostNetworkHostPortsInPodTemplates) {
+		if in.HostNetwork {
+			defaultHostNetworkPorts(&in.Containers)
+			defaultHostNetworkPorts(&in.InitContainers)
+		}
+	}
 	//default pod volumes
 	SetDefaultPodVolumes(in.Volumes)
 	for i := range in.InitContainers {
@@ -180,6 +191,17 @@ func SetDefaultPodSpec(in *corev1.PodSpec) {
 		}
 	}
 	v1.SetDefaults_ResourceList(&in.Overhead)
+}
+
+// With host networking default all container ports to host ports.
+func defaultHostNetworkPorts(containers *[]corev1.Container) {
+	for i := range *containers {
+		for j := range (*containers)[i].Ports {
+			if (*containers)[i].Ports[j].HostPort == 0 {
+				(*containers)[i].Ports[j].HostPort = (*containers)[i].Ports[j].ContainerPort
+			}
+		}
+	}
 }
 
 func SetDefaultPodVolumes(volumes []corev1.Volume) {

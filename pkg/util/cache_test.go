@@ -19,11 +19,11 @@ package util
 import (
 	"testing"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 func TestGlobalCache(t *testing.T) {

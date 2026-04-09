@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kruise Authors.
+Copyright 2025 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,22 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// AdvancedCronJobs returns a AdvancedCronJobInformer.
+	AdvancedCronJobs() AdvancedCronJobInformer
+	// BroadcastJobs returns a BroadcastJobInformer.
+	BroadcastJobs() BroadcastJobInformer
+	// CloneSets returns a CloneSetInformer.
+	CloneSets() CloneSetInformer
+	// DaemonSets returns a DaemonSetInformer.
+	DaemonSets() DaemonSetInformer
+	// ImageListPullJobs returns a ImageListPullJobInformer.
+	ImageListPullJobs() ImageListPullJobInformer
+	// ImagePullJobs returns a ImagePullJobInformer.
+	ImagePullJobs() ImagePullJobInformer
+	// NodeImages returns a NodeImageInformer.
+	NodeImages() NodeImageInformer
+	// SidecarSets returns a SidecarSetInformer.
+	SidecarSets() SidecarSetInformer
 	// StatefulSets returns a StatefulSetInformer.
 	StatefulSets() StatefulSetInformer
 }
@@ -36,6 +52,46 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// AdvancedCronJobs returns a AdvancedCronJobInformer.
+func (v *version) AdvancedCronJobs() AdvancedCronJobInformer {
+	return &advancedCronJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// BroadcastJobs returns a BroadcastJobInformer.
+func (v *version) BroadcastJobs() BroadcastJobInformer {
+	return &broadcastJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// CloneSets returns a CloneSetInformer.
+func (v *version) CloneSets() CloneSetInformer {
+	return &cloneSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// DaemonSets returns a DaemonSetInformer.
+func (v *version) DaemonSets() DaemonSetInformer {
+	return &daemonSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ImageListPullJobs returns a ImageListPullJobInformer.
+func (v *version) ImageListPullJobs() ImageListPullJobInformer {
+	return &imageListPullJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ImagePullJobs returns a ImagePullJobInformer.
+func (v *version) ImagePullJobs() ImagePullJobInformer {
+	return &imagePullJobInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// NodeImages returns a NodeImageInformer.
+func (v *version) NodeImages() NodeImageInformer {
+	return &nodeImageInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// SidecarSets returns a SidecarSetInformer.
+func (v *version) SidecarSets() SidecarSetInformer {
+	return &sidecarSetInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // StatefulSets returns a StatefulSetInformer.

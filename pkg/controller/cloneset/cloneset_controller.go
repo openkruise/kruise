@@ -22,25 +22,6 @@ import (
 	"flag"
 	"time"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	kruiseclient "github.com/openkruise/kruise/pkg/client"
-	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
-	revisioncontrol "github.com/openkruise/kruise/pkg/controller/cloneset/revision"
-	synccontrol "github.com/openkruise/kruise/pkg/controller/cloneset/sync"
-	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
-	utilclient "github.com/openkruise/kruise/pkg/util/client"
-	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
-	"github.com/openkruise/kruise/pkg/util/expectations"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	"github.com/openkruise/kruise/pkg/util/fieldindex"
-	historyutil "github.com/openkruise/kruise/pkg/util/history"
-	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
-	"github.com/openkruise/kruise/pkg/util/ratelimiter"
-	"github.com/openkruise/kruise/pkg/util/refmanager"
-	"github.com/openkruise/kruise/pkg/util/volumeclaimtemplate"
-
 	"github.com/prometheus/client_golang/prometheus"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -64,6 +45,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	kruiseclient "github.com/openkruise/kruise/pkg/client"
+	clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
+	revisioncontrol "github.com/openkruise/kruise/pkg/controller/cloneset/revision"
+	synccontrol "github.com/openkruise/kruise/pkg/controller/cloneset/sync"
+	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+	"github.com/openkruise/kruise/pkg/util/expectations"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/fieldindex"
+	historyutil "github.com/openkruise/kruise/pkg/util/history"
+	imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
+	"github.com/openkruise/kruise/pkg/util/ratelimiter"
+	"github.com/openkruise/kruise/pkg/util/refmanager"
+	"github.com/openkruise/kruise/pkg/util/volumeclaimtemplate"
 )
 
 func init() {
@@ -95,7 +95,7 @@ func Add(mgr manager.Manager) error {
 	if !utildiscovery.DiscoverGVK(clonesetutils.ControllerKind) {
 		return nil
 	}
-	if !utildiscovery.DiscoverGVK(appsv1alpha1.SchemeGroupVersion.WithKind("ImagePullJob")) ||
+	if !utildiscovery.DiscoverGVK(appsv1beta1.SchemeGroupVersion.WithKind("ImagePullJob")) ||
 		!utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) ||
 		!utilfeature.DefaultFeatureGate.Enabled(features.PreDownloadImageForInPlaceUpdate) {
 		isPreDownloadDisabled = true
@@ -137,9 +137,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to CloneSet
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.CloneSet{}, &handler.TypedEnqueueRequestForObject[*appsv1alpha1.CloneSet]{},
-		predicate.TypedFuncs[*appsv1alpha1.CloneSet]{
-			UpdateFunc: func(e event.TypedUpdateEvent[*appsv1alpha1.CloneSet]) bool {
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.CloneSet{}, &handler.TypedEnqueueRequestForObject[*appsv1beta1.CloneSet]{},
+		predicate.TypedFuncs[*appsv1beta1.CloneSet]{
+			UpdateFunc: func(e event.TypedUpdateEvent[*appsv1beta1.CloneSet]) bool {
 				oldCS := e.ObjectOld
 				newCS := e.ObjectNew
 				if *oldCS.Spec.Replicas != *newCS.Spec.Replicas {
@@ -185,6 +185,7 @@ type ReconcileCloneSet struct {
 
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=core,resources=pods/resize,verbs=get;patch;update
 // +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=controllerrevisions,verbs=get;list;watch;create;update;patch;delete
@@ -215,7 +216,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	}()
 
 	// Fetch the CloneSet instance
-	instance := &appsv1alpha1.CloneSet{}
+	instance := &appsv1beta1.CloneSet{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -288,14 +289,14 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 
 	// If cloneSet doesn't want to reuse pvc, clean up
 	// the existing pvc first, which are owned by inactive or deleted pods.
-	if instance.Spec.ScaleStrategy.DisablePVCReuse {
+	if !instance.Spec.ScaleStrategy.EnablePVCReuse {
 		filteredPVCs, err = r.cleanupPVCs(instance, filteredPods, filterOutPods, filteredPVCs)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
 	}
 
-	//release Pods ownerRef
+	// release Pods ownerRef
 	filteredPods, err = r.claimPods(instance, filteredPods)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -336,21 +337,25 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 		}
 	}
 
-	newStatus := appsv1alpha1.CloneSetStatus{
+	newStatus := appsv1beta1.CloneSetStatus{
 		ObservedGeneration: instance.Generation,
 		CurrentRevision:    currentRevision.Name,
 		UpdateRevision:     updateRevision.Name,
 		CollisionCount:     new(int32),
 		LabelSelector:      selector.String(),
+		Conditions:         instance.Status.Conditions,
 	}
 	*newStatus.CollisionCount = collisionCount
-
 	if !isPreDownloadDisabled {
 		if currentRevision.Name != updateRevision.Name {
-			// get clone pre-download annotation
+			// Get minUpdatedReadyPods
+			// Priority: 1. spec field (v1beta1) 2. annotation (v1alpha1 or fallback)
 			minUpdatedReadyPodsCount := 0
-			if minUpdatedReadyPods, ok := instance.Annotations[appsv1alpha1.ImagePreDownloadMinUpdatedReadyPods]; ok {
-				minUpdatedReadyPodsIntStr := intstrutil.Parse(minUpdatedReadyPods)
+			if instance.Spec.UpdateStrategy.RollingUpdate != nil &&
+				instance.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy != nil &&
+				instance.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy.ImagePreDownloadMinUpdatedReadyPods != nil {
+				// Read from v1beta1 spec field
+				minUpdatedReadyPodsIntStr := intstrutil.FromInt(int(*instance.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy.ImagePreDownloadMinUpdatedReadyPods))
 				minUpdatedReadyPodsCount, err = intstrutil.GetScaledValueFromIntOrPercent(&minUpdatedReadyPodsIntStr, int(*instance.Spec.Replicas), true)
 				if err != nil {
 					klog.ErrorS(err, "Failed to GetScaledValueFromIntOrPercent of minUpdatedReadyPods for CloneSet", "cloneSet", request)
@@ -376,7 +381,6 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 
 	// scale and update pods
 	syncErr := r.syncCloneSet(instance, &newStatus, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
-
 	// update new status
 	if err = r.statusUpdater.UpdateCloneSetStatus(instance, &newStatus, filteredPods); err != nil {
 		return reconcile.Result{}, err
@@ -397,7 +401,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 }
 
 func (r *ReconcileCloneSet) syncCloneSet(
-	instance *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus,
+	instance *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus,
 	currentRevision, updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 	filteredPods []*v1.Pod, filteredPVCs []*v1.PersistentVolumeClaim,
 ) error {
@@ -421,12 +425,13 @@ func (r *ReconcileCloneSet) syncCloneSet(
 
 	scaling, podsScaleErr = r.syncControl.Scale(currentSet, updateSet, currentRevision.Name, updateRevision.Name, filteredPods, filteredPVCs)
 	if podsScaleErr != nil {
-		newStatus.Conditions = append(newStatus.Conditions, appsv1alpha1.CloneSetCondition{
-			Type:               appsv1alpha1.CloneSetConditionFailedScale,
+		cond := appsv1beta1.CloneSetCondition{
+			Type:               appsv1beta1.CloneSetConditionFailedScale,
 			Status:             v1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
 			Message:            podsScaleErr.Error(),
-		})
+		}
+		clonesetutils.SetCloneSetCondition(newStatus, cond)
 		err = podsScaleErr
 	}
 	if scaling {
@@ -435,12 +440,13 @@ func (r *ReconcileCloneSet) syncCloneSet(
 
 	podsUpdateErr = r.syncControl.Update(updateSet, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
 	if podsUpdateErr != nil {
-		newStatus.Conditions = append(newStatus.Conditions, appsv1alpha1.CloneSetCondition{
-			Type:               appsv1alpha1.CloneSetConditionFailedUpdate,
+		cond := appsv1beta1.CloneSetCondition{
+			Type:               appsv1beta1.CloneSetConditionFailedUpdate,
 			Status:             v1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
 			Message:            podsUpdateErr.Error(),
-		})
+		}
+		clonesetutils.SetCloneSetCondition(newStatus, cond)
 		if err == nil {
 			err = podsUpdateErr
 		}
@@ -449,7 +455,7 @@ func (r *ReconcileCloneSet) syncCloneSet(
 	return err
 }
 
-func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisions []*apps.ControllerRevision) (
+func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1beta1.CloneSet, revisions []*apps.ControllerRevision) (
 	*apps.ControllerRevision, *apps.ControllerRevision, int32, error,
 ) {
 	var currentRevision, updateRevision *apps.ControllerRevision
@@ -501,7 +507,7 @@ func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisi
 			return nil, nil, collisionCount, err
 		}
 	} else {
-		//if there is no equivalent revision we create a new one
+		// if there is no equivalent revision we create a new one
 		updateRevision, err = r.controllerHistory.CreateControllerRevision(cs, updateRevision, &collisionCount)
 		if err != nil {
 			return nil, nil, collisionCount, err
@@ -524,7 +530,7 @@ func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisi
 	return currentRevision, updateRevision, collisionCount, nil
 }
 
-func (r *ReconcileCloneSet) getOwnedPods(cs *appsv1alpha1.CloneSet) ([]*v1.Pod, []*v1.Pod, error) {
+func (r *ReconcileCloneSet) getOwnedPods(cs *appsv1beta1.CloneSet) ([]*v1.Pod, []*v1.Pod, error) {
 	opts := &client.ListOptions{
 		Namespace:     cs.Namespace,
 		FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(cs.UID)}),
@@ -532,7 +538,7 @@ func (r *ReconcileCloneSet) getOwnedPods(cs *appsv1alpha1.CloneSet) ([]*v1.Pod, 
 	return clonesetutils.GetActiveAndInactivePods(r.Client, opts)
 }
 
-func (r *ReconcileCloneSet) getOwnedPVCs(cs *appsv1alpha1.CloneSet) ([]*v1.PersistentVolumeClaim, error) {
+func (r *ReconcileCloneSet) getOwnedPVCs(cs *appsv1beta1.CloneSet) ([]*v1.PersistentVolumeClaim, error) {
 	opts := &client.ListOptions{
 		Namespace:     cs.Namespace,
 		FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(cs.UID)}),
@@ -554,7 +560,7 @@ func (r *ReconcileCloneSet) getOwnedPVCs(cs *appsv1alpha1.CloneSet) ([]*v1.Persi
 }
 
 // truncatePodsToDelete truncates any non-live pod names in spec.scaleStrategy.podsToDelete.
-func (r *ReconcileCloneSet) truncatePodsToDelete(cs *appsv1alpha1.CloneSet, pods []*v1.Pod) error {
+func (r *ReconcileCloneSet) truncatePodsToDelete(cs *appsv1beta1.CloneSet, pods []*v1.Pod) error {
 	if len(cs.Spec.ScaleStrategy.PodsToDelete) == 0 {
 		return nil
 	}
@@ -586,7 +592,7 @@ func (r *ReconcileCloneSet) truncatePodsToDelete(cs *appsv1alpha1.CloneSet, pods
 // only RevisionHistoryLimit revisions remain. If the returned error is nil the operation was successful. This method
 // expects that revisions is sorted when supplied.
 func (r *ReconcileCloneSet) truncateHistory(
-	cs *appsv1alpha1.CloneSet,
+	cs *appsv1beta1.CloneSet,
 	pods []*v1.Pod,
 	revisions []*apps.ControllerRevision,
 	current *apps.ControllerRevision,
@@ -627,7 +633,7 @@ func (r *ReconcileCloneSet) truncateHistory(
 	return nil
 }
 
-func (r *ReconcileCloneSet) claimPods(instance *appsv1alpha1.CloneSet, pods []*v1.Pod) ([]*v1.Pod, error) {
+func (r *ReconcileCloneSet) claimPods(instance *appsv1beta1.CloneSet, pods []*v1.Pod) ([]*v1.Pod, error) {
 	mgr, err := refmanager.New(r, instance.Spec.Selector, instance, r.scheme)
 	if err != nil {
 		return nil, err
@@ -655,7 +661,7 @@ func (r *ReconcileCloneSet) claimPods(instance *appsv1alpha1.CloneSet, pods []*v
 // If pvc owner pod does not exist, the pvc can be deleted directly,
 // else update pvc's ownerReference to pod.
 func (r *ReconcileCloneSet) cleanupPVCs(
-	cs *appsv1alpha1.CloneSet,
+	cs *appsv1beta1.CloneSet,
 	activePods, inactivePods []*v1.Pod,
 	pvcs []*v1.PersistentVolumeClaim,
 ) ([]*v1.PersistentVolumeClaim, error) {
@@ -713,7 +719,7 @@ func (r *ReconcileCloneSet) cleanupPVCs(
 	return activePVCs, nil
 }
 
-func (r *ReconcileCloneSet) updateOnePVC(cs *appsv1alpha1.CloneSet, pvc *v1.PersistentVolumeClaim) error {
+func (r *ReconcileCloneSet) updateOnePVC(cs *appsv1beta1.CloneSet, pvc *v1.PersistentVolumeClaim) error {
 	if err := r.Client.Update(context.TODO(), pvc); err != nil {
 		r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedUpdate", "failed to update PVC %s: %v", pvc.Name, err)
 		return err
@@ -721,7 +727,7 @@ func (r *ReconcileCloneSet) updateOnePVC(cs *appsv1alpha1.CloneSet, pvc *v1.Pers
 	return nil
 }
 
-func (r *ReconcileCloneSet) deleteOnePVC(cs *appsv1alpha1.CloneSet, pvc *v1.PersistentVolumeClaim) error {
+func (r *ReconcileCloneSet) deleteOnePVC(cs *appsv1beta1.CloneSet, pvc *v1.PersistentVolumeClaim) error {
 	clonesetutils.ScaleExpectations.ExpectScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pvc.Name)
 	if err := r.Delete(context.TODO(), pvc); err != nil {
 		clonesetutils.ScaleExpectations.ObserveScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pvc.Name)
@@ -731,7 +737,7 @@ func (r *ReconcileCloneSet) deleteOnePVC(cs *appsv1alpha1.CloneSet, pvc *v1.Pers
 	return nil
 }
 
-func updateClaimOwnerRefToPod(pvc *v1.PersistentVolumeClaim, cs *appsv1alpha1.CloneSet, pod *v1.Pod) bool {
+func updateClaimOwnerRefToPod(pvc *v1.PersistentVolumeClaim, cs *appsv1beta1.CloneSet, pod *v1.Pod) bool {
 	util.RemoveOwnerRef(pvc, cs)
 	return util.SetOwnerRef(pvc, pod, schema.GroupVersionKind{Version: "v1", Kind: "Pod"})
 }

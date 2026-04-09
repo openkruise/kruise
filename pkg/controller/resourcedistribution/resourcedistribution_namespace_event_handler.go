@@ -20,8 +20,6 @@ import (
 	"context"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/workqueue"
@@ -30,6 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 var _ handler.TypedEventHandler[*corev1.Namespace, reconcile.Request] = &enqueueRequestForNamespace{}

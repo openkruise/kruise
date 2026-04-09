@@ -225,7 +225,7 @@ func (r *ReconcilePodProbeMarker) handlerPodProbeMarkerFinalizer(ppm *appsv1alph
 		return nil
 	}
 	for _, pod := range pods {
-		if err := r.removePodProbeFromNodePodProbe(ppm.Name, pod.Spec.NodeName); err != nil {
+		if err := r.removePodProbeFromNodePodProbe(ppm.Namespace, ppm.Name, pod.Spec.NodeName); err != nil {
 			return err
 		}
 	}
@@ -478,7 +478,7 @@ func (r *ReconcilePodProbeMarker) getMatchingPods(ppm *appsv1alpha1.PodProbeMark
 	return normalPods, serverlessPods, nil
 }
 
-func (r *ReconcilePodProbeMarker) removePodProbeFromNodePodProbe(ppmName, nppName string) error {
+func (r *ReconcilePodProbeMarker) removePodProbeFromNodePodProbe(ppmNamespace, ppmName, nppName string) error {
 	npp := &appsv1alpha1.NodePodProbe{}
 	err := r.Get(context.TODO(), client.ObjectKey{Name: nppName}, npp)
 	if err != nil {
@@ -489,8 +489,13 @@ func (r *ReconcilePodProbeMarker) removePodProbeFromNodePodProbe(ppmName, nppNam
 	}
 
 	newSpec := appsv1alpha1.NodePodProbeSpec{}
-	for _, podProbe := range npp.Spec.PodProbes {
-		newPodProbe := appsv1alpha1.PodProbe{Name: podProbe.Name, Namespace: podProbe.Namespace, UID: podProbe.UID}
+	for i := range npp.Spec.PodProbes {
+		podProbe := npp.Spec.PodProbes[i]
+		if ppmNamespace != podProbe.Namespace {
+			newSpec.PodProbes = append(newSpec.PodProbes, podProbe)
+			continue
+		}
+		newPodProbe := appsv1alpha1.PodProbe{Name: podProbe.Name, Namespace: podProbe.Namespace, UID: podProbe.UID, IP: podProbe.IP}
 		for i := range podProbe.Probes {
 			probe := podProbe.Probes[i]
 			// probe.Name -> podProbeMarker.Name#probe.Name

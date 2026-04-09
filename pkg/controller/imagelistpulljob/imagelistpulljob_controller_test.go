@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 )
 
@@ -47,24 +47,24 @@ var (
 func init() {
 	testscheme = k8sruntime.NewScheme()
 	utilruntime.Must(corev1.AddToScheme(testscheme))
-	utilruntime.Must(appsv1alpha1.AddToScheme(testscheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(testscheme))
 }
 
 func TestReconcile(t *testing.T) {
 	now := metav1.Now()
-	instance := &appsv1alpha1.ImageListPullJob{
+	instance := &appsv1beta1.ImageListPullJob{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default", UID: types.UID(jobUID)},
-		Spec: appsv1alpha1.ImageListPullJobSpec{
+		Spec: appsv1beta1.ImageListPullJobSpec{
 			Images: images,
 		},
 	}
 	cases := []struct {
 		name               string
-		expectImagePullJob []*appsv1alpha1.ImagePullJob
+		expectImagePullJob []*appsv1beta1.ImagePullJob
 	}{
 		{
 			name: "test-imagelistpulljob-controller",
-			expectImagePullJob: []*appsv1alpha1.ImagePullJob{
+			expectImagePullJob: []*appsv1beta1.ImagePullJob{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "j01",
@@ -73,13 +73,13 @@ func TestReconcile(t *testing.T) {
 							{UID: types.UID(jobUID), Name: instance.Name},
 						},
 					},
-					Spec: appsv1alpha1.ImagePullJobSpec{
+					Spec: appsv1beta1.ImagePullJobSpec{
 						Image: images[0],
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 						},
 					},
-					Status: appsv1alpha1.ImagePullJobStatus{
+					Status: appsv1beta1.ImagePullJobStatus{
 						Active:         0,
 						StartTime:      &now,
 						CompletionTime: &now,
@@ -96,13 +96,13 @@ func TestReconcile(t *testing.T) {
 							{UID: types.UID(jobUID), Name: instance.Name},
 						},
 					},
-					Spec: appsv1alpha1.ImagePullJobSpec{
+					Spec: appsv1beta1.ImagePullJobSpec{
 						Image: images[1],
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 						},
 					},
-					Status: appsv1alpha1.ImagePullJobStatus{
+					Status: appsv1beta1.ImagePullJobStatus{
 						Desired:   1,
 						Active:    1,
 						StartTime: &now,
@@ -116,13 +116,13 @@ func TestReconcile(t *testing.T) {
 							{UID: types.UID(jobUID), Name: instance.Name},
 						},
 					},
-					Spec: appsv1alpha1.ImagePullJobSpec{
+					Spec: appsv1beta1.ImagePullJobSpec{
 						Image: images[2],
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 						},
 					},
-					Status: appsv1alpha1.ImagePullJobStatus{
+					Status: appsv1beta1.ImagePullJobStatus{
 						Desired:        1,
 						Active:         0,
 						StartTime:      &now,
@@ -148,11 +148,11 @@ func TestReconcile(t *testing.T) {
 
 			_, err := reconcileJob.Reconcile(context.TODO(), request)
 			assert.NoError(t, err)
-			retrievedJob := &appsv1alpha1.ImageListPullJob{}
+			retrievedJob := &appsv1beta1.ImageListPullJob{}
 			err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
 			assert.NoError(t, err)
 
-			imagePullJobList := &appsv1alpha1.ImagePullJobList{}
+			imagePullJobList := &appsv1beta1.ImagePullJobList{}
 			listOptions := client.InNamespace(request.Namespace)
 			err = reconcileJob.List(context.TODO(), imagePullJobList, listOptions)
 			assert.NoError(t, err)
@@ -169,28 +169,28 @@ func TestReconcile(t *testing.T) {
 }
 
 func TestComputeImagePullJobActions(t *testing.T) {
-	baseImageListPullJob := &appsv1alpha1.ImageListPullJob{
+	baseImageListPullJob := &appsv1beta1.ImageListPullJob{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default", UID: types.UID(jobUID)},
 	}
 	cases := []struct {
 		name                      string
-		ImageListPullJob          *appsv1alpha1.ImageListPullJob
-		ImagePullJobs             map[string]*appsv1alpha1.ImagePullJob
-		needToCreateImagePullJobs []*appsv1alpha1.ImagePullJob
-		needToDeleteImagePullJobs []*appsv1alpha1.ImagePullJob
+		ImageListPullJob          *appsv1beta1.ImageListPullJob
+		ImagePullJobs             map[string]*appsv1beta1.ImagePullJob
+		needToCreateImagePullJobs []*appsv1beta1.ImagePullJob
+		needToDeleteImagePullJobs []*appsv1beta1.ImagePullJob
 	}{
 		{
 			name: "test_add_image",
-			ImageListPullJob: &appsv1alpha1.ImageListPullJob{
+			ImageListPullJob: &appsv1beta1.ImageListPullJob{
 				ObjectMeta: baseImageListPullJob.ObjectMeta,
-				Spec: appsv1alpha1.ImageListPullJobSpec{
+				Spec: appsv1beta1.ImageListPullJobSpec{
 					Images: []string{"nginx:1.9.1", "busybox:1.35", "httpd:2.4.38"},
-					ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-						CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+					ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+						CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 					},
 				},
 			},
-			ImagePullJobs: map[string]*appsv1alpha1.ImagePullJob{
+			ImagePullJobs: map[string]*appsv1beta1.ImagePullJob{
 				"nginx:1.9.1": {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "j01",
@@ -199,10 +199,10 @@ func TestComputeImagePullJobActions(t *testing.T) {
 							{UID: types.UID(jobUID), Name: "foo"},
 						},
 					},
-					Spec: appsv1alpha1.ImagePullJobSpec{
+					Spec: appsv1beta1.ImagePullJobSpec{
 						Image: "nginx:1.9.1",
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 						},
 					}},
 				"busybox:1.35": {
@@ -213,14 +213,14 @@ func TestComputeImagePullJobActions(t *testing.T) {
 							{UID: types.UID(jobUID), Name: "foo"},
 						},
 					},
-					Spec: appsv1alpha1.ImagePullJobSpec{
+					Spec: appsv1beta1.ImagePullJobSpec{
 						Image: "busybox:1.35",
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 						},
 					}},
 			},
-			needToCreateImagePullJobs: []*appsv1alpha1.ImagePullJob{
+			needToCreateImagePullJobs: []*appsv1beta1.ImagePullJob{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:    "default",
@@ -231,10 +231,10 @@ func TestComputeImagePullJobActions(t *testing.T) {
 							*metav1.NewControllerRef(baseImageListPullJob, controllerKind),
 						},
 					},
-					Spec: appsv1alpha1.ImagePullJobSpec{
+					Spec: appsv1beta1.ImagePullJobSpec{
 						Image: "httpd:2.4.38",
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 						},
 					},
 				},
@@ -243,16 +243,16 @@ func TestComputeImagePullJobActions(t *testing.T) {
 		},
 		{
 			name: "test_delete_image",
-			ImageListPullJob: &appsv1alpha1.ImageListPullJob{
+			ImageListPullJob: &appsv1beta1.ImageListPullJob{
 				ObjectMeta: baseImageListPullJob.ObjectMeta,
-				Spec: appsv1alpha1.ImageListPullJobSpec{
+				Spec: appsv1beta1.ImageListPullJobSpec{
 					Images: []string{"nginx:1.9.1"},
-					ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-						CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+					ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+						CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 					},
 				},
 			},
-			ImagePullJobs: map[string]*appsv1alpha1.ImagePullJob{
+			ImagePullJobs: map[string]*appsv1beta1.ImagePullJob{
 				"nginx:1.9.1": {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "j01",
@@ -261,10 +261,10 @@ func TestComputeImagePullJobActions(t *testing.T) {
 							{UID: types.UID(jobUID), Name: "foo"},
 						},
 					},
-					Spec: appsv1alpha1.ImagePullJobSpec{
+					Spec: appsv1beta1.ImagePullJobSpec{
 						Image: "nginx:1.9.1",
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 						},
 					}},
 				"busybox:1.35": {
@@ -275,15 +275,15 @@ func TestComputeImagePullJobActions(t *testing.T) {
 							{UID: types.UID(jobUID), Name: "foo"},
 						},
 					},
-					Spec: appsv1alpha1.ImagePullJobSpec{
+					Spec: appsv1beta1.ImagePullJobSpec{
 						Image: "busybox:1.35",
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 						},
 					}},
 			},
 			needToCreateImagePullJobs: nil,
-			needToDeleteImagePullJobs: []*appsv1alpha1.ImagePullJob{
+			needToDeleteImagePullJobs: []*appsv1beta1.ImagePullJob{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "j02",
@@ -292,26 +292,26 @@ func TestComputeImagePullJobActions(t *testing.T) {
 							{UID: types.UID(jobUID), Name: "foo"},
 						},
 					},
-					Spec: appsv1alpha1.ImagePullJobSpec{
+					Spec: appsv1beta1.ImagePullJobSpec{
 						Image: "busybox:1.35",
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 						},
 					}},
 			},
 		},
 		{
 			name: "test_change_imagepulljobtemplate",
-			ImageListPullJob: &appsv1alpha1.ImageListPullJob{
+			ImageListPullJob: &appsv1beta1.ImageListPullJob{
 				ObjectMeta: baseImageListPullJob.ObjectMeta,
-				Spec: appsv1alpha1.ImageListPullJobSpec{
+				Spec: appsv1beta1.ImageListPullJobSpec{
 					Images: []string{"nginx:1.9.1", "busybox:1.35"},
-					ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-						CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Never},
+					ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+						CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Never},
 					},
 				},
 			},
-			ImagePullJobs: map[string]*appsv1alpha1.ImagePullJob{
+			ImagePullJobs: map[string]*appsv1beta1.ImagePullJob{
 				"nginx:1.9.1": {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "j01",
@@ -320,10 +320,10 @@ func TestComputeImagePullJobActions(t *testing.T) {
 							{UID: types.UID(jobUID), Name: "foo"},
 						},
 					},
-					Spec: appsv1alpha1.ImagePullJobSpec{
+					Spec: appsv1beta1.ImagePullJobSpec{
 						Image: "nginx:1.9.1",
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 						},
 					}},
 				"busybox:1.35": {
@@ -334,14 +334,14 @@ func TestComputeImagePullJobActions(t *testing.T) {
 							{UID: types.UID(jobUID), Name: "foo"},
 						},
 					},
-					Spec: appsv1alpha1.ImagePullJobSpec{
+					Spec: appsv1beta1.ImagePullJobSpec{
 						Image: "busybox:1.35",
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 						},
 					}},
 			},
-			needToCreateImagePullJobs: []*appsv1alpha1.ImagePullJob{
+			needToCreateImagePullJobs: []*appsv1beta1.ImagePullJob{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace:    "default",
@@ -352,10 +352,10 @@ func TestComputeImagePullJobActions(t *testing.T) {
 							*metav1.NewControllerRef(baseImageListPullJob, controllerKind),
 						},
 					},
-					Spec: appsv1alpha1.ImagePullJobSpec{
+					Spec: appsv1beta1.ImagePullJobSpec{
 						Image: "nginx:1.9.1",
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Never},
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Never},
 						},
 					},
 				},
@@ -370,15 +370,15 @@ func TestComputeImagePullJobActions(t *testing.T) {
 							*metav1.NewControllerRef(baseImageListPullJob, controllerKind),
 						},
 					},
-					Spec: appsv1alpha1.ImagePullJobSpec{
+					Spec: appsv1beta1.ImagePullJobSpec{
 						Image: "busybox:1.35",
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Never},
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Never},
 						},
 					},
 				},
 			},
-			needToDeleteImagePullJobs: []*appsv1alpha1.ImagePullJob{
+			needToDeleteImagePullJobs: []*appsv1beta1.ImagePullJob{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "j01",
@@ -387,10 +387,10 @@ func TestComputeImagePullJobActions(t *testing.T) {
 							{UID: types.UID(jobUID), Name: "foo"},
 						},
 					},
-					Spec: appsv1alpha1.ImagePullJobSpec{
+					Spec: appsv1beta1.ImagePullJobSpec{
 						Image: "nginx:1.9.1",
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 						},
 					}},
 				{
@@ -401,10 +401,10 @@ func TestComputeImagePullJobActions(t *testing.T) {
 							{UID: types.UID(jobUID), Name: "foo"},
 						},
 					},
-					Spec: appsv1alpha1.ImagePullJobSpec{
+					Spec: appsv1beta1.ImagePullJobSpec{
 						Image: "busybox:1.35",
-						ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
-							CompletionPolicy: appsv1alpha1.CompletionPolicy{Type: appsv1alpha1.Always},
+						ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+							CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
 						},
 					}},
 			},
@@ -425,13 +425,13 @@ func TestComputeImagePullJobActions(t *testing.T) {
 
 func createReconcileJob(scheme *k8sruntime.Scheme, initObjs ...client.Object) ReconcileImageListPullJob {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(initObjs...).
-		WithIndex(&appsv1alpha1.ImagePullJob{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
+		WithIndex(&appsv1beta1.ImagePullJob{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
 			var owners []string
 			for _, ref := range obj.GetOwnerReferences() {
 				owners = append(owners, string(ref.UID))
 			}
 			return owners
-		}).WithStatusSubresource(&appsv1alpha1.ImageListPullJob{}).Build()
+		}).WithStatusSubresource(&appsv1beta1.ImageListPullJob{}).Build()
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme, corev1.EventSource{Component: "imagelistpulljob-controller"})
 	reconcileJob := ReconcileImageListPullJob{

@@ -19,6 +19,7 @@ package mutating
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"reflect"
 
@@ -28,6 +29,7 @@ import (
 
 	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
 )
@@ -42,35 +44,67 @@ var _ admission.Handler = &NodeImageCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *NodeImageCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.NodeImage{}
-	err := h.Decoder.Decode(req, obj)
-	if err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
-	}
-	var copy runtime.Object = obj.DeepCopy()
-	// Set defaults
-	defaults.SetDefaultsNodeImage(obj)
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		obj := &appsv1beta1.NodeImage{}
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		var copy runtime.Object = obj.DeepCopy()
+		// Set defaults
+		defaults.SetDefaultsNodeImageV1beta1(obj)
 
-	// Sort image tags
-	for name, imageSpec := range obj.Spec.Images {
-		utilimagejob.SortSpecImageTags(&imageSpec)
-		obj.Spec.Images[name] = imageSpec
-	}
-	for name, imageStatus := range obj.Status.ImageStatuses {
-		utilimagejob.SortStatusImageTags(&imageStatus)
-		obj.Status.ImageStatuses[name] = imageStatus
-	}
-	if reflect.DeepEqual(obj, copy) {
-		return admission.Allowed("")
-	}
-	marshaled, err := json.Marshal(obj)
-	if err != nil {
-		return admission.Errored(http.StatusInternalServerError, err)
-	}
-	resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
-	if len(resp.Patches) > 0 {
-		klog.V(5).InfoS("Admit NodeImage patches", "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
-	}
+		// Sort image tags
+		for name, imageSpec := range obj.Spec.Images {
+			utilimagejob.SortSpecImageTagsV1beta1(&imageSpec)
+			obj.Spec.Images[name] = imageSpec
+		}
+		for name, imageStatus := range obj.Status.ImageStatuses {
+			utilimagejob.SortStatusImageTagsV1beta1(&imageStatus)
+			obj.Status.ImageStatuses[name] = imageStatus
+		}
+		if reflect.DeepEqual(obj, copy) {
+			return admission.Allowed("")
+		}
+		marshaled, err := json.Marshal(obj)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
+		if len(resp.Patches) > 0 {
+			klog.V(5).InfoS("Admit NodeImage patches", "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
+		}
+		return resp
+	case appsv1alpha1.GroupVersion.Version:
+		obj := &appsv1alpha1.NodeImage{}
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		var copy runtime.Object = obj.DeepCopy()
+		// Set defaults
+		defaults.SetDefaultsNodeImage(obj)
 
-	return resp
+		// Sort image tags
+		for name, imageSpec := range obj.Spec.Images {
+			utilimagejob.SortSpecImageTags(&imageSpec)
+			obj.Spec.Images[name] = imageSpec
+		}
+		for name, imageStatus := range obj.Status.ImageStatuses {
+			utilimagejob.SortStatusImageTags(&imageStatus)
+			obj.Status.ImageStatuses[name] = imageStatus
+		}
+		if reflect.DeepEqual(obj, copy) {
+			return admission.Allowed("")
+		}
+		marshaled, err := json.Marshal(obj)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
+		if len(resp.Patches) > 0 {
+			klog.V(5).InfoS("Admit NodeImage patches", "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
+		}
+		return resp
+	}
+	return admission.Errored(http.StatusBadRequest, fmt.Errorf("unsupported version: %s", req.AdmissionRequest.Resource.Version))
 }

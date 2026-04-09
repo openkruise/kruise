@@ -2,16 +2,18 @@ package fuzz
 
 import (
 	"encoding/json"
+
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util/configuration"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/util/configuration"
 )
 
-type SidecarSetGenerateSpecFunc = func(cf *fuzz.ConsumeFuzzer, subset *appsv1alpha1.SidecarSet) error
+type SidecarSetGenerateSpecFunc = func(cf *fuzz.ConsumeFuzzer, subset *appsv1beta1.SidecarSet) error
 
-func GenerateSidecarSetSpec(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1alpha1.SidecarSet, fns ...SidecarSetGenerateSpecFunc) error {
+func GenerateSidecarSetSpec(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1beta1.SidecarSet, fns ...SidecarSetGenerateSpecFunc) error {
 	if len(fns) == 0 {
 		return nil
 	}
@@ -24,7 +26,7 @@ func GenerateSidecarSetSpec(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1alpha1.Sid
 	return nil
 }
 
-func GenerateSidecarSetSelector(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1alpha1.SidecarSet) error {
+func GenerateSidecarSetSelector(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1beta1.SidecarSet) error {
 	selector := &metav1.LabelSelector{}
 	if err := GenerateLabelSelector(cf, selector); err != nil {
 		return err
@@ -33,31 +35,12 @@ func GenerateSidecarSetSelector(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1alpha1
 	return nil
 }
 
-func GenerateSidecarSetNamespace(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1alpha1.SidecarSet) error {
-	isStructured, err := cf.GetBool()
-	if err != nil {
-		return err
-	}
-
-	if !isStructured {
-		namespace, err := cf.GetString()
-		if err != nil {
-			return err
-		}
-		sidecarSet.Spec.Namespace = namespace
-		return nil
-	}
-
-	if valid, err := cf.GetBool(); valid && err == nil {
-		sidecarSet.Spec.Namespace = GenerateValidNamespaceName()
-	} else {
-		sidecarSet.Spec.Namespace = GenerateInvalidNamespaceName()
-	}
-
-	return nil
+func GenerateSidecarSetNamespace(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1beta1.SidecarSet) error {
+	// Namespace field has been removed from v1beta1, use GenerateSidecarSetNamespaceSelector instead
+	return GenerateSidecarSetNamespaceSelector(cf, sidecarSet)
 }
 
-func GenerateSidecarSetNamespaceSelector(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1alpha1.SidecarSet) error {
+func GenerateSidecarSetNamespaceSelector(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1beta1.SidecarSet) error {
 	selector := &metav1.LabelSelector{}
 	if err := GenerateLabelSelector(cf, selector); err != nil {
 		return err
@@ -66,14 +49,14 @@ func GenerateSidecarSetNamespaceSelector(cf *fuzz.ConsumeFuzzer, sidecarSet *app
 	return nil
 }
 
-func GenerateSidecarSetInitContainer(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1alpha1.SidecarSet) error {
+func GenerateSidecarSetInitContainer(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1beta1.SidecarSet) error {
 	isStructured, err := cf.GetBool()
 	if err != nil {
 		return err
 	}
 
 	if !isStructured {
-		initContainers := make([]appsv1alpha1.SidecarContainer, 0)
+		initContainers := make([]appsv1beta1.SidecarContainer, 0)
 		if err := cf.CreateSlice(&initContainers); err != nil {
 			return err
 		}
@@ -81,7 +64,7 @@ func GenerateSidecarSetInitContainer(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1a
 		return nil
 	}
 
-	initContainers := make([]appsv1alpha1.SidecarContainer, r.Intn(collectionMaxElements)+1)
+	initContainers := make([]appsv1beta1.SidecarContainer, r.Intn(collectionMaxElements)+1)
 	for i := range initContainers {
 		if err := GenerateSidecarContainer(cf, &initContainers[i]); err != nil {
 			return err
@@ -91,14 +74,14 @@ func GenerateSidecarSetInitContainer(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1a
 	return nil
 }
 
-func GenerateSidecarSetContainer(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1alpha1.SidecarSet) error {
+func GenerateSidecarSetContainer(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1beta1.SidecarSet) error {
 	isStructured, err := cf.GetBool()
 	if err != nil {
 		return err
 	}
 
 	if !isStructured {
-		containers := make([]appsv1alpha1.SidecarContainer, 0)
+		containers := make([]appsv1beta1.SidecarContainer, 0)
 		if err := cf.CreateSlice(&containers); err != nil {
 			return err
 		}
@@ -106,7 +89,7 @@ func GenerateSidecarSetContainer(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1alpha
 		return nil
 	}
 
-	containers := make([]appsv1alpha1.SidecarContainer, r.Intn(collectionMaxElements)+1)
+	containers := make([]appsv1beta1.SidecarContainer, r.Intn(collectionMaxElements)+1)
 	for i := range containers {
 		if err := GenerateSidecarContainer(cf, &containers[i]); err != nil {
 			return err
@@ -116,7 +99,7 @@ func GenerateSidecarSetContainer(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1alpha
 	return nil
 }
 
-func GenerateSidecarContainer(cf *fuzz.ConsumeFuzzer, sidecarContainer *appsv1alpha1.SidecarContainer) error {
+func GenerateSidecarContainer(cf *fuzz.ConsumeFuzzer, sidecarContainer *appsv1beta1.SidecarContainer) error {
 	isStructured, err := cf.GetBool()
 	if err != nil {
 		return err
@@ -135,19 +118,19 @@ func GenerateSidecarContainer(cf *fuzz.ConsumeFuzzer, sidecarContainer *appsv1al
 		return err
 	}
 
-	validPodInjectPolicyType := []appsv1alpha1.PodInjectPolicyType{
-		appsv1alpha1.BeforeAppContainerType,
-		appsv1alpha1.AfterAppContainerType,
+	validPodInjectPolicyType := []appsv1beta1.PodInjectPolicyType{
+		appsv1beta1.BeforeAppContainerType,
+		appsv1beta1.AfterAppContainerType,
 	}
 
-	validSidecarContainerUpgradeType := []appsv1alpha1.SidecarContainerUpgradeType{
-		appsv1alpha1.SidecarContainerColdUpgrade,
-		appsv1alpha1.SidecarContainerHotUpgrade,
+	validSidecarContainerUpgradeType := []appsv1beta1.SidecarContainerUpgradeType{
+		appsv1beta1.SidecarContainerColdUpgrade,
+		appsv1beta1.SidecarContainerHotUpgrade,
 	}
 
-	validShareVolumePolicy := []appsv1alpha1.ShareVolumePolicyType{
-		appsv1alpha1.ShareVolumePolicyEnabled,
-		appsv1alpha1.ShareVolumePolicyDisabled,
+	validShareVolumePolicy := []appsv1beta1.ShareVolumePolicyType{
+		appsv1beta1.ShareVolumePolicyEnabled,
+		appsv1beta1.ShareVolumePolicyDisabled,
 	}
 
 	validRestartPolicy := []corev1.ContainerRestartPolicy{
@@ -169,13 +152,13 @@ func GenerateSidecarContainer(cf *fuzz.ConsumeFuzzer, sidecarContainer *appsv1al
 	return nil
 }
 
-func GenerateSidecarSetUpdateStrategy(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1alpha1.SidecarSet) error {
+func GenerateSidecarSetUpdateStrategy(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1beta1.SidecarSet) error {
 	isStructured, err := cf.GetBool()
 	if err != nil {
 		return err
 	}
 
-	updateStrategy := appsv1alpha1.SidecarSetUpdateStrategy{}
+	updateStrategy := appsv1beta1.SidecarSetUpdateStrategy{}
 	if err := cf.GenerateStruct(&updateStrategy); err != nil {
 		return err
 	}
@@ -185,9 +168,9 @@ func GenerateSidecarSetUpdateStrategy(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1
 		return nil
 	}
 
-	validStrategyTypes := []appsv1alpha1.SidecarSetUpdateStrategyType{
-		appsv1alpha1.NotUpdateSidecarSetStrategyType,
-		appsv1alpha1.RollingUpdateSidecarSetStrategyType,
+	validStrategyTypes := []appsv1beta1.SidecarSetUpdateStrategyType{
+		appsv1beta1.NotUpdateSidecarSetStrategyType,
+		appsv1beta1.RollingUpdateSidecarSetStrategyType,
 	}
 	choice, err := cf.GetInt()
 	if err != nil {
@@ -212,13 +195,13 @@ func GenerateSidecarSetUpdateStrategy(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1
 	return nil
 }
 
-func GenerateSidecarSetInjectionStrategy(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1alpha1.SidecarSet) error {
+func GenerateSidecarSetInjectionStrategy(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1beta1.SidecarSet) error {
 	isStructured, err := cf.GetBool()
 	if err != nil {
 		return err
 	}
 
-	injectionStrategy := appsv1alpha1.SidecarSetInjectionStrategy{}
+	injectionStrategy := appsv1beta1.SidecarSetInjectionStrategy{}
 	if err := cf.GenerateStruct(&injectionStrategy); err != nil {
 		return err
 	}
@@ -228,16 +211,16 @@ func GenerateSidecarSetInjectionStrategy(cf *fuzz.ConsumeFuzzer, sidecarSet *app
 		return nil
 	}
 
-	validPolicies := []appsv1alpha1.SidecarSetInjectRevisionPolicy{
-		appsv1alpha1.AlwaysSidecarSetInjectRevisionPolicy,
-		appsv1alpha1.PartialSidecarSetInjectRevisionPolicy,
+	validPolicies := []appsv1beta1.SidecarSetInjectRevisionPolicy{
+		appsv1beta1.AlwaysSidecarSetInjectRevisionPolicy,
+		appsv1beta1.PartialSidecarSetInjectRevisionPolicy,
 	}
 	choice, err := cf.GetInt()
 	if err != nil {
 		return err
 	}
 
-	injectRevision := &appsv1alpha1.SidecarSetInjectRevision{
+	injectRevision := &appsv1beta1.SidecarSetInjectRevision{
 		RevisionName:  func() *string { name := GenerateValidValue(); return &name }(),
 		CustomVersion: func() *string { version := GenerateValidValue(); return &version }(),
 		Policy:        validPolicies[choice%len(validPolicies)],
@@ -248,13 +231,13 @@ func GenerateSidecarSetInjectionStrategy(cf *fuzz.ConsumeFuzzer, sidecarSet *app
 	return nil
 }
 
-func GenerateSidecarSetPatchPodMetadata(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1alpha1.SidecarSet) error {
+func GenerateSidecarSetPatchPodMetadata(cf *fuzz.ConsumeFuzzer, sidecarSet *appsv1beta1.SidecarSet) error {
 	sliceLen, err := cf.GetInt()
 	if err != nil {
 		return err
 	}
 
-	sidecarSetPatchSlice := make([]appsv1alpha1.SidecarSetPatchPodMetadata, sliceLen%3+1)
+	sidecarSetPatchSlice := make([]appsv1beta1.SidecarSetPatchPodMetadata, sliceLen%3+1)
 	for i := range sidecarSetPatchSlice {
 		jsonPatch, err := cf.GetBool()
 		if err != nil {
@@ -270,13 +253,13 @@ func GenerateSidecarSetPatchPodMetadata(cf *fuzz.ConsumeFuzzer, sidecarSet *apps
 	return nil
 }
 
-func GeneratePatchPodMetadata(cf *fuzz.ConsumeFuzzer, jsonPatch bool) (*appsv1alpha1.SidecarSetPatchPodMetadata, error) {
+func GeneratePatchPodMetadata(cf *fuzz.ConsumeFuzzer, jsonPatch bool) (*appsv1beta1.SidecarSetPatchPodMetadata, error) {
 	isStructured, err := cf.GetBool()
 	if err != nil {
 		return nil, err
 	}
 
-	sidecarSetPatch := &appsv1alpha1.SidecarSetPatchPodMetadata{}
+	sidecarSetPatch := &appsv1beta1.SidecarSetPatchPodMetadata{}
 	if !isStructured {
 		if err := cf.GenerateStruct(sidecarSetPatch); err != nil {
 			return nil, err
@@ -284,10 +267,10 @@ func GeneratePatchPodMetadata(cf *fuzz.ConsumeFuzzer, jsonPatch bool) (*appsv1al
 		return sidecarSetPatch, nil
 	}
 
-	validPatchPolicies := []appsv1alpha1.SidecarSetPatchPolicyType{
-		appsv1alpha1.SidecarSetMergePatchJsonPatchPolicy,
-		appsv1alpha1.SidecarSetRetainPatchPolicy,
-		appsv1alpha1.SidecarSetOverwritePatchPolicy,
+	validPatchPolicies := []appsv1beta1.SidecarSetPatchPolicyType{
+		appsv1beta1.SidecarSetMergePatchJsonPatchPolicy,
+		appsv1beta1.SidecarSetRetainPatchPolicy,
+		appsv1beta1.SidecarSetOverwritePatchPolicy,
 	}
 
 	annotations := make(map[string]string)

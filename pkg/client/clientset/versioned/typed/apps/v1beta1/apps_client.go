@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Kruise Authors.
+Copyright 2025 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,12 +27,52 @@ import (
 
 type AppsV1beta1Interface interface {
 	RESTClient() rest.Interface
+	AdvancedCronJobsGetter
+	BroadcastJobsGetter
+	CloneSetsGetter
+	DaemonSetsGetter
+	ImageListPullJobsGetter
+	ImagePullJobsGetter
+	NodeImagesGetter
+	SidecarSetsGetter
 	StatefulSetsGetter
 }
 
 // AppsV1beta1Client is used to interact with features provided by the apps.kruise.io group.
 type AppsV1beta1Client struct {
 	restClient rest.Interface
+}
+
+func (c *AppsV1beta1Client) AdvancedCronJobs(namespace string) AdvancedCronJobInterface {
+	return newAdvancedCronJobs(c, namespace)
+}
+
+func (c *AppsV1beta1Client) BroadcastJobs(namespace string) BroadcastJobInterface {
+	return newBroadcastJobs(c, namespace)
+}
+
+func (c *AppsV1beta1Client) CloneSets(namespace string) CloneSetInterface {
+	return newCloneSets(c, namespace)
+}
+
+func (c *AppsV1beta1Client) DaemonSets(namespace string) DaemonSetInterface {
+	return newDaemonSets(c, namespace)
+}
+
+func (c *AppsV1beta1Client) ImageListPullJobs(namespace string) ImageListPullJobInterface {
+	return newImageListPullJobs(c, namespace)
+}
+
+func (c *AppsV1beta1Client) ImagePullJobs(namespace string) ImagePullJobInterface {
+	return newImagePullJobs(c, namespace)
+}
+
+func (c *AppsV1beta1Client) NodeImages() NodeImageInterface {
+	return newNodeImages(c)
+}
+
+func (c *AppsV1beta1Client) SidecarSets() SidecarSetInterface {
+	return newSidecarSets(c)
 }
 
 func (c *AppsV1beta1Client) StatefulSets(namespace string) StatefulSetInterface {

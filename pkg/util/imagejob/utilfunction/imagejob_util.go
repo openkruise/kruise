@@ -27,43 +27,92 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
+// CreateJobForWorkload creates an ImagePullJob for the given workload.
+// This function reads configuration from annotations (v1alpha1 style).
+// For v1beta1 workloads with spec fields, use CreateJobForWorkloadWithStrategy instead.
 func CreateJobForWorkload(c client.Client, owner metav1.Object, gvk schema.GroupVersionKind, name, image string, labels map[string]string, annotations map[string]string, podSelector metav1.LabelSelector, pullSecrets []string) error {
+	// Read from annotations only
 	var pullTimeoutSeconds int32 = 300
-	if str, ok := owner.GetAnnotations()[appsv1alpha1.ImagePreDownloadTimeoutSecondsKey]; ok {
+	if str, ok := owner.GetAnnotations()[appsv1beta1.ImagePreDownloadTimeoutSecondsKey]; ok {
 		if i, err := strconv.ParseInt(str, 10, 32); err == nil {
 			pullTimeoutSeconds = int32(i)
 		}
 	}
 
 	parallelism := intstr.FromInt(1)
-	if str, ok := owner.GetAnnotations()[appsv1alpha1.ImagePreDownloadParallelismKey]; ok {
+	if str, ok := owner.GetAnnotations()[appsv1beta1.ImagePreDownloadParallelismKey]; ok {
 		if i, err := strconv.Atoi(str); err == nil {
 			parallelism = intstr.FromInt(i)
 		}
 	}
 
-	job := &appsv1alpha1.ImagePullJob{
+	job := &appsv1beta1.ImagePullJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       owner.GetNamespace(),
 			Name:            name,
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(owner, gvk)},
 			Labels:          labels,
 		},
-		Spec: appsv1alpha1.ImagePullJobSpec{
+		Spec: appsv1beta1.ImagePullJobSpec{
 			Image: image,
-			ImagePullJobTemplate: appsv1alpha1.ImagePullJobTemplate{
+			ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
 				PullSecrets: pullSecrets,
-				PodSelector: &appsv1alpha1.ImagePullJobPodSelector{LabelSelector: podSelector},
+				PodSelector: &appsv1beta1.ImagePullJobPodSelector{LabelSelector: podSelector},
 				Parallelism: &parallelism,
-				PullPolicy:  &appsv1alpha1.PullPolicy{BackoffLimit: ptr.To[int32](1), TimeoutSeconds: &pullTimeoutSeconds},
-				CompletionPolicy: appsv1alpha1.CompletionPolicy{
-					Type:                    appsv1alpha1.Always,
+				PullPolicy:  &appsv1beta1.PullPolicy{BackoffLimit: ptr.To[int32](1), TimeoutSeconds: &pullTimeoutSeconds},
+				CompletionPolicy: appsv1beta1.CompletionPolicy{
+					Type:                    appsv1beta1.Always,
 					TTLSecondsAfterFinished: ptr.To[int32](600),
 				},
-				SandboxConfig: &appsv1alpha1.SandboxConfig{
+				SandboxConfig: &appsv1beta1.SandboxConfig{
+					Annotations: annotations,
+					Labels:      labels,
+				},
+			},
+		},
+	}
+
+	return c.Create(context.TODO(), job)
+}
+
+// CreateJobForWorkloadWithStrategy creates an ImagePullJob for v1beta1 workloads.
+// This function reads configuration from InPlaceUpdateStrategy spec fields only.
+// It does not read from annotations - use CreateJobForWorkload for annotation-based configuration.
+func CreateJobForWorkloadWithStrategy(c client.Client, owner metav1.Object, gvk schema.GroupVersionKind, name, image string, labels map[string]string, annotations map[string]string, podSelector metav1.LabelSelector, pullSecrets []string, strategy *appspub.InPlaceUpdateStrategy) error {
+	// Read from spec fields only, with defaults if not set
+	var pullTimeoutSeconds int32 = 300
+	if strategy != nil && strategy.ImagePreDownloadTimeoutSeconds != nil {
+		pullTimeoutSeconds = *strategy.ImagePreDownloadTimeoutSeconds
+	}
+
+	parallelism := intstr.FromInt(1)
+	if strategy != nil && strategy.ImagePreDownloadParallelism != nil {
+		parallelism = *strategy.ImagePreDownloadParallelism
+	}
+
+	job := &appsv1beta1.ImagePullJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       owner.GetNamespace(),
+			Name:            name,
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(owner, gvk)},
+			Labels:          labels,
+		},
+		Spec: appsv1beta1.ImagePullJobSpec{
+			Image: image,
+			ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+				PullSecrets: pullSecrets,
+				PodSelector: &appsv1beta1.ImagePullJobPodSelector{LabelSelector: podSelector},
+				Parallelism: &parallelism,
+				PullPolicy:  &appsv1beta1.PullPolicy{BackoffLimit: ptr.To[int32](1), TimeoutSeconds: &pullTimeoutSeconds},
+				CompletionPolicy: appsv1beta1.CompletionPolicy{
+					Type:                    appsv1beta1.Always,
+					TTLSecondsAfterFinished: ptr.To[int32](600),
+				},
+				SandboxConfig: &appsv1beta1.SandboxConfig{
 					Annotations: annotations,
 					Labels:      labels,
 				},
@@ -75,7 +124,7 @@ func CreateJobForWorkload(c client.Client, owner metav1.Object, gvk schema.Group
 }
 
 func DeleteJobsForWorkload(c client.Client, ownerObj metav1.Object) error {
-	jobList := &appsv1alpha1.ImagePullJobList{}
+	jobList := &appsv1beta1.ImagePullJobList{}
 	if err := c.List(context.TODO(), jobList, client.InNamespace(ownerObj.GetNamespace())); err != nil {
 		return err
 	}

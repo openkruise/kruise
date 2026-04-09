@@ -98,7 +98,7 @@ const (
 	PreDownloadImageForDaemonSetUpdate featuregate.Feature = "PreDownloadImageForDaemonSetUpdate"
 
 	// CloneSetEventHandlerOptimization enable optimization for cloneset-controller to reduce the
-	// queuing frequency cased by pod update.
+	// queuing frequency caused by pod update.
 	CloneSetEventHandlerOptimization featuregate.Feature = "CloneSetEventHandlerOptimization"
 
 	// PreparingUpdateAsUpdate enable CloneSet/Advanced StatefulSet controller to regard preparing-update Pod
@@ -114,7 +114,7 @@ const (
 	// DeletionProtectionForCRDCascadingGate enable deletionProtection for crd Cascading
 	DeletionProtectionForCRDCascadingGate featuregate.Feature = "DeletionProtectionForCRDCascadingGate"
 
-	// Enables a enhanced livenessProbe solution
+	// Enables an enhanced livenessProbe solution
 	EnhancedLivenessProbeGate featuregate.Feature = "EnhancedLivenessProbe"
 
 	// RecreatePodWhenChangeVCTInCloneSetGate recreate the pod upon changing volume claim templates in a clone set to ensure PVC consistency.
@@ -150,6 +150,12 @@ const (
 	// Under this feature, kruise will think all legal pod-vertical-scaling actions must success.
 	// PodUnavailableBudget will specifically protect the resize actions of individual Pods.
 	InPlacePodVerticalScaling featuregate.Feature = "InPlacePodVerticalScaling"
+
+	// Changes when the default value of PodSpec.containers[].ports[].hostPort
+	// is assigned.  The default is to only set a default value in Pods.
+	// Enabling this means a default will be assigned even to embeddedPodSpecs
+	// (e.g. in a CloneSet,Advanced DaemonSet), which is the historical default.
+	DefaultHostNetworkHostPortsInPodTemplates featuregate.Feature = "DefaultHostNetworkHostPortsInPodTemplates"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -179,17 +185,18 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	ResourceDistributionGate:              {Default: false, PreRelease: featuregate.Alpha},
 	DeletionProtectionForCRDCascadingGate: {Default: false, PreRelease: featuregate.Alpha},
 
-	EnhancedLivenessProbeGate:                {Default: false, PreRelease: featuregate.Alpha},
-	RecreatePodWhenChangeVCTInCloneSetGate:   {Default: false, PreRelease: featuregate.Alpha},
-	StatefulSetStartOrdinal:                  {Default: false, PreRelease: featuregate.Alpha},
-	PodIndexLabel:                            {Default: true, PreRelease: featuregate.Beta},
-	EnableExternalCerts:                      {Default: false, PreRelease: featuregate.Alpha},
-	StatefulSetAutoResizePVCGate:             {Default: false, PreRelease: featuregate.Alpha},
-	ForceDeleteTimeoutExpectationFeatureGate: {Default: false, PreRelease: featuregate.Alpha},
-	InPlaceWorkloadVerticalScaling:           {Default: false, PreRelease: featuregate.Alpha},
-	EnablePodProbeMarkerOnServerless:         {Default: false, PreRelease: featuregate.Alpha},
-	EnableSortSidecarContainerByName:         {Default: false, PreRelease: featuregate.Alpha},
-	InPlacePodVerticalScaling:                {Default: false, PreRelease: featuregate.Alpha},
+	EnhancedLivenessProbeGate:                 {Default: false, PreRelease: featuregate.Alpha},
+	RecreatePodWhenChangeVCTInCloneSetGate:    {Default: false, PreRelease: featuregate.Alpha},
+	StatefulSetStartOrdinal:                   {Default: false, PreRelease: featuregate.Alpha},
+	PodIndexLabel:                             {Default: true, PreRelease: featuregate.Beta},
+	EnableExternalCerts:                       {Default: false, PreRelease: featuregate.Alpha},
+	StatefulSetAutoResizePVCGate:              {Default: false, PreRelease: featuregate.Alpha},
+	ForceDeleteTimeoutExpectationFeatureGate:  {Default: false, PreRelease: featuregate.Alpha},
+	InPlaceWorkloadVerticalScaling:            {Default: false, PreRelease: featuregate.Alpha},
+	EnablePodProbeMarkerOnServerless:          {Default: false, PreRelease: featuregate.Alpha},
+	EnableSortSidecarContainerByName:          {Default: false, PreRelease: featuregate.Alpha},
+	InPlacePodVerticalScaling:                 {Default: false, PreRelease: featuregate.Alpha},
+	DefaultHostNetworkHostPortsInPodTemplates: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

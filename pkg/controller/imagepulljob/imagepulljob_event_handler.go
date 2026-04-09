@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	kruiseutil "github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -42,14 +42,14 @@ type nodeImageEventHandler struct {
 	client.Reader
 }
 
-var _ handler.TypedEventHandler[*appsv1alpha1.NodeImage, reconcile.Request] = &nodeImageEventHandler{}
+var _ handler.TypedEventHandler[*appsv1beta1.NodeImage, reconcile.Request] = &nodeImageEventHandler{}
 
-func (e *nodeImageEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*appsv1alpha1.NodeImage], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+func (e *nodeImageEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*appsv1beta1.NodeImage], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	obj := evt.Object
 	e.handle(obj, q)
 }
 
-func (e *nodeImageEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1alpha1.NodeImage], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+func (e *nodeImageEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*appsv1beta1.NodeImage], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	obj := evt.ObjectNew
 	oldObj := evt.ObjectOld
 	if obj.DeletionTimestamp != nil {
@@ -59,16 +59,16 @@ func (e *nodeImageEventHandler) Update(ctx context.Context, evt event.TypedUpdat
 	}
 }
 
-func (e *nodeImageEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1alpha1.NodeImage], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+func (e *nodeImageEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1beta1.NodeImage], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	obj := evt.Object
 	resourceVersionExpectations.Delete(obj)
 	e.handle(obj, q)
 }
 
-func (e *nodeImageEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsv1alpha1.NodeImage], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+func (e *nodeImageEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*appsv1beta1.NodeImage], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 }
 
-func (e *nodeImageEventHandler) handle(nodeImage *appsv1alpha1.NodeImage, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+func (e *nodeImageEventHandler) handle(nodeImage *appsv1beta1.NodeImage, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	// Get jobs related to this NodeImage
 	jobs, _, err := utilimagejob.GetActiveJobsForNodeImage(e.Reader, nodeImage, nil)
 	if err != nil {
@@ -79,7 +79,7 @@ func (e *nodeImageEventHandler) handle(nodeImage *appsv1alpha1.NodeImage, q work
 	}
 }
 
-func (e *nodeImageEventHandler) handleUpdate(nodeImage, oldNodeImage *appsv1alpha1.NodeImage, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+func (e *nodeImageEventHandler) handleUpdate(nodeImage, oldNodeImage *appsv1beta1.NodeImage, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	changedImages := sets.NewString()
 	tmpOldNodeImage := oldNodeImage.DeepCopy()
 	for name, imageSpec := range nodeImage.Spec.Images {
@@ -217,10 +217,10 @@ func (e *secretEventHandler) Generic(ctx context.Context, evt event.TypedGeneric
 
 func (e *secretEventHandler) handle(secret *v1.Secret, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	if secret != nil && secret.Namespace == kruiseutil.GetKruiseDaemonConfigNamespace() {
-		jobKeySet := referenceSetFromTarget(secret)
-		klog.V(4).InfoS("Observed Secret created", "secret", klog.KObj(secret), "secretUID", secret.UID, "jobRefs", jobKeySet)
-		for key := range jobKeySet {
-			scaleExpectations.ObserveScale(key.String(), expectations.Create, secret.Labels[SourceSecretUIDLabelKey])
+		jobKeySet := getReferencingJobsFromSecret(secret)
+		klog.V(5).InfoS("Observed Secret created", "secret", klog.KObj(secret), "secretUID", secret.UID, "jobRefs", jobKeySet)
+		for _, ref := range jobKeySet.UnsortedList() {
+			scaleExpectations.ObserveScale(ref.String(), expectations.Create, secret.Name)
 		}
 		return
 	}
@@ -232,6 +232,7 @@ func (e *secretEventHandler) handle(secret *v1.Secret, q workqueue.TypedRateLimi
 	jobKeys, err := e.getActiveJobKeysForSecret(secret)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get jobs for Secret", "secret", klog.KObj(secret))
+		return
 	}
 	for _, jKey := range jobKeys {
 		q.Add(reconcile.Request{NamespacedName: jKey})
@@ -240,9 +241,9 @@ func (e *secretEventHandler) handle(secret *v1.Secret, q workqueue.TypedRateLimi
 
 func (e *secretEventHandler) handleUpdate(secretNew, secretOld *v1.Secret, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	if secretNew != nil && secretNew.Namespace == kruiseutil.GetKruiseDaemonConfigNamespace() {
-		jobKeySet := referenceSetFromTarget(secretNew)
-		for key := range jobKeySet {
-			scaleExpectations.ObserveScale(key.String(), expectations.Create, secretNew.Labels[SourceSecretUIDLabelKey])
+		jobKeySet := getReferencingJobsFromSecret(secretNew)
+		for _, ref := range jobKeySet.UnsortedList() {
+			scaleExpectations.ObserveScale(ref.String(), expectations.Create, secretNew.Name)
 		}
 		return
 	}
@@ -262,7 +263,7 @@ func (e *secretEventHandler) handleUpdate(secretNew, secretOld *v1.Secret, q wor
 }
 
 func (e *secretEventHandler) getActiveJobKeysForSecret(secret *v1.Secret) ([]types.NamespacedName, error) {
-	jobLister := &appsv1alpha1.ImagePullJobList{}
+	jobLister := &appsv1beta1.ImagePullJobList{}
 	if err := e.List(context.TODO(), jobLister, client.InNamespace(secret.Namespace), utilclient.DisableDeepCopy); err != nil {
 		return nil, err
 	}
@@ -273,13 +274,13 @@ func (e *secretEventHandler) getActiveJobKeysForSecret(secret *v1.Secret) ([]typ
 			continue
 		}
 		if jobContainsSecret(job, secret.Name) {
-			jobKeys = append(jobKeys, keyFromObject(job))
+			jobKeys = append(jobKeys, types.NamespacedName{Namespace: job.Namespace, Name: job.Name})
 		}
 	}
 	return jobKeys, nil
 }
 
-func jobContainsSecret(job *appsv1alpha1.ImagePullJob, secretName string) bool {
+func jobContainsSecret(job *appsv1beta1.ImagePullJob, secretName string) bool {
 	for _, s := range job.Spec.PullSecrets {
 		if secretName == s {
 			return true
@@ -288,7 +289,7 @@ func jobContainsSecret(job *appsv1alpha1.ImagePullJob, secretName string) bool {
 	return false
 }
 
-func diffJobs(newJobs, oldJobs []*appsv1alpha1.ImagePullJob) set {
+func diffJobs(newJobs, oldJobs []*appsv1beta1.ImagePullJob) set {
 	setNew := make(set, len(newJobs))
 	setOld := make(set, len(oldJobs))
 	for _, j := range newJobs {

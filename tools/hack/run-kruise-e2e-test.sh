@@ -15,7 +15,7 @@
 
 set -e
 # default value
-FOCUS_DEFAULT='\[apps\] StatefulSet'
+FOCUS_DEFAULT='StatefulSet'
 FOCUS=${FOCUS_DEFAULT}
 SKIP=""
 TIMEOUT="60m"
@@ -67,7 +67,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubeflow/training-operator/re
 
 set +e
 set -x
-GINKGO_CMD="./bin/ginkgo -timeout $TIMEOUT -v"
+GINKGO_CMD="./bin/ginkgo -timeout $TIMEOUT -v --fail-fast"
 if [ "$PARALLEL" = true ]; then
     GINKGO_CMD+=" -p"
 fi

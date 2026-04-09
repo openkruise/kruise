@@ -184,7 +184,7 @@ func newRequirement(key string, op selection.Operator, vals []string) (*labels.R
 	return sel, nil
 }
 
-// IsSelectorLooseOverlap indicates whether selectors overlap (indicates that selector1, selector2 have same key, and there is an certain intersection）
+// IsSelectorLooseOverlap indicates whether selectors overlap (indicates that selector1, selector2 have same key, and there is a certain intersection）
 // 1. when selector1、selector2 don't have same key, it is considered non-overlap, e.g. selector1(a=b) and selector2(c=d)
 // 2. when selector1、selector2 have same key, and matchLabels & matchExps are intersection, it is considered overlap.
 // For examples:

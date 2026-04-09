@@ -225,6 +225,24 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 			},
 			expectErrList: 1,
 		},
+		{
+			name: "test10, invalid ppm",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Probes[0].Name = ""
+				return ppm
+			},
+			expectErrList: 1,
+		},
+		{
+			name: "test11, invalid ppm",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Probes[0].ContainerName = ""
+				return ppm
+			},
+			expectErrList: 1,
+		},
 	}
 
 	decoder := admission.NewDecoder(scheme)
@@ -246,11 +264,9 @@ func TestValidateHandler(t *testing.T) {
 		{Exec: &corev1.ExecAction{Command: []string{"echo"}}},
 		{TCPSocket: &corev1.TCPSocketAction{
 			Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(8000)},
-			Host: "3.3.3.3",
 		}},
 		{TCPSocket: &corev1.TCPSocketAction{
 			Port: intstr.IntOrString{Type: intstr.String, StrVal: "container-port"},
-			Host: "3.3.3.3",
 		}},
 	}
 	for _, h := range successCases {
@@ -264,11 +280,9 @@ func TestValidateHandler(t *testing.T) {
 		{Exec: &corev1.ExecAction{Command: []string{}}},
 		{TCPSocket: &corev1.TCPSocketAction{
 			Port: intstr.IntOrString{Type: intstr.String, StrVal: "container-port-v2"},
-			Host: "3.3.3.3",
 		}},
 		{TCPSocket: &corev1.TCPSocketAction{
 			Port: intstr.IntOrString{Type: intstr.Int, IntVal: -1},
-			Host: "3.3.3.3",
 		}},
 		{HTTPGet: &corev1.HTTPGetAction{Path: "", Port: intstr.FromInt(0), Host: ""}},
 		{HTTPGet: &corev1.HTTPGetAction{Path: "/foo", Port: intstr.FromInt(65536), Host: "host"}},
@@ -277,7 +291,6 @@ func TestValidateHandler(t *testing.T) {
 			Exec: &corev1.ExecAction{Command: []string{}},
 			TCPSocket: &corev1.TCPSocketAction{
 				Port: intstr.IntOrString{Type: intstr.String, StrVal: "container-port-v2"},
-				Host: "3.3.3.3",
 			},
 		},
 		{
@@ -287,7 +300,6 @@ func TestValidateHandler(t *testing.T) {
 		{
 			TCPSocket: &corev1.TCPSocketAction{
 				Port: intstr.IntOrString{Type: intstr.String, StrVal: "container-port-v2"},
-				Host: "3.3.3.3",
 			},
 			HTTPGet: &corev1.HTTPGetAction{Path: "", Port: intstr.FromString(""), Host: ""},
 		},
@@ -295,7 +307,6 @@ func TestValidateHandler(t *testing.T) {
 			Exec: &corev1.ExecAction{Command: []string{}},
 			TCPSocket: &corev1.TCPSocketAction{
 				Port: intstr.IntOrString{Type: intstr.String, StrVal: "container-port-v2"},
-				Host: "3.3.3.3",
 			},
 			HTTPGet: &corev1.HTTPGetAction{Path: "", Port: intstr.FromString(""), Host: ""},
 		},
@@ -447,6 +458,16 @@ func TestValidateTCPSocketAction(t *testing.T) {
 			},
 			fldPath: field.NewPath("field"),
 		},
+		{
+			tcp: &corev1.TCPSocketAction{
+				Port: intstr.IntOrString{
+					Type:   intstr.Int,
+					IntVal: 80,
+				},
+				Host: "127.0.0.1",
+			},
+			fldPath: field.NewPath("field"),
+		},
 	}
 	for _, cs := range errorCases {
 		if getErrs := validateTCPSocketAction(cs.tcp, cs.fldPath); len(getErrs) == 0 {
@@ -549,6 +570,16 @@ func TestValidateHTTPGetAction(t *testing.T) {
 						Value: "value",
 					},
 				},
+			},
+			expectErrs: 1,
+		},
+		{
+			name: "invalid host field",
+			httpGet: &corev1.HTTPGetAction{
+				Host:   "127.0.0.1",
+				Path:   "/healthz",
+				Port:   intstr.FromInt(8080),
+				Scheme: corev1.URISchemeHTTP,
 			},
 			expectErrs: 1,
 		},

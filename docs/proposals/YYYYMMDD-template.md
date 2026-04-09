@@ -156,7 +156,7 @@ considerations for performance, reliability and security.
 - What are some important details that didn't come across above.
 - What are the caveats to the implementation?
 - Go in to as much detail as necessary here.
-- Talk about core concepts and how they releate.
+- Talk about core concepts and how they release.
 
 ### Risks and Mitigations
 

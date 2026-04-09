@@ -15,7 +15,6 @@ import (
 	"k8s.io/client-go/tools/reference"
 	"k8s.io/klog/v2"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
 	"github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
@@ -31,7 +30,7 @@ type imageStatus struct {
 	statusCh chan int
 }
 
-func (f *fakeRuntime) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, sandboxConfig *appsv1alpha1.SandboxConfig) (imageruntime.ImagePullStatusReader, error) {
+func (f *fakeRuntime) PullImage(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, sandboxConfig *appsv1beta1.SandboxConfig) (imageruntime.ImagePullStatusReader, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -146,7 +145,7 @@ func (r *fakeStatusReader) Close() {
 type fakeSecret struct {
 }
 
-func (f *fakeSecret) GetSecrets(secret []appsv1alpha1.ReferenceObject) ([]v1.Secret, error) {
+func (f *fakeSecret) GetSecrets(secret []appsv1beta1.ReferenceObject) ([]v1.Secret, error) {
 	return nil, nil
 }
 
@@ -155,11 +154,11 @@ func realPullerSyncFn(t *testing.T, limitedPool bool) {
 	eventRecorder := record.NewFakeRecorder(100)
 	secretManager := fakeSecret{}
 
-	baseNodeImage := &appsv1alpha1.NodeImage{
-		Spec: appsv1alpha1.NodeImageSpec{
-			Images: map[string]appsv1alpha1.ImageSpec{
+	baseNodeImage := &appsv1beta1.NodeImage{
+		Spec: appsv1beta1.NodeImageSpec{
+			Images: map[string]appsv1beta1.ImageSpec{
 				"nginx": {
-					Tags: []appsv1alpha1.ImageTagSpec{
+					Tags: []appsv1beta1.ImageTagSpec{
 						{Tag: "latest", Version: 1},
 					},
 				},
@@ -170,7 +169,7 @@ func realPullerSyncFn(t *testing.T, limitedPool bool) {
 	testCases := []struct {
 		name        string
 		prePools    map[string]struct{}
-		inputSpec   *appsv1alpha1.NodeImage
+		inputSpec   *appsv1beta1.NodeImage
 		expectPools sets.String
 		expectErr   bool
 	}{
@@ -188,16 +187,16 @@ func realPullerSyncFn(t *testing.T, limitedPool bool) {
 		{
 			name:     "add image",
 			prePools: map[string]struct{}{"nginx": {}},
-			inputSpec: &appsv1alpha1.NodeImage{
-				Spec: appsv1alpha1.NodeImageSpec{
-					Images: map[string]appsv1alpha1.ImageSpec{
+			inputSpec: &appsv1beta1.NodeImage{
+				Spec: appsv1beta1.NodeImageSpec{
+					Images: map[string]appsv1beta1.ImageSpec{
 						"nginx": {
-							Tags: []appsv1alpha1.ImageTagSpec{
+							Tags: []appsv1beta1.ImageTagSpec{
 								{Tag: "latest", Version: 1},
 							},
 						},
 						"busybox": {
-							Tags: []appsv1alpha1.ImageTagSpec{
+							Tags: []appsv1beta1.ImageTagSpec{
 								{Tag: "1.15", Version: 1},
 							},
 						},
@@ -272,7 +271,7 @@ var scheme *runtime.Scheme
 
 func init() {
 	scheme = runtime.NewScheme()
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(policyv1alpha1.AddToScheme(scheme))
 }
@@ -281,21 +280,21 @@ func TestRealPullerSyncWithLimitedPool(t *testing.T) {
 	eventRecorder := record.NewFakeRecorder(100)
 	secretManager := fakeSecret{}
 
-	baseNodeImage := &appsv1alpha1.NodeImage{
-		Spec: appsv1alpha1.NodeImageSpec{
-			Images: map[string]appsv1alpha1.ImageSpec{
+	baseNodeImage := &appsv1beta1.NodeImage{
+		Spec: appsv1beta1.NodeImageSpec{
+			Images: map[string]appsv1beta1.ImageSpec{
 				"nginx": {
-					Tags: []appsv1alpha1.ImageTagSpec{
+					Tags: []appsv1beta1.ImageTagSpec{
 						{Tag: "latest", Version: 1},
 					},
 				},
 				"busybox": {
-					Tags: []appsv1alpha1.ImageTagSpec{
+					Tags: []appsv1beta1.ImageTagSpec{
 						{Tag: "latest", Version: 1},
 					},
 				},
 				"redis": {
-					Tags: []appsv1alpha1.ImageTagSpec{
+					Tags: []appsv1beta1.ImageTagSpec{
 						{Tag: "latest", Version: 1},
 					},
 				},
@@ -322,9 +321,9 @@ func TestRealPullerSyncWithLimitedPool(t *testing.T) {
 				t.Errorf("expect image %s to be running", imageName)
 				continue
 			}
-			if status.Tags[0].Phase == appsv1alpha1.ImagePhasePulling {
+			if status.Tags[0].Phase == appsv1beta1.ImagePhasePulling {
 				running++
-			} else if status.Tags[0].Phase == appsv1alpha1.ImagePhaseWaiting {
+			} else if status.Tags[0].Phase == appsv1beta1.ImagePhaseWaiting {
 				waiting++
 			}
 		}

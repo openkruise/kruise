@@ -17,8 +17,6 @@ limitations under the License.
 package defaults
 
 import (
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	"github.com/openkruise/kruise/apis/apps/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -26,6 +24,10 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 )
 
 const (
@@ -45,10 +47,10 @@ func SetDefaultsSidecarSet(obj *v1alpha1.SidecarSet) {
 		setDefaultSidecarContainer(&obj.Spec.Containers[i], v1alpha1.BeforeAppContainerType)
 	}
 
-	//default setting volumes
+	// default setting volumes
 	SetDefaultPodVolumes(obj.Spec.Volumes)
 
-	//default setting history revision limitation
+	// default setting history revision limitation
 	SetDefaultRevisionHistoryLimit(&obj.Spec.RevisionHistoryLimit)
 
 	// default patchPolicy is 'Retain'
@@ -59,8 +61,28 @@ func SetDefaultsSidecarSet(obj *v1alpha1.SidecarSet) {
 		}
 	}
 
-	//default setting injectRevisionStrategy
+	// default setting injectRevisionStrategy
 	SetDefaultInjectRevision(&obj.Spec.InjectionStrategy)
+}
+
+func SetHashSidecarSet(sidecarset *v1alpha1.SidecarSet) error {
+	if sidecarset.Annotations == nil {
+		sidecarset.Annotations = make(map[string]string)
+	}
+
+	hash, err := sidecarcontrol.SidecarSetHash(sidecarset)
+	if err != nil {
+		return err
+	}
+	sidecarset.Annotations[sidecarcontrol.SidecarSetHashAnnotation] = hash
+
+	hash, err = sidecarcontrol.SidecarSetHashWithoutImage(sidecarset)
+	if err != nil {
+		return err
+	}
+	sidecarset.Annotations[sidecarcontrol.SidecarSetHashWithoutImageAnnotation] = hash
+
+	return nil
 }
 
 func SetDefaultInjectRevision(strategy *v1alpha1.SidecarSetInjectionStrategy) {

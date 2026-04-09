@@ -23,15 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	appspub "github.com/openkruise/kruise/apis/apps/pub"
-	"github.com/openkruise/kruise/pkg/client"
-	"github.com/openkruise/kruise/pkg/features"
-	"github.com/openkruise/kruise/pkg/util"
-	utilcontainerlaunchpriority "github.com/openkruise/kruise/pkg/util/containerlaunchpriority"
-	utilcontainermeta "github.com/openkruise/kruise/pkg/util/containermeta"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	"github.com/openkruise/kruise/pkg/util/volumeclaimtemplate"
-
 	"github.com/appscode/jsonpatch"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -41,6 +32,15 @@ import (
 	"k8s.io/klog/v2"
 	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
+
+	appspub "github.com/openkruise/kruise/apis/apps/pub"
+	"github.com/openkruise/kruise/pkg/client"
+	"github.com/openkruise/kruise/pkg/features"
+	"github.com/openkruise/kruise/pkg/util"
+	utilcontainerlaunchpriority "github.com/openkruise/kruise/pkg/util/containerlaunchpriority"
+	utilcontainermeta "github.com/openkruise/kruise/pkg/util/containermeta"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/volumeclaimtemplate"
 )
 
 func SetOptionsDefaults(opts *UpdateOptions) *UpdateOptions {
