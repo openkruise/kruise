@@ -215,7 +215,7 @@ spec:
 ```yaml
 apiVersion: v1
 kind: ConfigMap
-metedata:
+metadata:
   name: test-sidecarset
   namespace: infra-demo-uat
 spec:
