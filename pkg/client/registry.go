@@ -17,6 +17,9 @@ var (
 	defaultGenericClient *GenericClientset
 
 	curVersion = &version.Info{Major: "1", Minor: "30"}
+
+	resizeSubresourceVersion = semver.New("1.32.0")
+	leadingDigitsRegexp     = regexp.MustCompile(`^(\d+)`)
 )
 
 // NewRegistry creates clientset by client-go
@@ -68,13 +71,7 @@ func ShouldUpdateResourceByResize() bool {
 		return false
 	}
 
-	targetSemver, err := semver.NewVersion("1.32.0")
-	if err != nil {
-		klog.ErrorS(err, "Failed to parse target k8s version")
-		return false
-	}
-
-	return currentSemver.Compare(*targetSemver) >= 0
+	return currentSemver.Compare(*resizeSubresourceVersion) >= 0
 }
 
 func sanitizeVersion(v string) string {
@@ -83,8 +80,7 @@ func sanitizeVersion(v string) string {
 		return "0"
 	}
 
-	re := regexp.MustCompile(`^(\d+)`)
-	matches := re.FindStringSubmatch(v)
+	matches := leadingDigitsRegexp.FindStringSubmatch(v)
 	if len(matches) > 1 {
 		return matches[1]
 	}
