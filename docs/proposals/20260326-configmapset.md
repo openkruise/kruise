@@ -218,8 +218,8 @@ kind: ConfigMap
 metadata:
   name: test-sidecarset
   namespace: infra-demo-uat
-spec:
-  data: |
+data:
+  config: |
    {
      name: logshipper
      image: alpine:latest
