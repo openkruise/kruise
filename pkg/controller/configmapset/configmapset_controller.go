@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"k8s.io/cri-api/pkg/errors"
 	"math"
 	"sort"
 	"strconv"
@@ -33,7 +34,6 @@ import (
 	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,6 +61,13 @@ import (
 func init() {
 	flag.IntVar(&concurrentReconciles, "configmapset-workers", concurrentReconciles, "Max concurrent workers for ConfigMapSet controller.")
 }
+
+var (
+	concurrentReconciles                      = 3
+	controllerKind                            = appsv1alpha1.SchemeGroupVersion.WithKind("ConfigMapSet")
+	resourceVersionExpectations               = expectations.NewResourceVersionExpectation()
+	retryDuration               time.Duration = 15
+)
 
 type RevisionKeys struct {
 	CurrentRevisionKey          string
@@ -96,13 +103,6 @@ const (
 	AnnotationTargetCustomVersionSuffix      = ".customVersion"
 	AnnotationCurrentCustomVersionSuffix     = ".currentCustomVersion"
 	ConfigMapFinalizerName                   = "finalizer.configmapset.kruise.io"
-)
-
-var (
-	concurrentReconciles                      = 3
-	controllerKind                            = appsv1alpha1.SchemeGroupVersion.WithKind("ConfigMapSet")
-	resourceVersionExpectations               = expectations.NewResourceVersionExpectation()
-	retryDuration               time.Duration = 15
 )
 
 // RevisionEntry 定义存储 revisions 的数据结构
@@ -178,11 +178,6 @@ func (r *ReconcileConfigMapSet) Reconcile(ctx context.Context, request reconcile
 	// Fetch the ConfigMapSet instance
 	cms := &appsv1alpha1.ConfigMapSet{}
 	err := r.Get(ctx, request.NamespacedName, cms)
-
-	// 打印日志信息
-	klog.Warningf("start to reconcile ConfigMapSet %s", request.String())
-
-	// 处理删除逻辑
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -190,34 +185,21 @@ func (r *ReconcileConfigMapSet) Reconcile(ctx context.Context, request reconcile
 			// cms 被删除, 不影响存量的pod
 			return reconcile.Result{}, nil
 		}
-		// Error reading the object - requeue the request.
-		klog.Errorf("failed to get ConfigMapSet %s: %v", request.NamespacedName, err)
 		return reconcile.Result{}, err
 	}
 
-	// If resourceVersion expectations have not satisfied yet, just skip this reconcile
-	resourceVersionExpectations.Observe(cms)
-	if isSatisfied, unsatisfiedDuration := resourceVersionExpectations.IsSatisfied(cms); !isSatisfied {
-		if unsatisfiedDuration >= expectations.ExpectationTimeout {
-			klog.Warningf("Expectation unsatisfied overtime for %v, timeout=%v", request.String(), unsatisfiedDuration)
-			return reconcile.Result{}, nil
-		}
-		klog.V(4).Infof("Not satisfied resourceVersion for %v", request.String())
-		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
-	}
-
-	// 如果正在被删除
-	if cms.DeletionTimestamp != nil && !cms.DeletionTimestamp.IsZero() {
+	// handle delete
+	if cms.DeletionTimestamp != nil {
 		if containsString(cms.Finalizers, ConfigMapFinalizerName) {
-			// TODO 清理关联的ConfigMap之前，还需要等待相关联Pod已不再使用cms
+			// 1. check has injected pod exist by webhook
+			// 2. clean configmap-hub
 			if err := r.cleanupConfigMap(ctx, cms); err != nil {
 				return reconcile.Result{}, fmt.Errorf("cleanupConfigMap failed for cms %s/%s: %w", cms.Namespace, cms.Name, err)
 			}
-
-			// 移除 Finalizer，允许 CMS 资源被真正删除
+			// 3. remove finalizer
 			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				latest := &appsv1alpha1.ConfigMapSet{}
-				if err := r.Get(ctx, types.NamespacedName{Name: cms.Name, Namespace: cms.Namespace}, latest); err != nil {
+				if err = r.Get(ctx, types.NamespacedName{Name: cms.Name, Namespace: cms.Namespace}, latest); err != nil {
 					return err
 				}
 				latest.Finalizers = removeString(latest.Finalizers, ConfigMapFinalizerName)
@@ -251,42 +233,8 @@ func (r *ReconcileConfigMapSet) Reconcile(ctx context.Context, request reconcile
 		}
 	}
 
-	hashChangedFlag := false
-
-	// 解决幻读问题
-	if cms.Generation != cms.Status.ObservedGeneration {
-		klog.V(4).Infof("ConfigMapSet %s/%s Generation (%d) != ObservedGeneration (%d), wait for next reconcile",
-			cms.Namespace, cms.Name, cms.Generation, cms.Status.ObservedGeneration)
-		// 不能直接 return nil，需要走后面的 updateStatus 逻辑去更新 ObservedGeneration
-	}
-
-	// 冷启动状态处理
-	// 对spec.containers做hash
-	// 如果和status.lastContainersHash不一致, 说明更新了
-	newContainersHash, err := CalculateHash(cms.Spec.Containers)
-	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to compute spec.containers hash for cms %s/%s: %w", cms.Namespace, cms.Name, err)
-	}
-	if newContainersHash != cms.Status.LastContainersHash { // spec.containers发生了变化
-		hashChangedFlag = true
-		cms.Status.LastContainersHash = newContainersHash
-		cms.Status.LastContainersTimestamp = &metav1.Time{Time: metav1.Now().Time}
-	}
-
-	// 记录spec的修改
-	newSpecHash, err := CalculateHash(cms.Spec)
-	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("failed to compute spec hash for cms %s/%s: %w", cms.Namespace, cms.Name, err)
-	}
-	if newSpecHash != cms.Status.LastSpecHash { // spec发生了变化
-		klog.Warningf("cms spec changed, lastSpecHash: %s, newSpecHash: %s", cms.Status.LastSpecHash, newSpecHash)
-		hashChangedFlag = true
-		cms.Status.LastSpecHash = newSpecHash
-		cms.Status.LastSpecTimestamp = &metav1.Time{Time: metav1.Now().Time}
-	}
-
-	// 版本管理
-	revisionEntry, err := r.manageRevisions(ctx, cms)
+	// manage configmap-hub
+	revisionEntry, err := r.syncRevisions(ctx, cms)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("manageRevisions failed for cms %s/%s: %w", cms.Namespace, cms.Name, err)
 	}
@@ -327,7 +275,7 @@ func (r *ReconcileConfigMapSet) Reconcile(ctx context.Context, request reconcile
 	}
 
 	// 更新状态
-	err = r.updateStatus(ctx, request, cms, hashChangedFlag)
+	err = r.updateStatus(ctx, request, cms, true)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("updateStatus failed for cms %s/%s: %w", cms.Namespace, cms.Name, err)
 	}
@@ -336,17 +284,15 @@ func (r *ReconcileConfigMapSet) Reconcile(ctx context.Context, request reconcile
 }
 
 func (r *ReconcileConfigMapSet) cleanupConfigMap(ctx context.Context, cms *appsv1alpha1.ConfigMapSet) error {
-	cmName := fmt.Sprintf("%s-hub", cms.Name)
+	cmName := fmt.Sprintf("%s-%s", strings.ToLower(cms.Name), "hub")
 	cm := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: cms.Namespace}, cm)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return nil // ConfigMap 已经被删除
+			return nil
 		}
 		return err
 	}
-
-	// 删除 ConfigMap
 	return r.Delete(ctx, cm)
 }
 
@@ -370,16 +316,14 @@ func CalculateHash(v interface{}) (string, error) {
 }
 
 // 版本管理逻辑
-func (r *ReconcileConfigMapSet) manageRevisions(ctx context.Context, cms *appsv1alpha1.ConfigMapSet) ([]RevisionEntry, error) {
-	klog.Infof("Manage revisions for ConfigMapSet %s/%s", cms.Namespace, cms.Name)
-	// 计算当前 Spec 的 Hash
+func (r *ReconcileConfigMapSet) syncRevisions(ctx context.Context, cms *appsv1alpha1.ConfigMapSet) ([]RevisionEntry, error) {
 	hash, err := CalculateHash(cms.Spec.Data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute hash: %v", err)
 	}
 
 	// ConfigMap 命名：cms.Name + "-hub"
-	cmName := fmt.Sprintf("%s-hub", cms.Name)
+	cmName := fmt.Sprintf("%s-%s", strings.ToLower(cms.Name), "hub")
 	cmNamespace := cms.Namespace
 
 	var revisions []RevisionEntry
@@ -411,22 +355,18 @@ func (r *ReconcileConfigMapSet) manageRevisions(ctx context.Context, cms *appsv1
 			}
 		}
 
-		// 检查 Hash 是否已存在
+		// old CustomVersion and old hash
 		for i, rev := range revisions {
 			if rev.Hash == hash {
 				klog.Warningf("Revision %s already exists in ConfigMap %s, skipping update", hash, cmName)
-				// hash允许重复
-				// 但是customVersion不可以同时也重复
 				if rev.CustomVersion == cms.Spec.CustomVersion {
-					// 回滚的场景
-					// 修改re, 但是不更新configmap
 					revisions[i].TimeStamp = &metav1.Time{Time: time.Now()}
 					return nil
 				}
 			}
 		}
 
-		// 插入新的 revision
+		// new CustomVersion and new hash
 		revisions = append(revisions, RevisionEntry{
 			Hash:          hash,
 			TimeStamp:     &metav1.Time{Time: time.Now()},
@@ -548,7 +488,7 @@ func TransformPartition2Distribution(cms *appsv1alpha1.ConfigMapSet, re []Revisi
 			if err != nil || percent < 0 || percent > 100 {
 				return nil, fmt.Errorf("invalid partition percentage: %s", partitionStr)
 			}
-			newReplicas = replicas - int(math.Ceil(float64(percent/100)*float64(replicas)))
+			newReplicas = replicas - int(math.Ceil(float64(percent)/100.0*float64(replicas)))
 		} else if count, err := strconv.Atoi(partitionStr); err == nil && count >= 0 {
 			// 处理整数 partition
 			newReplicas = replicas - count
@@ -755,7 +695,7 @@ func fetchPodsMoreThanReserved(totalPods int32, reservedCount int32, distributio
 
 func fetchPodsLessThanReserved(podsToUpdate []*v1.Pod, totalPods int32, distributionsCopy []Distribution, rmcIndexMap map[string]int, targetRevisions []string, targetCustomVersions []string, revisionToPods map[string][]*v1.Pod) ([]*v1.Pod, []string, []string) {
 	// 这种情况, 我们更新所有pod
-	podsToUpdate = make([]*corev1.Pod, totalPods)
+	podsToUpdate = make([]*corev1.Pod, int(totalPods))
 	// 对distributionsCopy排序
 	// preferred 优先更新
 	// 版本更新的 优先更新
@@ -850,11 +790,6 @@ func (r *ReconcileConfigMapSet) UpdateByDistribution(ctx context.Context, c clie
 		return fmt.Errorf("podsToUpdate(%d) > targetRevisions(%d)", len(updateInfo.PodsToUpdate), len(updateInfo.TargetRevisions)), false
 	}
 
-	klog.Infof("pods to update: ")
-	for _, p := range updateInfo.PodsToUpdate {
-		klog.Infof("%s/%s\t", p.Namespace, p.Name)
-	}
-
 	// 在一轮更新前就计算好最多能更新几个pod
 	var notReadyNum, crrNum int
 	// pods 不包含terminating的, 但是包含新启动的
@@ -885,6 +820,10 @@ func (r *ReconcileConfigMapSet) UpdateByDistribution(ctx context.Context, c clie
 	matchedPods := len(pods)
 	maxUpdateNum := int32(0)
 	maxUnavailable := cms.Spec.UpdateStrategy.MaxUnavailable
+	if maxUnavailable == nil {
+		maxUnavailable = &intstr.IntOrString{Type: intstr.Int, IntVal: 0}
+	}
+
 	if maxUnavailable.Type == intstr.Int {
 		maxUpdateNum = maxUnavailable.IntVal - int32(crrNum) - int32(notReadyNum)
 	} else if maxUnavailable.Type == intstr.String {
@@ -894,15 +833,15 @@ func (r *ReconcileConfigMapSet) UpdateByDistribution(ctx context.Context, c clie
 			percentStr := strings.TrimSuffix(str, "%")
 			percent, err := strconv.ParseFloat(percentStr, 64)
 			if err != nil || percent < 0 || percent > 100 {
-				klog.Errorf("invalid partition percentage: %s", str)
-				return fmt.Errorf("invalid partition percentage: %s", str), false
+				klog.Errorf("invalid maxUnavailable percentage: %s", str)
+				return fmt.Errorf("invalid maxUnavailable percentage: %s", str), false
 			}
 			// 向下取整, 保证不超并发度, 但不能 < 1
 			maxUpdateNum = int32(math.Max(1, math.Floor(float64(matchedPods)*percent/100)))
 			maxUpdateNum = maxUpdateNum - int32(crrNum) - int32(notReadyNum) // 扣除已有的crr
 		} else {
-			klog.Errorf("invalid partition percentage: %s", str)
-			return fmt.Errorf("invalid partition percentage: %s", str), false
+			klog.Errorf("invalid maxUnavailable: %s", str)
+			return fmt.Errorf("invalid maxUnavailable: %s", str), false
 		}
 	}
 
@@ -1154,7 +1093,7 @@ func (r *ReconcileConfigMapSet) HandlePodUpdate(ctx context.Context, c client.Cl
 	// 提交对CRR的创建
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		createErr := c.Create(context.TODO(), crr)
-		if errors.IsAlreadyExists(createErr) {
+		if apierrors.IsAlreadyExists(createErr) {
 			klog.Infof("CRR %s already exists, skipping creation.", crr.Name)
 			return nil // 忽略错误
 		}
@@ -1525,7 +1464,7 @@ func (r *ReconcileConfigMapSet) updateStatus(ctx context.Context, request reconc
 		// 更新 Status 字段
 		latest.Status = cms.Status
 
-		fmt.Println("Before update, RV:", latest.ResourceVersion)
+		klog.Info("Before update, RV:", latest.ResourceVersion)
 
 		// 执行 Status 更新
 		if err := r.Status().Update(context.TODO(), latest); err != nil {

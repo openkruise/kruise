@@ -41,7 +41,7 @@ func containsString(slice []string, str string) bool {
 }
 
 func removeString(slice []string, str string) []string {
-	result := slice[:0]
+	result := make([]string, 0)
 	for _, s := range slice {
 		if s != str {
 			result = append(result, s)
@@ -67,21 +67,23 @@ func GetMatchedPods(ctx context.Context, reader client.Reader, cms *appsv1alpha1
 	}
 	err = reader.List(ctx, podList, opts)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("failed to list pods: %v", err)
 	}
 
 	// 过滤不活跃的pod, 新启动的pod不会被过滤
 	matchedPods := make([]*corev1.Pod, 0)
 	klog.Infof("total pods: %d", len(podList.Items))
-	for i := range podList.Items {
-		pod := &podList.Items[i]
+	for _, pod := range podList.Items {
 		// filter not active Pod if active is true.
-		if !kubecontroller.IsPodActive(pod) {
+		if !kubecontroller.IsPodActive(&pod) {
 			klog.Infof("pod %s/%s is not active, skip", pod.Namespace, pod.Name)
 			klog.Infof("pod %s/%s 's deletion timestamp: %v", pod.Namespace, pod.Name, pod.DeletionTimestamp)
 			continue
 		}
-		matchedPods = append(matchedPods, pod)
+		matchedPods = append(matchedPods, &pod)
 	}
 
 	return matchedPods, nil
@@ -96,7 +98,7 @@ func IsPodReady(pod *corev1.Pod) bool {
 	return false
 }
 
-func GetRelatedConfigMapSets(reader client.Reader, pod *corev1.Pod) ([]*appsv1alpha1.ConfigMapSet, error) {
+func GetMatchConfigMapSets(reader client.Reader, pod *corev1.Pod) ([]*appsv1alpha1.ConfigMapSet, error) {
 	res := make([]*appsv1alpha1.ConfigMapSet, 0)
 
 	// 查询 ConfigMapSet 对象

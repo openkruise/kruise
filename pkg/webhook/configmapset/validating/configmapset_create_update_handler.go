@@ -20,14 +20,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/kubernetes/pkg/controller"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/openkruise/kruise/pkg/controller/configmapset"
-	"github.com/openkruise/kruise/pkg/util"
-	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -36,11 +34,14 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/openkruise/kruise/pkg/controller/configmapset"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 const (
@@ -63,6 +64,20 @@ type ConfigMapSetCreateUpdateHandler struct {
 func (h *ConfigMapSetCreateUpdateHandler) validateConfigMapSetSpec(name, namespace string, spec *appsv1alpha1.ConfigMapSetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
+	if spec == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("spec"), ""))
+		return allErrs
+	}
+	if spec.Selector == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), "selector is required"))
+		return allErrs
+	}
+
+	if spec.Selector.MatchLabels == nil || len(spec.Selector.MatchLabels) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("selector", "matchLabels"), ""))
+		return allErrs
+	}
+
 	// 计算当前 Spec.Data 的 Hash
 	hash, err := configmapset.CalculateHash(spec.Data)
 	if err != nil {
@@ -71,7 +86,7 @@ func (h *ConfigMapSetCreateUpdateHandler) validateConfigMapSetSpec(name, namespa
 	var revisions []configmapset.RevisionEntry
 	// 检查是否已经有相同的revision / customVersion存在
 	// 重新获取最新的 ConfigMap，避免并发冲突
-	cmName := fmt.Sprintf("%s-hub", name)
+	cmName := fmt.Sprintf("%s-%s", strings.ToLower(name), "hub")
 	cmNamespace := namespace
 	cm := &corev1.ConfigMap{}
 	if err := h.Client.Get(context.TODO(), types.NamespacedName{Name: cmName, Namespace: cmNamespace}, cm); err != nil {
@@ -92,18 +107,14 @@ func (h *ConfigMapSetCreateUpdateHandler) validateConfigMapSetSpec(name, namespa
 			}
 		}
 
-		// 检查 Hash 是否已存在
 		for _, rev := range revisions {
-			// 如果已存在的customVersion == 当前customVersion
-			// 但是hash不一样, 拒绝
-			// 反之则允许
+			// hash must same if customVersion same
 			if rev.CustomVersion == spec.CustomVersion && rev.Hash != hash {
 				return append(allErrs, field.Invalid(fldPath.Child("customVersion"), spec.CustomVersion, "configmapset already exists with hash "+rev.Hash+" for customVersion "+spec.CustomVersion))
 			}
 		}
 	}
 	strategy := spec.UpdateStrategy
-
 	if strategy.Partition != nil && !validatePartition(strategy.Partition) {
 		return append(allErrs, field.Invalid(fldPath.Child("updateStrategy"),
 			spec.UpdateStrategy,
@@ -207,24 +218,16 @@ func validateConfigMapSetName(name string, prefix bool) (allErrs []string) {
 var _ admission.Handler = &ConfigMapSetCreateUpdateHandler{}
 
 // Handle handles admission requests.
-func (h *ConfigMapSetCreateUpdateHandler) validateConfigMapSet(configMapSet, oldConfigMapSet *appsv1alpha1.ConfigMapSet) field.ErrorList {
-	allErrs := genericvalidation.ValidateObjectMeta(&configMapSet.ObjectMeta, true, validateConfigMapSetName, field.NewPath("metadata"))
-	//var oldCloneSetSpec *appsv1alpha1.ConfigMapSetSpec
-	if oldConfigMapSet != nil {
-		//oldCloneSetSpec = &oldConfigMapSet.Spec
-	}
-	allErrs = append(allErrs, h.validateConfigMapSetSpec(configMapSet.Name, configMapSet.Namespace, &configMapSet.Spec, field.NewPath("spec"))...)
-	return allErrs
-	//allErrs := apivalidation.ValidateObjectMeta(&configMapSet.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	//
-	//allErrs = append(allErrs, h.validateConfigMapSetSpec(&configMapSet.Spec, oldCloneSetSpec, &configMapSet.ObjectMeta, field.NewPath("spec"))...)
-	//return allErrs
+func (h *ConfigMapSetCreateUpdateHandler) validateConfigMapSet(ctx context.Context, configMapSet *appsv1alpha1.ConfigMapSet) field.ErrorList {
+	metaErrs := genericvalidation.ValidateObjectMeta(&configMapSet.ObjectMeta, true, validateConfigMapSetName, field.NewPath("metadata"))
+	specErrs := h.validateConfigMapSetSpec(configMapSet.Name, configMapSet.Namespace, &configMapSet.Spec, field.NewPath("spec"))
+	return append(metaErrs, specErrs...)
 }
 
 // Handle handles admission requests.
 func (h *ConfigMapSetCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
 	obj := &appsv1alpha1.ConfigMapSet{}
-	oldObj := &appsv1alpha1.CloneSet{}
+	oldObj := &appsv1alpha1.ConfigMapSet{}
 
 	switch req.AdmissionRequest.Operation {
 	case admissionv1.Create, admissionv1.Update:
@@ -232,7 +235,7 @@ func (h *ConfigMapSetCreateUpdateHandler) Handle(ctx context.Context, req admiss
 		if err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
-		if allErrs := h.validateConfigMapSet(obj, nil); len(allErrs) > 0 {
+		if allErrs := h.validateConfigMapSet(ctx, obj); len(allErrs) > 0 {
 			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 		}
 	case admissionv1.Delete:
@@ -243,12 +246,41 @@ func (h *ConfigMapSetCreateUpdateHandler) Handle(ctx context.Context, req admiss
 		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
-		if err := deletionprotection.ValidateWorkloadDeletion(oldObj, oldObj.Spec.Replicas); err != nil {
-			deletionprotection.WorkloadDeletionProtectionMetrics.WithLabelValues(fmt.Sprintf("%s_%s_%s", req.Kind.Kind, oldObj.GetNamespace(), oldObj.GetName()), req.UserInfo.Username).Add(1)
-			util.LoggerProtectionInfo(util.ProtectionEventDeletionProtection, req.Kind.Kind, oldObj.GetNamespace(), oldObj.GetName(), req.UserInfo.Username)
+		err := h.validateDeleteConfigMapSet(ctx, oldObj)
+		if err != nil {
 			return admission.Errored(http.StatusForbidden, err)
 		}
 	}
 
 	return admission.ValidationResponse(true, "")
+}
+
+func (h *ConfigMapSetCreateUpdateHandler) validateDeleteConfigMapSet(ctx context.Context, cms *appsv1alpha1.ConfigMapSet) error {
+	selector := cms.Spec.Selector
+	if selector == nil {
+		return nil
+	}
+	matchLabels := selector.MatchLabels
+	podList := &corev1.PodList{}
+	err := h.Client.List(ctx, podList, client.InNamespace(cms.Namespace), client.MatchingLabels(matchLabels))
+	if err != nil {
+		return err
+	}
+	if len(podList.Items) == 0 {
+		return nil
+	}
+	for _, pod := range podList.Items {
+		if !controller.IsPodActive(&pod) {
+			continue
+		}
+
+		if pod.Annotations == nil {
+			continue
+		}
+
+		if pod.Annotations["apps.kruise.io/configmapset-enabled"] == "true" {
+			return fmt.Errorf("pod %s/%s is still used configmapSet:%s/%s", pod.Namespace, pod.Name, cms.Namespace, cms.Name)
+		}
+	}
+	return nil
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"reflect"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/workqueue"
@@ -13,6 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 // cms事件处理
@@ -80,17 +81,12 @@ func (p *podEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent
 }
 func (p *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	obj := evt.ObjectNew
-	oldObj := evt.ObjectOld
 	// 不处理正在terminating的pod
 	if obj.DeletionTimestamp != nil {
 		klog.Infof("Pod %s/%s is terminating, skip", obj.Namespace, obj.Name)
 		return
 	}
-	if obj.DeletionTimestamp != nil {
-		p.handle(obj, q)
-	} else {
-		p.handleUpdate(obj, oldObj, q)
-	}
+	p.handle(obj, q)
 }
 
 func (p *podEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
@@ -113,7 +109,7 @@ func (p *podEventHandler) handle(pod *v1.Pod, q workqueue.TypedRateLimitingInter
 		klog.Infof("Pod %s/%s has no labels, skip", pod.Namespace, pod.Name)
 		return
 	}
-	cmsList, err := GetRelatedConfigMapSets(p.Reader, pod)
+	cmsList, err := GetMatchConfigMapSets(p.Reader, pod)
 	if err != nil {
 		klog.Errorf("Failed to get ConfigMapSet for Pod %s/%s: %v", pod.Namespace, pod.Name, err)
 		return
