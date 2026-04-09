@@ -2,10 +2,13 @@ package client
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/coreos/go-semver/semver"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -55,5 +58,36 @@ func GetCurrentServerVersion() *version.Info {
 // ShouldUpdateResourceByResize returns whether should update resource by resize
 // The resize sub-resource was introduced in version 1.32, https://github.com/kubernetes/kubernetes/pull/128266
 func ShouldUpdateResourceByResize() bool {
-	return semver.New(fmt.Sprintf("%s.%s.0", curVersion.Major, curVersion.Minor)).Compare(*semver.New("1.32.0")) >= 0
+	major := sanitizeVersion(curVersion.Major)
+	minor := sanitizeVersion(curVersion.Minor)
+
+	versionStr := fmt.Sprintf("%s.%s.0", major, minor)
+	currentSemver, err := semver.NewVersion(versionStr)
+	if err != nil {
+		klog.ErrorS(err, "Failed to parse current k8s version", "version", versionStr, "originalMajor", curVersion.Major, "originalMinor", curVersion.Minor)
+		return false
+	}
+
+	targetSemver, err := semver.NewVersion("1.32.0")
+	if err != nil {
+		klog.ErrorS(err, "Failed to parse target k8s version")
+		return false
+	}
+
+	return currentSemver.Compare(*targetSemver) >= 0
+}
+
+func sanitizeVersion(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return "0"
+	}
+
+	re := regexp.MustCompile(`^(\d+)`)
+	matches := re.FindStringSubmatch(v)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+
+	return "0"
 }
