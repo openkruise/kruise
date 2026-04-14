@@ -20,6 +20,8 @@ package configmapset
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +32,94 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
+
+const (
+	ConfigMapSetAnnotationPrefix                         = "apps.kruise.io/configmapset."
+	ConfigMapSetAnnotationEnabled                        = "apps.kruise.io/configmapset-enabled"
+	ConfigMapSetAnnotationCrr                            = "apps.kruise.io/configmapset-crr"
+	ConfigMapSetAnnotationUpdateRevisionSuffix           = ".updateRevision"
+	ConfigMapSetAnnotationCurrentRevisionSuffix          = ".currentRevision"
+	ConfigMapSetAnnotationUpdateRevisionTimeStampSuffix  = ".updateRevisionTimestamp"
+	ConfigMapSetAnnotationCurrentRevisionTimeStampSuffix = ".currentRevisionTimestamp"
+	ConfigMapSetAnnotationUpdateCustomVersionSuffix      = ".updateCustomVersion"
+	ConfigMapSetAnnotationCurrentCustomVersionSuffix     = ".currentCustomVersion"
+)
+
+func GetConfigMapSetEnabledKey() string {
+	return ConfigMapSetAnnotationEnabled
+}
+
+func GetConfigMapSetCrrKey() string {
+	return ConfigMapSetAnnotationCrr
+}
+
+func GetConfigMapSetUpdateRevisionKey(cmsName string) string {
+	return ConfigMapSetAnnotationPrefix + cmsName + ConfigMapSetAnnotationUpdateRevisionSuffix
+}
+
+func GetConfigMapSetCurrentRevisionKey(cmsName string) string {
+	return ConfigMapSetAnnotationPrefix + cmsName + ConfigMapSetAnnotationCurrentRevisionSuffix
+}
+
+func GetConfigMapSetUpdateRevisionTimeStampKey(cmsName string) string {
+	return ConfigMapSetAnnotationPrefix + cmsName + ConfigMapSetAnnotationUpdateRevisionTimeStampSuffix
+}
+
+func GetConfigMapSetCurrentRevisionTimeStampKey(cmsName string) string {
+	return ConfigMapSetAnnotationPrefix + cmsName + ConfigMapSetAnnotationCurrentRevisionTimeStampSuffix
+}
+
+func GetConfigMapSetUpdateCustomVersionKey(cmsName string) string {
+	return ConfigMapSetAnnotationPrefix + cmsName + ConfigMapSetAnnotationUpdateCustomVersionSuffix
+}
+
+func GetConfigMapSetCurrentCustomVersionKey(cmsName string) string {
+	return ConfigMapSetAnnotationPrefix + cmsName + ConfigMapSetAnnotationCurrentCustomVersionSuffix
+}
+
+func GetConfigMapSetReloadSidecarRestartKey(cmsName string) string {
+	return fmt.Sprintf("apps.kruise.io/configmapset-%s-reload-sidecar-restart", cmsName)
+}
+
+func GetConfigMapSetContainerRestartKey(cmsName, containerName string) string {
+	return fmt.Sprintf("apps.kruise.io/configmapset-%s-%s-restart", cmsName, containerName)
+}
+
+func GetConfigMapSetHubName(cmsName string) string {
+	return fmt.Sprintf("%s-hub", strings.ToLower(cmsName))
+}
+
+func GetConfigMapSetDefaultSidecarName(cmsName string) string {
+	return fmt.Sprintf("%s-reload-sidecar", strings.ToLower(cmsName))
+}
+
+func GetConfigMapSetVolumeName(cmsName string) string {
+	return fmt.Sprintf("%s-empty", strings.ToLower(cmsName))
+}
+
+func GetConfigMapSetEnvRestartAnnotationName(cmsName string) string {
+	return fmt.Sprintf("CMS_%s_RESTART_ANNOTATION", strings.ToUpper(strings.ReplaceAll(cmsName, "-", "_")))
+}
+
+func GetConfigMapSetEnvConfigPathName(cmsName string) string {
+	return fmt.Sprintf("CMS_%s_CONFIG_PATH", strings.ToUpper(strings.ReplaceAll(cmsName, "-", "_")))
+}
+
+func GetConfigMapSetEnvSharePathName(cmsName string) string {
+	return fmt.Sprintf("CMS_%s_SHARE_PATH", strings.ToUpper(strings.ReplaceAll(cmsName, "-", "_")))
+}
+
+func GetConfigMapSetConfigMountPath(cmsName string) string {
+	return fmt.Sprintf("/etc/config/%s", strings.ToLower(cmsName))
+}
+
+func GetConfigMapSetConfigMapMountPath(cmsName string) string {
+	return fmt.Sprintf("/etc/cms/%s", strings.ToLower(cmsName))
+}
+
+func GetConfigMapSetEnvFieldPath(restartKey string) string {
+	return fmt.Sprintf("metadata.annotations['%s']", restartKey)
+}
 
 func containsString(slice []string, str string) bool {
 	for _, s := range slice {

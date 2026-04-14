@@ -18,22 +18,29 @@ package mutating
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"fmt"
+	"math"
+	"net/http"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
 	admissionv1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/fieldpath"
-	"net/http"
-	"sort"
-	"strings"
-
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	"github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/controller/configmapset"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -48,18 +55,11 @@ type RevisionKeys struct {
 	CurrentCustomVersionKey     string
 }
 
-const (
-	//DefaultVMName                     = "configmapset-volume"
+var defaultReloadImage string
 
-	ContainerLaunchPriorityAnnotation                    = "apps.kruise.io/container-launch-priority"
-	ConfigMapSetAnnotationPrefix                         = "apps.kruise.io/configmapset."
-	ConfigMapSetAnnotationTargetRevisionSuffix           = ".revision"
-	ConfigMapSetAnnotationCurrentRevisionSuffix          = ".currentRevision"
-	ConfigMapSetAnnotationTargetRevisionTimeStampSuffix  = ".revisionTimestamp"
-	ConfigMapSetAnnotationCurrentRevisionTimeStampSuffix = ".currentRevisionTimestamp"
-	ConfigMapSetAnnotationTargetCustomVersionSuffix      = ".customVersion"
-	ConfigMapSetAnnotationCurrentCustomVersionSuffix     = ".currentCustomVersion"
-)
+func init() {
+	flag.StringVar(&defaultReloadImage, "default-reload-image", "openkruise/reload-sidecar:v1.0.0", "Default reload sidecar image to use if not explicitly specified in ConfigMapSet.")
+}
 
 // PodCreateHandler handles Pod
 type PodCreateHandler struct {
@@ -108,6 +108,7 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 		changed = true
 	}
 
+	// configMapSetMutatingPod must after sidecarsetMutatingPod
 	if skip, err := h.configMapSetMutatingPod(ctx, req, obj); err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	} else if !skip {
@@ -170,10 +171,15 @@ func (h *PodCreateHandler) Handle(ctx context.Context, req admission.Request) ad
 }
 
 func (h *PodCreateHandler) injectSidecar4Pod(ctx context.Context, pod *corev1.Pod, cms *appsv1alpha1.ConfigMapSet) error {
-	configMapName := fmt.Sprintf("%s-%s", strings.ToLower(cms.Name), "hub")
-	defaultSidecarName := fmt.Sprintf("%s-%s", strings.ToLower(cms.Name), "reload-sidecar")
-	volumeName := fmt.Sprintf("%s-%s-empty", strings.ToLower(cms.Namespace), strings.ToLower(cms.Name))
-	revisionKey := fmt.Sprintf("%s%s%s", ConfigMapSetAnnotationPrefix, cms.Name, ConfigMapSetAnnotationTargetRevisionSuffix)
+	configMapName := configmapset.GetConfigMapSetHubName(cms.Name)
+	defaultSidecarName := configmapset.GetConfigMapSetDefaultSidecarName(cms.Name)
+	volumeName := configmapset.GetConfigMapSetVolumeName(cms.Name)
+	restartKey := configmapset.GetConfigMapSetReloadSidecarRestartKey(cms.Name)
+	envName := configmapset.GetConfigMapSetEnvRestartAnnotationName(cms.Name)
+
+	configMountPath := configmapset.GetConfigMapSetConfigMountPath(cms.Name)
+	configMapMountPath := configmapset.GetConfigMapSetConfigMapMountPath(cms.Name)
+
 	configMapVolume := corev1.Volume{
 		Name: configMapName + "-volume",
 		VolumeSource: corev1.VolumeSource{
@@ -185,70 +191,120 @@ func (h *PodCreateHandler) injectSidecar4Pod(ctx context.Context, pod *corev1.Po
 		},
 	}
 
-	reloadSidecar := corev1.Container{
-		Name: defaultSidecarName,
+	reloadSidecar := &corev1.Container{
+		Name:  defaultSidecarName,
+		Image: defaultReloadImage,
 		VolumeMounts: []corev1.VolumeMount{
-			{Name: volumeName, MountPath: "/etc/config"},
-			{Name: configMapVolume.Name, MountPath: "/etc/cms"},
+			{Name: volumeName, MountPath: configMountPath},
+			{Name: configMapVolume.Name, MountPath: configMapMountPath},
+			{Name: "podinfo", MountPath: "/etc/podinfo"},
 		},
 		Env: []corev1.EnvVar{{
-			Name: "CMS_REVISION",
+			Name: envName,
 			ValueFrom: &corev1.EnvVarSource{ // 可以支持原地升级
 				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: fmt.Sprintf("metadata.annotations['%s']", revisionKey),
+					FieldPath: configmapset.GetConfigMapSetEnvFieldPath(restartKey),
 				},
 			},
+		}, {
+			Name:  configmapset.GetConfigMapSetEnvConfigPathName(cms.Name),
+			Value: configMapMountPath,
+		}, {
+			Name:  configmapset.GetConfigMapSetEnvSharePathName(cms.Name),
+			Value: configMountPath,
 		}},
 	}
 
 	if cms.Spec.ReloadSidecarConfig != nil {
 		if cms.Spec.ReloadSidecarConfig.Type == appsv1alpha1.K8sConfigReloadSidecarType {
 			if cms.Spec.ReloadSidecarConfig.Config != nil {
-				reloadSidecar.Name = cms.Spec.ReloadSidecarConfig.Config.Name
-				reloadSidecar.Image = cms.Spec.ReloadSidecarConfig.Config.Image
+				if cms.Spec.ReloadSidecarConfig.Config.Name != "" {
+					reloadSidecar.Name = cms.Spec.ReloadSidecarConfig.Config.Name
+				}
+				if cms.Spec.ReloadSidecarConfig.Config.Image != "" {
+					reloadSidecar.Image = cms.Spec.ReloadSidecarConfig.Config.Image
+				}
 				if len(cms.Spec.ReloadSidecarConfig.Config.Command) > 0 {
 					reloadSidecar.Command = cms.Spec.ReloadSidecarConfig.Config.Command
 				}
 				if cms.Spec.ReloadSidecarConfig.Config.RestartPolicy != "" {
 					reloadSidecar.RestartPolicy = &cms.Spec.ReloadSidecarConfig.Config.RestartPolicy
 				}
-				// 强制为 Always 的逻辑通常由用户配置，或者这里不覆盖，这里遵循 ConfigMapSet 声明
 			}
 		} else if cms.Spec.ReloadSidecarConfig.Type == appsv1alpha1.CustomerReloadSidecarType {
-			// customer 类型从 ConfigMap 读取
-			// 由于此处为 mutator 阶段，且在 webhook 中读取 configmap 可能会增加耗时，
-			// 若实现需从 webhook Client 尝试 Get ConfigMap 并 Unmarshal 为 Container
-			// 为简化流程或遵循现有设计，这里给出获取 customer sidecar 的占位逻辑
 			if cms.Spec.ReloadSidecarConfig.Config != nil && cms.Spec.ReloadSidecarConfig.Config.ConfigMapRef != nil {
 				cmRef := cms.Spec.ReloadSidecarConfig.Config.ConfigMapRef
 				customerCM := &corev1.ConfigMap{}
-				if err := h.Client.Get(ctx, types.NamespacedName{Name: cmRef.Name, Namespace: cmRef.Namespace}, customerCM); err == nil {
-					// 解析 custom sidecar configuration
-					for _, v := range customerCM.Data {
-						if unmarshalErr := json.Unmarshal([]byte(v), &reloadSidecar); unmarshalErr == nil {
-							break
-						}
-					}
-				} else {
-					klog.Errorf("failed to get customer sidecar configmap %s/%s: %v", cmRef.Namespace, cmRef.Name, err)
+				cmNamespace := cmRef.Namespace
+				if cmNamespace == "" {
+					cmNamespace = cms.Namespace
+				}
+				if err := h.Client.Get(ctx, types.NamespacedName{Name: cmRef.Name, Namespace: cmNamespace}, customerCM); err != nil {
+					klog.Errorf("failed to get customer sidecar configmap %s/%s: %v", cmNamespace, cmRef.Name, err)
 					return err
+				}
+				if _, exists := customerCM.Data["reload-sidecar"]; !exists {
+					klog.Errorf("customer sidecar configmap %s/%s missing key 'reload-sidecar'", cmNamespace, cmRef.Name)
+					return fmt.Errorf("customer sidecar configmap %s/%s missing", cmNamespace, cmRef.Name)
+				}
+				if unmarshalErr := json.Unmarshal([]byte(customerCM.Data["reload-sidecar"]), &reloadSidecar); unmarshalErr != nil {
+					klog.Errorf("failed to unmarshal customer sidecar configmap %s/%s data 'reload-sidecar': %v", cmNamespace, cmRef.Name, unmarshalErr)
+					return unmarshalErr
 				}
 			}
 		} else if cms.Spec.ReloadSidecarConfig.Type == appsv1alpha1.SidecarSetReloadSidecarType {
-			// 引用 SidecarSet 对象，由 SidecarSet 负责注入和管理，ConfigMapSet webhook 中不进行注入
-			klog.Infof("pod %s/%s will be injected by SidecarSet, skip sidecar injection in ConfigMapSet webhook", pod.Namespace, pod.Name)
-			return nil
-		}
-	}
+			klog.Infof("pod %s/%s will be injected by SidecarSet, skip full sidecar injection in ConfigMapSet webhook, just merge VolumeMounts and Env", pod.Namespace, pod.Name)
 
-	if reloadSidecar.Image == "" {
-		reloadSidecar.Image = "hub.bilibili.co/infra-caster/kratos-demo-wuhao18:reload-sidecar"
+			// find reload-sidecar in Pod（Because already injected by sidecarSet）
+			targetSidecarName := cms.Spec.ReloadSidecarConfig.Config.SidecarSetRef.ContainerName
+			var container *corev1.Container
+			for _, c := range pod.Spec.Containers {
+				if c.Name == targetSidecarName {
+					container = c.DeepCopy()
+					break
+				}
+			}
+			if container == nil {
+				klog.Errorf("target container %s not found", targetSidecarName)
+				return fmt.Errorf("target container %s not found", targetSidecarName)
+			}
+
+			// Merge VolumeMounts
+			for _, newMount := range reloadSidecar.VolumeMounts {
+				mountExists := false
+				for _, existingMount := range container.VolumeMounts {
+					if existingMount.Name == newMount.Name || existingMount.MountPath == newMount.MountPath {
+						mountExists = true
+						break
+					}
+				}
+				if !mountExists {
+					container.VolumeMounts = append(container.VolumeMounts, newMount)
+				}
+			}
+
+			// Merge Env
+			for _, newEnv := range reloadSidecar.Env {
+				envExists := false
+				for j, existingEnv := range container.Env {
+					if existingEnv.Name == newEnv.Name {
+						container.Env[j] = newEnv
+						envExists = true
+						break
+					}
+				}
+				if !envExists {
+					container.Env = append(container.Env, newEnv)
+				}
+			}
+			reloadSidecar = container
+		}
 	}
 
 	// 查找是否已有相同的 Sidecar 容器
 	containerExistingIdx := -1
 	for i, c := range pod.Spec.Containers {
-		if c.Name == defaultSidecarName {
+		if c.Name == reloadSidecar.Name {
 			containerExistingIdx = i
 			break
 		}
@@ -256,12 +312,16 @@ func (h *PodCreateHandler) injectSidecar4Pod(ctx context.Context, pod *corev1.Po
 
 	// replace reload-sidecar if exist
 	if containerExistingIdx != -1 {
-		pod.Spec.Containers[containerExistingIdx] = reloadSidecar
+		pod.Spec.Containers[containerExistingIdx] = *reloadSidecar
 	} else {
-		pod.Annotations[ContainerLaunchPriorityAnnotation] = "Ordered"
-		pod.Spec.Containers = append([]corev1.Container{reloadSidecar}, pod.Spec.Containers...)
+		pod.Annotations[pub.ContainerLaunchPriorityKey] = pub.ContainerLaunchOrdered
+		pod.Spec.Containers = append([]corev1.Container{*reloadSidecar}, pod.Spec.Containers...)
 	}
 
+	return h.injectVolumes(pod, configMapVolume)
+}
+
+func (h *PodCreateHandler) injectVolumes(pod *corev1.Pod, configMapVolume corev1.Volume) error {
 	// 避免重复添加volume
 	volumeExistingIdx := -1
 	for i, vol := range pod.Spec.Volumes {
@@ -275,11 +335,41 @@ func (h *PodCreateHandler) injectSidecar4Pod(ctx context.Context, pod *corev1.Po
 	} else {
 		pod.Spec.Volumes = append(pod.Spec.Volumes, configMapVolume)
 	}
+
+	podInfoVolume := corev1.Volume{
+		Name: "podinfo",
+		VolumeSource: corev1.VolumeSource{
+			DownwardAPI: &corev1.DownwardAPIVolumeSource{
+				Items: []corev1.DownwardAPIVolumeFile{
+					{
+						Path: "annotations",
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: "metadata.annotations",
+						},
+					},
+				},
+			},
+		},
+	}
+	podInfoVolumeExistingIdx := -1
+	for i, vol := range pod.Spec.Volumes {
+		if vol.Name == podInfoVolume.Name {
+			podInfoVolumeExistingIdx = i
+			break
+		}
+	}
+	if podInfoVolumeExistingIdx != -1 {
+		pod.Spec.Volumes[podInfoVolumeExistingIdx] = podInfoVolume
+	} else {
+		pod.Spec.Volumes = append(pod.Spec.Volumes, podInfoVolume)
+	}
+
 	return nil
 }
 
 func (h *PodCreateHandler) injectEmptyDir4Pod(pod *corev1.Pod, cms *appsv1alpha1.ConfigMapSet) error {
-	volumeName := fmt.Sprintf("%s-%s-empty", strings.ToLower(cms.Namespace), strings.ToLower(cms.Name))
+	volumeName := configmapset.GetConfigMapSetVolumeName(cms.Name)
+
 	volume := corev1.Volume{
 		Name: volumeName,
 		VolumeSource: corev1.VolumeSource{
@@ -301,44 +391,56 @@ func (h *PodCreateHandler) injectEmptyDir4Pod(pod *corev1.Pod, cms *appsv1alpha1
 	}
 
 	for _, injectC := range cms.Spec.Containers {
-		for _, c := range pod.Spec.Containers {
-			if injectC.NameFrom == nil {
-				// inject from static conf
-				if injectC.Name == c.Name {
-					h.applyVM4Container(&c, injectC, volume.Name)
-					break
-				}
-			} else {
-				// inject from metadata
-				path, subscript, ok := fieldpath.SplitMaybeSubscriptedPath(injectC.NameFrom.FieldRef.FieldPath)
-				if !ok {
-					return fmt.Errorf("prase fieldPath failed with:%s", injectC.NameFrom.FieldRef.FieldPath)
-				}
-
-				annotations := pod.GetAnnotations()
-				labels := pod.GetLabels()
-				var cName string
-				switch path {
-				case "metadata.annotations":
-					if annotations != nil {
-						cName = annotations[subscript]
-					}
-				case "metadata.labels":
-					if labels != nil {
-						cName = labels[subscript]
-					}
-				}
-				if cName != "" && cName == c.Name {
-					h.applyVM4Container(&c, injectC, volume.Name)
-					break
-				}
+		containerName := configmapset.GetContainerName(pod, injectC)
+		for i, c := range pod.Spec.Containers {
+			if containerName == c.Name {
+				h.applyVM4Container(pod, &c, injectC, volume.Name, cms)
+				pod.Spec.Containers[i] = c
+				break
 			}
 		}
 	}
 	return nil
 }
 
-func (h *PodCreateHandler) applyVM4Container(c *corev1.Container, v appsv1alpha1.ContainerInjectSpec, volumeName string) {
+func (h *PodCreateHandler) applyVM4Container(pod *corev1.Pod, c *corev1.Container, v appsv1alpha1.ContainerInjectSpec, volumeName string, cms *appsv1alpha1.ConfigMapSet) {
+	// 为业务容器注入用于重启的环境变量，每个容器使用独立的 Annotation Key
+	restartAnnotationKey := configmapset.GetConfigMapSetContainerRestartKey(cms.Name, c.Name)
+	targetRevisionKey := configmapset.GetConfigMapSetUpdateRevisionKey(cms.Name)
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+	if pod.Annotations[restartAnnotationKey] == "" {
+		// 初始化时使用 md5(pod.Name + "0")，与 Controller 逻辑保持结构一致
+		// 由于 mutating 阶段 Pod Name 可能还未分配（例如通过 GenerateName 创建），如果为空则使用固定值或 "0" 的 md5
+		podNameForHash := pod.Name
+		if podNameForHash == "" {
+			podNameForHash = "unnamed"
+		}
+		hashBytes := md5.Sum([]byte(podNameForHash + pod.Annotations[targetRevisionKey]))
+		hashStr := hex.EncodeToString(hashBytes[:])
+		pod.Annotations[restartAnnotationKey] = hashStr
+	}
+
+	envName := configmapset.GetConfigMapSetEnvRestartAnnotationName(cms.Name)
+	envFound := false
+	for _, env := range c.Env {
+		if env.Name == envName {
+			envFound = true
+			break
+		}
+	}
+	if !envFound {
+		c.Env = append(c.Env, corev1.EnvVar{
+			Name: envName,
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: configmapset.GetConfigMapSetEnvFieldPath(restartAnnotationKey),
+				},
+			},
+		})
+	}
+
 	// 检查c里面是否已经有同名的volumeMount了
 	for i := range c.VolumeMounts {
 		if c.VolumeMounts[i].Name == volumeName {
@@ -362,12 +464,12 @@ func (h *PodCreateHandler) configMapSetMutatingPod(ctx context.Context, req admi
 		return true, nil
 	}
 
-	if pod.Annotations == nil {
+	if !sidecarcontrol.IsActivePod(pod) {
 		return true, nil
 	}
 
-	// no need inject
-	if pod.Annotations["apps.kruise.io/configmapset-enabled"] != "true" {
+	// no need inject with configMapSet
+	if pod.Annotations == nil || pod.Annotations[configmapset.GetConfigMapSetEnabledKey()] != "true" {
 		return true, nil
 	}
 
@@ -387,6 +489,13 @@ func (h *PodCreateHandler) configMapSetMutatingPod(ctx context.Context, req admi
 		return cmsList[i].Name < cmsList[j].Name
 	})
 	for _, cms := range cmsList {
+		// 处理创建时的版本注解
+		err = h.handlePodRevisionAnnotations(ctx, pod, cms)
+		if err != nil {
+			klog.Errorf("handle revision annotations for pod %s/%s failed, error : %v", pod.Namespace, pod.Name, err)
+			return false, fmt.Errorf("handle revision annotations for pod %s/%s failed, error : %v", pod.Namespace, pod.Name, err)
+		}
+
 		// 注入 emptyDir
 		klog.Infof("inject emptyDir for pod %s/%s", pod.Namespace, pod.Name)
 		err = h.injectEmptyDir4Pod(pod, cms)
@@ -409,4 +518,130 @@ func (h *PodCreateHandler) configMapSetMutatingPod(ctx context.Context, req admi
 	}
 
 	return false, nil
+}
+
+func (h *PodCreateHandler) handlePodRevisionAnnotations(ctx context.Context, pod *corev1.Pod, cms *appsv1alpha1.ConfigMapSet) error {
+	updateRevision, err := configmapset.CalculateHash(cms.Spec.Data)
+	if err != nil {
+		return fmt.Errorf("failed to compute hash for cms %s/%s: %w", cms.Namespace, cms.Name, err)
+	}
+
+	targetRevisionKey := configmapset.GetConfigMapSetUpdateRevisionKey(cms.Name)
+	currentRevisionKey := configmapset.GetConfigMapSetCurrentRevisionKey(cms.Name)
+	targetCustomVersionKey := configmapset.GetConfigMapSetUpdateCustomVersionKey(cms.Name)
+	currentCustomVersionKey := configmapset.GetConfigMapSetCurrentCustomVersionKey(cms.Name)
+	currentRevisionTimestampKey := configmapset.GetConfigMapSetCurrentRevisionTimeStampKey(cms.Name)
+	updateRevisionTimestampKey := configmapset.GetConfigMapSetUpdateRevisionTimeStampKey(cms.Name)
+	restartKey := configmapset.GetConfigMapSetReloadSidecarRestartKey(cms.Name)
+
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
+
+	// Get related pods to calculate partition correctly
+	pods, err := configmapset.GetMatchedPods(ctx, h.Client, cms)
+	if err != nil {
+		return err
+	}
+
+	// Determine if the pod should use the new version or old version based on partition
+	shouldUseNewVersion := true
+
+	if cms.Spec.UpdateStrategy.Partition != nil {
+		// Only consider pods matching the same MatchLabelKeys if specified
+		var groupPods []*corev1.Pod
+		if len(cms.Spec.UpdateStrategy.MatchLabelKeys) == 0 {
+			groupPods = pods
+		} else {
+			isMatch := true
+			for _, key := range cms.Spec.UpdateStrategy.MatchLabelKeys {
+				if pod.Labels[key] != "" {
+					// We only need to check if existing pods match this pod's label values
+					for _, p := range pods {
+						if p.Labels[key] == pod.Labels[key] {
+							groupPods = append(groupPods, p)
+						}
+					}
+				} else {
+					isMatch = false
+					break
+				}
+			}
+			if !isMatch {
+				groupPods = pods // fallback to all pods if no labels to match
+			}
+		}
+
+		// Calculate how many pods should be updated based on partition
+		expectedUpdatedCount := len(groupPods) // Default: all pods in group
+		partitionStr := cms.Spec.UpdateStrategy.Partition.String()
+		if strings.HasSuffix(partitionStr, "%") {
+			percentStr := strings.TrimSuffix(partitionStr, "%")
+			if percent, err := strconv.Atoi(percentStr); err == nil && percent >= 0 && percent <= 100 {
+				// newReplicas = replicas - partition
+				expectedUpdatedCount = len(groupPods) - int(math.Ceil(float64(percent)/100.0*float64(len(groupPods))))
+			}
+		} else if count, err := strconv.Atoi(partitionStr); err == nil && count >= 0 {
+			expectedUpdatedCount = len(groupPods) - count
+			if expectedUpdatedCount < 0 {
+				expectedUpdatedCount = 0
+			}
+		}
+
+		// Count how many pods in this group are already at the new version
+		currentUpdatedCount := 0
+		for _, p := range groupPods {
+			if p.Annotations[targetRevisionKey] == updateRevision {
+				currentUpdatedCount++
+			}
+		}
+
+		// If we've already reached the target number of updated pods, this new pod should get the old version
+		if currentUpdatedCount >= expectedUpdatedCount {
+			shouldUseNewVersion = false
+		}
+	}
+
+	now := time.Now().Format("2006-01-02 15:04:05")
+	if shouldUseNewVersion {
+		pod.Annotations[targetRevisionKey] = updateRevision
+		pod.Annotations[currentRevisionKey] = updateRevision
+		pod.Annotations[targetCustomVersionKey] = cms.Spec.CustomVersion
+		pod.Annotations[currentCustomVersionKey] = cms.Spec.CustomVersion
+
+		pod.Annotations[currentRevisionTimestampKey] = now
+		pod.Annotations[updateRevisionTimestampKey] = now
+
+	} else if cms.Status.CurrentRevision != "" {
+		pod.Annotations[targetRevisionKey] = cms.Status.CurrentRevision
+		pod.Annotations[currentRevisionKey] = cms.Status.CurrentRevision
+		pod.Annotations[targetCustomVersionKey] = cms.Status.CurrentCustomVersion
+		pod.Annotations[currentCustomVersionKey] = cms.Status.CurrentCustomVersion
+
+		pod.Annotations[currentRevisionTimestampKey] = now
+		pod.Annotations[updateRevisionTimestampKey] = now
+
+	} else {
+		// If there is no current revision (first rollout), force new version regardless of partition
+		pod.Annotations[targetRevisionKey] = updateRevision
+		pod.Annotations[currentRevisionKey] = updateRevision
+		pod.Annotations[targetCustomVersionKey] = cms.Spec.CustomVersion
+		pod.Annotations[currentCustomVersionKey] = cms.Spec.CustomVersion
+		pod.Annotations[currentRevisionTimestampKey] = now
+		pod.Annotations[updateRevisionTimestampKey] = now
+	}
+
+	if pod.Annotations[restartKey] == "" {
+		// 初始化时使用 md5(pod.Name + "0")，与 Controller 逻辑保持结构一致
+		// 由于 mutating 阶段 Pod Name 可能还未分配（例如通过 GenerateName 创建），如果为空则使用固定值或 "0" 的 md5
+		podNameForHash := pod.Name
+		if podNameForHash == "" {
+			podNameForHash = "unnamed"
+		}
+		hashBytes := md5.Sum([]byte(podNameForHash + pod.Annotations[targetRevisionKey]))
+		hashStr := hex.EncodeToString(hashBytes[:])
+		pod.Annotations[restartKey] = hashStr
+	}
+
+	return nil
 }

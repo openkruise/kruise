@@ -118,6 +118,76 @@ spec:
                             type: array
                             x-kubernetes-list-type: atomic
                         type: object
+                      httpGet:
+                        description: HTTPGetAction describes an action based on HTTP
+                          Get requests.
+                        properties:
+                          host:
+                            description: |-
+                              Host name to connect to, defaults to the pod IP. You probably want to set
+                              "Host" in httpHeaders instead.
+                            type: string
+                          httpHeaders:
+                            description: Custom headers to set in the request. HTTP
+                              allows repeated headers.
+                            items:
+                              description: HTTPHeader describes a custom header to
+                                be used in HTTP probes
+                              properties:
+                                name:
+                                  description: |-
+                                    The header field name.
+                                    This will be canonicalized upon output, so case-variant names will be understood as the same header.
+                                  type: string
+                                value:
+                                  description: The header field value
+                                  type: string
+                              required:
+                              - name
+                              - value
+                              type: object
+                            type: array
+                            x-kubernetes-list-type: atomic
+                          path:
+                            description: Path to access on the HTTP server.
+                            type: string
+                          port:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: |-
+                              Name or number of the port to access on the container.
+                              Number must be in the range 1 to 65535.
+                              Name must be an IANA_SVC_NAME.
+                            x-kubernetes-int-or-string: true
+                          scheme:
+                            description: |-
+                              Scheme to use for connecting to the host.
+                              Defaults to HTTP.
+                            type: string
+                        required:
+                        - port
+                        type: object
+                      tcpSocket:
+                        description: TCPSocketAction describes an action based on
+                          opening a socket
+                        properties:
+                          host:
+                            description: 'Optional: Host name to connect to, defaults
+                              to the pod IP.'
+                            type: string
+                          port:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: |-
+                              Number or name of the port to access on the container.
+                              Number must be in the range 1 to 65535.
+                              Name must be an IANA_SVC_NAME.
+                            x-kubernetes-int-or-string: true
+                        required:
+                        - port
+                        type: object
                     type: object
                   type:
                     description: EffectPolicyType 定义配置生效方式
@@ -194,12 +264,9 @@ spec:
                             type: string
                           name:
                             type: string
-                          namespace:
-                            type: string
                         required:
                         - containerName
                         - name
-                        - namespace
                         type: object
                     type: object
                   type:
@@ -261,6 +328,12 @@ spec:
               updateStrategy:
                 description: UpdateStrategy 指定更新策略, 详见结构体定义
                 properties:
+                  matchLabelKeys:
+                    description: MatchLabelKeys is a set of pod label keys to select
+                      the pods over which rolling update logic will be applied.
+                    items:
+                      type: string
+                    type: array
                   maxUnavailable:
                     anyOf:
                     - type: integer

@@ -19,15 +19,16 @@ package mutating
 import (
 	"context"
 	"encoding/json"
-	"github.com/openkruise/kruise/apis/apps/defaults"
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/util"
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	"net/http"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/openkruise/kruise/apis/apps/defaults"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 // ConfigMapSetCreateUpdateHandler handles ConfigMapSet
@@ -46,14 +47,14 @@ func (h *ConfigMapSetCreateUpdateHandler) Handle(ctx context.Context, req admiss
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	var copy runtime.Object = obj.DeepCopy()
+	var copyObj runtime.Object = obj.DeepCopy()
 	switch req.AdmissionRequest.Operation {
 	case admissionv1.Create, admissionv1.Update:
 		klog.Infof("setting default for configmapset %s/%s", obj.Namespace, obj.Name)
 		defaults.SetDefaultsConfigMapSet(obj)
 	}
 	klog.V(4).Infof("configmapset after mutating: %v", util.DumpJSON(obj))
-	if reflect.DeepEqual(obj, copy) {
+	if reflect.DeepEqual(obj, copyObj) {
 		return admission.Allowed("")
 	}
 	marshalled, err := json.Marshal(obj)

@@ -49,11 +49,11 @@ type ReloadSidecarType string
 
 const (
 	// K8sConfigReloadSidecarType 直接在ConfigMapSet中配置
-	K8sConfigReloadSidecarType ReloadSidecarType = "k8s-config"
+	K8sConfigReloadSidecarType ReloadSidecarType = "k8s"
 	// SidecarSetReloadSidecarType 引用外部的SidecarSet
-	SidecarSetReloadSidecarType ReloadSidecarType = "SidecarSet"
+	SidecarSetReloadSidecarType ReloadSidecarType = "sidecarset"
 	// CustomerReloadSidecarType 引用自定义ConfigMap
-	CustomerReloadSidecarType ReloadSidecarType = "customer"
+	CustomerReloadSidecarType ReloadSidecarType = "custom"
 )
 
 type ReloadSidecarConfig struct {
@@ -83,7 +83,6 @@ type ReloadSidecarReference struct {
 }
 
 type SidecarSetReference struct {
-	Namespace     string `json:"namespace"`
 	Name          string `json:"name"`
 	ContainerName string `json:"containerName"`
 }
@@ -106,9 +105,16 @@ type EffectPolicy struct {
 type PostHookConfig struct {
 	// +optional
 	Exec *corev1.ExecAction `json:"exec,omitempty"`
+	// +optional
+	HTTPGet *corev1.HTTPGetAction `json:"httpGet,omitempty"`
+	// +optional
+	TCPSocket *corev1.TCPSocketAction `json:"tcpSocket,omitempty"`
 }
 
 type ConfigMapSetUpdateStrategy struct {
+	// MatchLabelKeys is a set of pod label keys to select the pods over which rolling update logic will be applied.
+	// +optional
+	MatchLabelKeys []string `json:"matchLabelKeys,omitempty"`
 	// +optional
 	Partition *intstr.IntOrString `json:"partition,omitempty"` // 旧版本的比例
 	// +optional

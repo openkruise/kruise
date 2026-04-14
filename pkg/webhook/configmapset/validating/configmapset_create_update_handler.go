@@ -20,15 +20,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/kubernetes/pkg/controller"
 	"net/http"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"k8s.io/kubernetes/pkg/controller"
+
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
@@ -40,6 +44,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/openkruise/kruise/pkg/controller/configmapset"
+	"github.com/openkruise/kruise/pkg/util"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
@@ -61,70 +66,82 @@ type ConfigMapSetCreateUpdateHandler struct {
 	Decoder admission.Decoder
 }
 
-func (h *ConfigMapSetCreateUpdateHandler) validateConfigMapSetSpec(name, namespace string, spec *appsv1alpha1.ConfigMapSetSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-
+func (h *ConfigMapSetCreateUpdateHandler) validateConfigMapSetSpec(ctx context.Context, name, namespace string, spec *appsv1alpha1.ConfigMapSetSpec, fldPath *field.Path) *field.Error {
 	if spec == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("spec"), ""))
-		return allErrs
+		return field.Required(fldPath.Child("spec"), "")
 	}
 	if spec.Selector == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("selector"), "selector is required"))
-		return allErrs
+		return field.Required(fldPath.Child("selector"), "selector is required")
 	}
 
 	if spec.Selector.MatchLabels == nil || len(spec.Selector.MatchLabels) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("selector", "matchLabels"), ""))
-		return allErrs
+		return field.Required(fldPath.Child("selector", "matchLabels"), "")
+	}
+
+	if len(spec.UpdateStrategy.MatchLabelKeys) > 0 {
+		for _, key := range spec.UpdateStrategy.MatchLabelKeys {
+			if _, exists := spec.Selector.MatchLabels[key]; exists {
+				return field.Invalid(fldPath.Child("updateStrategy", "matchLabelKeys"), spec.UpdateStrategy.MatchLabelKeys, fmt.Sprintf("matchLabelKeys cannot intersect with selector matchLabels, conflict key: %s", key))
+			}
+		}
+	}
+
+	containerNames := make(map[string]struct{})
+	for i, c := range spec.Containers {
+		if c.Name != "" {
+			if _, exists := containerNames[c.Name]; exists {
+				return field.Duplicate(fldPath.Child("containers").Index(i).Child("name"), c.Name)
+			}
+			containerNames[c.Name] = struct{}{}
+		}
 	}
 
 	// 计算当前 Spec.Data 的 Hash
 	hash, err := configmapset.CalculateHash(spec.Data)
 	if err != nil {
-		return append(allErrs, field.InternalError(fldPath.Child("data"), fmt.Errorf("failed to compute hash: %v", err)))
+		return field.InternalError(fldPath.Child("data"), fmt.Errorf("failed to compute hash: %v", err))
 	}
-	var revisions []configmapset.RevisionEntry
 	// 检查是否已经有相同的revision / customVersion存在
 	// 重新获取最新的 ConfigMap，避免并发冲突
 	cmName := fmt.Sprintf("%s-%s", strings.ToLower(name), "hub")
 	cmNamespace := namespace
 	cm := &corev1.ConfigMap{}
-	if err := h.Client.Get(context.TODO(), types.NamespacedName{Name: cmName, Namespace: cmNamespace}, cm); err != nil {
-		if errors.IsNotFound(err) {
-			// 如果 ConfigMap 不存在，不用判断历史版本
-			// do nothing
-		} else {
-			return append(allErrs, field.InternalError(fldPath.Child("data"), fmt.Errorf("failed to get ConfigMap: %v", err)))
+	if err = h.Client.Get(context.TODO(), types.NamespacedName{Name: cmName, Namespace: cmNamespace}, cm); err != nil {
+		if !errors.IsNotFound(err) {
+			return field.InternalError(fldPath.Child("data"), fmt.Errorf("failed to get ConfigMap: %v", err))
 		}
-	} else {
-		// error == nil
-		// 解析现有 ConfigMap 的 revisions
+		cm = nil
+	}
+
+	if cm != nil {
+		var revisions []configmapset.RevisionEntry
 		if revData, exists := cm.Data["revisions"]; exists {
 			if err := json.Unmarshal([]byte(revData), &revisions); err != nil {
 				klog.Errorf("Failed to unmarshal revisions from ConfigMap %s: %v, resetting revisions", cmName, err)
 				//revisions = []RevisionEntry{} // 解析失败时重置 ?
-				return append(allErrs, field.InternalError(fldPath.Child("data"), fmt.Errorf("failed to unmarshal revisions from ConfigMap: %v", err)))
+				return field.InternalError(fldPath.Child("data"), fmt.Errorf("failed to unmarshal revisions from ConfigMap: %v", err))
 			}
 		}
 
 		for _, rev := range revisions {
 			// hash must same if customVersion same
 			if rev.CustomVersion == spec.CustomVersion && rev.Hash != hash {
-				return append(allErrs, field.Invalid(fldPath.Child("customVersion"), spec.CustomVersion, "configmapset already exists with hash "+rev.Hash+" for customVersion "+spec.CustomVersion))
+				return field.Invalid(fldPath.Child("customVersion"), spec.CustomVersion, "configmapset already exists with hash "+rev.Hash+" for customVersion "+spec.CustomVersion)
 			}
 		}
 	}
+
 	strategy := spec.UpdateStrategy
 	if strategy.Partition != nil && !validatePartition(strategy.Partition) {
-		return append(allErrs, field.Invalid(fldPath.Child("updateStrategy"),
+		return field.Invalid(fldPath.Child("updateStrategy"),
 			spec.UpdateStrategy,
-			"invalid partition value"))
+			"invalid partition value")
 	}
 
 	if strategy.MaxUnavailable != nil && !validateMaxUnavailable(strategy.MaxUnavailable) {
-		return append(allErrs, field.Invalid(fldPath.Child("updateStrategy"),
+		return field.Invalid(fldPath.Child("updateStrategy"),
 			spec.UpdateStrategy,
-			"invalid maxUnavailable value"))
+			"invalid maxUnavailable value")
 	}
 
 	// validate ReloadSidecarConfig
@@ -132,22 +149,108 @@ func (h *ConfigMapSetCreateUpdateHandler) validateConfigMapSetSpec(name, namespa
 		reloadConfigPath := fldPath.Child("reloadSidecarConfig")
 		if spec.ReloadSidecarConfig.Type == appsv1alpha1.K8sConfigReloadSidecarType {
 			if spec.ReloadSidecarConfig.Config == nil || spec.ReloadSidecarConfig.Config.Name == "" {
-				allErrs = append(allErrs, field.Invalid(reloadConfigPath.Child("config", "name"), "", "name must be set when type is k8s-config"))
+				return field.Invalid(reloadConfigPath.Child("config", "name"), "", "name must be set when type is k8s-config")
 			}
 		} else if spec.ReloadSidecarConfig.Type == appsv1alpha1.SidecarSetReloadSidecarType {
 			if spec.ReloadSidecarConfig.Config == nil || spec.ReloadSidecarConfig.Config.SidecarSetRef == nil {
-				allErrs = append(allErrs, field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef"), "", "sidecarSetRef must be set when type is SidecarSet"))
+				return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef"), "", "sidecarSetRef must be set when type is SidecarSet")
+			}
+			sidecarSetRef := spec.ReloadSidecarConfig.Config.SidecarSetRef
+			sidecarSet := &appsv1alpha1.SidecarSet{}
+			err = h.Client.Get(ctx, types.NamespacedName{Name: sidecarSetRef.Name}, sidecarSet)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarSetRef.Name, "SidecarSet not found")
+				}
+				return field.InternalError(reloadConfigPath.Child("config", "sidecarSetRef", "name"), fmt.Errorf("failed to get SidecarSet: %v", err))
+			}
+			containerFound := false
+			for _, c := range sidecarSet.Spec.Containers {
+				if c.Name == sidecarSetRef.ContainerName && c.Image != "" {
+					containerFound = true
+					break
+				}
+			}
+			if !containerFound {
+				return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "containerName"), sidecarSetRef.ContainerName, "container not found in SidecarSet")
+			}
+
+			// Validate if SidecarSet includes the current ConfigMapSet's Pods
+			if sidecarSet.Spec.Namespace != "" && sidecarSet.Spec.Namespace != namespace {
+				return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarSetRef.Name, fmt.Sprintf("SidecarSet targets namespace %s which does not match ConfigMapSet namespace %s", sidecarSet.Spec.Namespace, namespace))
+			}
+
+			// Validate NamespaceSelector
+			if sidecarSet.Spec.NamespaceSelector != nil {
+				nsObj := &corev1.Namespace{}
+				err = h.Client.Get(ctx, types.NamespacedName{Name: namespace}, nsObj)
+				if err != nil {
+					if errors.IsNotFound(err) {
+						return field.Invalid(field.NewPath("metadata", "namespace"), namespace, "Namespace not found")
+					}
+					return field.InternalError(field.NewPath("metadata", "namespace"), fmt.Errorf("failed to get namespace: %v", err))
+				}
+				selector, err := util.ValidatedLabelSelectorAsSelector(sidecarSet.Spec.NamespaceSelector)
+				if err != nil {
+					return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarSetRef.Name, fmt.Sprintf("invalid NamespaceSelector in SidecarSet: %v", err))
+				}
+				if !selector.Matches(labels.Set(nsObj.Labels)) {
+					return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarSetRef.Name, fmt.Sprintf("SidecarSet NamespaceSelector does not match ConfigMapSet namespace %s", namespace))
+				}
+			}
+
+			// Validate if ConfigMapSet selector is a subset of SidecarSet selector
+			if sidecarSet.Spec.Selector != nil {
+				sidecarSetSelector, err := util.ValidatedLabelSelectorAsSelector(sidecarSet.Spec.Selector)
+				if err != nil {
+					return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarSetRef.Name, fmt.Sprintf("invalid selector in SidecarSet: %v", err))
+				}
+				// Here we use a simplified approach as requested:
+				// We just check if the ConfigMapSet's MatchLabels satisfy the SidecarSet's Selector.
+				// This assumes ConfigMapSet pods will at least have these MatchLabels.
+				if !sidecarSetSelector.Matches(labels.Set(spec.Selector.MatchLabels)) {
+					return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarSetRef.Name, "ConfigMapSet MatchLabels do not satisfy SidecarSet selector")
+				}
 			}
 		} else if spec.ReloadSidecarConfig.Type == appsv1alpha1.CustomerReloadSidecarType {
 			if spec.ReloadSidecarConfig.Config == nil || spec.ReloadSidecarConfig.Config.ConfigMapRef == nil {
-				allErrs = append(allErrs, field.Invalid(reloadConfigPath.Child("config", "configMapRef"), "", "configMapRef must be set when type is customer"))
+				return field.Invalid(reloadConfigPath.Child("config", "configMapRef"), "", "configMapRef must be set when type is customer")
+			}
+			cmRef := spec.ReloadSidecarConfig.Config.ConfigMapRef
+			customerCM := &corev1.ConfigMap{}
+			// Use the ConfigMapSet's namespace if the ConfigMapRef namespace is not specified
+			cmRefNamespace := cmRef.Namespace
+			if cmRefNamespace == "" {
+				cmRefNamespace = namespace
+			}
+			err = h.Client.Get(ctx, types.NamespacedName{Name: cmRef.Name, Namespace: cmRefNamespace}, customerCM)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					return field.Invalid(reloadConfigPath.Child("config", "configMapRef", "name"), cmRef.Name, "customer sidecar ConfigMap not found")
+				}
+				return field.InternalError(reloadConfigPath.Child("config", "configMapRef", "name"), fmt.Errorf("failed to get customer sidecar ConfigMap: %v", err))
+			}
+
+			// Validate if the specific key "reload-sidecar" exists and can be unmarshaled into a valid Container
+			containerData, exists := customerCM.Data["reload-sidecar"]
+			if !exists {
+				return field.Invalid(reloadConfigPath.Child("config", "configMapRef", "name"), cmRef.Name, "customer sidecar ConfigMap must contain key 'reload-sidecar'")
+			}
+
+			var reloadSidecar corev1.Container
+			if err = json.Unmarshal([]byte(containerData), &reloadSidecar); err != nil {
+				return field.Invalid(reloadConfigPath.Child("config", "configMapRef", "name"), cmRef.Name, fmt.Sprintf("failed to unmarshal 'reload-sidecar' data to Container: %v", err))
+			}
+
+			if reloadSidecar.Image == "" {
+				return field.Invalid(reloadConfigPath.Child("config", "configMapRef", "name"), cmRef.Name, "container defined in 'reload-sidecar' must have image specified")
 			}
 		} else {
-			allErrs = append(allErrs, field.Invalid(reloadConfigPath.Child("type"), spec.ReloadSidecarConfig.Type, "invalid type, must be k8s-config, SidecarSet or customer"))
+			return field.Invalid(reloadConfigPath.Child("type"), spec.ReloadSidecarConfig.Type, "invalid type, must be k8s-config, SidecarSet or customer")
 		}
 	}
 
-	return allErrs
+	return nil
 }
 
 var percentagePattern = regexp.MustCompile(`^\d+%$`)
@@ -220,8 +323,14 @@ var _ admission.Handler = &ConfigMapSetCreateUpdateHandler{}
 // Handle handles admission requests.
 func (h *ConfigMapSetCreateUpdateHandler) validateConfigMapSet(ctx context.Context, configMapSet *appsv1alpha1.ConfigMapSet) field.ErrorList {
 	metaErrs := genericvalidation.ValidateObjectMeta(&configMapSet.ObjectMeta, true, validateConfigMapSetName, field.NewPath("metadata"))
-	specErrs := h.validateConfigMapSetSpec(configMapSet.Name, configMapSet.Namespace, &configMapSet.Spec, field.NewPath("spec"))
-	return append(metaErrs, specErrs...)
+	if len(metaErrs) > 0 {
+		return metaErrs
+	}
+	specErr := h.validateConfigMapSetSpec(ctx, configMapSet.Name, configMapSet.Namespace, &configMapSet.Spec, field.NewPath("spec"))
+	if specErr != nil {
+		return field.ErrorList{specErr}
+	}
+	return nil
 }
 
 // Handle handles admission requests.
@@ -235,6 +344,21 @@ func (h *ConfigMapSetCreateUpdateHandler) Handle(ctx context.Context, req admiss
 		if err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
+
+		if req.AdmissionRequest.Operation == admissionv1.Update {
+			if len(req.OldObject.Raw) > 0 {
+				if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
+					return admission.Errored(http.StatusBadRequest, err)
+				}
+				if oldObj.Spec.Selector != nil && obj.Spec.Selector != nil {
+					if !reflect.DeepEqual(oldObj.Spec.Selector.MatchLabels, obj.Spec.Selector.MatchLabels) {
+						errList := field.ErrorList{field.Forbidden(field.NewPath("spec", "selector", "matchLabels"), "field is immutable")}
+						return admission.Errored(http.StatusUnprocessableEntity, errList.ToAggregate())
+					}
+				}
+			}
+		}
+
 		if allErrs := h.validateConfigMapSet(ctx, obj); len(allErrs) > 0 {
 			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 		}
@@ -278,7 +402,7 @@ func (h *ConfigMapSetCreateUpdateHandler) validateDeleteConfigMapSet(ctx context
 			continue
 		}
 
-		if pod.Annotations["apps.kruise.io/configmapset-enabled"] == "true" {
+		if pod.Annotations[configmapset.GetConfigMapSetEnabledKey()] == "true" {
 			return fmt.Errorf("pod %s/%s is still used configmapSet:%s/%s", pod.Namespace, pod.Name, cms.Namespace, cms.Name)
 		}
 	}
