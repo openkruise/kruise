@@ -163,7 +163,7 @@ PS: 需要支持partition增大feature以覆盖az回滚场景
 
 Controller依据partition挑选更新Pod时，为了保证版本数量收敛趋势，会按照如下规则优先更新：
 
-1. 非currentRevision > curentRevision
+1. 非currentRevision > currentRevision
 
 2. 非currentRevision序号小的版本 > 非currentRevision序号大的版本
 
