@@ -1,4 +1,4 @@
-# ConfigMapSet设计提案（20260326）
+# 20260414-ConfigMapSet-enhance-zh
 
 # ConfigMapSet设计
 
@@ -54,9 +54,9 @@ spec:
   - name: main
     mountPath: /data/conf1 # 用于描述挂载路径及可读权限
   - nameFrom:
-	  fieldRef:
-	    apiVersion: v1
-	    fieldPath: metadata.labels['cName']
+	 fieldRef:
+	   apiVersion: v1
+	   fieldPath: metadata.labels['cName']
     mountPath: /data/conf3
   # 用于更新配置文件的容器，在Pod创建时注入
   reloadSidecarConfig:
@@ -72,7 +72,7 @@ spec:
       # 指定SidecarSet中的container
       sidecarSetRef:
         name: reload-sidecarSet
-        ContainerName: reload-sidecar
+        containerName: reload-sidecar
     # 自定义容器注入
     type: custom
     config:
@@ -330,7 +330,7 @@ spec:
             
         3.  检查是否已经加载最新配置。
             
-        4.  通过PostStart定义的方式通知到业务容器，触发业务容器更新配置文件。支持TCP、HTTP的方式。
+        4.  通过effectPolicy.postHook定义的方式通知到业务容器，触发业务容器更新配置文件。支持TCP、HTTP的方式。
             
 4.  更新ConfigMapSet Status
     

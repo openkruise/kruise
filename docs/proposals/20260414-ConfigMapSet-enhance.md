@@ -1,4 +1,4 @@
-# ConfigMapSet Design Proposal (20260326)
+# 20260414-ConfigMapSet-enhance
 
 # ConfigMapSet Design
 
@@ -69,7 +69,7 @@ spec:
       # Specify the container in SidecarSet
       sidecarSetRef:
         name: reload-sidecarSet
-        ContainerName: reload-sidecar
+        containerName: reload-sidecar
     # Custom container injection
     type: custom
     config:
@@ -238,7 +238,8 @@ kind: ConfigMapSet
 # ...
 spec:
   # ...
-    # Custom container injection
+  reloadSidecarConfig:
+   # Custom container injection
     type: custom
     config:
       # Specify reload-sidecar config through ConfigMap for unified cross-namespace configuration
@@ -254,11 +255,10 @@ Configure the Reload container through a ConfigMap. With this mode, a unified re
 ```yaml
 apiVersion: v1
 kind: ConfigMap
-metedata:
+metadata:
   name: reload-configMap
   namespace: default
-spec:
-  data: |
+data: |
    {
      name: reload-sidecar
      image: openkruise/reload-sidecar:v1.0.0
@@ -316,7 +316,7 @@ After `ConfigMapSet.data` is updated, the controller workflow is as follows:
       1. Restart `reload-sidecar` first
       2. Wait until the Reload container has restarted and becomes ready
       3. Check whether the latest configuration has been loaded
-      4. Notify the business containers by the method defined in `PostStart` to trigger configuration reload. Both TCP and HTTP are supported.
+      4. Notify the business containers by the method defined in `effectPolicy.postHook` to trigger configuration reload. Both TCP and HTTP are supported.
 
 4. Update `ConfigMapSet` Status
 
