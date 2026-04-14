@@ -620,15 +620,10 @@ func (r *ReconcileUnitedDeployment) calculateStatus(newStatus *appsv1beta1.Unite
 		newStatus.CurrentRevision = currentRevision.Name
 	}
 
-	if newStatus.UpdateStatus == nil {
-		newStatus.UpdateStatus = &appsv1beta1.UpdateStatus{}
-	}
+	newStatus.UpdatedRevision = expectedRevision
 
-	newStatus.UpdateStatus.UpdatedRevision = expectedRevision
-	newStatus.UpdateStatus.CurrentPartitions = nextPartition
-
-	if newStatus.UpdateStatus.UpdatedRevision != newStatus.CurrentRevision && newStatus.UpdatedReadyReplicas >= newStatus.Replicas {
-		newStatus.CurrentRevision = newStatus.UpdateStatus.UpdatedRevision
+	if newStatus.UpdatedRevision != newStatus.CurrentRevision && newStatus.UpdatedReadyReplicas >= newStatus.Replicas {
+		newStatus.CurrentRevision = newStatus.UpdatedRevision
 	}
 
 	var subsetFailure *string
@@ -663,10 +658,10 @@ func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1beta1.Unite
 		oldStatus.UpdatedReplicas == newStatus.UpdatedReplicas &&
 		oldStatus.UpdatedReadyReplicas == newStatus.UpdatedReadyReplicas &&
 		oldStatus.CurrentRevision == newStatus.CurrentRevision &&
+		oldStatus.UpdatedRevision == newStatus.UpdatedRevision &&
 		oldStatus.CollisionCount == newStatus.CollisionCount &&
 		oldStatus.LabelSelector == newStatus.LabelSelector &&
 		ud.Generation == newStatus.ObservedGeneration &&
-		reflect.DeepEqual(oldStatus.UpdateStatus, newStatus.UpdateStatus) &&
 		reflect.DeepEqual(oldStatus.Conditions, newStatus.Conditions) &&
 		reflect.DeepEqual(oldStatus.SubsetStatuses, newStatus.SubsetStatuses) {
 		return ud, nil

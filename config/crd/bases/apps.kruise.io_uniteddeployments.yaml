@@ -2803,19 +2803,6 @@ spec:
                       type: integer
                   type: object
                 type: array
-              updateStatus:
-                description: Records the information of update progress.
-                properties:
-                  currentPartitions:
-                    additionalProperties:
-                      format: int32
-                      type: integer
-                    description: Records the current partition.
-                    type: object
-                  updatedRevision:
-                    description: Records the latest revision.
-                    type: string
-                type: object
               updatedReadyReplicas:
                 description: The number of ready current revision replicas for this
                   UnitedDeployment.
@@ -2825,6 +2812,10 @@ spec:
                 description: The number of pods in current version.
                 format: int32
                 type: integer
+              updatedRevision:
+                description: UpdatedRevision, if not empty, indicates the latest version
+                  of the UnitedDeployment.
+                type: string
             required:
             - currentRevision
             - replicas

@@ -1138,7 +1138,7 @@ func TestAstsUpdate(t *testing.T) {
 	if v2 == v1 {
 		v2 = revisionList.Items[1].Name
 	}
-	g.Expect(instance.Status.UpdateStatus.UpdatedRevision).Should(gomega.BeEquivalentTo(v2))
+	g.Expect(instance.Status.UpdatedRevision).Should(gomega.BeEquivalentTo(v2))
 }
 
 func TestAstsRollingUpdatePartition(t *testing.T) {
@@ -1269,7 +1269,7 @@ func TestAstsRollingUpdatePartition(t *testing.T) {
 	g.Expect(*stsB.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(3))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
+	g.Expect(subsetPartitionsFromStatus(instance.Status.SubsetStatuses)).Should(gomega.BeEquivalentTo(map[string]int32{
 		"subset-a": 4,
 		"subset-b": 3,
 	}))
@@ -1297,7 +1297,7 @@ func TestAstsRollingUpdatePartition(t *testing.T) {
 	g.Expect(*stsB.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(3))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
+	g.Expect(subsetPartitionsFromStatus(instance.Status.SubsetStatuses)).Should(gomega.BeEquivalentTo(map[string]int32{
 		"subset-a": 0,
 		"subset-b": 3,
 	}))
@@ -1322,7 +1322,7 @@ func TestAstsRollingUpdatePartition(t *testing.T) {
 	g.Expect(*stsB.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(0))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
+	g.Expect(subsetPartitionsFromStatus(instance.Status.SubsetStatuses)).Should(gomega.BeEquivalentTo(map[string]int32{
 		"subset-a": 0,
 		"subset-b": 0,
 	}))
@@ -1464,7 +1464,7 @@ func TestAstsOnDelete(t *testing.T) {
 	g.Expect(stsB.Spec.UpdateStrategy.RollingUpdate).Should(gomega.BeNil())
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
+	g.Expect(subsetPartitionsFromStatus(instance.Status.SubsetStatuses)).Should(gomega.BeEquivalentTo(map[string]int32{
 		"subset-a": 4,
 		"subset-b": 3,
 	}))

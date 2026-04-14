@@ -151,8 +151,8 @@ func (r *ReconcileUnitedDeployment) cleanExpiredRevision(ud *appsv1beta1.UnitedD
 
 	live := map[string]bool{}
 	live[ud.Status.CurrentRevision] = true
-	if ud.Status.UpdateStatus != nil {
-		live[ud.Status.UpdateStatus.UpdatedRevision] = true
+	if ud.Status.UpdatedRevision != "" {
+		live[ud.Status.UpdatedRevision] = true
 	}
 
 	for i, revision := range *sortedRevisions {

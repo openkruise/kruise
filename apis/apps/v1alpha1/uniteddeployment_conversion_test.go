@@ -92,7 +92,7 @@ func TestUnitedDeploymentConversionRoundTrip(t *testing.T) {
 			assert.Equal(t, "UnitedDeployment", dst.Kind)
 			assert.Equal(t, v1beta1.ManualUpdateStrategyType, dst.Spec.UpdateStrategy.Type)
 			assert.Equal(t, map[string]int32{"subset-a": 1}, dst.Spec.UpdateStrategy.ManualUpdate.Partitions)
-			assert.Equal(t, "rev-new", dst.Status.UpdateStatus.UpdatedRevision)
+			assert.Equal(t, "rev-new", dst.Status.UpdatedRevision)
 			assert.Len(t, dst.Status.SubsetStatuses, 2)
 			assert.Equal(t, map[string]int32{"subset-a": 3, "subset-b": 2}, subsetReplicasFromV1beta1Status(dst.Status.SubsetStatuses))
 			assert.True(t, dst.Spec.Topology.ScheduleStrategy.IsAdaptive())

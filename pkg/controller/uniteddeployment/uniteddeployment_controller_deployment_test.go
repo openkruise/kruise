@@ -974,7 +974,7 @@ func TestDeploymentUpdate(t *testing.T) {
 	if v2 == v1 {
 		v2 = revisionList.Items[1].Name
 	}
-	g.Expect(instance.Status.UpdateStatus.UpdatedRevision).Should(gomega.BeEquivalentTo(v2))
+	g.Expect(instance.Status.UpdatedRevision).Should(gomega.BeEquivalentTo(v2))
 }
 
 func TestDeploymentOnDelete(t *testing.T) {
@@ -1098,7 +1098,7 @@ func TestDeploymentOnDelete(t *testing.T) {
 	g.Expect(deploymentB).ShouldNot(gomega.BeNil())
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
+	g.Expect(subsetPartitionsFromStatus(instance.Status.SubsetStatuses)).Should(gomega.BeEquivalentTo(map[string]int32{
 		"subset-a": 4,
 		"subset-b": 3,
 	}))

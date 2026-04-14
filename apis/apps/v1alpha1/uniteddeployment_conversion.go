@@ -351,9 +351,9 @@ func convertUnitedDeploymentStatusToV1beta1(src UnitedDeploymentStatus) v1beta1.
 		UpdatedReadyReplicas: src.UpdatedReadyReplicas,
 		CollisionCount:       src.CollisionCount,
 		CurrentRevision:      src.CurrentRevision,
+		UpdatedRevision:      updatedRevisionToV1beta1(src.UpdateStatus),
 		SubsetStatuses:       convertUnitedDeploymentSubsetStatusesToV1beta1(src.SubsetStatuses),
 		Conditions:           convertUnitedDeploymentConditionsToV1beta1(src.Conditions),
-		UpdateStatus:         convertUpdateStatusToV1beta1(src.UpdateStatus),
 		LabelSelector:        src.LabelSelector,
 	}
 }
@@ -368,9 +368,9 @@ func convertUnitedDeploymentStatusFromV1beta1(src v1beta1.UnitedDeploymentStatus
 		UpdatedReadyReplicas: src.UpdatedReadyReplicas,
 		CollisionCount:       src.CollisionCount,
 		CurrentRevision:      src.CurrentRevision,
+		UpdateStatus:         convertUpdateStatusFromV1beta1(src),
 		SubsetStatuses:       convertUnitedDeploymentSubsetStatusesFromV1beta1(src.SubsetStatuses),
 		Conditions:           convertUnitedDeploymentConditionsFromV1beta1(src.Conditions),
-		UpdateStatus:         convertUpdateStatusFromV1beta1(src.UpdateStatus),
 		LabelSelector:        src.LabelSelector,
 	}
 }
@@ -409,23 +409,33 @@ func convertUnitedDeploymentConditionsFromV1beta1(src []v1beta1.UnitedDeployment
 	return dst
 }
 
-func convertUpdateStatusToV1beta1(src *UpdateStatus) *v1beta1.UpdateStatus {
+func updatedRevisionToV1beta1(src *UpdateStatus) string {
 	if src == nil {
-		return nil
+		return ""
 	}
-	return &v1beta1.UpdateStatus{
-		UpdatedRevision:   src.UpdatedRevision,
-		CurrentPartitions: cloneStringInt32Map(src.CurrentPartitions),
-	}
+	return src.UpdatedRevision
 }
 
-func convertUpdateStatusFromV1beta1(src *v1beta1.UpdateStatus) *UpdateStatus {
-	if src == nil {
+func convertUpdateStatusFromV1beta1(src v1beta1.UnitedDeploymentStatus) *UpdateStatus {
+	if src.UpdatedRevision == "" && len(src.SubsetStatuses) == 0 {
 		return nil
 	}
+
+	currentPartitions := make(map[string]int32, len(src.SubsetStatuses))
+	for _, status := range src.SubsetStatuses {
+		if status.Name == "" {
+			continue
+		}
+		currentPartitions[status.Name] = status.Partition
+	}
+
+	if len(currentPartitions) == 0 {
+		currentPartitions = nil
+	}
+
 	return &UpdateStatus{
 		UpdatedRevision:   src.UpdatedRevision,
-		CurrentPartitions: cloneStringInt32Map(src.CurrentPartitions),
+		CurrentPartitions: currentPartitions,
 	}
 }
 

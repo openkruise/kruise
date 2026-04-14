@@ -332,15 +332,15 @@ type UnitedDeploymentStatus struct {
 	// CurrentRevision, if not empty, indicates the current version of the UnitedDeployment.
 	CurrentRevision string `json:"currentRevision"`
 
+	// UpdatedRevision, if not empty, indicates the latest version of the UnitedDeployment.
+	// +optional
+	UpdatedRevision string `json:"updatedRevision,omitempty"`
+
 	// Records the structured status of each subset.
 	SubsetStatuses []UnitedDeploymentSubsetStatus `json:"subsetStatuses,omitempty"`
 	// Represents the latest available observations of a UnitedDeployment's current state.
 	// +optional
 	Conditions []UnitedDeploymentCondition `json:"conditions,omitempty"`
-
-	// Records the information of update progress.
-	// +optional
-	UpdateStatus *UpdateStatus `json:"updateStatus,omitempty"`
 
 	// LabelSelector is label selectors for query over pods that should match the replica count used by HPA.
 	LabelSelector string `json:"labelSelector,omitempty"`
@@ -371,17 +371,6 @@ type UnitedDeploymentCondition struct {
 
 	// A human-readable message indicating details about the transition.
 	Message string `json:"message,omitempty"`
-}
-
-// UpdateStatus defines the observed update state of UnitedDeployment.
-type UpdateStatus struct {
-	// Records the latest revision.
-	// +optional
-	UpdatedRevision string `json:"updatedRevision,omitempty"`
-
-	// Records the current partition.
-	// +optional
-	CurrentPartitions map[string]int32 `json:"currentPartitions,omitempty"`
 }
 
 type UnitedDeploymentSubsetStatus struct {

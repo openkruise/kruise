@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/openkruise/kruise/apis"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 var cfg *rest.Config
@@ -164,4 +165,15 @@ func StartTestManager(ctx context.Context, mgr manager.Manager, g *gomega.Gomega
 		g.Expect(mgr.Start(ctx)).NotTo(gomega.HaveOccurred())
 	}()
 	return wg
+}
+
+func subsetPartitionsFromStatus(statuses []appsv1beta1.UnitedDeploymentSubsetStatus) map[string]int32 {
+	partitions := make(map[string]int32, len(statuses))
+	for _, status := range statuses {
+		if status.Name == "" {
+			continue
+		}
+		partitions[status.Name] = status.Partition
+	}
+	return partitions
 }

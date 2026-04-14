@@ -117,12 +117,7 @@ status:
     replicas: 3
     readyReplicas: 3
     partition: 0
-  updateStatus:
-    currentPartitions:
-      subset-a: 0
-      subset-b: 0
-      subset-c: 0
-    updatedRevision: demo-guestbook-kruise-55f9dbcb4b
+  updatedRevision: demo-guestbook-kruise-55f9dbcb4b
   updatedReadyReplicas: 10
   updatedReplicas: 10
 ...
@@ -288,12 +283,7 @@ status:
     replicas: 4
     readyReplicas: 4
     partition: 0
-  updateStatus:
-    currentPartitions:
-      subset-a: 1
-      subset-b: 2
-      subset-c: 0
-+ updatedRevision: demo-guestbook-kruise-64494c46ff
+  updatedRevision: demo-guestbook-kruise-64494c46ff
   updatedReadyReplicas: 7
   updatedReplicas: 7
 ```
