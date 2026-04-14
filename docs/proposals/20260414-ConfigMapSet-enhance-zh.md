@@ -254,11 +254,10 @@ spec:
 ```yaml
 apiVersion: v1
 kind: ConfigMap
-metedata:
+metadata:
   name: reload-configMap
   namespace: default
-spec:
-  data: |
+data: |
    {
      name: reload-sidecar
      image: openkruise/reload-sidecar:v1.0.0

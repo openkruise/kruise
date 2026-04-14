@@ -71,7 +71,7 @@ status:
 
 ## 版本管理
 
-为每一个ConfigMapSet创建一个独特的ConfigMap(RevisonManager-ConfigMap后续将简称为RMC)，持久化ConfigMapSet的多版本数据，并严格按照顺序(如果新版本与历史版本hash相同将引起顺序变化)
+为每一个ConfigMapSet创建一个独特的ConfigMap(RevisionManager-ConfigMap后续将简称为RMC)，持久化ConfigMapSet的多版本数据，并严格按照顺序(如果新版本与历史版本hash相同将引起顺序变化)
 
 ```plaintext
 apiVersion: v1
