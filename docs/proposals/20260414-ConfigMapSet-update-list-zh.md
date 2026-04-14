@@ -4,8 +4,8 @@
 
 本文对比以下两版提案，输出一份面向评审的增量变化说明，重点突出新提案相较旧提案的设计改进点、语义收敛点与落地价值。
 
-- 旧提案：`20250306-configMapSet (1).md`
-- 新提案：`ConfigMapSet设计提案（20260326）.md`
+- 旧提案：`https://github.com/openkruise/kruise/pull/2408/changes#diff-e33f815106047a3386f45fa8b743f73d22537670b79b46e0173c297f87ee7288`
+- 新提案：`https://github.com/openkruise/kruise/pull/2408/changes#diff-ed8540e7f9763bfd9d83c178411aa64b7e43196890d77c20e93d19c2e416ac19`
 
 本文不重复完整方案，仅描述“新增、调整、收敛、删除”的关键变化。
 

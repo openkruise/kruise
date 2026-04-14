@@ -4,8 +4,8 @@
 
 This document compares the following two proposal versions and provides a reviewer-oriented summary of incremental changes, focusing on design improvements, semantic convergence, and implementation value introduced by the new proposal compared with the old one.
 
-- Old proposal: `20250306-configMapSet (1).md`
-- New proposal: `ConfigMapSet设计提案（20260326）.md`
+- Old proposal: `https://github.com/openkruise/kruise/pull/2408/changes#diff-b4dbb1751c3569a251ac288f6d8744fc543495d5128a4dfadc99002d8e4989cf`
+- New proposal: `https://github.com/openkruise/kruise/pull/2408/changes#diff-ca8af212237c53351c20033f7e3c1bed94120aa0ad32895ba3972fea0a8f465d`
 
 This document does not repeat the full solution. It only describes the key changes in terms of what was added, adjusted, converged, or removed.
 
