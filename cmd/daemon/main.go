@@ -53,6 +53,7 @@ var (
 
 	restConfigQPS   = flag.Int("rest-config-qps", 0, "QPS of rest config. Defaults to 0, which means using the default value of client-go.")
 	restConfigBurst = flag.Int("rest-config-burst", 0, "Burst of rest config. Defaults to 0, which means using the default value of client-go.")
+	crrWorkers      = flag.Int("crr-workers", 32, "The number of concurrent workers for ContainerRecreateRequest processing.")
 )
 
 func main() {
@@ -82,7 +83,7 @@ func main() {
 		}()
 	}
 	ctx := signals.SetupSignalHandler()
-	d, err := daemon.NewDaemon(cfg, *bindAddr, *maxWorkersForPullImage)
+	d, err := daemon.NewDaemon(cfg, *bindAddr, *maxWorkersForPullImage, *crrWorkers)
 	if err != nil {
 		klog.Fatalf("Failed to new daemon: %v", err)
 	}

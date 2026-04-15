@@ -35,4 +35,5 @@ type Options struct {
 	Healthz        *daemonutil.Healthz
 
 	MaxWorkersForPullImages int
+	CRRWorkers              int
 }

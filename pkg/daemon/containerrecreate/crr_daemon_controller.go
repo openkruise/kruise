@@ -52,9 +52,6 @@ import (
 )
 
 const (
-	// TODO: make it a configurable flag
-	workers = 32
-
 	maxExpectationWaitDuration = 10 * time.Second
 )
 
@@ -69,6 +66,8 @@ type Controller struct {
 	crrLister      listersalpha1.ContainerRecreateRequestLister
 	eventRecorder  record.EventRecorder
 	runtimeFactory daemonruntime.Factory
+
+	workers int
 }
 
 // NewController returns the controller for CRR
@@ -121,6 +120,7 @@ func NewController(opts daemonoptions.Options) (*Controller, error) {
 		crrLister:      listersalpha1.NewContainerRecreateRequestLister(informer.GetIndexer()),
 		eventRecorder:  recorder,
 		runtimeFactory: opts.RuntimeFactory,
+		workers:        opts.CRRWorkers,
 	}, nil
 }
 
@@ -172,7 +172,7 @@ func (c *Controller) Run(stop <-chan struct{}) {
 	}
 
 	klog.Info("Starting crr daemon controller")
-	for i := 0; i < workers; i++ {
+	for i := 0; i < c.workers; i++ {
 		go wait.Until(func() {
 			for c.processNextWorkItem() {
 			}
