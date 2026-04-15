@@ -37,3 +37,41 @@ func TestMetaGetNamespace(t *testing.T) {
 		t.Fatalf("expect(test), but get(%s)", GetKruiseDaemonConfigNamespace())
 	}
 }
+
+func TestIsNamespaceTerminating(t *testing.T) {
+	testCases := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name:     "unrelated error",
+			err:      os.ErrNotExist,
+			expected: false,
+		},
+		{
+			name:     "terminating error",
+			err:      &terminatingError{},
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if actual := IsNamespaceTerminating(tc.err); actual != tc.expected {
+				t.Errorf("expected %v, got %v", tc.expected, actual)
+			}
+		})
+	}
+}
+
+type terminatingError struct{}
+
+func (e *terminatingError) Error() string {
+	return "Forbidden: because it is being terminated"
+}

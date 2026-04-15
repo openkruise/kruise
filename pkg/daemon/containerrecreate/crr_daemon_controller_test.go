@@ -18,6 +18,7 @@ package containerrecreate
 
 import (
 	"testing"
+	"time"
 
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -30,12 +31,18 @@ func TestControllerRun(t *testing.T) {
 	}
 
 	stop := make(chan struct{})
-	close(stop) // Close immediately so Run exits
 
 	// We can't easily test the informer sync because it's not set,
 	// but we can test that it doesn't crash and logs the workers count.
 	// We'll use a dummy informer that is already synced.
 	c.crrInformer = &fakeInformer{}
+
+	go func() {
+		// Wait a little bit to let WaitForCacheSync succeed and reach the worker loop
+		// before closing the stop channel.
+		time.Sleep(100 * time.Millisecond)
+		close(stop)
+	}()
 
 	c.Run(stop)
 
@@ -49,4 +56,4 @@ type fakeInformer struct {
 }
 
 func (f *fakeInformer) Run(stopCh <-chan struct{}) {}
-func (f *fakeInformer) HasSynced() bool           { return true }
+func (f *fakeInformer) HasSynced() bool            { return true }

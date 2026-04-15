@@ -1331,3 +1331,27 @@ func randomString(n int) string {
 	}
 	return string(b)
 }
+
+func TestReconcileNamespaceTerminating(t *testing.T) {
+	reconciler := newMockCloneSetReconciler()
+	reconciler.Client = &failingClient{Client: reconciler.Client}
+	req := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: "default",
+			Name:      "test-cs",
+		},
+	}
+	// It should return nil error because it is a namespace terminating error
+	_, err := reconciler.doReconcile(req)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+}
+
+type failingClient struct {
+	client.Client
+}
+
+func (c *failingClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	return apierrors.NewForbidden(schema.GroupResource{}, "", fmt.Errorf("because it is being terminated"))
+}
