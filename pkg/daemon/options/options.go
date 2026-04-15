@@ -23,12 +23,14 @@ import (
 
 	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
 	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+	"github.com/openkruise/kruise/pkg/client"
 )
 
 type Options struct {
 	NodeName      string
 	Scheme        *runtime.Scheme
 	RuntimeClient runtimeclient.Client
+	GenericClient *client.GenericClientset
 	PodInformer   cache.SharedIndexInformer
 
 	RuntimeFactory daemonruntime.Factory

@@ -1348,10 +1348,33 @@ func TestReconcileNamespaceTerminating(t *testing.T) {
 	}
 }
 
+func TestReconcileError(t *testing.T) {
+	reconciler := newMockCloneSetReconciler()
+	reconciler.Client = &failingClient{Client: reconciler.Client, returnCustomError: true}
+	req := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: "default",
+			Name:      "test-cs",
+		},
+	}
+	// It should return the error because it is NOT a namespace terminating error
+	_, err := reconciler.doReconcile(req)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "custom error") {
+		t.Fatalf("expected custom error, got %v", err)
+	}
+}
+
 type failingClient struct {
 	client.Client
+	returnCustomError bool
 }
 
 func (c *failingClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if c.returnCustomError {
+		return fmt.Errorf("custom error")
+	}
 	return apierrors.NewForbidden(schema.GroupResource{}, "", fmt.Errorf("because it is being terminated"))
 }

@@ -20,8 +20,15 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+
+	"github.com/openkruise/kruise/pkg/client"
+	kruisefake "github.com/openkruise/kruise/pkg/client/clientset/versioned/fake"
+	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 )
 
 func TestControllerRun(t *testing.T) {
@@ -48,6 +55,27 @@ func TestControllerRun(t *testing.T) {
 
 	if c.workers != 5 {
 		t.Errorf("expected workers 5, but got %d", c.workers)
+	}
+}
+
+func TestNewController(t *testing.T) {
+	fakeKruiseClient := &kruisefake.Clientset{}
+	fakeKubeClient := &kubefake.Clientset{}
+	opts := daemonoptions.Options{
+		CRRWorkers: 10,
+		GenericClient: &client.GenericClientset{
+			KubeClient:   fakeKubeClient,
+			KruiseClient: fakeKruiseClient,
+		},
+		Scheme:  runtime.NewScheme(),
+		Healthz: daemonutil.NewHealthz(),
+	}
+	c, err := NewController(opts, fakeKruiseClient)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if c.workers != 10 {
+		t.Errorf("expected workers 10, but got %d", c.workers)
 	}
 }
 

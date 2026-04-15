@@ -22,7 +22,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func TestNewDaemonValidation(t *testing.T) {
+func TestValidateDaemonFlags(t *testing.T) {
 	testCases := []struct {
 		name        string
 		cfg         *rest.Config
@@ -51,11 +51,17 @@ func TestNewDaemonValidation(t *testing.T) {
 			expectError: true,
 			errorMsg:    "crr-workers must be greater than 0",
 		},
+		{
+			name:        "valid crr workers",
+			cfg:         &rest.Config{},
+			crrWorkers:  32,
+			expectError: false,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := NewDaemon(tc.cfg, "localhost:1234", 1, tc.crrWorkers)
+			err := ValidateDaemonFlags(tc.cfg, tc.crrWorkers)
 			if tc.expectError {
 				if err == nil {
 					t.Fatal("expected error, but got nil")
@@ -64,7 +70,6 @@ func TestNewDaemonValidation(t *testing.T) {
 					t.Fatalf("expected error message %q, but got %q", tc.errorMsg, err.Error())
 				}
 			} else {
-				// We don't test success case deeply here as it would require mocking multiple clients
 				if err != nil {
 					t.Fatalf("expected no error, but got %v", err)
 				}

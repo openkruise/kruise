@@ -41,7 +41,6 @@ import (
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	"github.com/openkruise/kruise/pkg/client"
 	kruiseclient "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
 	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
@@ -71,12 +70,11 @@ type Controller struct {
 }
 
 // NewController returns the controller for CRR
-func NewController(opts daemonoptions.Options) (*Controller, error) {
-	genericClient := client.GetGenericClientWithName("kruise-daemon-crr")
-	informer := newCRRInformer(genericClient.KruiseClient, opts.NodeName)
+func NewController(opts daemonoptions.Options, kruiseClient kruiseclient.Interface) (*Controller, error) {
+	informer := newCRRInformer(kruiseClient, opts.NodeName)
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: genericClient.KubeClient.CoreV1().Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: opts.GenericClient.KubeClient.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(opts.Scheme, v1.EventSource{Component: "kruise-daemon-crr", Host: opts.NodeName})
 
 	queue := workqueue.NewNamedRateLimitingQueue(

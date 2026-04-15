@@ -86,11 +86,8 @@ type daemon struct {
 
 // NewDaemon create a daemon
 func NewDaemon(cfg *rest.Config, bindAddress string, MaxWorkersForPullImages int, CRRWorkers int) (Daemon, error) {
-	if cfg == nil {
-		return nil, fmt.Errorf("cfg can not be nil")
-	}
-	if CRRWorkers <= 0 {
-		return nil, fmt.Errorf("crr-workers must be greater than 0")
+	if err := ValidateDaemonFlags(cfg, CRRWorkers); err != nil {
+		return nil, err
 	}
 
 	nodeName, err := daemonutil.NodeName()
@@ -133,6 +130,7 @@ func NewDaemon(cfg *rest.Config, bindAddress string, MaxWorkersForPullImages int
 		NodeName:       nodeName,
 		Scheme:         scheme,
 		RuntimeClient:  runtimeClient,
+		GenericClient:  genericClient,
 		PodInformer:    podInformer,
 		RuntimeFactory: runtimeFactory,
 		Healthz:        healthz,
@@ -146,7 +144,7 @@ func NewDaemon(cfg *rest.Config, bindAddress string, MaxWorkersForPullImages int
 		return nil, fmt.Errorf("failed to new image puller controller: %v", err)
 	}
 
-	crrController, err := containerrecreate.NewController(opts)
+	crrController, err := containerrecreate.NewController(opts, genericClient.KruiseClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to new crr daemon controller: %v", err)
 	}
@@ -294,4 +292,14 @@ func (r *errSignaler) GotError() chan struct{} {
 	defer r.mu.Unlock()
 
 	return r.errSignal
+}
+
+func ValidateDaemonFlags(cfg *rest.Config, CRRWorkers int) error {
+	if cfg == nil {
+		return fmt.Errorf("cfg can not be nil")
+	}
+	if CRRWorkers <= 0 {
+		return fmt.Errorf("crr-workers must be greater than 0")
+	}
+	return nil
 }

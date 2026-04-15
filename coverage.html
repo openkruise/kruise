@@ -1,0 +1,2565 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>cloneset: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/openkruise/kruise/pkg/controller/cloneset/cloneset_controller.go (72.8%)</option>
+				
+				<option value="file1">github.com/openkruise/kruise/pkg/controller/cloneset/cloneset_event_handler.go (89.5%)</option>
+				
+				<option value="file2">github.com/openkruise/kruise/pkg/controller/cloneset/cloneset_predownload_image.go (77.9%)</option>
+				
+				<option value="file3">github.com/openkruise/kruise/pkg/controller/cloneset/cloneset_status.go (93.5%)</option>
+				
+				<option value="file4">github.com/openkruise/kruise/pkg/daemon/containerrecreate/crr_daemon_controller.go (6.9%)</option>
+				
+				<option value="file5">github.com/openkruise/kruise/pkg/daemon/containerrecreate/crr_daemon_util.go (0.0%)</option>
+				
+				<option value="file6">github.com/openkruise/kruise/pkg/daemon/daemon.go (6.7%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">/*
+Copyright 2019 The Kruise Authors.
+Copyright 2016 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package cloneset
+
+import (
+        "context"
+        "flag"
+        "time"
+
+        "github.com/prometheus/client_golang/prometheus"
+        apps "k8s.io/api/apps/v1"
+        v1 "k8s.io/api/core/v1"
+        "k8s.io/apimachinery/pkg/api/errors"
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+        "k8s.io/apimachinery/pkg/fields"
+        "k8s.io/apimachinery/pkg/runtime"
+        "k8s.io/apimachinery/pkg/runtime/schema"
+        intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+        "k8s.io/apimachinery/pkg/util/sets"
+        v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+        "k8s.io/client-go/tools/record"
+        klog "k8s.io/klog/v2"
+        "k8s.io/kubernetes/pkg/controller/history"
+        "sigs.k8s.io/controller-runtime/pkg/client"
+        "sigs.k8s.io/controller-runtime/pkg/controller"
+        "sigs.k8s.io/controller-runtime/pkg/event"
+        "sigs.k8s.io/controller-runtime/pkg/handler"
+        "sigs.k8s.io/controller-runtime/pkg/manager"
+        "sigs.k8s.io/controller-runtime/pkg/metrics"
+        "sigs.k8s.io/controller-runtime/pkg/predicate"
+        "sigs.k8s.io/controller-runtime/pkg/reconcile"
+        "sigs.k8s.io/controller-runtime/pkg/source"
+
+        appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+        kruiseclient "github.com/openkruise/kruise/pkg/client"
+        clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
+        revisioncontrol "github.com/openkruise/kruise/pkg/controller/cloneset/revision"
+        synccontrol "github.com/openkruise/kruise/pkg/controller/cloneset/sync"
+        clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+        "github.com/openkruise/kruise/pkg/features"
+        "github.com/openkruise/kruise/pkg/util"
+        utilclient "github.com/openkruise/kruise/pkg/util/client"
+        utildiscovery "github.com/openkruise/kruise/pkg/util/discovery"
+        "github.com/openkruise/kruise/pkg/util/expectations"
+        utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+        "github.com/openkruise/kruise/pkg/util/fieldindex"
+        historyutil "github.com/openkruise/kruise/pkg/util/history"
+        imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
+        "github.com/openkruise/kruise/pkg/util/ratelimiter"
+        "github.com/openkruise/kruise/pkg/util/refmanager"
+        "github.com/openkruise/kruise/pkg/util/volumeclaimtemplate"
+)
+
+func init() <span class="cov8" title="1">{
+        flag.IntVar(&amp;concurrentReconciles, "cloneset-workers", concurrentReconciles, "Max concurrent workers for CloneSet controller.")
+        // register prometheus
+        metrics.Registry.MustRegister(CloneSetScaleExpectationLeakageMetrics)
+}</span>
+
+var (
+        concurrentReconciles = 3
+
+        isPreDownloadDisabled             bool
+        minimumReplicasToPreDownloadImage int32 = 3
+)
+
+var (
+        CloneSetScaleExpectationLeakageMetrics = prometheus.NewCounterVec(
+                prometheus.CounterOpts{
+                        Name: "cloneset_scale_expectation_leakage",
+                        Help: "CloneSet Scale Expectation Leakage Metrics",
+                        // cloneSet namespace, name
+                }, []string{"namespace", "name"},
+        )
+)
+
+// Add creates a new CloneSet Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
+// and Start it when the Manager is Started.
+func Add(mgr manager.Manager) error <span class="cov0" title="0">{
+        if !utildiscovery.DiscoverGVK(clonesetutils.ControllerKind) </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov0" title="0">if !utildiscovery.DiscoverGVK(appsv1beta1.SchemeGroupVersion.WithKind("ImagePullJob")) ||
+                !utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) ||
+                !utilfeature.DefaultFeatureGate.Enabled(features.PreDownloadImageForInPlaceUpdate) </span><span class="cov0" title="0">{
+                isPreDownloadDisabled = true
+        }</span>
+        <span class="cov0" title="0">return add(mgr, newReconciler(mgr))</span>
+}
+
+// newReconciler returns a new reconcile.Reconciler
+func newReconciler(mgr manager.Manager) reconcile.Reconciler <span class="cov8" title="1">{
+        recorder := mgr.GetEventRecorderFor("cloneset-controller")
+        if cli := kruiseclient.GetGenericClientWithName("cloneset-controller"); cli != nil </span><span class="cov0" title="0">{
+                eventBroadcaster := record.NewBroadcaster()
+                eventBroadcaster.StartLogging(klog.Infof)
+                eventBroadcaster.StartRecordingToSink(&amp;v1core.EventSinkImpl{Interface: cli.KubeClient.CoreV1().Events("")})
+                recorder = eventBroadcaster.NewRecorder(mgr.GetScheme(), v1.EventSource{Component: "cloneset-controller"})
+        }</span>
+        <span class="cov8" title="1">cli := utilclient.NewClientFromManager(mgr, "cloneset-controller")
+        reconciler := &amp;ReconcileCloneSet{
+                Client:            cli,
+                scheme:            mgr.GetScheme(),
+                recorder:          recorder,
+                statusUpdater:     newStatusUpdater(cli),
+                controllerHistory: historyutil.NewHistory(cli),
+                revisionControl:   revisioncontrol.NewRevisionControl(),
+        }
+        reconciler.syncControl = synccontrol.New(cli, reconciler.recorder)
+        reconciler.reconcileFunc = reconciler.doReconcile
+        return reconciler</span>
+}
+
+// add adds a new Controller to mgr with r as the reconcile.Reconciler
+func add(mgr manager.Manager, r reconcile.Reconciler) error <span class="cov8" title="1">{
+        // Create a new controller
+        c, err := controller.New("cloneset-controller", mgr, controller.Options{
+                Reconciler: r, MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: util.GetControllerCacheSyncTimeout(),
+                RateLimiter: ratelimiter.DefaultControllerRateLimiter[reconcile.Request]()})
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        // Watch for changes to CloneSet
+        <span class="cov8" title="1">err = c.Watch(source.Kind(mgr.GetCache(), &amp;appsv1beta1.CloneSet{}, &amp;handler.TypedEnqueueRequestForObject[*appsv1beta1.CloneSet]{},
+                predicate.TypedFuncs[*appsv1beta1.CloneSet]{
+                        UpdateFunc: func(e event.TypedUpdateEvent[*appsv1beta1.CloneSet]) bool </span><span class="cov8" title="1">{
+                                oldCS := e.ObjectOld
+                                newCS := e.ObjectNew
+                                if *oldCS.Spec.Replicas != *newCS.Spec.Replicas </span><span class="cov8" title="1">{
+                                        klog.V(4).InfoS("Observed updated replicas for CloneSet",
+                                                "cloneSet", klog.KObj(newCS), "oldReplicas", *oldCS.Spec.Replicas, "newReplicas", *newCS.Spec.Replicas)
+                                }</span>
+                                <span class="cov8" title="1">return true</span>
+                        },
+                }))
+        <span class="cov8" title="1">if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        // Watch for changes to Pod
+        <span class="cov8" title="1">err = c.Watch(source.Kind(mgr.GetCache(), &amp;v1.Pod{}, &amp;podEventHandler{Reader: mgr.GetCache()}))
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        // Watch for changes to PVC, just ensure cache updated
+        <span class="cov8" title="1">err = c.Watch(source.Kind(mgr.GetCache(), &amp;v1.PersistentVolumeClaim{}, &amp;pvcEventHandler{}))
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+var _ reconcile.Reconciler = &amp;ReconcileCloneSet{}
+
+// ReconcileCloneSet reconciles a CloneSet object
+type ReconcileCloneSet struct {
+        client.Client
+        scheme        *runtime.Scheme
+        reconcileFunc func(request reconcile.Request) (reconcile.Result, error)
+
+        recorder          record.EventRecorder
+        controllerHistory history.Interface
+        statusUpdater     StatusUpdater
+        revisionControl   revisioncontrol.Interface
+        syncControl       synccontrol.Interface
+}
+
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=core,resources=pods/resize,verbs=get;patch;update
+// +kubebuilder:rbac:groups=core,resources=events,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=controllerrevisions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=clonesets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=clonesets/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kruise.io,resources=clonesets/finalizers,verbs=update
+
+// Reconcile reads that state of the cluster for a CloneSet object and makes changes based on the state read
+// and what is in the CloneSet.Spec
+func (r *ReconcileCloneSet) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) <span class="cov8" title="1">{
+        return r.reconcileFunc(request)
+}</span>
+
+func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcile.Result, retErr error) <span class="cov8" title="1">{
+        startTime := time.Now()
+        defer func() </span><span class="cov8" title="1">{
+                if retErr == nil </span><span class="cov8" title="1">{
+                        if res.Requeue || res.RequeueAfter &gt; 0 </span><span class="cov0" title="0">{
+                                klog.InfoS("Finished syncing CloneSet", "cloneSet", request, "cost", time.Since(startTime), "result", res)
+                        }</span> else<span class="cov8" title="1"> {
+                                klog.InfoS("Finished syncing CloneSet", "cloneSet", request, "cost", time.Since(startTime))
+                        }</span>
+                } else<span class="cov8" title="1"> {
+                        if errors.IsForbidden(retErr) &amp;&amp; util.IsNamespaceTerminating(retErr) </span><span class="cov8" title="1">{
+                                klog.V(3).InfoS("CloneSet skipped reconcile for namespace terminating", "cloneSet", request)
+                                retErr = nil
+                        }</span> else<span class="cov0" title="0"> {
+                                klog.ErrorS(retErr, "Failed syncing CloneSet", "cloneSet", request)
+                        }</span>
+                }
+                // clean the duration store
+                <span class="cov8" title="1">_ = clonesetutils.DurationStore.Pop(request.String())</span>
+        }()
+
+        // Fetch the CloneSet instance
+        <span class="cov8" title="1">instance := &amp;appsv1beta1.CloneSet{}
+        err := r.Get(context.TODO(), request.NamespacedName, instance)
+        if err != nil </span><span class="cov8" title="1">{
+                if errors.IsNotFound(err) </span><span class="cov0" title="0">{
+                        // Object not found, return.  Created objects are automatically garbage collected.
+                        // For additional cleanup logic use finalizers.
+                        klog.V(3).InfoS("CloneSet has been deleted", "cloneSet", request)
+                        clonesetutils.ScaleExpectations.DeleteExpectations(request.String())
+                        return reconcile.Result{}, nil
+                }</span>
+                <span class="cov8" title="1">return reconcile.Result{}, err</span>
+        }
+
+        <span class="cov8" title="1">coreControl := clonesetcore.New(instance)
+        if coreControl.IsInitializing() </span><span class="cov0" title="0">{
+                klog.V(4).InfoS("CloneSet skipped reconcile for initializing", "cloneSet", request)
+                return reconcile.Result{}, nil
+        }</span>
+
+        <span class="cov8" title="1">selector, err := util.ValidatedLabelSelectorAsSelector(instance.Spec.Selector)
+        if err != nil </span><span class="cov0" title="0">{
+                klog.ErrorS(err, "Error converting CloneSet selector", "cloneSet", request)
+                // This is a non-transient error, so don't retry.
+                return reconcile.Result{}, nil
+        }</span>
+
+        // If scaling expectations have not satisfied yet, just skip this reconcile.
+        <span class="cov8" title="1">if scaleSatisfied, unsatisfiedDuration, scaleDirtyPods := clonesetutils.ScaleExpectations.SatisfiedExpectations(request.String()); !scaleSatisfied </span><span class="cov0" title="0">{
+                if unsatisfiedDuration &gt;= expectations.ExpectationTimeout </span><span class="cov0" title="0">{
+                        // In some extreme scenarios, if the Pod is created and then quickly deleted, there may be event loss.
+                        // Therefore, a touting mechanism is needed to ensure that clonesets can continue to work.
+                        klog.InfoS("Expectation unsatisfied overtime", "cloneSet", request, "scaleDirtyPods", scaleDirtyPods, "overTime", unsatisfiedDuration)
+                        CloneSetScaleExpectationLeakageMetrics.WithLabelValues(request.Namespace, request.Name).Add(1)
+                        // TODO: check the existence of resource in apiserver using client-go directly
+                        /*for _, pods := range scaleDirtyPods {
+                                for _, name := range pods {
+                                        _, err = kubeClient.GetGenericClient().KubeClient.CoreV1().Pods(request.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
+                                        if err == nil {
+                                                klog.Warningf("CloneSet(%s/%s) ScaleExpectations leakage, but Pod(%s) already exist", request.Namespace, request.Name, name)
+                                                return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
+                                        } else if !errors.IsNotFound(err) {
+                                                klog.ErrorS(err, "Failed to get Pod", "cloneSet", request, "pod", name)
+                                                return reconcile.Result{RequeueAfter: 3 * time.Second}, nil
+                                        }
+                                }
+                        }
+                        klog.InfoS("CloneSet ScaleExpectation DirtyPods no longer exists, and delete ScaleExpectation", "cloneSet", request)*/
+                        if utilfeature.DefaultFeatureGate.Enabled(features.ForceDeleteTimeoutExpectationFeatureGate) </span><span class="cov0" title="0">{
+                                klog.InfoS("Expectation unsatisfied overtime, and force delete the timeout Expectation", "cloneSet", request, "scaleDirtyPods", scaleDirtyPods, "overTime", unsatisfiedDuration)
+                                clonesetutils.ScaleExpectations.DeleteExpectations(request.String())
+                                // In order to avoid the scale expectation timeout,
+                                // there is no subsequent Pod, CloneSet event causing CloneSet not to be scheduled
+                                return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
+                        }</span>
+                        <span class="cov0" title="0">return reconcile.Result{}, nil</span>
+                }
+                <span class="cov0" title="0">klog.V(4).InfoS("Not satisfied scale", "cloneSet", request, "scaleDirtyPods", scaleDirtyPods)
+                return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil</span>
+        }
+
+        // list active and inactive Pods belongs to cs
+        <span class="cov8" title="1">filteredPods, filterOutPods, err := r.getOwnedPods(instance)
+        if err != nil </span><span class="cov0" title="0">{
+                return reconcile.Result{}, err
+        }</span>
+        // filteredPVCS's ownerRef is CloneSet
+        <span class="cov8" title="1">filteredPVCs, err := r.getOwnedPVCs(instance)
+        if err != nil </span><span class="cov0" title="0">{
+                return reconcile.Result{}, err
+        }</span>
+
+        // If cloneSet doesn't want to reuse pvc, clean up
+        // the existing pvc first, which are owned by inactive or deleted pods.
+        <span class="cov8" title="1">if !instance.Spec.ScaleStrategy.EnablePVCReuse </span><span class="cov8" title="1">{
+                filteredPVCs, err = r.cleanupPVCs(instance, filteredPods, filterOutPods, filteredPVCs)
+                if err != nil </span><span class="cov0" title="0">{
+                        return reconcile.Result{}, err
+                }</span>
+        }
+
+        // release Pods ownerRef
+        <span class="cov8" title="1">filteredPods, err = r.claimPods(instance, filteredPods)
+        if err != nil </span><span class="cov0" title="0">{
+                return reconcile.Result{}, err
+        }</span>
+
+        // list all revisions and sort them
+        <span class="cov8" title="1">revisions, err := r.controllerHistory.ListControllerRevisions(instance, selector)
+        if err != nil </span><span class="cov0" title="0">{
+                return reconcile.Result{}, err
+        }</span>
+        <span class="cov8" title="1">history.SortControllerRevisions(revisions)
+
+        // get the current, and update revisions
+        currentRevision, updateRevision, collisionCount, err := r.getActiveRevisions(instance, revisions)
+        if err != nil </span><span class="cov0" title="0">{
+                return reconcile.Result{}, err
+        }</span>
+
+        // If resourceVersion expectations have not satisfied yet, just skip this reconcile
+        <span class="cov8" title="1">clonesetutils.ResourceVersionExpectations.Observe(updateRevision)
+        if isSatisfied, unsatisfiedDuration := clonesetutils.ResourceVersionExpectations.IsSatisfied(updateRevision); !isSatisfied </span><span class="cov0" title="0">{
+                if unsatisfiedDuration &lt; expectations.ExpectationTimeout </span><span class="cov0" title="0">{
+                        klog.V(4).InfoS("Not satisfied resourceVersion for CloneSet, wait for updateRevision updating", "cloneSet", request, "updateRevisionName", updateRevision.Name)
+                        return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
+                }</span>
+                <span class="cov0" title="0">klog.InfoS("Expectation unsatisfied overtime for CloneSet, wait for updateRevision updating timeout", "cloneSet", request, "updateRevisionName", updateRevision.Name, "timeout", unsatisfiedDuration)
+                clonesetutils.ResourceVersionExpectations.Delete(updateRevision)</span>
+        }
+        <span class="cov8" title="1">for _, pod := range filteredPods </span><span class="cov8" title="1">{
+                clonesetutils.ResourceVersionExpectations.Observe(pod)
+                if isSatisfied, unsatisfiedDuration := clonesetutils.ResourceVersionExpectations.IsSatisfied(pod); !isSatisfied </span><span class="cov0" title="0">{
+                        if unsatisfiedDuration &gt;= expectations.ExpectationTimeout </span><span class="cov0" title="0">{
+                                klog.InfoS("Expectation unsatisfied overtime for CloneSet, wait for pod updating timeout", "cloneSet", request, "pod", klog.KObj(pod), "timeout", unsatisfiedDuration)
+                                return reconcile.Result{}, nil
+                        }</span>
+                        <span class="cov0" title="0">klog.V(4).InfoS("Not satisfied resourceVersion for CloneSet, wait for pod updating", "cloneSet", request, "pod", klog.KObj(pod))
+                        return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil</span>
+                }
+        }
+
+        <span class="cov8" title="1">newStatus := appsv1beta1.CloneSetStatus{
+                ObservedGeneration: instance.Generation,
+                CurrentRevision:    currentRevision.Name,
+                UpdateRevision:     updateRevision.Name,
+                CollisionCount:     new(int32),
+                LabelSelector:      selector.String(),
+                Conditions:         instance.Status.Conditions,
+        }
+        *newStatus.CollisionCount = collisionCount
+        if !isPreDownloadDisabled </span><span class="cov8" title="1">{
+                if currentRevision.Name != updateRevision.Name </span><span class="cov8" title="1">{
+                        // Get minUpdatedReadyPods
+                        // Priority: 1. spec field (v1beta1) 2. annotation (v1alpha1 or fallback)
+                        minUpdatedReadyPodsCount := 0
+                        if instance.Spec.UpdateStrategy.RollingUpdate != nil &amp;&amp;
+                                instance.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy != nil &amp;&amp;
+                                instance.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy.ImagePreDownloadMinUpdatedReadyPods != nil </span><span class="cov0" title="0">{
+                                // Read from v1beta1 spec field
+                                minUpdatedReadyPodsIntStr := intstrutil.FromInt(int(*instance.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy.ImagePreDownloadMinUpdatedReadyPods))
+                                minUpdatedReadyPodsCount, err = intstrutil.GetScaledValueFromIntOrPercent(&amp;minUpdatedReadyPodsIntStr, int(*instance.Spec.Replicas), true)
+                                if err != nil </span><span class="cov0" title="0">{
+                                        klog.ErrorS(err, "Failed to GetScaledValueFromIntOrPercent of minUpdatedReadyPods for CloneSet", "cloneSet", request)
+                                }</span>
+                        }
+                        <span class="cov8" title="1">updatedReadyReplicas := instance.Status.UpdatedReadyReplicas
+                        if updateRevision.Name != instance.Status.UpdateRevision </span><span class="cov8" title="1">{
+                                updatedReadyReplicas = 0
+                        }</span>
+                        <span class="cov8" title="1">if int32(minUpdatedReadyPodsCount) &lt;= updatedReadyReplicas </span><span class="cov8" title="1">{
+                                // pre-download images for new revision
+                                if err := r.createImagePullJobsForInPlaceUpdate(instance, currentRevision, updateRevision); err != nil </span><span class="cov0" title="0">{
+                                        klog.ErrorS(err, "Failed to create ImagePullJobs for CloneSet", "cloneSet", request)
+                                }</span>
+                        }
+                } else<span class="cov8" title="1"> {
+                        // delete ImagePullJobs if revisions have been consistent
+                        if err := imagejobutilfunc.DeleteJobsForWorkload(r.Client, instance); err != nil </span><span class="cov0" title="0">{
+                                klog.ErrorS(err, "Failed to delete imagepulljobs for CloneSet", "cloneSet", request)
+                        }</span>
+                }
+        }
+
+        // scale and update pods
+        <span class="cov8" title="1">syncErr := r.syncCloneSet(instance, &amp;newStatus, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
+        // update new status
+        if err = r.statusUpdater.UpdateCloneSetStatus(instance, &amp;newStatus, filteredPods); err != nil </span><span class="cov0" title="0">{
+                return reconcile.Result{}, err
+        }</span>
+
+        <span class="cov8" title="1">if err = r.truncatePodsToDelete(instance, filteredPods); err != nil </span><span class="cov8" title="1">{
+                klog.ErrorS(err, "Failed to truncate podsToDelete for CloneSet", "cloneSet", request)
+        }</span>
+
+        <span class="cov8" title="1">if err = r.truncateHistory(instance, filteredPods, revisions, currentRevision, updateRevision); err != nil </span><span class="cov0" title="0">{
+                klog.ErrorS(err, "Failed to truncate history for CloneSet", "cloneSet", request)
+        }</span>
+
+        <span class="cov8" title="1">if syncErr == nil &amp;&amp; instance.Spec.MinReadySeconds &gt; 0 &amp;&amp; newStatus.AvailableReplicas != newStatus.ReadyReplicas </span><span class="cov0" title="0">{
+                clonesetutils.DurationStore.Push(request.String(), time.Second*time.Duration(instance.Spec.MinReadySeconds))
+        }</span>
+        <span class="cov8" title="1">return reconcile.Result{RequeueAfter: clonesetutils.DurationStore.Pop(request.String())}, syncErr</span>
+}
+
+func (r *ReconcileCloneSet) syncCloneSet(
+        instance *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus,
+        currentRevision, updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
+        filteredPods []*v1.Pod, filteredPVCs []*v1.PersistentVolumeClaim,
+) error <span class="cov8" title="1">{
+        if instance.DeletionTimestamp != nil </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+
+        // get the current and update revisions of the set.
+        <span class="cov8" title="1">currentSet, err := r.revisionControl.ApplyRevision(instance, currentRevision)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">updateSet, err := r.revisionControl.ApplyRevision(instance, updateRevision)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">var scaling bool
+        var podsScaleErr error
+        var podsUpdateErr error
+
+        scaling, podsScaleErr = r.syncControl.Scale(currentSet, updateSet, currentRevision.Name, updateRevision.Name, filteredPods, filteredPVCs)
+        if podsScaleErr != nil </span><span class="cov0" title="0">{
+                cond := appsv1beta1.CloneSetCondition{
+                        Type:               appsv1beta1.CloneSetConditionFailedScale,
+                        Status:             v1.ConditionTrue,
+                        LastTransitionTime: metav1.Now(),
+                        Message:            podsScaleErr.Error(),
+                }
+                clonesetutils.SetCloneSetCondition(newStatus, cond)
+                err = podsScaleErr
+        }</span>
+        <span class="cov8" title="1">if scaling </span><span class="cov8" title="1">{
+                return podsScaleErr
+        }</span>
+
+        <span class="cov8" title="1">podsUpdateErr = r.syncControl.Update(updateSet, currentRevision, updateRevision, revisions, filteredPods, filteredPVCs)
+        if podsUpdateErr != nil </span><span class="cov0" title="0">{
+                cond := appsv1beta1.CloneSetCondition{
+                        Type:               appsv1beta1.CloneSetConditionFailedUpdate,
+                        Status:             v1.ConditionTrue,
+                        LastTransitionTime: metav1.Now(),
+                        Message:            podsUpdateErr.Error(),
+                }
+                clonesetutils.SetCloneSetCondition(newStatus, cond)
+                if err == nil </span><span class="cov0" title="0">{
+                        err = podsUpdateErr
+                }</span>
+        }
+
+        <span class="cov8" title="1">return err</span>
+}
+
+func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1beta1.CloneSet, revisions []*apps.ControllerRevision) (
+        *apps.ControllerRevision, *apps.ControllerRevision, int32, error,
+) <span class="cov8" title="1">{
+        var currentRevision, updateRevision *apps.ControllerRevision
+        revisionCount := len(revisions)
+
+        // Use a local copy of cs.Status.CollisionCount to avoid modifying cs.Status directly.
+        // This copy is returned so the value gets carried over to cs.Status in UpdateCloneSetStatus.
+        var collisionCount int32
+        if cs.Status.CollisionCount != nil </span><span class="cov8" title="1">{
+                collisionCount = *cs.Status.CollisionCount
+        }</span>
+
+        // create a new revision from the current cs
+        <span class="cov8" title="1">updateRevision, err := r.revisionControl.NewRevision(cs, clonesetutils.NextRevision(revisions), &amp;collisionCount)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, nil, collisionCount, err
+        }</span>
+
+        // Here, we do not consider the case where the volumeClaimTemplates Hash was not added before the upgrade feature.
+        // 1. It is not possible to actually extract the previous volumeClaimTemplates Hash.
+        // 2. the hash must exist in all revisions that have been updated after the feature is enabled.
+        <span class="cov8" title="1">VCTHashEqual := func(revision *apps.ControllerRevision, needle *apps.ControllerRevision) bool </span><span class="cov8" title="1">{
+                needleVolumeClaimHash, _ := volumeclaimtemplate.GetVCTemplatesHash(needle)
+                tmpHash, exist := volumeclaimtemplate.GetVCTemplatesHash(revision)
+                // vcTemplate hash may not exist in old revision, use hash of new revision instead
+                if !exist || tmpHash != needleVolumeClaimHash </span><span class="cov8" title="1">{
+                        return false
+                }</span>
+                <span class="cov8" title="1">return true</span>
+        }
+
+        // When there is a change in the PVC only, no new revision will be generated.
+        // find any equivalent revisions
+        <span class="cov8" title="1">equalRevisions := history.FindEqualRevisions(revisions, updateRevision)
+        equalCount := len(equalRevisions)
+        if equalCount &gt; 0 &amp;&amp; history.EqualRevision(revisions[revisionCount-1], equalRevisions[equalCount-1]) </span><span class="cov8" title="1">{
+                // if the equivalent revision is immediately prior the update revision has not changed
+                updateRevision = revisions[revisionCount-1]
+        }</span> else<span class="cov8" title="1"> if equalCount &gt; 0 </span><span class="cov8" title="1">{
+                lastEqualRevision := equalRevisions[equalCount-1]
+                if !VCTHashEqual(lastEqualRevision, updateRevision) </span><span class="cov8" title="1">{
+                        klog.InfoS("Revision vct hash will be updated", "revisionName", lastEqualRevision.Name, "lastRevisionVCTHash", lastEqualRevision.Annotations[volumeclaimtemplate.HashAnnotation], "updateRevisionVCTHash", updateRevision.Annotations[volumeclaimtemplate.HashAnnotation])
+                        lastEqualRevision.Annotations[volumeclaimtemplate.HashAnnotation] = updateRevision.Annotations[volumeclaimtemplate.HashAnnotation]
+                }</span>
+                // if the equivalent revision is not immediately prior we will roll back by incrementing the
+                // Revision of the equivalent revision
+                <span class="cov8" title="1">updateRevision, err = r.controllerHistory.UpdateControllerRevision(equalRevisions[equalCount-1], updateRevision.Revision)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, nil, collisionCount, err
+                }</span>
+        } else<span class="cov8" title="1"> {
+                // if there is no equivalent revision we create a new one
+                updateRevision, err = r.controllerHistory.CreateControllerRevision(cs, updateRevision, &amp;collisionCount)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, nil, collisionCount, err
+                }</span>
+        }
+
+        // attempt to find the revision that corresponds to the current revision
+        <span class="cov8" title="1">for i := range revisions </span><span class="cov8" title="1">{
+                if revisions[i].Name == cs.Status.CurrentRevision </span><span class="cov8" title="1">{
+                        currentRevision = revisions[i]
+                        break</span>
+                }
+        }
+
+        // if the current revision is nil we initialize the history by setting it to the update revision
+        <span class="cov8" title="1">if currentRevision == nil </span><span class="cov8" title="1">{
+                currentRevision = updateRevision
+        }</span>
+
+        <span class="cov8" title="1">return currentRevision, updateRevision, collisionCount, nil</span>
+}
+
+func (r *ReconcileCloneSet) getOwnedPods(cs *appsv1beta1.CloneSet) ([]*v1.Pod, []*v1.Pod, error) <span class="cov8" title="1">{
+        opts := &amp;client.ListOptions{
+                Namespace:     cs.Namespace,
+                FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(cs.UID)}),
+        }
+        return clonesetutils.GetActiveAndInactivePods(r.Client, opts)
+}</span>
+
+func (r *ReconcileCloneSet) getOwnedPVCs(cs *appsv1beta1.CloneSet) ([]*v1.PersistentVolumeClaim, error) <span class="cov8" title="1">{
+        opts := &amp;client.ListOptions{
+                Namespace:     cs.Namespace,
+                FieldSelector: fields.SelectorFromSet(fields.Set{fieldindex.IndexNameForOwnerRefUID: string(cs.UID)}),
+        }
+
+        pvcList := v1.PersistentVolumeClaimList{}
+        if err := r.List(context.TODO(), &amp;pvcList, opts, utilclient.DisableDeepCopy); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">var filteredPVCs []*v1.PersistentVolumeClaim
+        for i := range pvcList.Items </span><span class="cov8" title="1">{
+                pvc := &amp;pvcList.Items[i]
+                if pvc.DeletionTimestamp == nil </span><span class="cov8" title="1">{
+                        filteredPVCs = append(filteredPVCs, pvc)
+                }</span>
+        }
+
+        <span class="cov8" title="1">return filteredPVCs, nil</span>
+}
+
+// truncatePodsToDelete truncates any non-live pod names in spec.scaleStrategy.podsToDelete.
+func (r *ReconcileCloneSet) truncatePodsToDelete(cs *appsv1beta1.CloneSet, pods []*v1.Pod) error <span class="cov8" title="1">{
+        if len(cs.Spec.ScaleStrategy.PodsToDelete) == 0 </span><span class="cov8" title="1">{
+                return nil
+        }</span>
+
+        <span class="cov8" title="1">existingPods := sets.NewString()
+        for _, p := range pods </span><span class="cov8" title="1">{
+                existingPods.Insert(p.Name)
+        }</span>
+
+        <span class="cov8" title="1">var newPodsToDelete []string
+        for _, podName := range cs.Spec.ScaleStrategy.PodsToDelete </span><span class="cov8" title="1">{
+                if existingPods.Has(podName) </span><span class="cov0" title="0">{
+                        newPodsToDelete = append(newPodsToDelete, podName)
+                }</span>
+        }
+
+        <span class="cov8" title="1">if len(newPodsToDelete) == len(cs.Spec.ScaleStrategy.PodsToDelete) </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+
+        <span class="cov8" title="1">newCS := cs.DeepCopy()
+        newCS.Spec.ScaleStrategy.PodsToDelete = newPodsToDelete
+        return r.Update(context.TODO(), newCS)</span>
+}
+
+// truncateHistory truncates any non-live ControllerRevisions in revisions from cs's history. The UpdateRevision and
+// CurrentRevision in cs's Status are considered to be live. Any revisions associated with the Pods in pods are also
+// considered to be live. Non-live revisions are deleted, starting with the revision with the lowest Revision, until
+// only RevisionHistoryLimit revisions remain. If the returned error is nil the operation was successful. This method
+// expects that revisions is sorted when supplied.
+func (r *ReconcileCloneSet) truncateHistory(
+        cs *appsv1beta1.CloneSet,
+        pods []*v1.Pod,
+        revisions []*apps.ControllerRevision,
+        current *apps.ControllerRevision,
+        update *apps.ControllerRevision,
+) error <span class="cov8" title="1">{
+        noLiveRevisions := make([]*apps.ControllerRevision, 0, len(revisions))
+
+        // collect live revisions and historic revisions
+        for i := range revisions </span><span class="cov8" title="1">{
+                if revisions[i].Name != current.Name &amp;&amp; revisions[i].Name != update.Name </span><span class="cov8" title="1">{
+                        var found bool
+                        for _, pod := range pods </span><span class="cov8" title="1">{
+                                if clonesetutils.EqualToRevisionHash("", pod, revisions[i].Name) </span><span class="cov8" title="1">{
+                                        found = true
+                                        break</span>
+                                }
+                        }
+                        <span class="cov8" title="1">if !found </span><span class="cov8" title="1">{
+                                noLiveRevisions = append(noLiveRevisions, revisions[i])
+                        }</span>
+                }
+        }
+        <span class="cov8" title="1">historyLen := len(noLiveRevisions)
+        historyLimit := 10
+        if cs.Spec.RevisionHistoryLimit != nil </span><span class="cov8" title="1">{
+                historyLimit = int(*cs.Spec.RevisionHistoryLimit)
+        }</span>
+        <span class="cov8" title="1">if historyLen &lt;= historyLimit </span><span class="cov8" title="1">{
+                return nil
+        }</span>
+        // delete any non-live history to maintain the revision limit.
+        <span class="cov8" title="1">noLiveRevisions = noLiveRevisions[:(historyLen - historyLimit)]
+        for i := 0; i &lt; len(noLiveRevisions); i++ </span><span class="cov8" title="1">{
+                if err := r.controllerHistory.DeleteControllerRevision(noLiveRevisions[i]); err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+        }
+        <span class="cov8" title="1">return nil</span>
+}
+
+func (r *ReconcileCloneSet) claimPods(instance *appsv1beta1.CloneSet, pods []*v1.Pod) ([]*v1.Pod, error) <span class="cov8" title="1">{
+        mgr, err := refmanager.New(r, instance.Spec.Selector, instance, r.scheme)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">selected := make([]metav1.Object, len(pods))
+        for i, pod := range pods </span><span class="cov8" title="1">{
+                selected[i] = pod
+        }</span>
+
+        <span class="cov8" title="1">claimed, err := mgr.ClaimOwnedObjects(selected)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">claimedPods := make([]*v1.Pod, len(claimed))
+        for i, pod := range claimed </span><span class="cov8" title="1">{
+                claimedPods[i] = pod.(*v1.Pod)
+        }</span>
+
+        <span class="cov8" title="1">return claimedPods, nil</span>
+}
+
+// cleanUp unUsed pvcs, and return used pvcs.
+// If pvc owner pod does not exist, the pvc can be deleted directly,
+// else update pvc's ownerReference to pod.
+func (r *ReconcileCloneSet) cleanupPVCs(
+        cs *appsv1beta1.CloneSet,
+        activePods, inactivePods []*v1.Pod,
+        pvcs []*v1.PersistentVolumeClaim,
+) ([]*v1.PersistentVolumeClaim, error) <span class="cov8" title="1">{
+        activeIds := sets.NewString()
+        for _, pod := range activePods </span><span class="cov8" title="1">{
+                if id := clonesetutils.GetInstanceID(pod); id != "" </span><span class="cov8" title="1">{
+                        activeIds.Insert(id)
+                }</span>
+        }
+        <span class="cov8" title="1">inactiveIds := map[string]*v1.Pod{}
+        for i := range inactivePods </span><span class="cov8" title="1">{
+                pod := inactivePods[i]
+                if id := clonesetutils.GetInstanceID(pod); id != "" </span><span class="cov8" title="1">{
+                        inactiveIds[id] = pod
+                }</span>
+        }
+        <span class="cov8" title="1">var inactivePVCs, toDeletePVCs, activePVCs []*v1.PersistentVolumeClaim
+        for i := range pvcs </span><span class="cov8" title="1">{
+                pvc := pvcs[i]
+                if activeIds.Has(clonesetutils.GetInstanceID(pvc)) </span><span class="cov8" title="1">{
+                        activePVCs = append(activePVCs, pvc)
+                        continue</span>
+                }
+                <span class="cov8" title="1">_, ok := inactiveIds[clonesetutils.GetInstanceID(pvc)]
+                if ok </span><span class="cov8" title="1">{
+                        inactivePVCs = append(inactivePVCs, pvc.DeepCopy())
+                }</span> else<span class="cov8" title="1"> {
+                        toDeletePVCs = append(toDeletePVCs, pvc.DeepCopy())
+                }</span>
+        }
+        <span class="cov8" title="1">if len(inactivePVCs) == 0 &amp;&amp; len(toDeletePVCs) == 0 </span><span class="cov8" title="1">{
+                return activePVCs, nil
+        }</span>
+
+        // update useless pvc owner to pod
+        <span class="cov8" title="1">for i := range inactivePVCs </span><span class="cov8" title="1">{
+                pvc := inactivePVCs[i]
+                pod := inactiveIds[clonesetutils.GetInstanceID(pvc)]
+                // There is no need to judge whether the ownerRef has met expectations
+                // because the pvc(listed in the previous list)'s ownerRef must be CloneSet
+                _ = updateClaimOwnerRefToPod(pvc, cs, pod)
+                if err := r.updateOnePVC(cs, pvc); err != nil &amp;&amp; !errors.IsNotFound(err) </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov8" title="1">klog.V(3).InfoS("Updated CloneSet pvc's ownerRef to Pod", "cloneSet", klog.KObj(cs), "pvc", klog.KObj(pvc))</span>
+        }
+        // delete pvc directly
+        <span class="cov8" title="1">for i := range toDeletePVCs </span><span class="cov8" title="1">{
+                pvc := toDeletePVCs[i]
+                if err := r.deleteOnePVC(cs, pvc); err != nil &amp;&amp; !errors.IsNotFound(err) </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov8" title="1">klog.V(3).InfoS("Deleted CloneSet pvc directly", "cloneSet", klog.KObj(cs), "pvc", klog.KObj(pvc))</span>
+        }
+        <span class="cov8" title="1">return activePVCs, nil</span>
+}
+
+func (r *ReconcileCloneSet) updateOnePVC(cs *appsv1beta1.CloneSet, pvc *v1.PersistentVolumeClaim) error <span class="cov8" title="1">{
+        if err := r.Client.Update(context.TODO(), pvc); err != nil </span><span class="cov0" title="0">{
+                r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedUpdate", "failed to update PVC %s: %v", pvc.Name, err)
+                return err
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+
+func (r *ReconcileCloneSet) deleteOnePVC(cs *appsv1beta1.CloneSet, pvc *v1.PersistentVolumeClaim) error <span class="cov8" title="1">{
+        clonesetutils.ScaleExpectations.ExpectScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pvc.Name)
+        if err := r.Delete(context.TODO(), pvc); err != nil </span><span class="cov0" title="0">{
+                clonesetutils.ScaleExpectations.ObserveScale(clonesetutils.GetControllerKey(cs), expectations.Delete, pvc.Name)
+                r.recorder.Eventf(cs, v1.EventTypeWarning, "FailedDelete", "failed to clean up PVC %s: %v", pvc.Name, err)
+                return err
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+
+func updateClaimOwnerRefToPod(pvc *v1.PersistentVolumeClaim, cs *appsv1beta1.CloneSet, pod *v1.Pod) bool <span class="cov8" title="1">{
+        util.RemoveOwnerRef(pvc, cs)
+        return util.SetOwnerRef(pvc, pod, schema.GroupVersionKind{Version: "v1", Kind: "Pod"})
+}</span>
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">/*
+Copyright 2019 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package cloneset
+
+import (
+        "context"
+        "reflect"
+        "strings"
+        "time"
+
+        v1 "k8s.io/api/core/v1"
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+        "k8s.io/apimachinery/pkg/labels"
+        "k8s.io/apimachinery/pkg/runtime/schema"
+        "k8s.io/apimachinery/pkg/types"
+        "k8s.io/client-go/util/workqueue"
+        "k8s.io/klog/v2"
+        "sigs.k8s.io/controller-runtime/pkg/client"
+        "sigs.k8s.io/controller-runtime/pkg/event"
+        "sigs.k8s.io/controller-runtime/pkg/handler"
+        "sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+        appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+        clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
+        clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+        "github.com/openkruise/kruise/pkg/features"
+        "github.com/openkruise/kruise/pkg/util/expectations"
+        utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+)
+
+var (
+        // initialingRateLimiter calculates the delay duration for existing Pods
+        // triggered Create event when the Informer cache has just synced.
+        initialingRateLimiter = workqueue.NewItemExponentialFailureRateLimiter(3*time.Second, 30*time.Second)
+)
+
+type podEventHandler struct {
+        client.Reader
+}
+
+var _ handler.TypedEventHandler[*v1.Pod, reconcile.Request] = &amp;podEventHandler{}
+
+func (e *podEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) <span class="cov8" title="1">{
+        pod := evt.Object
+        if pod.DeletionTimestamp != nil </span><span class="cov8" title="1">{
+                // on a restart of the controller manager, it's possible a new pod shows up in a state that
+                // is already pending deletion. Prevent the pod from being a creation observation.
+                e.Delete(ctx, event.TypedDeleteEvent[*v1.Pod]{Object: evt.Object}, q)
+                return
+        }</span>
+
+        // If it has a ControllerRef, that's all that matters.
+        <span class="cov8" title="1">if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil </span><span class="cov8" title="1">{
+                req := resolveControllerRef(pod.Namespace, controllerRef)
+                if req == nil </span><span class="cov0" title="0">{
+                        return
+                }</span>
+                <span class="cov8" title="1">klog.V(4).InfoS("Pod created", "pod", klog.KObj(pod), "owner", req)
+
+                isSatisfied, _, _ := clonesetutils.ScaleExpectations.SatisfiedExpectations(req.String())
+                clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Create, pod.Name)
+                if isSatisfied </span><span class="cov0" title="0">{
+                        // If the scale expectation is satisfied, it should be an existing Pod and the Informer
+                        // cache should have just synced.
+                        q.AddAfter(*req, initialingRateLimiter.When(req))
+                }</span> else<span class="cov8" title="1"> {
+                        // Otherwise, add it immediately and reset the rate limiter
+                        initialingRateLimiter.Forget(req)
+                        q.Add(*req)
+                }</span>
+                <span class="cov8" title="1">return</span>
+        }
+
+        // Otherwise, it's an orphan. Get a list of all matching CloneSets and sync
+        // them to see if anyone wants to adopt it.
+        // DO NOT observe creation because no controller should be waiting for an
+        // orphan.
+        <span class="cov8" title="1">csList := e.getPodCloneSets(pod)
+        if len(csList) == 0 </span><span class="cov8" title="1">{
+                return
+        }</span>
+        <span class="cov8" title="1">klog.V(4).InfoS("Orphan Pod created", "pod", klog.KObj(pod), "owner", e.joinCloneSetNames(csList))
+        for _, cs := range csList </span><span class="cov8" title="1">{
+                q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
+                        Name:      cs.GetName(),
+                        Namespace: cs.GetNamespace(),
+                }})
+        }</span>
+}
+
+func (e *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) <span class="cov8" title="1">{
+        oldPod := evt.ObjectOld
+        curPod := evt.ObjectNew
+        if curPod.ResourceVersion == oldPod.ResourceVersion </span><span class="cov8" title="1">{
+                // Periodic resync will send update events for all known pods.
+                // Two different versions of the same pod will always have different RVs.
+                return
+        }</span>
+
+        <span class="cov8" title="1">labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
+        if curPod.DeletionTimestamp != nil </span><span class="cov8" title="1">{
+                // when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
+                // and after such time has passed, the kubelet actually deletes it from the store. We receive an update
+                // for modification of the deletion timestamp and expect a rs to create more replicas asap, not wait
+                // until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
+                // a rs never initiates a phase change, and so is never asleep waiting for the same.
+                e.Delete(ctx, event.TypedDeleteEvent[*v1.Pod]{Object: evt.ObjectNew}, q)
+                if labelChanged </span><span class="cov8" title="1">{
+                        // we don't need to check the oldPod.DeletionTimestamp because DeletionTimestamp cannot be unset.
+                        e.Delete(ctx, event.TypedDeleteEvent[*v1.Pod]{Object: evt.ObjectOld}, q)
+                }</span>
+                <span class="cov8" title="1">return</span>
+        }
+
+        <span class="cov8" title="1">curControllerRef := metav1.GetControllerOf(curPod)
+        oldControllerRef := metav1.GetControllerOf(oldPod)
+        controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
+        if controllerRefChanged &amp;&amp; oldControllerRef != nil </span><span class="cov8" title="1">{
+                // The ControllerRef was changed. Sync the old controller, if any.
+                if req := resolveControllerRef(oldPod.Namespace, oldControllerRef); req != nil </span><span class="cov8" title="1">{
+                        q.Add(*req)
+                }</span>
+        }
+
+        // If it has a ControllerRef, that's all that matters.
+        <span class="cov8" title="1">if curControllerRef != nil </span><span class="cov8" title="1">{
+                // TODO(Abner-1): delete it when fixes only resize resource
+                //old, _ := json.Marshal(oldPod)
+                //cur, _ := json.Marshal(curPod)
+                //patches, _ := jsonpatch.CreatePatch(old, cur)
+                //pjson, _ := json.Marshal(patches)
+                //klog.V(4).InfoS("Pod updated json", "pod", klog.KObj(curPod), "patch", pjson)
+
+                req := resolveControllerRef(curPod.Namespace, curControllerRef)
+                if req == nil </span><span class="cov0" title="0">{
+                        return
+                }</span>
+
+                <span class="cov8" title="1">if utilfeature.DefaultFeatureGate.Enabled(features.CloneSetEventHandlerOptimization) </span><span class="cov8" title="1">{
+                        if !controllerRefChanged &amp;&amp; !labelChanged &amp;&amp; e.shouldIgnoreUpdate(req, oldPod, curPod) </span><span class="cov8" title="1">{
+                                return
+                        }</span>
+                }
+
+                <span class="cov8" title="1">klog.V(4).InfoS("Pod updated", "pod", klog.KObj(curPod), "owner", req)
+                q.Add(*req)
+                return</span>
+        }
+
+        // Otherwise, it's an orphan. If anything changed, sync matching controllers
+        // to see if anyone wants to adopt it now.
+        <span class="cov8" title="1">if labelChanged || controllerRefChanged </span><span class="cov8" title="1">{
+                csList := e.getPodCloneSets(curPod)
+                if len(csList) == 0 </span><span class="cov0" title="0">{
+                        return
+                }</span>
+                <span class="cov8" title="1">klog.V(4).InfoS("Orphan Pod updated", "pod", klog.KObj(curPod), "owner", e.joinCloneSetNames(csList))
+                for _, cs := range csList </span><span class="cov8" title="1">{
+                        q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
+                                Name:      cs.GetName(),
+                                Namespace: cs.GetNamespace(),
+                        }})
+                }</span>
+        }
+}
+
+func (e *podEventHandler) shouldIgnoreUpdate(req *reconcile.Request, oldPod, curPod *v1.Pod) bool <span class="cov8" title="1">{
+        cs := &amp;appsv1beta1.CloneSet{}
+        if err := e.Get(context.TODO(), req.NamespacedName, cs); err != nil </span><span class="cov0" title="0">{
+                return false
+        }</span>
+
+        <span class="cov8" title="1">return clonesetcore.New(cs).IgnorePodUpdateEvent(oldPod, curPod)</span>
+}
+
+func (e *podEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) <span class="cov8" title="1">{
+        pod := evt.Object
+        clonesetutils.ResourceVersionExpectations.Delete(pod)
+
+        controllerRef := metav1.GetControllerOf(pod)
+        if controllerRef == nil </span><span class="cov8" title="1">{
+                // No controller should care about orphans being deleted.
+                return
+        }</span>
+        <span class="cov8" title="1">req := resolveControllerRef(pod.Namespace, controllerRef)
+        if req == nil </span><span class="cov0" title="0">{
+                return
+        }</span>
+
+        <span class="cov8" title="1">klog.V(4).InfoS("Pod deleted", "pod", klog.KObj(pod), "owner", req)
+        clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Delete, pod.Name)
+        q.Add(*req)</span>
+}
+
+func (e *podEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {<span class="cov0" title="0">
+
+}</span>
+
+func resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *reconcile.Request <span class="cov8" title="1">{
+        // Parse the Group out of the OwnerReference to compare it to what was parsed out of the requested OwnerType
+        refGV, err := schema.ParseGroupVersion(controllerRef.APIVersion)
+        if err != nil </span><span class="cov0" title="0">{
+                klog.ErrorS(err, "Could not parse APIVersion in OwnerReference", "ownerRef", controllerRef)
+                return nil
+        }</span>
+
+        // Compare the OwnerReference Group and Kind against the OwnerType Group and Kind specified by the user.
+        // If the two match, create a Request for the objected referred to by
+        // the OwnerReference.  Use the Name from the OwnerReference and the Namespace from the
+        // object in the event.Typed
+        <span class="cov8" title="1">if controllerRef.Kind == clonesetutils.ControllerKind.Kind &amp;&amp; refGV.Group == clonesetutils.ControllerKind.Group </span><span class="cov8" title="1">{
+                // Match found - add a Request for the object referred to in the OwnerReference
+                req := reconcile.Request{NamespacedName: types.NamespacedName{
+                        Namespace: namespace,
+                        Name:      controllerRef.Name,
+                }}
+                return &amp;req
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+func (e *podEventHandler) getPodCloneSets(pod *v1.Pod) []appsv1beta1.CloneSet <span class="cov8" title="1">{
+        csList := appsv1beta1.CloneSetList{}
+        if err := e.List(context.TODO(), &amp;csList, client.InNamespace(pod.Namespace)); err != nil </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+
+        <span class="cov8" title="1">var csMatched []appsv1beta1.CloneSet
+        for _, cs := range csList.Items </span><span class="cov8" title="1">{
+                selector, err := metav1.LabelSelectorAsSelector(cs.Spec.Selector)
+                if err != nil || selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) </span><span class="cov8" title="1">{
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">csMatched = append(csMatched, cs)</span>
+        }
+
+        <span class="cov8" title="1">if len(csMatched) &gt; 1 </span><span class="cov8" title="1">{
+                // ControllerRef will ensure we don't do anything crazy, but more than one
+                // item in this list nevertheless constitutes user error.
+                klog.InfoS("Error! More than one CloneSet is selecting pod", "pod", klog.KObj(pod), "cloneSets", e.joinCloneSetNames(csMatched))
+        }</span>
+        <span class="cov8" title="1">return csMatched</span>
+}
+
+func (e *podEventHandler) joinCloneSetNames(csList []appsv1beta1.CloneSet) string <span class="cov8" title="1">{
+        var names []string
+        for _, cs := range csList </span><span class="cov8" title="1">{
+                names = append(names, cs.Name)
+        }</span>
+        <span class="cov8" title="1">return strings.Join(names, ",")</span>
+}
+
+type pvcEventHandler struct {
+}
+
+var _ handler.TypedEventHandler[*v1.PersistentVolumeClaim, reconcile.Request] = &amp;pvcEventHandler{}
+
+func (e *pvcEventHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.PersistentVolumeClaim], q workqueue.TypedRateLimitingInterface[reconcile.Request]) <span class="cov8" title="1">{
+        pvc := evt.Object
+        if pvc.DeletionTimestamp != nil </span><span class="cov0" title="0">{
+                e.Delete(ctx, event.TypedDeleteEvent[*v1.PersistentVolumeClaim]{Object: evt.Object}, q)
+                return
+        }</span>
+
+        <span class="cov8" title="1">if controllerRef := metav1.GetControllerOf(pvc); controllerRef != nil </span><span class="cov8" title="1">{
+                if req := resolveControllerRef(pvc.Namespace, controllerRef); req != nil </span><span class="cov8" title="1">{
+                        isSatisfied, _, _ := clonesetutils.ScaleExpectations.SatisfiedExpectations(req.String())
+                        clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Create, pvc.Name)
+                        if isSatisfied </span><span class="cov8" title="1">{
+                                // If the scale expectation is satisfied, it should be an existing Pod and the Informer
+                                // cache should have just synced.
+                                q.AddAfter(*req, initialingRateLimiter.When(req))
+                        }</span> else<span class="cov8" title="1"> {
+                                // Otherwise, add it immediately and reset the rate limiter
+                                initialingRateLimiter.Forget(req)
+                                q.Add(*req)
+                        }</span>
+                }
+        }
+}
+
+func (e *pvcEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.PersistentVolumeClaim], q workqueue.TypedRateLimitingInterface[reconcile.Request]) <span class="cov8" title="1">{
+        pvc := evt.ObjectNew
+        if pvc.DeletionTimestamp != nil </span><span class="cov8" title="1">{
+                e.Delete(ctx, event.TypedDeleteEvent[*v1.PersistentVolumeClaim]{Object: evt.ObjectNew}, q)
+        }</span>
+}
+
+func (e *pvcEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.PersistentVolumeClaim], q workqueue.TypedRateLimitingInterface[reconcile.Request]) <span class="cov8" title="1">{
+        pvc := evt.Object
+        if controllerRef := metav1.GetControllerOf(pvc); controllerRef != nil </span><span class="cov8" title="1">{
+                if req := resolveControllerRef(pvc.Namespace, controllerRef); req != nil </span><span class="cov8" title="1">{
+                        clonesetutils.ScaleExpectations.ObserveScale(req.String(), expectations.Delete, pvc.Name)
+                        q.Add(*req)
+                }</span>
+        }
+}
+
+func (e *pvcEventHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*v1.PersistentVolumeClaim], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {<span class="cov0" title="0">
+
+}</span>
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">/*
+Copyright 2021 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package cloneset
+
+import (
+        "context"
+        "fmt"
+
+        apps "k8s.io/api/apps/v1"
+        v1 "k8s.io/api/core/v1"
+        "k8s.io/apimachinery/pkg/api/errors"
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+        "k8s.io/apimachinery/pkg/types"
+        intstrutil "k8s.io/apimachinery/pkg/util/intstr"
+        "k8s.io/klog/v2"
+        "k8s.io/kubernetes/pkg/controller/history"
+        "sigs.k8s.io/controller-runtime/pkg/client"
+
+        appspub "github.com/openkruise/kruise/apis/apps/pub"
+        appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+        clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
+        clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+        "github.com/openkruise/kruise/pkg/util"
+        imagejobutilfunc "github.com/openkruise/kruise/pkg/util/imagejob/utilfunction"
+        "github.com/openkruise/kruise/pkg/util/inplaceupdate"
+)
+
+func (r *ReconcileCloneSet) createImagePullJobsForInPlaceUpdate(cs *appsv1beta1.CloneSet, currentRevision, updateRevision *apps.ControllerRevision) error <span class="cov8" title="1">{
+        if _, ok := updateRevision.Labels[appsv1beta1.ImagePreDownloadCreatedKey]; ok </span><span class="cov8" title="1">{
+                return nil
+        }</span> else<span class="cov8" title="1"> if _, ok := updateRevision.Labels[appsv1beta1.ImagePreDownloadIgnoredKey]; ok </span><span class="cov8" title="1">{
+                return nil
+        }</span>
+
+        // ignore if update type is ReCreate (PodUpdatePolicy is ReCreate or RollingUpdate is nil)
+        <span class="cov8" title="1">if cs.Spec.UpdateStrategy.RollingUpdate == nil || cs.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy == appsv1beta1.RecreateCloneSetPodUpdateStrategyType </span><span class="cov8" title="1">{
+                klog.V(4).InfoS("CloneSet skipped to create ImagePullJob for update type is ReCreate", "cloneSet", klog.KObj(cs))
+                return r.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
+        }</span>
+
+        // ignore if replicas &lt;= minimumReplicasToPreDownloadImage
+        <span class="cov8" title="1">if *cs.Spec.Replicas &lt;= minimumReplicasToPreDownloadImage </span><span class="cov0" title="0">{
+                klog.V(4).InfoS("CloneSet skipped to create ImagePullJob because replicas less than or equal to the minimum threshold",
+                        "cloneSet", klog.KObj(cs), "replicas", *cs.Spec.Replicas, "minimumReplicasToPreDownloadImage", minimumReplicasToPreDownloadImage)
+                return r.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
+        }</span>
+
+        // ignore if all Pods update in one batch
+        <span class="cov8" title="1">var partition, maxUnavailable int
+        if cs.Spec.UpdateStrategy.RollingUpdate != nil </span><span class="cov8" title="1">{
+                if cs.Spec.UpdateStrategy.RollingUpdate.Partition != nil </span><span class="cov8" title="1">{
+                        pValue, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.RollingUpdate.Partition, cs.Spec.Replicas)
+                        if err != nil </span><span class="cov0" title="0">{
+                                klog.ErrorS(err, "CloneSet partition value was illegal", "cloneSet", klog.KObj(cs))
+                                return err
+                        }</span>
+                        <span class="cov8" title="1">partition = pValue</span>
+                }
+                <span class="cov8" title="1">maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
+                        intstrutil.ValueOrDefault(cs.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromString(appsv1beta1.DefaultCloneSetMaxUnavailable)), int(*cs.Spec.Replicas), false)</span>
+        } else<span class="cov0" title="0"> {
+                defaultMaxUnavailable := intstrutil.FromString(appsv1beta1.DefaultCloneSetMaxUnavailable)
+                maxUnavailable, _ = intstrutil.GetValueFromIntOrPercent(
+                        &amp;defaultMaxUnavailable, int(*cs.Spec.Replicas), false)
+        }</span>
+        <span class="cov8" title="1">if partition == 0 &amp;&amp; maxUnavailable &gt;= int(*cs.Spec.Replicas) </span><span class="cov0" title="0">{
+                klog.V(4).InfoS("CloneSet skipped to create ImagePullJob for all Pods update in one batch",
+                        "cloneSet", klog.KObj(cs), "replicas", *cs.Spec.Replicas, "partition", partition, "maxUnavailable", maxUnavailable)
+                return r.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
+        }</span>
+
+        // ignore if this revision can not update in-place
+        <span class="cov8" title="1">coreControl := clonesetcore.New(cs)
+        inplaceControl := inplaceupdate.New(r.Client, clonesetutils.RevisionAdapterImpl)
+        if !inplaceControl.CanUpdateInPlace(currentRevision, updateRevision, coreControl.GetUpdateOptions()) </span><span class="cov8" title="1">{
+                klog.V(4).InfoS("CloneSet skipped to create ImagePullJob because in-place update was not possible",
+                        "cloneSet", klog.KObj(cs), "currentRevision", klog.KObj(currentRevision), "updateRevision", klog.KObj(updateRevision))
+                return r.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadIgnoredKey, "true")
+        }</span>
+
+        // start to create jobs
+
+        <span class="cov8" title="1">var pullSecrets []string
+        for _, s := range cs.Spec.Template.Spec.ImagePullSecrets </span><span class="cov0" title="0">{
+                pullSecrets = append(pullSecrets, s.Name)
+        }</span>
+
+        <span class="cov8" title="1">selector := cs.Spec.Selector.DeepCopy()
+        selector.MatchExpressions = append(selector.MatchExpressions, metav1.LabelSelectorRequirement{
+                Key:      apps.ControllerRevisionHashLabelKey,
+                Operator: metav1.LabelSelectorOpNotIn,
+                Values:   []string{updateRevision.Name, updateRevision.Labels[history.ControllerRevisionHashLabel]},
+        })
+
+        // As cloneset is the job's owner, we have the convention that all resources owned by cloneset
+        // have to match the selector of cloneset, such as pod, pvc and controllerrevision.
+        // So we had better put the labels into jobs.
+        labelMap := make(map[string]string)
+        for k, v := range cs.Spec.Template.Labels </span><span class="cov8" title="1">{
+                labelMap[k] = v
+        }</span>
+        <span class="cov8" title="1">labelMap[history.ControllerRevisionHashLabel] = updateRevision.Labels[history.ControllerRevisionHashLabel]
+
+        annotationMap := make(map[string]string)
+        for k, v := range cs.Spec.Template.Annotations </span><span class="cov0" title="0">{
+                annotationMap[k] = v
+        }</span>
+
+        <span class="cov8" title="1">containerImages := diffImagesBetweenRevisions(currentRevision, updateRevision)
+        klog.V(3).InfoS("CloneSet began to create ImagePullJobs for the revision changes",
+                "cloneSet", klog.KObj(cs), "currentRevision", klog.KObj(currentRevision), "updateRevision", klog.KObj(updateRevision), "containerImages", containerImages)
+
+        // Get InPlaceUpdateStrategy for v1beta1
+        var inPlaceStrategy *appspub.InPlaceUpdateStrategy
+        if cs.Spec.UpdateStrategy.RollingUpdate != nil </span><span class="cov8" title="1">{
+                inPlaceStrategy = cs.Spec.UpdateStrategy.RollingUpdate.InPlaceUpdateStrategy
+        }</span>
+
+        <span class="cov8" title="1">for name, image := range containerImages </span><span class="cov8" title="1">{
+                // job name is revision name + container name, it can not be more than 255 characters
+                jobName := fmt.Sprintf("%s-%s", updateRevision.Name, name)
+                err := imagejobutilfunc.CreateJobForWorkloadWithStrategy(r.Client, cs, clonesetutils.ControllerKind, jobName, image, labelMap, annotationMap, *selector, pullSecrets, inPlaceStrategy)
+                if err != nil </span><span class="cov0" title="0">{
+                        if !errors.IsAlreadyExists(err) </span><span class="cov0" title="0">{
+                                klog.ErrorS(err, "CloneSet failed to create ImagePullJob", "cloneSet", klog.KObj(cs), "jobName", jobName)
+                                r.recorder.Eventf(cs, v1.EventTypeNormal, "FailedCreateImagePullJob", "failed to create ImagePullJob %s: %v", jobName, err)
+                        }</span>
+                        <span class="cov0" title="0">continue</span>
+                }
+                <span class="cov8" title="1">klog.V(3).InfoS("CloneSet created ImagePullJob for the image", "cloneSet", klog.KObj(cs), "jobName", jobName, "image", image)
+                r.recorder.Eventf(cs, v1.EventTypeNormal, "CreatedImagePullJob", "created ImagePullJob %s for image: %s", jobName, image)</span>
+        }
+
+        <span class="cov8" title="1">return r.patchControllerRevisionLabels(updateRevision, appsv1beta1.ImagePreDownloadCreatedKey, "true")</span>
+}
+
+func (r *ReconcileCloneSet) patchControllerRevisionLabels(revision *apps.ControllerRevision, key, value string) error <span class="cov8" title="1">{
+        oldRevision := revision.ResourceVersion
+        newRevision := &amp;apps.ControllerRevision{
+                ObjectMeta: metav1.ObjectMeta{
+                        Name:      revision.Name,
+                        Namespace: revision.Namespace,
+                },
+        }
+        body := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, key, value)
+        if err := r.Patch(context.TODO(), newRevision, client.RawPatch(types.StrategicMergePatchType, []byte(body))); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">if oldRevision != newRevision.ResourceVersion </span><span class="cov8" title="1">{
+                clonesetutils.ResourceVersionExpectations.Expect(newRevision)
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+
+func diffImagesBetweenRevisions(oldRevision, newRevision *apps.ControllerRevision) map[string]string <span class="cov8" title="1">{
+        oldTemp, err := inplaceupdate.GetTemplateFromRevision(oldRevision)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov8" title="1">newTemp, err := inplaceupdate.GetTemplateFromRevision(newRevision)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+
+        <span class="cov8" title="1">containerImages := make(map[string]string)
+        for i := range newTemp.Spec.Containers </span><span class="cov8" title="1">{
+                name := newTemp.Spec.Containers[i].Name
+                newImage := newTemp.Spec.Containers[i].Image
+
+                var found bool
+                for j := range oldTemp.Spec.Containers </span><span class="cov8" title="1">{
+                        if oldTemp.Spec.Containers[j].Name != name </span><span class="cov0" title="0">{
+                                continue</span>
+                        }
+                        <span class="cov8" title="1">if oldTemp.Spec.Containers[j].Image != newImage </span><span class="cov8" title="1">{
+                                containerImages[name] = newImage
+                        }</span>
+                        <span class="cov8" title="1">found = true
+                        break</span>
+                }
+                <span class="cov8" title="1">if !found </span><span class="cov0" title="0">{
+                        containerImages[name] = newImage
+                }</span>
+        }
+        <span class="cov8" title="1">return containerImages</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">/*
+Copyright 2019 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package cloneset
+
+import (
+        "context"
+        "fmt"
+        "time"
+
+        v1 "k8s.io/api/core/v1"
+        "k8s.io/apimachinery/pkg/types"
+        "k8s.io/client-go/util/retry"
+        "k8s.io/klog/v2"
+        "k8s.io/utils/clock"
+        "sigs.k8s.io/controller-runtime/pkg/client"
+
+        appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+        clonesetcore "github.com/openkruise/kruise/pkg/controller/cloneset/core"
+        "github.com/openkruise/kruise/pkg/controller/cloneset/sync"
+        clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+        "github.com/openkruise/kruise/pkg/util"
+)
+
+var (
+        timer clock.Clock = clock.RealClock{}
+)
+
+// StatusUpdater is interface for updating CloneSet status.
+type StatusUpdater interface {
+        UpdateCloneSetStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus, pods []*v1.Pod) error
+}
+
+func newStatusUpdater(c client.Client) StatusUpdater <span class="cov8" title="1">{
+        return &amp;realStatusUpdater{Client: c}
+}</span>
+
+type realStatusUpdater struct {
+        client.Client
+}
+
+func (r *realStatusUpdater) UpdateCloneSetStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus, pods []*v1.Pod) error <span class="cov8" title="1">{
+        r.calculateStatus(cs, newStatus, pods)
+        if err := clonesetcore.New(cs).ExtraStatusCalculation(newStatus, pods); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to calculate extra status for cloneSet %s/%s: %v", cs.Namespace, cs.Name, err)
+        }</span>
+        <span class="cov8" title="1">if !r.inconsistentStatus(cs, newStatus) </span><span class="cov8" title="1">{
+                return nil
+        }</span>
+        <span class="cov8" title="1">klog.InfoS("To update CloneSet status", "cloneSet", klog.KObj(cs), "replicas", newStatus.Replicas, "ready", newStatus.ReadyReplicas, "available", newStatus.AvailableReplicas,
+                "updated", newStatus.UpdatedReplicas, "updatedReady", newStatus.UpdatedReadyReplicas, "currentRevision", newStatus.CurrentRevision, "updateRevision", newStatus.UpdateRevision)
+        return r.updateStatus(cs, newStatus)</span>
+}
+
+func (r *realStatusUpdater) updateStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus) error <span class="cov8" title="1">{
+        return retry.RetryOnConflict(retry.DefaultBackoff, func() error </span><span class="cov8" title="1">{
+                clone := &amp;appsv1beta1.CloneSet{}
+                if err := r.Get(context.TODO(), types.NamespacedName{Namespace: cs.Namespace, Name: cs.Name}, clone); err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+                <span class="cov8" title="1">clone.Status = *newStatus
+                return r.Status().Update(context.TODO(), clone)</span>
+        })
+}
+
+func (r *realStatusUpdater) inconsistentStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus) bool <span class="cov8" title="1">{
+        oldStatus := cs.Status
+        return newStatus.ObservedGeneration &gt; oldStatus.ObservedGeneration ||
+                newStatus.Replicas != oldStatus.Replicas ||
+                newStatus.ReadyReplicas != oldStatus.ReadyReplicas ||
+                newStatus.AvailableReplicas != oldStatus.AvailableReplicas ||
+                newStatus.UpdatedReadyReplicas != oldStatus.UpdatedReadyReplicas ||
+                newStatus.UpdatedReplicas != oldStatus.UpdatedReplicas ||
+                newStatus.UpdatedAvailableReplicas != oldStatus.UpdatedAvailableReplicas ||
+                newStatus.ExpectedUpdatedReplicas != oldStatus.ExpectedUpdatedReplicas ||
+                newStatus.UpdateRevision != oldStatus.UpdateRevision ||
+                newStatus.CurrentRevision != oldStatus.CurrentRevision ||
+                newStatus.LabelSelector != oldStatus.LabelSelector ||
+                hasProgressingConditionChanged(cs.Status, *newStatus)
+}</span>
+
+func (r *realStatusUpdater) calculateStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus, pods []*v1.Pod) <span class="cov8" title="1">{
+        coreControl := clonesetcore.New(cs)
+        for _, pod := range pods </span><span class="cov8" title="1">{
+                newStatus.Replicas++
+                if coreControl.IsPodUpdateReady(pod, 0) </span><span class="cov8" title="1">{
+                        newStatus.ReadyReplicas++
+                }</span>
+                <span class="cov8" title="1">if sync.IsPodAvailable(coreControl, pod, cs.Spec.MinReadySeconds) </span><span class="cov0" title="0">{
+                        newStatus.AvailableReplicas++
+                }</span>
+                <span class="cov8" title="1">if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) </span><span class="cov8" title="1">{
+                        newStatus.UpdatedReplicas++
+                }</span>
+                <span class="cov8" title="1">if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) &amp;&amp; coreControl.IsPodUpdateReady(pod, 0) </span><span class="cov8" title="1">{
+                        newStatus.UpdatedReadyReplicas++
+                }</span>
+                <span class="cov8" title="1">if clonesetutils.EqualToRevisionHash("", pod, newStatus.UpdateRevision) &amp;&amp; sync.IsPodAvailable(coreControl, pod, cs.Spec.MinReadySeconds) </span><span class="cov0" title="0">{
+                        newStatus.UpdatedAvailableReplicas++
+                }</span>
+        }
+        // Consider the update revision as stable if revisions of all pods are consistent to it and have the expected number of replicas, no need to wait all of them ready
+        <span class="cov8" title="1">if newStatus.UpdatedReplicas == newStatus.Replicas &amp;&amp; newStatus.Replicas == *cs.Spec.Replicas </span><span class="cov8" title="1">{
+                newStatus.CurrentRevision = newStatus.UpdateRevision
+        }</span>
+
+        <span class="cov8" title="1">if cs.Spec.UpdateStrategy.RollingUpdate != nil </span><span class="cov8" title="1">{
+                if partition, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.RollingUpdate.Partition, cs.Spec.Replicas); err == nil </span><span class="cov8" title="1">{
+                        newStatus.ExpectedUpdatedReplicas = *cs.Spec.Replicas - int32(partition)
+                }</span>
+        } else<span class="cov0" title="0"> {
+                newStatus.ExpectedUpdatedReplicas = *cs.Spec.Replicas
+        }</span>
+        <span class="cov8" title="1">duration := r.calculateProgressingStatus(cs, newStatus)
+        clonesetutils.DurationStore.Push(clonesetutils.GetControllerKey(cs), duration)</span>
+}
+
+func (r *realStatusUpdater) calculateProgressingStatus(cs *appsv1beta1.CloneSet, newStatus *appsv1beta1.CloneSetStatus) time.Duration <span class="cov8" title="1">{
+        if !clonesetutils.HasProgressDeadline(cs) </span><span class="cov8" title="1">{
+                clonesetutils.RemoveCloneSetCondition(newStatus, appsv1beta1.CloneSetConditionTypeProgressing)
+                return time.Duration(-1)
+        }</span>
+
+        <span class="cov8" title="1">timeNow := time.Now()
+        switch </span>{
+        case clonesetutils.CloneSetAvailable(cs, newStatus):<span class="cov8" title="1">
+                klog.V(5).InfoS("CloneSet is available", "cloneSet", klog.KObj(cs))
+                condition := clonesetutils.NewCloneSetCondition(appsv1beta1.CloneSetConditionTypeProgressing,
+                        v1.ConditionTrue, appsv1beta1.CloneSetAvailable, "CloneSet is available", timer.Now())
+                clonesetutils.SetCloneSetCondition(newStatus, *condition)
+                return time.Duration(-1)</span>
+
+        case clonesetutils.CloneSetBePaused(cs):<span class="cov8" title="1">
+                klog.V(5).InfoS("CloneSet is paused", "cloneSet", klog.KObj(cs))
+                condition := clonesetutils.NewCloneSetCondition(appsv1beta1.CloneSetConditionTypeProgressing,
+                        v1.ConditionTrue, appsv1beta1.CloneSetProgressPaused, "CloneSet is paused", timer.Now())
+                clonesetutils.SetCloneSetCondition(newStatus, *condition)
+                return time.Duration(-1)</span>
+
+        case clonesetutils.CloneSetPartitionAvailable(cs, newStatus):<span class="cov8" title="1">
+                klog.V(5).InfoS("CloneSet is partition available", "cloneSet", klog.KObj(cs))
+                condition := clonesetutils.NewCloneSetCondition(appsv1beta1.CloneSetConditionTypeProgressing,
+                        v1.ConditionTrue, appsv1beta1.CloneSetProgressPartitionAvailable, "CloneSet has been paused due to partition ready", timer.Now())
+                clonesetutils.SetCloneSetCondition(newStatus, *condition)
+                return time.Duration(-1)</span>
+
+        case clonesetutils.CloneSetDeadlineExceeded(cs, newStatus, timeNow):<span class="cov8" title="1">
+                klog.V(5).InfoS("CloneSet is timed out progressing", "cloneSet", klog.KObj(cs))
+                msg := fmt.Sprintf("CloneSet revision %s has timed out progressing", newStatus.UpdateRevision)
+                condition := clonesetutils.NewCloneSetCondition(appsv1beta1.CloneSetConditionTypeProgressing,
+                        v1.ConditionFalse, appsv1beta1.CloneSetProgressDeadlineExceeded, msg, timeNow)
+                clonesetutils.SetCloneSetCondition(newStatus, *condition)
+                return time.Duration(-1)</span>
+
+        default:<span class="cov8" title="1">
+                klog.V(5).InfoS("CloneSet is progressing", "cloneSet", klog.KObj(cs))
+                condition := clonesetutils.NewCloneSetCondition(appsv1beta1.CloneSetConditionTypeProgressing,
+                        v1.ConditionTrue, appsv1beta1.CloneSetProgressUpdated, "CloneSet is progressing", timer.Now())
+                clonesetutils.SetCloneSetCondition(newStatus, *condition)
+                condition = clonesetutils.GetCloneSetCondition(*newStatus, appsv1beta1.CloneSetConditionTypeProgressing)
+                return getRequeueSecondsFromCondition(condition, *cs.Spec.ProgressDeadlineSeconds, timeNow)</span>
+        }
+}
+
+func hasProgressingConditionChanged(oldStatus appsv1beta1.CloneSetStatus, newStatus appsv1beta1.CloneSetStatus) bool <span class="cov8" title="1">{
+        oldCond := clonesetutils.GetCloneSetCondition(oldStatus, appsv1beta1.CloneSetConditionTypeProgressing)
+        newCond := clonesetutils.GetCloneSetCondition(newStatus, appsv1beta1.CloneSetConditionTypeProgressing)
+
+        if oldCond == nil &amp;&amp; newCond == nil </span><span class="cov8" title="1">{
+                return false
+        }</span> else<span class="cov8" title="1"> if oldCond == nil || newCond == nil </span><span class="cov8" title="1">{
+                return true
+        }</span>
+        <span class="cov8" title="1">return oldCond.Status != newCond.Status || oldCond.Reason != newCond.Reason</span>
+}
+
+func getRequeueSecondsFromCondition(condition *appsv1beta1.CloneSetCondition, progressDeadlineSeconds int32, now time.Time) time.Duration <span class="cov8" title="1">{
+        if condition == nil </span><span class="cov8" title="1">{
+                return -1
+        }</span>
+        <span class="cov8" title="1">after := condition.LastUpdateTime.Time.Add(time.Duration(progressDeadlineSeconds) * time.Second).Sub(now)
+        if after &lt; time.Second </span><span class="cov8" title="1">{
+                return after
+        }</span>
+        // this helps avoid milliseconds skew in AddAfter.
+        // ref: https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133.
+        <span class="cov8" title="1">return after + time.Second</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">/*
+Copyright 2021 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package containerrecreate
+
+import (
+        "context"
+        "fmt"
+        "math/rand"
+        "net/http"
+        "reflect"
+        "sort"
+        "time"
+
+        v1 "k8s.io/api/core/v1"
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+        "k8s.io/apimachinery/pkg/runtime"
+        "k8s.io/apimachinery/pkg/types"
+        utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+        "k8s.io/apimachinery/pkg/util/wait"
+        "k8s.io/apimachinery/pkg/watch"
+        v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+        "k8s.io/client-go/tools/cache"
+        "k8s.io/client-go/tools/record"
+        "k8s.io/client-go/util/workqueue"
+        "k8s.io/klog/v2"
+        kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
+        runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+        appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+        "github.com/openkruise/kruise/pkg/client"
+        kruiseclient "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+        listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+        daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
+        "github.com/openkruise/kruise/pkg/daemon/kuberuntime"
+        daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
+        "github.com/openkruise/kruise/pkg/util"
+        "github.com/openkruise/kruise/pkg/util/expectations"
+)
+
+const (
+        maxExpectationWaitDuration = 10 * time.Second
+)
+
+var (
+        resourceVersionExpectation = expectations.NewResourceVersionExpectation()
+)
+
+type Controller struct {
+        queue          workqueue.RateLimitingInterface
+        runtimeClient  runtimeclient.Client
+        crrInformer    cache.SharedIndexInformer
+        crrLister      listersalpha1.ContainerRecreateRequestLister
+        eventRecorder  record.EventRecorder
+        runtimeFactory daemonruntime.Factory
+
+        workers int
+}
+
+// NewController returns the controller for CRR
+func NewController(opts daemonoptions.Options) (*Controller, error) <span class="cov0" title="0">{
+        genericClient := client.GetGenericClientWithName("kruise-daemon-crr")
+        informer := newCRRInformer(genericClient.KruiseClient, opts.NodeName)
+
+        eventBroadcaster := record.NewBroadcaster()
+        eventBroadcaster.StartRecordingToSink(&amp;v1core.EventSinkImpl{Interface: genericClient.KubeClient.CoreV1().Events("")})
+        recorder := eventBroadcaster.NewRecorder(opts.Scheme, v1.EventSource{Component: "kruise-daemon-crr", Host: opts.NodeName})
+
+        queue := workqueue.NewNamedRateLimitingQueue(
+                // Backoff duration from 500ms to 50~55s
+                workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 50*time.Second+time.Millisecond*time.Duration(rand.Intn(5000))),
+                "crr",
+        )
+
+        informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+                AddFunc: func(obj interface{}) </span><span class="cov0" title="0">{
+                        crr, ok := obj.(*appsv1alpha1.ContainerRecreateRequest)
+                        if ok </span><span class="cov0" title="0">{
+                                enqueue(queue, crr)
+                        }</span>
+                },
+                UpdateFunc: func(oldObj, newObj interface{}) <span class="cov0" title="0">{
+                        crr, ok := newObj.(*appsv1alpha1.ContainerRecreateRequest)
+                        if ok </span><span class="cov0" title="0">{
+                                enqueue(queue, crr)
+                        }</span>
+                },
+                DeleteFunc: func(obj interface{}) <span class="cov0" title="0">{
+                        crr, ok := obj.(*appsv1alpha1.ContainerRecreateRequest)
+                        if ok </span><span class="cov0" title="0">{
+                                resourceVersionExpectation.Delete(crr)
+                        }</span>
+                },
+        })
+
+        <span class="cov0" title="0">opts.Healthz.RegisterFunc("crrInformerSynced", func(_ *http.Request) error </span><span class="cov0" title="0">{
+                if !informer.HasSynced() </span><span class="cov0" title="0">{
+                        return fmt.Errorf("not synced")
+                }</span>
+                <span class="cov0" title="0">return nil</span>
+        })
+
+        <span class="cov0" title="0">return &amp;Controller{
+                queue:          queue,
+                runtimeClient:  opts.RuntimeClient,
+                crrInformer:    informer,
+                crrLister:      listersalpha1.NewContainerRecreateRequestLister(informer.GetIndexer()),
+                eventRecorder:  recorder,
+                runtimeFactory: opts.RuntimeFactory,
+                workers:        opts.CRRWorkers,
+        }, nil</span>
+}
+
+func newCRRInformer(client kruiseclient.Interface, nodeName string) cache.SharedIndexInformer <span class="cov0" title="0">{
+        tweakListOptionsFunc := func(opt *metav1.ListOptions) </span><span class="cov0" title="0">{
+                opt.LabelSelector = fmt.Sprintf("%s=%s,%s=%s",
+                        appsv1alpha1.ContainerRecreateRequestNodeNameKey, nodeName,
+                        appsv1alpha1.ContainerRecreateRequestActiveKey, "true",
+                )
+        }</span>
+
+        <span class="cov0" title="0">im := cache.NewSharedIndexInformer(
+                &amp;cache.ListWatch{
+                        ListFunc: func(options metav1.ListOptions) (runtime.Object, error) </span><span class="cov0" title="0">{
+                                tweakListOptionsFunc(&amp;options)
+                                return client.AppsV1alpha1().ContainerRecreateRequests(v1.NamespaceAll).List(context.TODO(), options)
+                        }</span>,
+                        WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) <span class="cov0" title="0">{
+                                tweakListOptionsFunc(&amp;options)
+                                return client.AppsV1alpha1().ContainerRecreateRequests(v1.NamespaceAll).Watch(context.TODO(), options)
+                        }</span>,
+                },
+                &amp;appsv1alpha1.ContainerRecreateRequest{},
+                0, // do not resync
+                cache.Indexers{CRRPodNameIndex: SpecPodNameIndexFunc, cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+        )
+        <span class="cov0" title="0">return im</span>
+}
+
+func enqueue(queue workqueue.Interface, obj *appsv1alpha1.ContainerRecreateRequest) <span class="cov0" title="0">{
+        if obj.DeletionTimestamp != nil || obj.Status.CompletionTime != nil </span><span class="cov0" title="0">{
+                return
+        }</span>
+        <span class="cov0" title="0">queue.Add(objectKey(obj))</span>
+}
+
+func objectKey(obj *appsv1alpha1.ContainerRecreateRequest) string <span class="cov0" title="0">{
+        return obj.Namespace + "/" + obj.Spec.PodName
+}</span>
+
+func (c *Controller) Run(stop &lt;-chan struct{}) <span class="cov8" title="1">{
+        defer utilruntime.HandleCrash()
+        defer c.queue.ShutDown()
+
+        klog.Info("Starting informer for ContainerRecreateRequest")
+        go c.crrInformer.Run(stop)
+        if !cache.WaitForCacheSync(stop, c.crrInformer.HasSynced) </span><span class="cov0" title="0">{
+                return
+        }</span>
+
+        <span class="cov8" title="1">klog.InfoS("Starting crr daemon controller", "workers", c.workers)
+        for i := 0; i &lt; c.workers; i++ </span><span class="cov8" title="1">{
+                go wait.Until(func() </span><span class="cov8" title="1">{
+                        for c.processNextWorkItem() </span>{<span class="cov0" title="0">
+                        }</span>
+                }, time.Second, stop)
+        }
+
+        <span class="cov8" title="1">klog.Info("Started crr daemon controller successfully")
+        &lt;-stop</span>
+}
+
+// processNextWorkItem will read a single work item off the workqueue and
+// attempt to process it, by calling the syncHandler.
+func (c *Controller) processNextWorkItem() bool <span class="cov8" title="1">{
+        // pull the next work item from queue.  It should be a key we use to lookup
+        // something in a cache
+        key, quit := c.queue.Get()
+        if quit </span><span class="cov8" title="1">{
+                return false
+        }</span>
+        <span class="cov0" title="0">defer c.queue.Done(key)
+
+        err := c.sync(key.(string))
+
+        if err == nil </span><span class="cov0" title="0">{
+                // No error, tell the queue to stop tracking history
+                c.queue.Forget(key)
+        }</span> else<span class="cov0" title="0"> {
+                // requeue the item to work on later
+                c.queue.AddRateLimited(key)
+        }</span>
+
+        <span class="cov0" title="0">return true</span>
+}
+
+func (c *Controller) sync(key string) (retErr error) <span class="cov0" title="0">{
+        namespace, podName, err := cache.SplitMetaNamespaceKey(key)
+        if err != nil </span><span class="cov0" title="0">{
+                klog.InfoS("Invalid key", "key", key)
+                return nil
+        }</span>
+
+        <span class="cov0" title="0">objectList, err := c.crrInformer.GetIndexer().ByIndex(CRRPodNameIndex, podName)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">crrList := make([]*appsv1alpha1.ContainerRecreateRequest, 0, len(objectList))
+        for _, obj := range objectList </span><span class="cov0" title="0">{
+                crr, ok := obj.(*appsv1alpha1.ContainerRecreateRequest)
+                if ok &amp;&amp; crr != nil &amp;&amp; crr.Namespace == namespace </span><span class="cov0" title="0">{
+                        crrList = append(crrList, crr)
+                }</span>
+        }
+        <span class="cov0" title="0">if len(crrList) == 0 </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+
+        <span class="cov0" title="0">crr, err := c.pickRecreateRequest(crrList)
+        if err != nil || crr == nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">klog.V(3).InfoS("Start syncing", "namespace", namespace, "name", crr.Name)
+        defer func() </span><span class="cov0" title="0">{
+                if retErr != nil </span><span class="cov0" title="0">{
+                        klog.ErrorS(retErr, "Failed to sync", "namespace", namespace, "name", crr.Name)
+                }</span> else<span class="cov0" title="0"> {
+                        klog.V(3).InfoS("Finished syncing", "namespace", namespace, "name", crr.Name)
+                }</span>
+        }()
+
+        // once first update its phase to recreating
+        <span class="cov0" title="0">if crr.Status.Phase != appsv1alpha1.ContainerRecreateRequestRecreating </span><span class="cov0" title="0">{
+                return c.updateCRRPhase(crr, appsv1alpha1.ContainerRecreateRequestRecreating)
+        }</span>
+
+        <span class="cov0" title="0">if crr.Spec.Strategy.UnreadyGracePeriodSeconds != nil </span><span class="cov0" title="0">{
+                unreadyTimeStr := crr.Annotations[appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey]
+                if unreadyTimeStr == "" </span><span class="cov0" title="0">{
+                        klog.InfoS("CRR is waiting for unready acquirement", "namespace", crr.Namespace, "name", crr.Name)
+                        return nil
+                }</span>
+
+                <span class="cov0" title="0">unreadyTime, err := time.Parse(time.RFC3339, unreadyTimeStr)
+                if err != nil </span><span class="cov0" title="0">{
+                        klog.ErrorS(err, "CRR failed to parse unready time", "namespace", crr.Namespace, "name", crr.Name, "unreadyTimeStr", unreadyTimeStr)
+                        return c.completeCRRStatus(crr, fmt.Sprintf("failed to parse unready time %s: %v", unreadyTimeStr, err))
+                }</span>
+
+                <span class="cov0" title="0">leftTime := time.Duration(*crr.Spec.Strategy.UnreadyGracePeriodSeconds)*time.Second - time.Since(unreadyTime)
+                if leftTime &gt; 0 </span><span class="cov0" title="0">{
+                        klog.InfoS("CRR is waiting for unready grace period", "namespace", crr.Namespace, "name", crr.Name, "leftTime", leftTime)
+                        c.queue.AddAfter(crr.Namespace+"/"+crr.Spec.PodName, leftTime+100*time.Millisecond)
+                        return nil
+                }</span>
+        }
+
+        <span class="cov0" title="0">return c.manage(crr)</span>
+}
+
+func (c *Controller) pickRecreateRequest(crrList []*appsv1alpha1.ContainerRecreateRequest) (*appsv1alpha1.ContainerRecreateRequest, error) <span class="cov0" title="0">{
+        sort.Sort(crrListByPhaseAndCreated(crrList))
+        var picked *appsv1alpha1.ContainerRecreateRequest
+        for _, crr := range crrList </span><span class="cov0" title="0">{
+                if crr.DeletionTimestamp != nil || crr.Status.CompletionTime != nil </span><span class="cov0" title="0">{
+                        resourceVersionExpectation.Delete(crr)
+                        continue</span>
+                }
+
+                <span class="cov0" title="0">resourceVersionExpectation.Observe(crr)
+                if satisfied, duration := resourceVersionExpectation.IsSatisfied(crr); !satisfied </span><span class="cov0" title="0">{
+                        if duration &lt; maxExpectationWaitDuration </span><span class="cov0" title="0">{
+                                break</span>
+                        }
+                        <span class="cov0" title="0">klog.InfoS("Wait for CRR resourceVersion expectation", "namespace", crr.Namespace, "name", crr.Name, "duration", duration)
+                        resourceVersionExpectation.Delete(crr)</span>
+                }
+
+                // Only update non-picked CRR to Pending, for the picked one will directly update to Recreating
+                <span class="cov0" title="0">if picked == nil </span><span class="cov0" title="0">{
+                        picked = crr
+                }</span> else<span class="cov0" title="0"> if crr.Status.Phase == "" </span><span class="cov0" title="0">{
+                        if err := c.updateCRRPhase(crr, appsv1alpha1.ContainerRecreateRequestPending); err != nil </span><span class="cov0" title="0">{
+                                klog.ErrorS(err, "Failed to update CRR status to Pending", "namespace", crr.Namespace, "name", crr.Name)
+                                return nil, err
+                        }</span>
+                }
+        }
+        <span class="cov0" title="0">return picked, nil</span>
+}
+
+func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error <span class="cov0" title="0">{
+        runtimeManager, err := c.newRuntimeManager(c.runtimeFactory, crr)
+        if err != nil </span><span class="cov0" title="0">{
+                klog.ErrorS(err, "Failed to find runtime service", "namespace", crr.Namespace, "name", crr.Name)
+                return c.completeCRRStatus(crr, fmt.Sprintf("failed to find runtime service: %v", err))
+        }</span>
+
+        <span class="cov0" title="0">pod := convertCRRToPod(crr)
+
+        podStatus, err := runtimeManager.GetPodStatus(context.TODO(), pod.UID, pod.Name, pod.Namespace)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to GetPodStatus %s/%s with uid %s: %v", pod.Namespace, pod.Name, pod.UID, err)
+        }</span>
+        <span class="cov0" title="0">klog.V(5).InfoS("CRR for Pod GetPodStatus", "namespace", crr.Namespace, "name", crr.Name, "podName", pod.Name, "podStatus", util.DumpJSON(podStatus))
+
+        newCRRContainerRecreateStates := getCurrentCRRContainersRecreateStates(crr, podStatus)
+        if !reflect.DeepEqual(crr.Status.ContainerRecreateStates, newCRRContainerRecreateStates) </span><span class="cov0" title="0">{
+                return c.patchCRRContainerRecreateStates(crr, newCRRContainerRecreateStates)
+        }</span>
+
+        <span class="cov0" title="0">var completedCount int
+        for i := range newCRRContainerRecreateStates </span><span class="cov0" title="0">{
+                state := &amp;newCRRContainerRecreateStates[i]
+                switch state.Phase </span>{
+                case appsv1alpha1.ContainerRecreateRequestSucceeded:<span class="cov0" title="0">
+                        completedCount++
+                        continue</span>
+                case appsv1alpha1.ContainerRecreateRequestFailed:<span class="cov0" title="0">
+                        completedCount++
+                        if crr.Spec.Strategy.FailurePolicy == appsv1alpha1.ContainerRecreateRequestFailurePolicyIgnore </span><span class="cov0" title="0">{
+                                continue</span>
+                        }
+                        <span class="cov0" title="0">return c.completeCRRStatus(crr, "")</span>
+                case appsv1alpha1.ContainerRecreateRequestPending, appsv1alpha1.ContainerRecreateRequestRecreating:<span class="cov0" title="0"></span>
+                }
+
+                <span class="cov0" title="0">if state.Phase == appsv1alpha1.ContainerRecreateRequestRecreating </span><span class="cov0" title="0">{
+                        state.IsKilled = true
+                        if crr.Spec.Strategy.OrderedRecreate </span><span class="cov0" title="0">{
+                                break</span>
+                        }
+                        <span class="cov0" title="0">continue</span>
+                }
+
+                <span class="cov0" title="0">kubeContainerStatus := podStatus.FindContainerStatusByName(state.Name)
+                if kubeContainerStatus == nil </span><span class="cov0" title="0">{
+                        break</span>
+                }
+
+                <span class="cov0" title="0">msg := fmt.Sprintf("Stopping container %s by ContainerRecreateRequest %s", state.Name, crr.Name)
+                err := runtimeManager.KillContainer(pod, kubeContainerStatus.ID, state.Name, msg, nil)
+                if err != nil </span><span class="cov0" title="0">{
+                        klog.ErrorS(err, "Failed to kill container in Pod for CRR", "containerName", state.Name, "podNamespace", pod.Namespace, "podName", pod.Name, "crrNamespace", crr.Namespace, "crrName", crr.Name)
+                        state.Phase = appsv1alpha1.ContainerRecreateRequestFailed
+                        state.Message = fmt.Sprintf("kill container error: %v", err)
+                        if crr.Spec.Strategy.FailurePolicy == appsv1alpha1.ContainerRecreateRequestFailurePolicyIgnore </span><span class="cov0" title="0">{
+                                continue</span>
+                        }
+                        <span class="cov0" title="0">return c.patchCRRContainerRecreateStates(crr, newCRRContainerRecreateStates)</span>
+                }
+                <span class="cov0" title="0">state.IsKilled = true
+                state.Phase = appsv1alpha1.ContainerRecreateRequestRecreating
+                break</span>
+        }
+
+        <span class="cov0" title="0">if !reflect.DeepEqual(crr.Status.ContainerRecreateStates, newCRRContainerRecreateStates) </span><span class="cov0" title="0">{
+                return c.patchCRRContainerRecreateStates(crr, newCRRContainerRecreateStates)
+        }</span>
+
+        // check if all containers have completed
+        <span class="cov0" title="0">if completedCount == len(newCRRContainerRecreateStates) </span><span class="cov0" title="0">{
+                return c.completeCRRStatus(crr, "")
+        }</span>
+
+        <span class="cov0" title="0">if crr.Spec.Strategy != nil &amp;&amp; crr.Spec.Strategy.MinStartedSeconds &gt; 0 </span><span class="cov0" title="0">{
+                c.queue.AddAfter(objectKey(crr), time.Duration(crr.Spec.Strategy.MinStartedSeconds)*time.Second)
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+func (c *Controller) patchCRRContainerRecreateStates(crr *appsv1alpha1.ContainerRecreateRequest, newCRRContainerRecreateStates []appsv1alpha1.ContainerRecreateRequestContainerRecreateState) error <span class="cov0" title="0">{
+        klog.V(3).InfoS("CRR patch containerRecreateStates", "namespace", crr.Namespace, "name", crr.Name, "states", util.DumpJSON(newCRRContainerRecreateStates))
+        crr = crr.DeepCopy()
+        body := fmt.Sprintf(`{"status":{"containerRecreateStates":%s}}`, util.DumpJSON(newCRRContainerRecreateStates))
+        oldRev := crr.ResourceVersion
+        defer func() </span><span class="cov0" title="0">{
+                if crr.ResourceVersion != oldRev </span><span class="cov0" title="0">{
+                        resourceVersionExpectation.Expect(crr)
+                }</span>
+        }()
+        <span class="cov0" title="0">return c.runtimeClient.Status().Patch(context.TODO(), crr, runtimeclient.RawPatch(types.MergePatchType, []byte(body)))</span>
+}
+
+func (c *Controller) updateCRRPhase(crr *appsv1alpha1.ContainerRecreateRequest, phase appsv1alpha1.ContainerRecreateRequestPhase) error <span class="cov0" title="0">{
+        crr = crr.DeepCopy()
+        crr.Status.Phase = phase
+        oldRev := crr.ResourceVersion
+        defer func() </span><span class="cov0" title="0">{
+                if crr.ResourceVersion != oldRev </span><span class="cov0" title="0">{
+                        resourceVersionExpectation.Expect(crr)
+                }</span>
+        }()
+        <span class="cov0" title="0">return c.runtimeClient.Status().Update(context.TODO(), crr)</span>
+}
+
+func (c *Controller) completeCRRStatus(crr *appsv1alpha1.ContainerRecreateRequest, msg string) error <span class="cov0" title="0">{
+        crr = crr.DeepCopy()
+        now := metav1.Now()
+        crr.Status.Phase = appsv1alpha1.ContainerRecreateRequestCompleted
+        crr.Status.CompletionTime = &amp;now
+        crr.Status.Message = msg
+        oldRev := crr.ResourceVersion
+        defer func() </span><span class="cov0" title="0">{
+                if crr.ResourceVersion != oldRev </span><span class="cov0" title="0">{
+                        resourceVersionExpectation.Expect(crr)
+                }</span>
+        }()
+        <span class="cov0" title="0">return c.runtimeClient.Status().Update(context.TODO(), crr)</span>
+}
+
+func (c *Controller) newRuntimeManager(runtimeFactory daemonruntime.Factory, crr *appsv1alpha1.ContainerRecreateRequest) (kuberuntime.Runtime, error) <span class="cov0" title="0">{
+        var runtimeName string
+        for i := range crr.Spec.Containers </span><span class="cov0" title="0">{
+                c := &amp;crr.Spec.Containers[i]
+                if c.StatusContext == nil || c.StatusContext.ContainerID == "" </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("no statusContext or empty containerID in %s container", c.Name)
+                }</span>
+
+                <span class="cov0" title="0">containerID := kubeletcontainer.ContainerID{}
+                if err := containerID.ParseString(c.StatusContext.ContainerID); err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to parse containerID %s in %s container: %v", c.StatusContext.ContainerID, c.Name, err)
+                }</span>
+                <span class="cov0" title="0">if runtimeName == "" </span><span class="cov0" title="0">{
+                        runtimeName = containerID.Type
+                }</span> else<span class="cov0" title="0"> if runtimeName != containerID.Type </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("has different runtime types %s, %s in Pod", runtimeName, containerID.Type)
+                }</span>
+        }
+        <span class="cov0" title="0">if runtimeName == "" </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("no runtime type found in Pod")
+        }</span>
+        <span class="cov0" title="0">runtimeService := runtimeFactory.GetRuntimeServiceByName(runtimeName)
+        if runtimeService == nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("not found runtime service for %s in daemon", runtimeName)
+        }</span>
+
+        <span class="cov0" title="0">return kuberuntime.NewGenericRuntime(runtimeName, runtimeService, c.eventRecorder, &amp;http.Client{}), nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">/*
+Copyright 2021 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package containerrecreate
+
+import (
+        "encoding/json"
+        "fmt"
+        "time"
+
+        v1 "k8s.io/api/core/v1"
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+        "k8s.io/apimachinery/pkg/types"
+        "k8s.io/klog/v2"
+        kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
+        "k8s.io/utils/ptr"
+
+        appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+)
+
+const (
+        // CRRPodNameIndex is the lookup name for the most comment index function, which is to index by the crr.spec.podName field.
+        CRRPodNameIndex = "podName"
+)
+
+type crrListByPhaseAndCreated []*appsv1alpha1.ContainerRecreateRequest
+
+func (c crrListByPhaseAndCreated) Len() int      <span class="cov0" title="0">{ return len(c) }</span>
+func (c crrListByPhaseAndCreated) Swap(i, j int) <span class="cov0" title="0">{ c[i], c[j] = c[j], c[i] }</span>
+func (c crrListByPhaseAndCreated) Less(i, j int) bool <span class="cov0" title="0">{
+        if c[i].Status.Phase == c[j].Status.Phase </span><span class="cov0" title="0">{
+                return c[i].CreationTimestamp.Before(&amp;c[j].CreationTimestamp)
+        }</span>
+        <span class="cov0" title="0">return c.phaseWeight(c[i].Status.Phase) &lt; c.phaseWeight(c[j].Status.Phase)</span>
+}
+
+func (c crrListByPhaseAndCreated) phaseWeight(phase appsv1alpha1.ContainerRecreateRequestPhase) int <span class="cov0" title="0">{
+        switch phase </span>{
+        case appsv1alpha1.ContainerRecreateRequestCompleted:<span class="cov0" title="0">
+                return 1</span>
+        case appsv1alpha1.ContainerRecreateRequestRecreating:<span class="cov0" title="0">
+                return 2</span>
+        case appsv1alpha1.ContainerRecreateRequestPending:<span class="cov0" title="0">
+                return 3</span>
+        }
+        <span class="cov0" title="0">return 4</span>
+}
+
+func getCurrentCRRContainersRecreateStates(
+        crr *appsv1alpha1.ContainerRecreateRequest,
+        podStatus *kubeletcontainer.PodStatus,
+) []appsv1alpha1.ContainerRecreateRequestContainerRecreateState <span class="cov0" title="0">{
+
+        var minStartedDuration time.Duration
+        if crr.Spec.Strategy != nil </span><span class="cov0" title="0">{
+                minStartedDuration = time.Duration(crr.Spec.Strategy.MinStartedSeconds) * time.Second
+        }</span>
+
+        <span class="cov0" title="0">syncContainerStatuses := getCRRSyncContainerStatuses(crr)
+        var statuses []appsv1alpha1.ContainerRecreateRequestContainerRecreateState
+
+        for i := range crr.Spec.Containers </span><span class="cov0" title="0">{
+                c := &amp;crr.Spec.Containers[i]
+                previousContainerRecreateState := getCRRContainerRecreateState(crr, c.Name)
+                if previousContainerRecreateState != nil &amp;&amp;
+                        (previousContainerRecreateState.Phase == appsv1alpha1.ContainerRecreateRequestFailed ||
+                                previousContainerRecreateState.Phase == appsv1alpha1.ContainerRecreateRequestSucceeded) </span><span class="cov0" title="0">{
+                        statuses = append(statuses, *previousContainerRecreateState)
+                        continue</span>
+                }
+
+                <span class="cov0" title="0">syncContainerStatus := syncContainerStatuses[c.Name]
+                kubeContainerStatus := podStatus.FindContainerStatusByName(c.Name)
+
+                var currentState appsv1alpha1.ContainerRecreateRequestContainerRecreateState
+
+                if kubeContainerStatus == nil </span><span class="cov0" title="0">{
+                        // not found the real container
+                        currentState = appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
+                                Name:     c.Name,
+                                Phase:    appsv1alpha1.ContainerRecreateRequestPending,
+                                IsKilled: getPreviousContainerKillState(previousContainerRecreateState),
+                                Message:  "not found container on Node",
+                        }
+
+                }</span> else<span class="cov0" title="0"> if kubeContainerStatus.State == kubeletcontainer.ContainerStateExited </span><span class="cov0" title="0">{
+                        // for no-running state, we consider it will be recreated or restarted soon
+                        currentState = appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
+                                Name:     c.Name,
+                                Phase:    appsv1alpha1.ContainerRecreateRequestRecreating,
+                                IsKilled: getPreviousContainerKillState(previousContainerRecreateState),
+                        }
+                }</span> else<span class="cov0" title="0"> if crr.Spec.Strategy.ForceRecreate &amp;&amp; (previousContainerRecreateState == nil || !previousContainerRecreateState.IsKilled) </span><span class="cov0" title="0">{
+                        // for forceKill scenarios, when the previous recreate state is empty or has not been killed, the current restart requirement will be set immediately
+                        currentState = appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
+                                Name:  c.Name,
+                                Phase: appsv1alpha1.ContainerRecreateRequestPending,
+                        }
+                }</span> else<span class="cov0" title="0"> if kubeContainerStatus.ID.String() != c.StatusContext.ContainerID ||
+                        kubeContainerStatus.RestartCount &gt; int(c.StatusContext.RestartCount) ||
+                        kubeContainerStatus.StartedAt.After(crr.CreationTimestamp.Time) </span><span class="cov0" title="0">{
+                        // already recreated or restarted
+                        currentState = appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
+                                Name:     c.Name,
+                                Phase:    appsv1alpha1.ContainerRecreateRequestRecreating,
+                                IsKilled: getPreviousContainerKillState(previousContainerRecreateState),
+                        }
+                        if syncContainerStatus != nil &amp;&amp;
+                                syncContainerStatus.ContainerID == kubeContainerStatus.ID.String() &amp;&amp;
+                                time.Since(kubeContainerStatus.StartedAt) &gt; minStartedDuration &amp;&amp;
+                                syncContainerStatus.Ready </span><span class="cov0" title="0">{
+                                currentState.Phase = appsv1alpha1.ContainerRecreateRequestSucceeded
+                        }</span>
+                } else<span class="cov0" title="0"> {
+                        currentState = appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
+                                Name:     c.Name,
+                                Phase:    appsv1alpha1.ContainerRecreateRequestPending,
+                                IsKilled: getPreviousContainerKillState(previousContainerRecreateState),
+                        }
+                }</span>
+
+                <span class="cov0" title="0">statuses = append(statuses, currentState)</span>
+        }
+
+        <span class="cov0" title="0">return statuses</span>
+}
+
+func getPreviousContainerKillState(previousContainerRecreateState *appsv1alpha1.ContainerRecreateRequestContainerRecreateState) bool <span class="cov0" title="0">{
+        if previousContainerRecreateState == nil </span><span class="cov0" title="0">{
+                return false
+        }</span>
+        <span class="cov0" title="0">return previousContainerRecreateState.IsKilled</span>
+}
+
+func getCRRContainerRecreateState(crr *appsv1alpha1.ContainerRecreateRequest, name string) *appsv1alpha1.ContainerRecreateRequestContainerRecreateState <span class="cov0" title="0">{
+        for i := range crr.Status.ContainerRecreateStates </span><span class="cov0" title="0">{
+                c := &amp;crr.Status.ContainerRecreateStates[i]
+                if c.Name == name </span><span class="cov0" title="0">{
+                        return c
+                }</span>
+        }
+        <span class="cov0" title="0">return nil</span>
+}
+
+func getCRRSyncContainerStatuses(crr *appsv1alpha1.ContainerRecreateRequest) map[string]*appsv1alpha1.ContainerRecreateRequestSyncContainerStatus <span class="cov0" title="0">{
+        str := crr.Annotations[appsv1alpha1.ContainerRecreateRequestSyncContainerStatusesKey]
+        if str == "" </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov0" title="0">var syncContainerStatuses []appsv1alpha1.ContainerRecreateRequestSyncContainerStatus
+        if err := json.Unmarshal([]byte(str), &amp;syncContainerStatuses); err != nil </span><span class="cov0" title="0">{
+                klog.ErrorS(err, "Failed to unmarshal CRR syncContainerStatuses", "namespace", crr.Namespace, "name", crr.Name, "rawString", str)
+                return nil
+        }</span>
+
+        <span class="cov0" title="0">statuses := make(map[string]*appsv1alpha1.ContainerRecreateRequestSyncContainerStatus, len(syncContainerStatuses))
+        for i := range syncContainerStatuses </span><span class="cov0" title="0">{
+                c := &amp;syncContainerStatuses[i]
+                statuses[c.Name] = c
+        }</span>
+        <span class="cov0" title="0">return statuses</span>
+}
+
+func convertCRRToPod(crr *appsv1alpha1.ContainerRecreateRequest) *v1.Pod <span class="cov0" title="0">{
+        podName := crr.Spec.PodName
+        podUID := types.UID(crr.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey])
+
+        pod := &amp;v1.Pod{
+                ObjectMeta: metav1.ObjectMeta{
+                        Namespace: crr.Namespace,
+                        Name:      podName,
+                        UID:       podUID,
+                },
+                Spec: v1.PodSpec{
+                        TerminationGracePeriodSeconds: crr.Spec.Strategy.TerminationGracePeriodSeconds,
+                },
+        }
+
+        if pod.Spec.TerminationGracePeriodSeconds == nil </span><span class="cov0" title="0">{
+                pod.Spec.TerminationGracePeriodSeconds = ptr.To(int64(30))
+        }</span>
+
+        <span class="cov0" title="0">for i := range crr.Spec.Containers </span><span class="cov0" title="0">{
+                crrContainer := &amp;crr.Spec.Containers[i]
+                podContainer := v1.Container{
+                        Name:  crrContainer.Name,
+                        Ports: crrContainer.Ports,
+                }
+                if crrContainer.PreStop != nil </span><span class="cov0" title="0">{
+                        podContainer.Lifecycle = &amp;v1.Lifecycle{PreStop: &amp;v1.LifecycleHandler{
+                                Exec:      crrContainer.PreStop.Exec,
+                                HTTPGet:   crrContainer.PreStop.HTTPGet,
+                                TCPSocket: crrContainer.PreStop.TCPSocket,
+                        }}
+                }</span>
+                <span class="cov0" title="0">pod.Spec.Containers = append(pod.Spec.Containers, podContainer)</span>
+        }
+
+        <span class="cov0" title="0">return pod</span>
+}
+
+// SpecPodNameIndexFunc is a default index function that indexes based on crr.spec.podName
+func SpecPodNameIndexFunc(obj interface{}) ([]string, error) <span class="cov0" title="0">{
+        crr, ok := obj.(*appsv1alpha1.ContainerRecreateRequest)
+        if !ok </span><span class="cov0" title="0">{
+                return []string{""}, fmt.Errorf("object cannot be convert to CRR")
+        }</span>
+        <span class="cov0" title="0">return []string{crr.Spec.PodName}, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">/*
+Copyright 2021 The Kruise Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package daemon
+
+import (
+        "context"
+        "fmt"
+        "net"
+        "net/http"
+        "sync"
+
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+        v1 "k8s.io/api/core/v1"
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+        "k8s.io/apimachinery/pkg/runtime"
+        utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+        "k8s.io/apimachinery/pkg/watch"
+        clientset "k8s.io/client-go/kubernetes"
+        clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+        "k8s.io/client-go/rest"
+        "k8s.io/client-go/tools/cache"
+        "k8s.io/klog/v2"
+        runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
+        "sigs.k8s.io/controller-runtime/pkg/metrics"
+
+        kruiseapis "github.com/openkruise/kruise/apis"
+        "github.com/openkruise/kruise/pkg/client"
+        "github.com/openkruise/kruise/pkg/daemon/containermeta"
+        "github.com/openkruise/kruise/pkg/daemon/containerrecreate"
+        daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
+        "github.com/openkruise/kruise/pkg/daemon/imagepuller"
+        daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
+        "github.com/openkruise/kruise/pkg/daemon/podprobe"
+        daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
+        "github.com/openkruise/kruise/pkg/features"
+        utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+)
+
+var (
+        scheme = runtime.NewScheme()
+)
+
+func init() <span class="cov8" title="1">{
+        utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+        utilruntime.Must(kruiseapis.AddToScheme(scheme))
+}</span>
+
+// Runnable allows a component to be started.
+// It's very important that Start blocks until
+// it's done running.
+type Runnable interface {
+        // Run starts running the component. The component will stop running
+        // when the channel is closed. Run blocks until the channel is closed or
+        // an error occurs.
+        Run(&lt;-chan struct{})
+}
+
+// Daemon is interface for process to run every node
+type Daemon interface {
+        Run(ctx context.Context) error
+}
+
+type daemon struct {
+        runtimeFactory daemonruntime.Factory
+        podInformer    cache.SharedIndexInformer
+        runnables      []Runnable
+
+        listener  net.Listener
+        healthz   *daemonutil.Healthz
+        errSignal *errSignaler
+}
+
+// NewDaemon create a daemon
+func NewDaemon(cfg *rest.Config, bindAddress string, MaxWorkersForPullImages int, CRRWorkers int) (Daemon, error) <span class="cov8" title="1">{
+        if cfg == nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("cfg can not be nil")
+        }</span>
+        <span class="cov8" title="1">if CRRWorkers &lt;= 0 </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("crr-workers must be greater than 0")
+        }</span>
+
+        <span class="cov0" title="0">nodeName, err := daemonutil.NodeName()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">klog.InfoS("Starting daemon", "nodeName", nodeName)
+
+        listener, err := net.Listen("tcp", bindAddress)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("new listener error: %v", err)
+        }</span>
+
+        <span class="cov0" title="0">healthz := daemonutil.NewHealthz()
+
+        runtimeClient, err := runtimeclient.New(cfg, runtimeclient.Options{Scheme: scheme})
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to new controller-runtime client: %v", err)
+        }</span>
+
+        <span class="cov0" title="0">genericClient := client.GetGenericClient()
+        if genericClient == nil || genericClient.KubeClient == nil || genericClient.KruiseClient == nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("generic client can not be nil")
+        }</span>
+
+        <span class="cov0" title="0">var podInformer cache.SharedIndexInformer
+        if utilfeature.DefaultFeatureGate.Enabled(features.DaemonWatchingPod) </span><span class="cov0" title="0">{
+                podInformer = newPodInformer(genericClient.KubeClient, nodeName)
+        }</span>
+
+        <span class="cov0" title="0">accountManager := daemonutil.NewImagePullAccountManager(genericClient.KubeClient)
+        runtimeFactory, err := daemonruntime.NewFactory(accountManager)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to new runtime factory: %v", err)
+        }</span>
+
+        <span class="cov0" title="0">secretManager := daemonutil.NewCacheBasedSecretManager(genericClient.KubeClient)
+
+        opts := daemonoptions.Options{
+                NodeName:       nodeName,
+                Scheme:         scheme,
+                RuntimeClient:  runtimeClient,
+                PodInformer:    podInformer,
+                RuntimeFactory: runtimeFactory,
+                Healthz:        healthz,
+
+                MaxWorkersForPullImages: MaxWorkersForPullImages,
+                CRRWorkers:              CRRWorkers,
+        }
+
+        puller, err := imagepuller.NewController(opts, secretManager, cfg)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to new image puller controller: %v", err)
+        }</span>
+
+        <span class="cov0" title="0">crrController, err := containerrecreate.NewController(opts)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to new crr daemon controller: %v", err)
+        }</span>
+
+        <span class="cov0" title="0">var runnables = []Runnable{
+                puller,
+                crrController,
+        }
+
+        // node pod probe
+        if utilfeature.DefaultFeatureGate.Enabled(features.PodProbeMarkerGate) </span><span class="cov0" title="0">{
+                nppController, err := podprobe.NewController(opts)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to new nodePodProbe daemon controller: %v", err)
+                }</span>
+                <span class="cov0" title="0">runnables = append(runnables, nppController)</span>
+        }
+
+        <span class="cov0" title="0">if utilfeature.DefaultFeatureGate.Enabled(features.DaemonWatchingPod) </span><span class="cov0" title="0">{
+                containerMetaController, err := containermeta.NewController(opts)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to new containermeta controller: %v", err)
+                }</span>
+                <span class="cov0" title="0">runnables = append(runnables, containerMetaController)</span>
+        }
+
+        <span class="cov0" title="0">return &amp;daemon{
+                runtimeFactory: runtimeFactory,
+                podInformer:    podInformer,
+                runnables:      runnables,
+                listener:       listener,
+                healthz:        healthz,
+                errSignal:      &amp;errSignaler{errSignal: make(chan struct{})},
+        }, nil</span>
+}
+
+func newPodInformer(client clientset.Interface, nodeName string) cache.SharedIndexInformer <span class="cov0" title="0">{
+        tweakListOptionsFunc := func(opt *metav1.ListOptions) </span><span class="cov0" title="0">{
+                opt.FieldSelector = "spec.nodeName=" + nodeName
+        }</span>
+        <span class="cov0" title="0">return cache.NewSharedIndexInformer(
+                &amp;cache.ListWatch{
+                        ListFunc: func(options metav1.ListOptions) (runtime.Object, error) </span><span class="cov0" title="0">{
+                                tweakListOptionsFunc(&amp;options)
+                                return client.CoreV1().Pods(v1.NamespaceAll).List(context.TODO(), options)
+                        }</span>,
+                        WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) <span class="cov0" title="0">{
+                                tweakListOptionsFunc(&amp;options)
+                                return client.CoreV1().Pods(v1.NamespaceAll).Watch(context.TODO(), options)
+                        }</span>,
+                },
+                &amp;v1.Pod{},
+                0, // do not resync
+                cache.Indexers{},
+        )
+}
+
+func (d *daemon) Run(ctx context.Context) error <span class="cov0" title="0">{
+        if d.podInformer != nil </span><span class="cov0" title="0">{
+                go d.podInformer.Run(ctx.Done())
+                if !cache.WaitForCacheSync(ctx.Done(), d.podInformer.HasSynced) </span><span class="cov0" title="0">{
+                        return fmt.Errorf("error waiting for pod informer synced")
+                }</span>
+        }
+
+        <span class="cov0" title="0">go d.serve(ctx)
+        for _, r := range d.runnables </span><span class="cov0" title="0">{
+                go r.Run(ctx.Done())
+        }</span>
+
+        <span class="cov0" title="0">select </span>{
+        case &lt;-ctx.Done():<span class="cov0" title="0">
+                // We are done
+                return nil</span>
+        case &lt;-d.errSignal.GotError():<span class="cov0" title="0">
+                // Error starting a controller
+                return d.errSignal.Error()</span>
+        }
+}
+
+func (d *daemon) serve(ctx context.Context) <span class="cov0" title="0">{
+        handler := promhttp.HandlerFor(metrics.Registry, promhttp.HandlerOpts{
+                ErrorHandling: promhttp.HTTPErrorOnError,
+        })
+        mux := http.NewServeMux()
+        mux.Handle("/metrics", handler)
+        mux.HandleFunc("/healthz", d.healthz.Handler)
+        server := http.Server{
+                Handler: mux,
+        }
+        // Run the server
+        go func() </span><span class="cov0" title="0">{
+                if err := server.Serve(d.listener); err != nil &amp;&amp; err != http.ErrServerClosed </span><span class="cov0" title="0">{
+                        d.errSignal.SignalError(err)
+                }</span>
+        }()
+
+        // Shutdown the server when stop is closed
+        <span class="cov0" title="0">&lt;-ctx.Done()
+        if err := server.Shutdown(context.Background()); err != nil </span><span class="cov0" title="0">{
+                d.errSignal.SignalError(err)
+        }</span>
+}
+
+type errSignaler struct {
+        // errSignal indicates that an error occurred, when closed.  It shouldn't
+        // be written to.
+        errSignal chan struct{}
+
+        // err is the received error
+        err error
+
+        mu sync.Mutex
+}
+
+func (r *errSignaler) SignalError(err error) <span class="cov0" title="0">{
+        r.mu.Lock()
+        defer r.mu.Unlock()
+
+        if err == nil </span><span class="cov0" title="0">{
+                // non-error, ignore
+                klog.Error("SignalError called without an (with a nil) error, which should never happen, ignoring")
+                return
+        }</span>
+
+        <span class="cov0" title="0">if r.err != nil </span><span class="cov0" title="0">{
+                // we already have an error, don't try again
+                return
+        }</span>
+
+        // save the error and report it
+        <span class="cov0" title="0">r.err = err
+        close(r.errSignal)</span>
+}
+
+func (r *errSignaler) Error() error <span class="cov0" title="0">{
+        r.mu.Lock()
+        defer r.mu.Unlock()
+
+        return r.err
+}</span>
+
+func (r *errSignaler) GotError() chan struct{} <span class="cov0" title="0">{
+        r.mu.Lock()
+        defer r.mu.Unlock()
+
+        return r.errSignal
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
