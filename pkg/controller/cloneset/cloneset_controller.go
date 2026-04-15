@@ -209,7 +209,12 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 				klog.InfoS("Finished syncing CloneSet", "cloneSet", request, "cost", time.Since(startTime))
 			}
 		} else {
-			klog.ErrorS(retErr, "Failed syncing CloneSet", "cloneSet", request)
+			if errors.IsForbidden(retErr) && util.IsNamespaceTerminating(retErr) {
+				klog.V(3).InfoS("CloneSet skipped reconcile for namespace terminating", "cloneSet", request)
+				retErr = nil
+			} else {
+				klog.ErrorS(retErr, "Failed syncing CloneSet", "cloneSet", request)
+			}
 		}
 		// clean the duration store
 		_ = clonesetutils.DurationStore.Pop(request.String())

@@ -16,7 +16,10 @@ limitations under the License.
 
 package util
 
-import "os"
+import (
+	"os"
+	"strings"
+)
 
 func GetKruiseNamespace() string {
 	if ns := os.Getenv("POD_NAMESPACE"); len(ns) > 0 {
@@ -30,4 +33,12 @@ func GetKruiseDaemonConfigNamespace() string {
 		return ns
 	}
 	return "kruise-daemon-config"
+}
+
+// IsNamespaceTerminating checks if the error is a Forbidden error caused by namespace termination
+func IsNamespaceTerminating(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "because it is being terminated")
 }
