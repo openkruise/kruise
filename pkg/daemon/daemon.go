@@ -89,6 +89,9 @@ func NewDaemon(cfg *rest.Config, bindAddress string, MaxWorkersForPullImages int
 	if cfg == nil {
 		return nil, fmt.Errorf("cfg can not be nil")
 	}
+	if CRRWorkers <= 0 {
+		return nil, fmt.Errorf("crr-workers must be greater than 0")
+	}
 
 	nodeName, err := daemonutil.NodeName()
 	if err != nil {

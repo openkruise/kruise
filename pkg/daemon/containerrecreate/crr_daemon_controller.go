@@ -171,7 +171,7 @@ func (c *Controller) Run(stop <-chan struct{}) {
 		return
 	}
 
-	klog.Info("Starting crr daemon controller")
+	klog.InfoS("Starting crr daemon controller", "workers", c.workers)
 	for i := 0; i < c.workers; i++ {
 		go wait.Until(func() {
 			for c.processNextWorkItem() {
