@@ -108,6 +108,11 @@ func (m *SubsetControl) UpdateSubset(subset *Subset, ud *alpha1.UnitedDeployment
 			// This gives the number of pods we can afford to take down during an update
 			// while keeping the subset functional at its target capacity.
 			maxUnavailable := subset.Spec.Replicas - subset.Status.ReadyReplicas + subset.Status.UnschedulableStatus.UpdateTimeoutPods
+			// Guard: ReadyReplicas can transiently exceed Spec.Replicas during a scale-down race,
+			// making the result negative. Clamp to 0 to avoid disabling all rolling-update limits.
+			if maxUnavailable < 0 {
+				maxUnavailable = 0
+			}
 			klog.V(3).InfoS("overwrite subset maxUnavailable",
 				"unitedDeployment", klog.KObj(ud), "maxUnavailable", maxUnavailable, "subset", subset.Name)
 			m.adapter.SetMaxUnavailable(workload, maxUnavailable)
