@@ -386,7 +386,7 @@ func (s *spyMaxUnavailableAdapter) SetMaxUnavailable(obj metav1.Object, val int3
 	if s.onSetMaxUnavailable != nil {
 		s.onSetMaxUnavailable(val)
 	}
-	return obj
+	return s.inner.SetMaxUnavailable(obj, val)
 }
 func (s *spyMaxUnavailableAdapter) NewResourceObject() client.Object { return s.inner.NewResourceObject() }
 func (s *spyMaxUnavailableAdapter) NewResourceListObject() client.ObjectList {
