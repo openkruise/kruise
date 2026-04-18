@@ -101,11 +101,11 @@ func (r *ReconcileWorkloadSpread) deletePodsForSubset(ws *appsv1alpha1.WorkloadS
 		if err := r.Client.Delete(context.TODO(), pod); err != nil {
 			r.recorder.Eventf(ws, corev1.EventTypeWarning,
 				"DeletePodFailed",
-				"Failed to delete unschedulabe Pod %s/%s in Subset %s of WorkloadSpread %s/%s",
+				"Failed to delete unschedulable Pod %s/%s in Subset %s of WorkloadSpread %s/%s",
 				pod.Namespace, pod.Name, subsetName, ws.Namespace, ws.Name)
 			return err
 		}
-		klog.V(3).InfoS("WorkloadSpread deleted unschedulabe Pod in Subset successfully", "workloadSpread", klog.KObj(ws), "pod", klog.KObj(pod), "subsetName", subsetName)
+		klog.V(3).InfoS("WorkloadSpread deleted unschedulable Pod in Subset successfully", "workloadSpread", klog.KObj(ws), "pod", klog.KObj(pod), "subsetName", subsetName)
 	}
 	return nil
 }
