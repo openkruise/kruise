@@ -111,6 +111,11 @@ func (m *SubsetControl) UpdateSubset(subset *Subset, ud *alpha1.UnitedDeployment
 			// Guard: ReadyReplicas can transiently exceed Spec.Replicas during a scale-down race,
 			// making the result negative. Clamp to 0 to avoid disabling all rolling-update limits.
 			if maxUnavailable < 0 {
+				klog.V(3).InfoS("clamped negative maxUnavailable to 0: ReadyReplicas transiently exceeded Spec.Replicas during scale-down",
+					"unitedDeployment", klog.KObj(ud), "subset", subset.Name,
+					"spec.replicas", subset.Spec.Replicas,
+					"status.readyReplicas", subset.Status.ReadyReplicas,
+					"updateTimeoutPods", subset.Status.UnschedulableStatus.UpdateTimeoutPods)
 				maxUnavailable = 0
 			}
 			klog.V(3).InfoS("overwrite subset maxUnavailable",
