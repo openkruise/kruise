@@ -334,14 +334,6 @@ func TestUpdateSubset_MaxUnavailableClamp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var capturedMaxUnavailable *int32
-			spy := &spyMaxUnavailableAdapter{
-				inner: &adapter.CloneSetAdapter{},
-				onSetMaxUnavailable: func(v int32) {
-					capturedMaxUnavailable = ptr.To(v)
-				},
-			}
-
 			cs := &appsv1beta1.CloneSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "subset-a-cs", Namespace: "default"},
 				Spec: appsv1beta1.CloneSetSpec{
@@ -349,6 +341,20 @@ func TestUpdateSubset_MaxUnavailableClamp(t *testing.T) {
 					Replicas: ptr.To(tt.specReplicas),
 				},
 			}
+
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(cs).Build()
+
+			var capturedMaxUnavailable *int32
+			spy := &spyMaxUnavailableAdapter{
+				inner: &adapter.CloneSetAdapter{
+					Client: fakeClient,
+					Scheme: scheme,
+				},
+				onSetMaxUnavailable: func(v int32) {
+					capturedMaxUnavailable = ptr.To(v)
+				},
+			}
+
 			subset := &Subset{
 				ObjectMeta: metav1.ObjectMeta{Name: "subset-a-cs", Namespace: "default"},
 				Spec: SubsetSpec{
@@ -365,7 +371,6 @@ func TestUpdateSubset_MaxUnavailableClamp(t *testing.T) {
 				},
 			}
 
-			fakeClient := fake.NewFakeClient(cs)
 			m := &SubsetControl{Client: fakeClient, scheme: scheme, adapter: spy}
 
 			if err := m.UpdateSubset(subset, makeUD(), "v1", tt.specReplicas, 0); err != nil {
