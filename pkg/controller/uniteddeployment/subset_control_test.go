@@ -269,6 +269,15 @@ func TestUpdateSubset_MaxUnavailableClamp(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "ud", Namespace: "default"},
 			Spec: appsv1alpha1.UnitedDeploymentSpec{
 				Selector: &metav1.LabelSelector{MatchLabels: selectorLabels},
+				Template: appsv1alpha1.SubsetTemplate{
+					CloneSetTemplate: &appsv1alpha1.CloneSetTemplateSpec{
+						Spec: appsv1beta1.CloneSetSpec{
+							Template: corev1.PodTemplateSpec{
+								Spec: corev1.PodSpec{},
+							},
+						},
+					},
+				},
 				Topology: appsv1alpha1.Topology{
 					ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
 						Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
