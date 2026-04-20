@@ -156,6 +156,11 @@ const (
 	// Enabling this means a default will be assigned even to embeddedPodSpecs
 	// (e.g. in a CloneSet,Advanced DaemonSet), which is the historical default.
 	DefaultHostNetworkHostPortsInPodTemplates featuregate.Feature = "DefaultHostNetworkHostPortsInPodTemplates"
+
+	// DaemonSetPruneIneligibleNodes Enabling this feature means if the reduction in the node set such as
+	// node affinity, then the pods on the nodes that have undergone
+	// this reduction will not be counted in the maxUnavailable.
+	DaemonSetPruneIneligibleNodes featuregate.Feature = "DaemonSetPruneIneligibleNodes"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -197,6 +202,8 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	EnableSortSidecarContainerByName:          {Default: false, PreRelease: featuregate.Alpha},
 	InPlacePodVerticalScaling:                 {Default: false, PreRelease: featuregate.Alpha},
 	DefaultHostNetworkHostPortsInPodTemplates: {Default: false, PreRelease: featuregate.Alpha},
+
+	DaemonSetPruneIneligibleNodes: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

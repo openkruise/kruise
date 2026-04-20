@@ -273,6 +273,11 @@ func TestGetPodRevision(t *testing.T) {
 }
 
 func newNode(name string, label map[string]string) *corev1.Node {
+	if label == nil {
+		label = make(map[string]string)
+	}
+	label["kubernetes.io/hostname"] = name
+
 	return &corev1.Node{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
