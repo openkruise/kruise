@@ -676,3 +676,42 @@ func patchPodName(pod *v1.Pod) {
 		pod.Name = pod.GenerateName + string(uuid.NewUUID())
 	}
 }
+
+func TestReconcileJobCreatePodFailureDoesNotInflateActiveCount(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
+
+	p := intstr.FromInt(2)
+	job := createJob("job-fail", p)
+
+	node1 := createNode("node1")
+	node2 := createNode("node2")
+
+	// Create 1 pod on node1
+	pod1 := createPod(job, "pod1", "node1", v1.PodRunning)
+
+	reconcileJob := createReconcileJob(scheme, job, node1, node2, pod1)
+	
+	// Force create to fail by setting the new pod's name to the existing pod's name.
+	reconcileJob.podModifier = func(pod *v1.Pod) {
+		pod.Name = "pod1"
+	}
+
+	request := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "job-fail",
+			Namespace: "default",
+		},
+	}
+
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
+	assert.Error(t, err)
+
+	retrievedJob := &appsv1beta1.BroadcastJob{}
+	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
+	assert.NoError(t, err)
+
+	// active should be 1 (the original pod), not 2, because the creation on node2 failed
+	assert.Equal(t, int32(1), retrievedJob.Status.Active)
+}
