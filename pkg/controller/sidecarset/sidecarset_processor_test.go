@@ -538,3 +538,22 @@ func TestTruncateHistory(t *testing.T) {
 		t.Fatalf("expected name %s, actual : %s", getName(15), rvs[9].Name)
 	}
 }
+
+func TestUpdatePodSidecarAndHashGetError(t *testing.T) {
+	sidecarSetInput := sidecarSetDemo.DeepCopy()
+	podInput := podDemo.DeepCopy()
+
+	// Build a fake client that contains the sidecarSet but NOT the pod.
+	// This forces p.Client.Get() inside updatePodSidecarAndHash to fail
+	// with a "not found" error, exercising the early-return error path.
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(sidecarSetInput).
+		WithStatusSubresource(&appsv1beta1.SidecarSet{}).Build()
+	processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
+
+	control := sidecarcontrol.New(sidecarSetInput)
+	err := processor.updatePodSidecarAndHash(control, podInput)
+	if err == nil {
+		t.Fatal("expected error from updatePodSidecarAndHash when pod Get() fails, but got nil")
+	}
+}
