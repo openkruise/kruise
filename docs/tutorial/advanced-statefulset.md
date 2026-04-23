@@ -134,7 +134,7 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/t
 ```
 
 What this command does is that it changes the image version to `v2` and changes `partition` to `15`.
-This will update pods with ordinal number >= 15 (i.e., 15 - 19)to image version `v2`. The rest pods (0 ~ 14) will remain at version `v1`.
+This will update pods with ordinal numbers >= 15 (i.e., 15 - 19) to image version `v2`. The rest pods (0 ~ 14) will remain at version `v1`.
 The YAML diff details are shown below:
 
 ```yaml
