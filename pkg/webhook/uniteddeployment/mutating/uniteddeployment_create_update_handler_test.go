@@ -3,6 +3,7 @@ package mutating
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"testing"
 
 	evanjsonpatch "github.com/evanphx/json-patch/v5"
@@ -17,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/openkruise/kruise/apis"
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
@@ -166,6 +168,181 @@ func mustMarshalUnitedDeployment(t *testing.T, obj *appsv1beta1.UnitedDeployment
 	raw, err := json.Marshal(obj)
 	require.NoError(t, err)
 	return raw
+}
+
+func mustMarshalAlphaUnitedDeployment(t *testing.T, obj *appsv1alpha1.UnitedDeployment) []byte {
+	t.Helper()
+	raw, err := json.Marshal(obj)
+	require.NoError(t, err)
+	return raw
+}
+
+func newAlphaDeploymentUnitedDeployment() *appsv1alpha1.UnitedDeployment {
+	replicas := int32(5)
+	revisionHistoryLimit := int32(12)
+	min := intstr.FromInt(1)
+
+	return &appsv1alpha1.UnitedDeployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-ud-alpha",
+			Namespace: "default",
+		},
+		Spec: appsv1alpha1.UnitedDeploymentSpec{
+			Replicas:             &replicas,
+			RevisionHistoryLimit: &revisionHistoryLimit,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "demo"},
+			},
+			Template: appsv1alpha1.SubsetTemplate{
+				DeploymentTemplate: &appsv1alpha1.DeploymentTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{"app": "demo"},
+					},
+					Spec: appsv1.DeploymentSpec{
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{"app": "demo"},
+							},
+							Spec: corev1.PodSpec{
+								RestartPolicy: corev1.RestartPolicyAlways,
+								DNSPolicy:     corev1.DNSClusterFirst,
+								Containers: []corev1.Container{{
+									Name:                     "main",
+									Image:                    "nginx:1.25",
+									ImagePullPolicy:          corev1.PullIfNotPresent,
+									TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+								}},
+							},
+						},
+					},
+				},
+			},
+			Topology: appsv1alpha1.Topology{
+				Subsets: []appsv1alpha1.Subset{{
+					Name:        "subset-a",
+					MinReplicas: &min,
+				}},
+			},
+		},
+	}
+}
+
+func TestUnitedDeploymentCreateUpdateHandlerHandleV1alpha1CreateDefaultsAndClearsStatus(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, apis.AddToScheme(scheme))
+
+	handler := &UnitedDeploymentCreateUpdateHandler{
+		Decoder: admission.NewDecoder(scheme),
+	}
+
+	max := intstr.FromInt(5)
+	obj := newAlphaDeploymentUnitedDeployment()
+	obj.Spec.Replicas = nil
+	obj.Spec.RevisionHistoryLimit = nil
+	obj.Spec.UpdateStrategy = appsv1alpha1.UnitedDeploymentUpdateStrategy{}
+	obj.Spec.Topology.Subsets[0].MinReplicas = nil
+	obj.Spec.Topology.Subsets[0].MaxReplicas = &max
+	obj.Status = appsv1alpha1.UnitedDeploymentStatus{Replicas: 99}
+
+	raw := mustMarshalAlphaUnitedDeployment(t, obj)
+	resp := handler.Handle(context.Background(), admission.Request{
+		AdmissionRequest: admissionv1.AdmissionRequest{
+			Operation: admissionv1.Create,
+			Resource: metav1.GroupVersionResource{
+				Group:    appsv1alpha1.GroupVersion.Group,
+				Version:  appsv1alpha1.GroupVersion.Version,
+				Resource: "uniteddeployments",
+			},
+			Object: runtime.RawExtension{Raw: raw},
+		},
+	})
+
+	require.True(t, resp.Allowed, "unexpected denial: %#v", resp.Result)
+	require.NotEmpty(t, resp.Patches)
+
+	mutated := &appsv1alpha1.UnitedDeployment{}
+	require.NoError(t, json.Unmarshal(applyAdmissionPatches(t, raw, resp.Patches), mutated))
+
+	require.NotNil(t, mutated.Spec.Replicas)
+	assert.Equal(t, int32(1), *mutated.Spec.Replicas)
+	require.NotNil(t, mutated.Spec.RevisionHistoryLimit)
+	assert.Equal(t, int32(10), *mutated.Spec.RevisionHistoryLimit)
+	assert.Equal(t, appsv1alpha1.ManualUpdateStrategyType, mutated.Spec.UpdateStrategy.Type)
+	require.NotNil(t, mutated.Spec.UpdateStrategy.ManualUpdate)
+	assert.Empty(t, mutated.Spec.UpdateStrategy.ManualUpdate.Partitions)
+	require.NotNil(t, mutated.Spec.Topology.Subsets[0].MinReplicas)
+	assert.Equal(t, int32(0), mutated.Spec.Topology.Subsets[0].MinReplicas.IntVal)
+	assert.Equal(t, appsv1alpha1.UnitedDeploymentStatus{}, mutated.Status)
+}
+
+func TestUnitedDeploymentCreateUpdateHandlerHandleV1alpha1UpdatePreservesExplicitSpec(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, apis.AddToScheme(scheme))
+
+	handler := &UnitedDeploymentCreateUpdateHandler{
+		Decoder: admission.NewDecoder(scheme),
+	}
+
+	oldObj := newAlphaDeploymentUnitedDeployment()
+	oldObj.Spec.UpdateStrategy = appsv1alpha1.UnitedDeploymentUpdateStrategy{
+		Type: appsv1alpha1.ManualUpdateStrategyType,
+		ManualUpdate: &appsv1alpha1.ManualUpdate{
+			Partitions: map[string]int32{"subset-a": 1},
+		},
+	}
+	newObj := oldObj.DeepCopy()
+	newObj.Status = appsv1alpha1.UnitedDeploymentStatus{Replicas: 100}
+
+	oldRaw := mustMarshalAlphaUnitedDeployment(t, oldObj)
+	newRaw := mustMarshalAlphaUnitedDeployment(t, newObj)
+	resp := handler.Handle(context.Background(), admission.Request{
+		AdmissionRequest: admissionv1.AdmissionRequest{
+			Operation: admissionv1.Update,
+			Resource: metav1.GroupVersionResource{
+				Group:    appsv1alpha1.GroupVersion.Group,
+				Version:  appsv1alpha1.GroupVersion.Version,
+				Resource: "uniteddeployments",
+			},
+			Object:    runtime.RawExtension{Raw: newRaw},
+			OldObject: runtime.RawExtension{Raw: oldRaw},
+		},
+	})
+
+	require.True(t, resp.Allowed, "unexpected denial: %#v", resp.Result)
+	require.NotEmpty(t, resp.Patches)
+
+	mutated := &appsv1alpha1.UnitedDeployment{}
+	require.NoError(t, json.Unmarshal(applyAdmissionPatches(t, newRaw, resp.Patches), mutated))
+
+	assert.Equal(t, oldObj.Spec, mutated.Spec)
+	assert.Equal(t, appsv1alpha1.UnitedDeploymentStatus{}, mutated.Status)
+}
+
+func TestUnitedDeploymentCreateUpdateHandlerHandleUnsupportedVersionErrors(t *testing.T) {
+	scheme := runtime.NewScheme()
+	require.NoError(t, apis.AddToScheme(scheme))
+
+	handler := &UnitedDeploymentCreateUpdateHandler{
+		Decoder: admission.NewDecoder(scheme),
+	}
+
+	raw, err := json.Marshal(map[string]interface{}{"apiVersion": "apps.kruise.io/v1gamma1", "kind": "UnitedDeployment"})
+	require.NoError(t, err)
+
+	resp := handler.Handle(context.Background(), admission.Request{
+		AdmissionRequest: admissionv1.AdmissionRequest{
+			Operation: admissionv1.Create,
+			Resource: metav1.GroupVersionResource{
+				Group:    "apps.kruise.io",
+				Version:  "v1gamma1",
+				Resource: "uniteddeployments",
+			},
+			Object: runtime.RawExtension{Raw: raw},
+		},
+	})
+
+	require.False(t, resp.Allowed)
+	assert.Equal(t, int32(http.StatusBadRequest), resp.Result.Code)
 }
 
 func applyAdmissionPatches(t *testing.T, raw []byte, patches interface{}) []byte {
