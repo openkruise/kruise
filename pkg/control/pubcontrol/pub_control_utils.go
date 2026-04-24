@@ -67,21 +67,15 @@ const (
 // 2. err(error)
 func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1beta1.PubOperation, username string, dryRun bool) (allowed bool, reason string, err error) {
 	klog.V(3).InfoS("Validated pod operation for podUnavailableBudget", "pod", klog.KObj(pod), "operation", operation)
-	// pods that contain annotations[pod.kruise.io/pub-no-protect]="true" will be ignore
-	// and will no longer check the pub quota
-	if isPodNoProtection(pod) {
-		klog.V(3).InfoS("Pod contained annotations=true, then didn't need check pub", "pod", klog.KObj(pod), "annotations", policyv1beta1.PodPubNoProtectionAnnotation)
+	// pods that carry pub-no-protect=true or match spec.ignoredPodSelector are exempt
+	if exempt, err := isPodNoProtection(kclient, pod); err != nil {
+		return false, "", err
+	} else if exempt {
+		klog.V(3).InfoS("Pod is exempt from PUB enforcement", "pod", klog.KObj(pod))
 		return true, "", nil
 		// If the pod is not ready or state is inconsistent, it doesn't count towards healthy and we should not decrement
 	} else if !PubControl.IsPodReady(pod) || !PubControl.IsPodStateConsistent(pod) {
 		klog.V(3).InfoS("Pod was not ready or state was inconsistent, then didn't need check pub", "pod", klog.KObj(pod))
-		return true, "", nil
-	}
-
-	if ignored, err := isPodMatchedIgnoredPubSelector(kclient, pod); err != nil {
-		return false, "", err
-	} else if ignored {
-		klog.V(3).InfoS("Pod matched spec.ignoredPodSelector, then didn't need check pub", "pod", klog.KObj(pod))
 		return true, "", nil
 	}
 
@@ -294,16 +288,18 @@ func SetPodRelatedPubAnnotation(annotations map[string]string, pubName string) m
 	return annotations
 }
 
-func isPodNoProtection(pod *corev1.Pod) bool {
-	if pod == nil || len(pod.Annotations) == 0 {
-		return false
+// isPodNoProtection returns true if the pod should be exempt from PUB enforcement.
+// It checks two conditions in order (cheap before expensive):
+// 1. Pod carries the pub-no-protect=true annotation.
+// 2. Pod matches spec.ignoredPodSelector on its related PUB.
+func isPodNoProtection(cli client.Client, pod *corev1.Pod) (bool, error) {
+	if pod != nil && len(pod.Annotations) > 0 {
+		value := pod.Annotations[policyv1beta1.PodPubNoProtectionAnnotation]
+		if allow, err := strconv.ParseBool(value); err == nil && allow {
+			return true, nil
+		}
 	}
-	value := pod.Annotations[policyv1beta1.PodPubNoProtectionAnnotation]
-	if value == "" {
-		return false
-	}
-	allow, err := strconv.ParseBool(value)
-	return err == nil && allow
+	return isPodMatchedIgnoredPubSelector(cli, pod)
 }
 
 // getPubProtectOperations returns the effective beta protection list.
@@ -338,25 +334,9 @@ func getPubProtectOperations(pub *policyv1beta1.PodUnavailableBudget) sets.Set[p
 	return operations
 }
 
-// getPubProtectTotalReplicas returns the effective beta replica override.
-// It prefers the typed beta spec field and falls back to the deprecated annotation for compatibility.
+// getPubProtectTotalReplicas returns spec.protectTotalReplicas for v1beta1 PodUnavailableBudget.
 func getPubProtectTotalReplicas(pub *policyv1beta1.PodUnavailableBudget) *int32 {
-	if pub.Spec.ProtectTotalReplicas != nil {
-		return pub.Spec.ProtectTotalReplicas
-	}
-
-	value := pub.Annotations[policyv1beta1.PubProtectTotalReplicasAnnotation]
-	if value == "" {
-		return nil
-	}
-
-	replicas, err := strconv.ParseInt(value, 10, 32)
-	if err != nil {
-		klog.ErrorS(err, "Failed to parse deprecated protectTotalReplicas annotation", "pub", klog.KObj(pub), "annotation", policyv1beta1.PubProtectTotalReplicasAnnotation)
-		return nil
-	}
-	replicas32 := int32(replicas)
-	return &replicas32
+	return pub.Spec.ProtectTotalReplicas
 }
 
 func isPodMatchedIgnoredPubSelector(cli client.Client, pod *corev1.Pod) (bool, error) {

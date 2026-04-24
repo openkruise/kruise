@@ -61,11 +61,6 @@ func FuzzPubProtectionCompatibility(f *testing.F) {
 			pub.Spec.ProtectOperations = fuzzRuntimeOperations(cf)
 		}
 
-		if includeAnnotationReplicas, err := cf.GetBool(); err == nil && includeAnnotationReplicas {
-			if value, err := cf.GetString(); err == nil {
-				pub.Annotations[policyv1beta1.PubProtectTotalReplicasAnnotation] = value
-			}
-		}
 		if includeTypedReplicas, err := cf.GetBool(); err == nil && includeTypedReplicas {
 			if value, err := cf.GetInt(); err == nil {
 				replicas := int32(value)
@@ -88,8 +83,10 @@ func FuzzPubProtectionCompatibility(f *testing.F) {
 		replicas := getPubProtectTotalReplicas(pub)
 		if pub.Spec.ProtectTotalReplicas != nil {
 			if replicas == nil || *replicas != *pub.Spec.ProtectTotalReplicas {
-				t.Fatalf("typed protectTotalReplicas should win: got=%v want=%d", replicas, *pub.Spec.ProtectTotalReplicas)
+				t.Fatalf("protectTotalReplicas mismatch: got=%v want=%d", replicas, *pub.Spec.ProtectTotalReplicas)
 			}
+		} else if replicas != nil {
+			t.Fatalf("expected nil protectTotalReplicas when spec unset, got=%v", replicas)
 		}
 
 		noProtectValue := ""
@@ -103,13 +100,17 @@ func FuzzPubProtectionCompatibility(f *testing.F) {
 				},
 			},
 		}
-		got := isPodNoProtection(pod)
+		cli := fake.NewClientBuilder().WithScheme(pubControlFuzzScheme).Build()
+		exempt, err := isPodNoProtection(cli, pod)
+		if err != nil {
+			t.Fatalf("isPodNoProtection returned unexpected error: %v", err)
+		}
 		want := false
-		if parsed, err := strconv.ParseBool(noProtectValue); err == nil {
+		if parsed, parseErr := strconv.ParseBool(noProtectValue); parseErr == nil {
 			want = parsed
 		}
-		if got != want {
-			t.Fatalf("isPodNoProtection mismatch: got=%t want=%t for value=%q", got, want, noProtectValue)
+		if exempt != want {
+			t.Fatalf("isPodNoProtection mismatch: got=%t want=%t for value=%q", exempt, want, noProtectValue)
 		}
 	})
 }

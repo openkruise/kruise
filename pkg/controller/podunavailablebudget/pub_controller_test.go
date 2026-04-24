@@ -247,7 +247,7 @@ func TestPubReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "select matched pub.annotations[pub.kruise.io/protect-total-replicas]=15 and selector, selector and maxUnavailable 30%",
+			name: "select matched pub.spec.protectTotalReplicas=15 and selector, selector and maxUnavailable 30%",
 			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; int32(i) < 5; i++ {
@@ -295,7 +295,7 @@ func TestPubReconcile(t *testing.T) {
 			},
 			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
-				pub.Annotations[policyv1beta1.PubProtectTotalReplicasAnnotation] = "15"
+				pub.Spec.ProtectTotalReplicas = ptr.To[int32](15)
 				return pub
 			},
 			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
@@ -528,7 +528,7 @@ func TestPubReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "select matched deployment(replicas=1,maxSurge=0,maxUnavailable=30%), pub.kruise.io/protect-total-replicas=15 and pub(targetRef,maxUnavailable=30%)",
+			name: "select matched deployment(replicas=1,maxSurge=0,maxUnavailable=30%), spec.protectTotalReplicas=15 and pub(targetRef,maxUnavailable=30%)",
 			getPods: func(rs ...*apps.ReplicaSet) []*corev1.Pod {
 				var matchedPods []*corev1.Pod
 				for i := 0; int32(i) < 10; i++ {
@@ -565,7 +565,7 @@ func TestPubReconcile(t *testing.T) {
 					Kind:       "Deployment",
 					Name:       "nginx",
 				}
-				pub.Annotations[policyv1beta1.PubProtectTotalReplicasAnnotation] = "15"
+				pub.Spec.ProtectTotalReplicas = ptr.To[int32](15)
 				return pub
 			},
 			expectPubStatus: func() policyv1beta1.PodUnavailableBudgetStatus {
@@ -1224,8 +1224,7 @@ func TestPubReconcile(t *testing.T) {
 			},
 			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
-
-				pub.Annotations[policyv1beta1.PubProtectTotalReplicasAnnotation] = "50"
+				pub.Spec.ProtectTotalReplicas = ptr.To[int32](50)
 				for i := 0; i < 10; i++ {
 					if i >= 0 && i < 5 {
 						pub.Status.UnavailablePods[fmt.Sprintf("test-pod-%d", i)] = metav1.Time{Time: time.Now().Add(-10 * time.Second)}
