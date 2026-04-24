@@ -118,26 +118,26 @@ func NewDaemon(cfg *rest.Config, bindAddress string, maxWorkersForPullImages, ma
 		podInformer = newPodInformer(genericClient.KubeClient, nodeName)
 	}
 
-	accountManager := daemonutil.NewImagePullAccountManager(genericClient.KubeClient)
-	runtimeFactory, err := daemonruntime.NewFactory(accountManager)
-	if err != nil {
-		return nil, fmt.Errorf("failed to new runtime factory: %v", err)
-	}
-
-	secretManager := daemonutil.NewCacheBasedSecretManager(genericClient.KubeClient)
-
 	opts := daemonoptions.Options{
 		NodeName:       nodeName,
 		Scheme:         scheme,
 		RuntimeClient:  runtimeClient,
 		PodInformer:    podInformer,
-		RuntimeFactory: runtimeFactory,
 		Healthz:        healthz,
 
 		MaxWorkersForPullImages:           maxWorkersForPullImages,
 		MaxWorkersForContainerMeta:        maxWorkersForContainerMeta,
 		MaxWorkersForContainerMetaRestart: maxWorkersForContainerMetaRestart,
 	}
+
+	accountManager := daemonutil.NewImagePullAccountManager(genericClient.KubeClient)
+	runtimeFactory, err := daemonruntime.NewFactory(accountManager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to new runtime factory: %v", err)
+	}
+	opts.RuntimeFactory = runtimeFactory
+
+	secretManager := daemonutil.NewCacheBasedSecretManager(genericClient.KubeClient)
 
 	puller, err := imagepuller.NewController(opts, secretManager, cfg)
 	if err != nil {
