@@ -60,7 +60,6 @@ import (
 )
 
 var (
-	// TODO: make it a configurable flag
 	workers        = 5
 	restartWorkers = 10
 
@@ -79,6 +78,13 @@ type Controller struct {
 
 // NewController returns the Controller for containermeta reporting
 func NewController(opts daemonoptions.Options) (*Controller, error) {
+	if opts.MaxWorkersForContainerMeta > 0 {
+		workers = opts.MaxWorkersForContainerMeta
+	}
+	if opts.MaxWorkersForContainerMetaRestart > 0 {
+		restartWorkers = opts.MaxWorkersForContainerMetaRestart
+	}
+
 	if opts.PodInformer == nil {
 		return nil, fmt.Errorf("containermeta Controller can not run without pod informer")
 	}

@@ -51,6 +51,9 @@ var (
 	// which could otherwise impact the performance of other running pods.
 	maxWorkersForPullImage = flag.Int("max-workers-for-pull-image", -1, "The maximum number of workers for pulling images.")
 
+	containerMetaWorkers        = flag.Int("containermeta-workers", 5, "The number of workers for containermeta controller.")
+	containerMetaRestartWorkers = flag.Int("containermeta-restart-workers", 10, "The number of restart workers for containermeta controller.")
+
 	restConfigQPS   = flag.Int("rest-config-qps", 0, "QPS of rest config. Defaults to 0, which means using the default value of client-go.")
 	restConfigBurst = flag.Int("rest-config-burst", 0, "Burst of rest config. Defaults to 0, which means using the default value of client-go.")
 )
@@ -82,7 +85,7 @@ func main() {
 		}()
 	}
 	ctx := signals.SetupSignalHandler()
-	d, err := daemon.NewDaemon(cfg, *bindAddr, *maxWorkersForPullImage)
+	d, err := daemon.NewDaemon(cfg, *bindAddr, *maxWorkersForPullImage, *containerMetaWorkers, *containerMetaRestartWorkers)
 	if err != nil {
 		klog.Fatalf("Failed to new daemon: %v", err)
 	}
