@@ -18,8 +18,10 @@ package validating
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -236,79 +238,6 @@ func TestValidatingPub(t *testing.T) {
 	}
 }
 
-func TestValidatingAlphaPub(t *testing.T) {
-	alphaPub := &policyv1alpha1.PodUnavailableBudget{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: policyv1alpha1.GroupVersion.String(),
-			Kind:       "PodUnavailableBudget",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:   "default",
-			Name:        "alpha-pub-test",
-			Annotations: map[string]string{},
-		},
-		Spec: policyv1alpha1.PodUnavailableBudgetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": "pub-controller"},
-			},
-			MaxUnavailable: &intstr.IntOrString{
-				Type:   intstr.String,
-				StrVal: "20%",
-			},
-		},
-	}
-
-	cases := []struct {
-		name          string
-		pub           func() *policyv1alpha1.PodUnavailableBudget
-		expectErrList int
-	}{
-		{
-			name: "valid alpha annotation",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := alphaPub.DeepCopy()
-				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = "EVICT,DELETE,UPDATE"
-				pub.Annotations[policyv1alpha1.PubProtectTotalReplicasAnnotation] = "100"
-				return pub
-			},
-			expectErrList: 0,
-		},
-		{
-			name: "invalid alpha operation annotation",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := alphaPub.DeepCopy()
-				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = "DELETE,BOGUS"
-				return pub
-			},
-			expectErrList: 1,
-		},
-		{
-			name: "invalid alpha replicas annotation",
-			pub: func() *policyv1alpha1.PodUnavailableBudget {
-				pub := alphaPub.DeepCopy()
-				pub.Annotations[policyv1alpha1.PubProtectTotalReplicasAnnotation] = "%%"
-				return pub
-			},
-			expectErrList: 1,
-		},
-	}
-
-	decoder := admission.NewDecoder(scheme)
-	client := fake.NewClientBuilder().WithScheme(scheme).Build()
-	pubHandler := PodUnavailableBudgetCreateUpdateHandler{
-		Client:  client,
-		Decoder: decoder,
-	}
-	for _, cs := range cases {
-		t.Run(cs.name, func(t *testing.T) {
-			errList := pubHandler.validatingPodUnavailableBudgetFn(cs.pub(), nil)
-			if len(errList) != cs.expectErrList {
-				t.Fatalf("expect errList(%d) but get(%d) error: %v", cs.expectErrList, len(errList), errList.ToAggregate())
-			}
-		})
-	}
-}
-
 func TestPubConflictWithOthers(t *testing.T) {
 	cases := []struct {
 		name          string
@@ -511,6 +440,206 @@ func TestValidatingUpdatePub(t *testing.T) {
 			errList := pubHandler.validatingPodUnavailableBudgetFnV1beta1(cs.obj(), cs.old())
 			if len(errList) != cs.expectErrList {
 				t.Fatalf("expect errList(%d) but get(%d) error: %v", cs.expectErrList, len(errList), errList.ToAggregate())
+			}
+		})
+	}
+}
+
+func marshalPub(t *testing.T, obj interface{}) []byte {
+	t.Helper()
+	data, err := json.Marshal(obj)
+	if err != nil {
+		t.Fatalf("failed to marshal object: %v", err)
+	}
+	return data
+}
+
+func baseBetaPub() *policyv1beta1.PodUnavailableBudget {
+	pub := pubDemo.DeepCopy()
+	pub.Spec.Selector = nil
+	pub.Spec.MinAvailable = nil
+	return pub
+}
+
+func baseAlphaPub() *policyv1alpha1.PodUnavailableBudget {
+	return &policyv1alpha1.PodUnavailableBudget{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: policyv1alpha1.GroupVersion.String(),
+			Kind:       "PodUnavailableBudget",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:   "default",
+			Name:        "alpha-pub-handle-test",
+			Annotations: map[string]string{},
+		},
+		Spec: policyv1alpha1.PodUnavailableBudgetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "handle-test"},
+			},
+			MaxUnavailable: &intstr.IntOrString{
+				Type:   intstr.String,
+				StrVal: "20%",
+			},
+		},
+	}
+}
+
+func TestHandle(t *testing.T) {
+	cases := []struct {
+		name        string
+		request     func() admission.Request
+		wantAllowed bool
+	}{
+		{
+			name: "v1beta1 create valid pub",
+			request: func() admission.Request {
+				return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource:  metav1.GroupVersionResource{Group: policyv1beta1.GroupVersion.Group, Version: policyv1beta1.GroupVersion.Version, Resource: "podunavailablebudgets"},
+					Object:    runtime.RawExtension{Raw: marshalPub(t, baseBetaPub())},
+				}}
+			},
+			wantAllowed: true,
+		},
+		{
+			name: "v1beta1 create invalid pub — selector and targetRef both set",
+			request: func() admission.Request {
+				pub := baseBetaPub()
+				pub.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"app": "x"}}
+				return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource:  metav1.GroupVersionResource{Group: policyv1beta1.GroupVersion.Group, Version: policyv1beta1.GroupVersion.Version, Resource: "podunavailablebudgets"},
+					Object:    runtime.RawExtension{Raw: marshalPub(t, pub)},
+				}}
+			},
+			wantAllowed: false,
+		},
+		
+		{
+			name: "v1beta1 update valid pub — targetRef unchanged",
+			request: func() admission.Request {
+				pub := baseBetaPub()
+				return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Update,
+					Resource:  metav1.GroupVersionResource{Group: policyv1beta1.GroupVersion.Group, Version: policyv1beta1.GroupVersion.Version, Resource: "podunavailablebudgets"},
+					Object:    runtime.RawExtension{Raw: marshalPub(t, pub)},
+					OldObject: runtime.RawExtension{Raw: marshalPub(t, pub)},
+				}}
+			},
+			wantAllowed: true,
+		},
+		{
+			name: "v1beta1 update invalid pub — targetRef changed",
+			request: func() admission.Request {
+				old := baseBetaPub()
+				updated := baseBetaPub()
+				updated.Spec.TargetReference = &policyv1beta1.TargetReference{APIVersion: "apps/v1", Kind: "Deployment", Name: "changed"}
+				return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Update,
+					Resource:  metav1.GroupVersionResource{Group: policyv1beta1.GroupVersion.Group, Version: policyv1beta1.GroupVersion.Version, Resource: "podunavailablebudgets"},
+					Object:    runtime.RawExtension{Raw: marshalPub(t, updated)},
+					OldObject: runtime.RawExtension{Raw: marshalPub(t, old)},
+				}}
+			},
+			wantAllowed: false,
+		},
+		{
+			name: "v1alpha1 create valid pub — annotation promoted to spec via conversion",
+			request: func() admission.Request {
+				pub := baseAlphaPub()
+				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = "DELETE,EVICT"
+				pub.Annotations[policyv1alpha1.PubProtectTotalReplicasAnnotation] = "10"
+				return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource:  metav1.GroupVersionResource{Group: policyv1alpha1.GroupVersion.Group, Version: policyv1alpha1.GroupVersion.Version, Resource: "podunavailablebudgets"},
+					Object:    runtime.RawExtension{Raw: marshalPub(t, pub)},
+				}}
+			},
+			wantAllowed: true,
+		},
+		{
+			name: "v1alpha1 create invalid pub — invalid operation annotation rejected via beta validator",
+			request: func() admission.Request {
+				pub := baseAlphaPub()
+				pub.Annotations[policyv1alpha1.PubProtectOperationAnnotation] = "BOGUS"
+				return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource:  metav1.GroupVersionResource{Group: policyv1alpha1.GroupVersion.Group, Version: policyv1alpha1.GroupVersion.Version, Resource: "podunavailablebudgets"},
+					Object:    runtime.RawExtension{Raw: marshalPub(t, pub)},
+				}}
+			},
+			wantAllowed: false,
+		},
+		{
+			name: "v1alpha1 create invalid pub — bad replicas annotation rejected via beta validator",
+			request: func() admission.Request {
+				pub := baseAlphaPub()
+				pub.Annotations[policyv1alpha1.PubProtectTotalReplicasAnnotation] = "not-a-number"
+				return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource:  metav1.GroupVersionResource{Group: policyv1alpha1.GroupVersion.Group, Version: policyv1alpha1.GroupVersion.Version, Resource: "podunavailablebudgets"},
+					Object:    runtime.RawExtension{Raw: marshalPub(t, pub)},
+				}}
+			},
+			wantAllowed: false,
+		},
+		{
+			name: "v1alpha1 update valid pub — selector unchanged",
+			request: func() admission.Request {
+				pub := baseAlphaPub()
+				return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Update,
+					Resource:  metav1.GroupVersionResource{Group: policyv1alpha1.GroupVersion.Group, Version: policyv1alpha1.GroupVersion.Version, Resource: "podunavailablebudgets"},
+					Object:    runtime.RawExtension{Raw: marshalPub(t, pub)},
+					OldObject: runtime.RawExtension{Raw: marshalPub(t, pub)},
+				}}
+			},
+			wantAllowed: true,
+		},
+		{
+			name: "v1alpha1 update invalid pub — selector changed",
+			request: func() admission.Request {
+				old := baseAlphaPub()
+				updated := baseAlphaPub()
+				updated.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"app": "changed"}}
+				return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Update,
+					Resource:  metav1.GroupVersionResource{Group: policyv1alpha1.GroupVersion.Group, Version: policyv1alpha1.GroupVersion.Version, Resource: "podunavailablebudgets"},
+					Object:    runtime.RawExtension{Raw: marshalPub(t, updated)},
+					OldObject: runtime.RawExtension{Raw: marshalPub(t, old)},
+				}}
+			},
+			wantAllowed: false,
+		},
+		{
+			name: "unsupported version returns error",
+			request: func() admission.Request {
+				return admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource:  metav1.GroupVersionResource{Group: "policy.kruise.io", Version: "v99beta99", Resource: "podunavailablebudgets"},
+					Object:    runtime.RawExtension{Raw: []byte(`{}`)},
+				}}
+			},
+			wantAllowed: false,
+		},
+	}
+
+	decoder := admission.NewDecoder(scheme)
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	handler := PodUnavailableBudgetCreateUpdateHandler{
+		Client:  fakeClient,
+		Decoder: decoder,
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			resp := handler.Handle(context.TODO(), cs.request())
+			if resp.Allowed != cs.wantAllowed {
+				msg := "<nil result>"
+				if resp.Result != nil {
+					msg = resp.Result.Message
+				}
+				t.Fatalf("wantAllowed=%v got=%v msg=%s", cs.wantAllowed, resp.Allowed, msg)
 			}
 		})
 	}
