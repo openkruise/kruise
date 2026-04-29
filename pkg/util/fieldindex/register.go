@@ -44,13 +44,14 @@ const (
 	IndexNameForSidecarSetNamespace  = "namespace"
 	IndexValueSidecarSetClusterScope = "clusterScope"
 	LabelMetadataName                = v1.LabelMetadataName
+
+	indexRegistrationRetryInterval = time.Second
+	indexRegistrationTimeout       = 30 * time.Second
 )
 
 var (
-	registerOnce                   sync.Once
-	apiGVStr                       = appsv1alpha1.GroupVersion.String()
-	indexRegistrationRetryInterval = time.Second
-	indexRegistrationTimeout       = 30 * time.Second
+	registerOnce sync.Once
+	apiGVStr     = appsv1alpha1.GroupVersion.String()
 )
 
 var ownerIndexFunc = func(obj client.Object) []string {
@@ -64,69 +65,75 @@ var ownerIndexFunc = func(obj client.Object) []string {
 func RegisterFieldIndexes(c cache.Cache) error {
 	var err error
 	registerOnce.Do(func() {
-
-		// pod ownerReference
-		if err = registerFieldIndex(c, &v1.Pod{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
-			return
-		}
-		// pvc ownerReference
-		if err = registerFieldIndex(c, &v1.PersistentVolumeClaim{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
-			return
-		}
-		// ImagePullJob ownerReference
-		if err = registerFieldIndex(c, &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
-			return
-		}
-		// ImagePullJob ownerReference for v1beta1
-		if err = registerFieldIndex(c, &appsv1beta1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
-			return
-		}
-
-		// pod name
-		if err = indexPodNodeName(c); err != nil {
-			return
-		}
-		// job owner
-		if err = indexJob(c); err != nil {
-			return
-		}
-		// broadcastjob owner
-		if err = indexBroadcastCronJob(c); err != nil {
-			return
-		}
-		// broadcastjob owner for v1beta1
-		if err = indexBroadcastCronJobV1Beta1(c); err != nil {
-			return
-		}
-		// imagepulljob active
-		if err = indexImagePullJobActive(c); err != nil {
-			return
-		}
-		// imagepulljob active for v1beta1
-		if err = indexImagePullJobActiveV1Beta1(c); err != nil {
-			return
-		}
-		// imageListPullJob owner for v1beta1
-		if err = indexImageListPullJobV1Beta1(c); err != nil {
-			return
-		}
-		// sidecar spec namespaces
-		if err = indexSidecarSet(c); err != nil {
-			return
-		}
-		// sidecar spec namespaces for v1beta1
-		if err = indexSidecarSetV1Beta1(c); err != nil {
-			return
-		}
+		err = registerFieldIndexes(c)
 	})
 	return err
 }
 
+func registerFieldIndexes(c cache.Cache) (err error) {
+	// Built-in resources are always expected to be available. Fail fast if any
+	// of these indexes cannot be registered.
+	if err = registerFieldIndex(c, &v1.Pod{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
+		return
+	}
+	if err = registerFieldIndex(c, &v1.PersistentVolumeClaim{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
+		return
+	}
+	if err = indexPodNodeName(c); err != nil {
+		return
+	}
+	if err = indexJob(c); err != nil {
+		return
+	}
+
+	// CRDs can be established slightly later than the controller starts, so
+	// retry their index registration on discovery NoMatch errors.
+	if err = registerCRDFieldIndex(c, &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
+		return
+	}
+	if err = registerCRDFieldIndex(c, &appsv1beta1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
+		return
+	}
+	if err = indexBroadcastCronJob(c); err != nil {
+		return
+	}
+	if err = indexBroadcastCronJobV1Beta1(c); err != nil {
+		return
+	}
+	if err = indexImagePullJobActive(c); err != nil {
+		return
+	}
+	if err = indexImagePullJobActiveV1Beta1(c); err != nil {
+		return
+	}
+	if err = indexImageListPullJobV1Beta1(c); err != nil {
+		return
+	}
+	if err = indexSidecarSet(c); err != nil {
+		return
+	}
+	if err = indexSidecarSetV1Beta1(c); err != nil {
+		return
+	}
+	return
+}
+
 func registerFieldIndex(c cache.Cache, obj client.Object, field string, extractValue client.IndexerFunc) error {
+	if err := c.IndexField(context.TODO(), obj, field, extractValue); err != nil {
+		return fmt.Errorf("failed to register field index %q for %T: %w", field, obj, err)
+	}
+	return nil
+}
+
+func registerCRDFieldIndex(c cache.Cache, obj client.Object, field string, extractValue client.IndexerFunc) error {
+	return registerCRDFieldIndexWithRetry(c, obj, field, extractValue, indexRegistrationRetryInterval, indexRegistrationTimeout)
+}
+
+func registerCRDFieldIndexWithRetry(c cache.Cache, obj client.Object, field string, extractValue client.IndexerFunc, retryInterval, timeout time.Duration) error {
 	var lastErr error
 	retried := false
 	startTime := time.Now()
-	err := wait.PollUntilContextTimeout(context.TODO(), indexRegistrationRetryInterval, indexRegistrationTimeout, true, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(context.TODO(), retryInterval, timeout, true, func(ctx context.Context) (bool, error) {
 		lastErr = c.IndexField(ctx, obj, field, extractValue)
 		if lastErr == nil {
 			if retried {
@@ -145,7 +152,7 @@ func registerFieldIndex(c cache.Cache, obj client.Object, field string, extractV
 	})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) && lastErr != nil {
-			return fmt.Errorf("timed out after %s registering field index %q for %T: %w", indexRegistrationTimeout, field, obj, lastErr)
+			return fmt.Errorf("timed out after %s registering field index %q for %T: %w", timeout, field, obj, lastErr)
 		}
 		return fmt.Errorf("failed to register field index %q for %T: %w", field, obj, err)
 	}
@@ -186,7 +193,7 @@ func indexJob(c cache.Cache) error {
 }
 
 func indexBroadcastCronJob(c cache.Cache) error {
-	return registerFieldIndex(c, &appsv1alpha1.BroadcastJob{}, IndexNameForController, func(rawObj client.Object) []string {
+	return registerCRDFieldIndex(c, &appsv1alpha1.BroadcastJob{}, IndexNameForController, func(rawObj client.Object) []string {
 		// grab the job object, extract the owner...
 		job := rawObj.(*appsv1alpha1.BroadcastJob)
 		owner := metav1.GetControllerOf(job)
@@ -205,7 +212,7 @@ func indexBroadcastCronJob(c cache.Cache) error {
 }
 
 func indexBroadcastCronJobV1Beta1(c cache.Cache) error {
-	return registerFieldIndex(c, &appsv1beta1.BroadcastJob{}, IndexNameForController, func(rawObj client.Object) []string {
+	return registerCRDFieldIndex(c, &appsv1beta1.BroadcastJob{}, IndexNameForController, func(rawObj client.Object) []string {
 		// grab the job object, extract the owner...
 		job := rawObj.(*appsv1beta1.BroadcastJob)
 		owner := metav1.GetControllerOf(job)
@@ -224,7 +231,7 @@ func indexBroadcastCronJobV1Beta1(c cache.Cache) error {
 }
 
 func indexImageListPullJobV1Beta1(c cache.Cache) error {
-	return registerFieldIndex(c, &appsv1beta1.ImageListPullJob{}, IndexNameForController, func(rawObj client.Object) []string {
+	return registerCRDFieldIndex(c, &appsv1beta1.ImageListPullJob{}, IndexNameForController, func(rawObj client.Object) []string {
 		// grab the job object, extract the owner...
 		job := rawObj.(*appsv1beta1.ImageListPullJob)
 		owner := metav1.GetControllerOf(job)
@@ -243,7 +250,7 @@ func indexImageListPullJobV1Beta1(c cache.Cache) error {
 }
 
 func indexImagePullJobActive(c cache.Cache) error {
-	return registerFieldIndex(c, &appsv1alpha1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
+	return registerCRDFieldIndex(c, &appsv1alpha1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
 		obj := rawObj.(*appsv1alpha1.ImagePullJob)
 		isActive := "false"
 		if obj.DeletionTimestamp == nil && obj.Status.CompletionTime == nil {
@@ -254,7 +261,7 @@ func indexImagePullJobActive(c cache.Cache) error {
 }
 
 func indexImagePullJobActiveV1Beta1(c cache.Cache) error {
-	return registerFieldIndex(c, &appsv1beta1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
+	return registerCRDFieldIndex(c, &appsv1beta1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
 		return IndexImagePullJob(rawObj)
 	})
 }
@@ -292,7 +299,7 @@ func IndexSidecarSet(rawObj client.Object) []string {
 }
 
 func indexSidecarSet(c cache.Cache) error {
-	return registerFieldIndex(c, &appsv1alpha1.SidecarSet{}, IndexNameForSidecarSetNamespace, func(rawObj client.Object) []string {
+	return registerCRDFieldIndex(c, &appsv1alpha1.SidecarSet{}, IndexNameForSidecarSetNamespace, func(rawObj client.Object) []string {
 		return IndexSidecarSet(rawObj)
 	})
 }
@@ -319,7 +326,7 @@ func IndexSidecarSetV1Beta1(rawObj client.Object) []string {
 }
 
 func indexSidecarSetV1Beta1(c cache.Cache) error {
-	return registerFieldIndex(c, &appsv1beta1.SidecarSet{}, IndexNameForSidecarSetNamespace, func(rawObj client.Object) []string {
+	return registerCRDFieldIndex(c, &appsv1beta1.SidecarSet{}, IndexNameForSidecarSetNamespace, func(rawObj client.Object) []string {
 		return IndexSidecarSetV1Beta1(rawObj)
 	})
 }

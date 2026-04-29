@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -64,17 +66,6 @@ func (f *fakeIndexCache) IndexField(ctx context.Context, obj client.Object, fiel
 	return nil
 }
 
-func withIndexRegistrationTiming(t *testing.T, interval, timeout time.Duration) {
-	oldInterval := indexRegistrationRetryInterval
-	oldTimeout := indexRegistrationTimeout
-	indexRegistrationRetryInterval = interval
-	indexRegistrationTimeout = timeout
-	t.Cleanup(func() {
-		indexRegistrationRetryInterval = oldInterval
-		indexRegistrationTimeout = oldTimeout
-	})
-}
-
 func newNoMatchError() error {
 	return &meta.NoKindMatchError{
 		GroupKind:        schema.GroupKind{Group: "apps.kruise.io", Kind: "ImagePullJob"},
@@ -82,8 +73,22 @@ func newNoMatchError() error {
 	}
 }
 
-func TestRegisterFieldIndexRetriesNoMatchError(t *testing.T) {
-	withIndexRegistrationTiming(t, time.Millisecond, 100*time.Millisecond)
+func TestRegisterFieldIndexFailsFastOnNoMatchError(t *testing.T) {
+	noMatchErr := newNoMatchError()
+	fakeCache := &fakeIndexCache{
+		indexFieldFunc: func(ctx context.Context, obj client.Object, field string, extractValue client.IndexerFunc) error {
+			return noMatchErr
+		},
+	}
+
+	err := registerFieldIndex(fakeCache, &corev1.Pod{}, IndexNameForOwnerRefUID, ownerIndexFunc)
+
+	assert.ErrorIs(t, err, noMatchErr)
+	assert.True(t, meta.IsNoMatchError(err))
+	assert.Equal(t, 1, fakeCache.calls)
+}
+
+func TestRegisterCRDFieldIndexRetriesNoMatchError(t *testing.T) {
 	noMatchErr := newNoMatchError()
 	fakeCache := &fakeIndexCache{}
 	fakeCache.indexFieldFunc = func(ctx context.Context, obj client.Object, field string, extractValue client.IndexerFunc) error {
@@ -93,15 +98,14 @@ func TestRegisterFieldIndexRetriesNoMatchError(t *testing.T) {
 		return nil
 	}
 
-	err := registerFieldIndex(fakeCache, &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc)
+	err := registerCRDFieldIndexWithRetry(fakeCache, &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc, time.Millisecond, 100*time.Millisecond)
 
 	assert.NoError(t, err)
 	assert.Equal(t, 2, fakeCache.calls)
 	assert.Equal(t, []string{IndexNameForOwnerRefUID, IndexNameForOwnerRefUID}, fakeCache.fields)
 }
 
-func TestRegisterFieldIndexTimesOutOnNoMatchError(t *testing.T) {
-	withIndexRegistrationTiming(t, time.Millisecond, 5*time.Millisecond)
+func TestRegisterCRDFieldIndexTimesOutOnNoMatchError(t *testing.T) {
 	noMatchErr := newNoMatchError()
 	fakeCache := &fakeIndexCache{
 		indexFieldFunc: func(ctx context.Context, obj client.Object, field string, extractValue client.IndexerFunc) error {
@@ -109,7 +113,7 @@ func TestRegisterFieldIndexTimesOutOnNoMatchError(t *testing.T) {
 		},
 	}
 
-	err := registerFieldIndex(fakeCache, &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc)
+	err := registerCRDFieldIndexWithRetry(fakeCache, &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc, time.Millisecond, 5*time.Millisecond)
 
 	assert.Error(t, err)
 	assert.True(t, meta.IsNoMatchError(err))
@@ -117,8 +121,7 @@ func TestRegisterFieldIndexTimesOutOnNoMatchError(t *testing.T) {
 	assert.GreaterOrEqual(t, fakeCache.calls, 2)
 }
 
-func TestRegisterFieldIndexDoesNotRetryNonNoMatchError(t *testing.T) {
-	withIndexRegistrationTiming(t, time.Millisecond, 100*time.Millisecond)
+func TestRegisterCRDFieldIndexDoesNotRetryNonNoMatchError(t *testing.T) {
 	expectedErr := errors.New("index failed")
 	fakeCache := &fakeIndexCache{
 		indexFieldFunc: func(ctx context.Context, obj client.Object, field string, extractValue client.IndexerFunc) error {
@@ -126,10 +129,37 @@ func TestRegisterFieldIndexDoesNotRetryNonNoMatchError(t *testing.T) {
 		},
 	}
 
-	err := registerFieldIndex(fakeCache, &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc)
+	err := registerCRDFieldIndexWithRetry(fakeCache, &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc, time.Millisecond, 100*time.Millisecond)
 
 	assert.ErrorIs(t, err, expectedErr)
 	assert.Equal(t, 1, fakeCache.calls)
+}
+
+func TestRegisterFieldIndexesRegistersBuiltInsBeforeCRDs(t *testing.T) {
+	fakeCache := &fakeIndexCache{}
+
+	err := registerFieldIndexes(fakeCache)
+
+	assert.NoError(t, err)
+	actualTypes := make([]reflect.Type, 0, len(fakeCache.objects))
+	for _, obj := range fakeCache.objects {
+		actualTypes = append(actualTypes, reflect.TypeOf(obj))
+	}
+	assert.Equal(t, []reflect.Type{
+		reflect.TypeOf(&corev1.Pod{}),
+		reflect.TypeOf(&corev1.PersistentVolumeClaim{}),
+		reflect.TypeOf(&corev1.Pod{}),
+		reflect.TypeOf(&batchv1.Job{}),
+		reflect.TypeOf(&appsv1alpha1.ImagePullJob{}),
+		reflect.TypeOf(&appsv1beta1.ImagePullJob{}),
+		reflect.TypeOf(&appsv1alpha1.BroadcastJob{}),
+		reflect.TypeOf(&appsv1beta1.BroadcastJob{}),
+		reflect.TypeOf(&appsv1alpha1.ImagePullJob{}),
+		reflect.TypeOf(&appsv1beta1.ImagePullJob{}),
+		reflect.TypeOf(&appsv1beta1.ImageListPullJob{}),
+		reflect.TypeOf(&appsv1alpha1.SidecarSet{}),
+		reflect.TypeOf(&appsv1beta1.SidecarSet{}),
+	}, actualTypes)
 }
 
 func TestIndexSidecarSet(t *testing.T) {
