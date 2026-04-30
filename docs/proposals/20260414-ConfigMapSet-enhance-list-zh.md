@@ -271,7 +271,7 @@
 - **场景限制**
   - 不支持注入多个 Reload 容器
   - 不支持多个 ConfigMapSet 控制同一 Pod 的同一路径
-  - 暂不支持配置和业务 Spec 同时修改
+  - 暂不支持ConfigMapSet Spec和业务 Workload Spec 联动滚动更新
   - 不支持 virtual-kubelet 节点上的 Pod 热更新
 
 ### 改进价值
