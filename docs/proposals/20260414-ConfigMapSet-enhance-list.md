@@ -269,7 +269,7 @@ The new proposal explicitly adds:
   - Pod selection prioritizes non-`currentRevision` Pods
 
 - **Scenario constraints**
-  - injecting multiple reload containers is not supported
+  - within a single ConfigMapSet, it is not supported to inject multiple Reload containers
   - multiple `ConfigMapSet`s controlling the same path on the same Pod is not supported
   - there is no support for the linkage of ConfigMapSet Spec and business Workload Spec for rolling updates
   - hot update is not supported for Pods on `virtual-kubelet` nodes

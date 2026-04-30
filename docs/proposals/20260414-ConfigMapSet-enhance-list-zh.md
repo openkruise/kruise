@@ -269,7 +269,7 @@
   - Pod 选择优先处理非 `currentRevision`
 
 - **场景限制**
-  - 不支持注入多个 Reload 容器
+  - 单个 ConfigMapSet 内, 不支持注入多个 Reload 容器
   - 不支持多个 ConfigMapSet 控制同一 Pod 的同一路径
   - 暂不支持ConfigMapSet Spec和业务 Workload Spec 联动滚动更新
   - 不支持 virtual-kubelet 节点上的 Pod 热更新
