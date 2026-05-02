@@ -276,6 +276,8 @@ func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueu
 	// Without this guard the reconciler would be invoked with an empty
 	// NamespacedName on every scale event, causing spurious API-server GETs.
 	if matched.Name == "" {
+		klog.V(5).InfoS("No PodUnavailableBudget matched the workload, skipping reconcile",
+			"workload", klog.KRef(namespace, targetRef.Name))
 		return
 	}
 
