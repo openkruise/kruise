@@ -87,6 +87,12 @@ func TestCertToProjectionMap(t *testing.T) {
 	g.Expect(projectionMap).To(gomega.HaveKey(ServerCertName))
 	g.Expect(projectionMap[ServerCertName].Mode).To(gomega.Equal(int32(0640)))
 	g.Expect(projectionMap[ServerCertName].Data).To(gomega.Equal([]byte("server-cert")))
+
+	g.Expect(projectionMap).To(gomega.HaveKey(ServerKeyName2))
+	g.Expect(projectionMap[ServerKeyName2].Mode).To(gomega.Equal(int32(0600)))
+
+	g.Expect(projectionMap).To(gomega.HaveKey(ServerCertName2))
+	g.Expect(projectionMap[ServerCertName2].Mode).To(gomega.Equal(int32(0640)))
 }
 
 func TestFSCertWriter(t *testing.T) {
