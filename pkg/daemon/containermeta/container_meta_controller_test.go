@@ -19,6 +19,8 @@ package containermeta
 import (
 	"testing"
 
+	"k8s.io/client-go/util/workqueue"
+
 	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
 )
 
@@ -68,4 +70,31 @@ func TestNewControllerWorkers(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error due to nil PodInformer, got nil")
 	}
+}
+
+func TestControllerRun(t *testing.T) {
+	c := &Controller{
+		queue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-queue"),
+		workers: 2,
+		restarter: &restartController{
+			queue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-restart-queue"),
+			workers: 2,
+		},
+	}
+
+	stop := make(chan struct{})
+	// Call Run in a goroutine and close stop immediately to ensure it exits without blocking
+	go c.Run(stop)
+	close(stop)
+}
+
+func TestRestartControllerRun(t *testing.T) {
+	c := &restartController{
+		queue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-restart-queue"),
+		workers: 2,
+	}
+
+	stop := make(chan struct{})
+	go c.Run(stop)
+	close(stop)
 }
