@@ -492,6 +492,83 @@ func TestReconcilePersistentPodState(t *testing.T) {
 				return staticIP
 			},
 		},
+		{
+			name: "kruise statefulset, 10 running pod with persistent annotations",
+			getSts: func() (*apps.StatefulSet, *appsv1beta1.StatefulSet) {
+				return nil, kruiseStsDemo.DeepCopy()
+			},
+			getPods: func() []*corev1.Pod {
+				pods := make([]*corev1.Pod, 0)
+				for i := 0; i < 10; i++ {
+					pod := podDemo.DeepCopy()
+					pod.Name = fmt.Sprintf("%s-%d", kruiseStsDemo.Name, i)
+					pod.OwnerReferences[0].UID = kruiseStsDemo.UID
+					pod.Status = corev1.PodStatus{
+						Phase: corev1.PodRunning,
+						Conditions: []corev1.PodCondition{
+							{
+								Type:   corev1.PodReady,
+								Status: corev1.ConditionTrue,
+							},
+						},
+					}
+					pod.Annotations["test-annotation-key"] = fmt.Sprintf("test-annotation-value-%d", i)
+					pods = append(pods, pod)
+				}
+				return pods
+			},
+			getNodes: func() []*corev1.Node {
+				nodes := make([]*corev1.Node, 0)
+				for i := 0; i < 10; i++ {
+					node := nodeDemo.DeepCopy()
+					node.Name = fmt.Sprintf("node-%d", i)
+					node.Labels[podStateZoneTopologyLabel] = fmt.Sprintf("cn-beijing-%d", i)
+					node.Labels[podStateNodeTopologyLabel] = fmt.Sprintf("kube-resource011162007216-%d", i)
+					nodes = append(nodes, node)
+				}
+				return nodes
+			},
+			getPersistentPodState: func() *appsv1alpha1.PersistentPodState {
+				staticIP := staticIPDemo.DeepCopy()
+				staticIP.Spec.PersistentPodAnnotations = []appsv1alpha1.PersistentPodAnnotation{
+					{Key: "test-annotation-key"},
+				}
+				for i := 0; i < 5; i++ {
+					key := fmt.Sprintf("%s-%d", kruiseStsDemo.Name, i)
+					staticIP.Status.PodStates[key] = appsv1alpha1.PodState{
+						NodeName: fmt.Sprintf("node-%d", i),
+						NodeTopologyLabels: map[string]string{
+							podStateZoneTopologyLabel: fmt.Sprintf("cn-beijing-%d", i),
+							podStateNodeTopologyLabel: fmt.Sprintf("kube-resource011162007216-%d", i),
+						},
+						Annotations: map[string]string{
+							"test-annotation-key": fmt.Sprintf("test-annotation-value-%d", i),
+						},
+					}
+				}
+				return staticIP
+			},
+			exceptPersistentPodState: func() *appsv1alpha1.PersistentPodState {
+				staticIP := staticIPDemo.DeepCopy()
+				staticIP.Spec.PersistentPodAnnotations = []appsv1alpha1.PersistentPodAnnotation{
+					{Key: "test-annotation-key"},
+				}
+				for i := 0; i < 10; i++ {
+					key := fmt.Sprintf("%s-%d", kruiseStsDemo.Name, i)
+					staticIP.Status.PodStates[key] = appsv1alpha1.PodState{
+						NodeName: fmt.Sprintf("node-%d", i),
+						NodeTopologyLabels: map[string]string{
+							podStateZoneTopologyLabel: fmt.Sprintf("cn-beijing-%d", i),
+							podStateNodeTopologyLabel: fmt.Sprintf("kube-resource011162007216-%d", i),
+						},
+						Annotations: map[string]string{
+							"test-annotation-key": fmt.Sprintf("test-annotation-value-%d", i),
+						},
+					}
+				}
+				return staticIP
+			},
+		},
 	}
 
 	for _, cs := range cases {
