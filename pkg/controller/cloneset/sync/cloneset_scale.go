@@ -69,7 +69,8 @@ func (r *realControl) Scale(
 	}
 
 	// 2. calculate scale numbers
-	diffRes := calculateDiffsWithExpectation(updateCS, pods, currentRevision, updateRevision, r.inplaceControl, revision.IsPodUpdate)
+	canUpdateInPlace := canInPlaceUpdate(updateCS, currentRevision, updateRevision, coreControl, r.inplaceControl)
+	diffRes := calculateDiffsWithExpectation(updateCS, pods, currentRevision.Name, updateRevision.Name, canUpdateInPlace, revision.IsPodUpdate)
 	updatedPods, notUpdatedPods := clonesetutils.GroupUpdateAndNotUpdatePods(pods, updateRevision.Name)
 
 	if diffRes.scaleUpNum > diffRes.scaleUpLimit {

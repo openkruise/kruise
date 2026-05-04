@@ -24,19 +24,12 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/openkruise/kruise/apis"
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
-	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
-	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/revision"
 )
 
@@ -50,11 +43,9 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		pods               []*v1.Pod
 		revisionConsistent bool
 		disableFeatureGate bool
+		canInPlaceUpdate   bool
 		isPodUpdate        IsPodUpdateFunc
 		expectResult       expectationDiffs
-		// For testing in-place update detection
-		oldRevisionData string // JSON data for old revision (for CanUpdateInPlace check)
-		newRevisionData string // JSON data for new revision (for CanUpdateInPlace check)
 	}{
 		{
 			name:         "an empty cloneset",
@@ -977,16 +968,7 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 		},
 		{
 			name: "in-place update with maxSurge should not create surge pods",
-			set: func() *appsv1beta1.CloneSet {
-				cs := createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(1))
-				cs.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy = appsv1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType
-				cs.Spec.Template = v1.PodTemplateSpec{
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{{Name: "test", Image: "nginx:1.0"}},
-					},
-				}
-				return cs
-			}(),
+			set:  createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(3)),
 			pods: []*v1.Pod{
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
@@ -994,18 +976,37 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 			},
-			// Image change only - allows in-place update
-			oldRevisionData: `{"spec":{"template":{"spec":{"containers":[{"name":"test","image":"nginx:1.0"}]}}}}`,
-			newRevisionData: `{"spec":{"template":{"spec":{"containers":[{"name":"test","image":"nginx:2.0"}]}}}}`,
-			expectResult: expectationDiffs{
-				updateNum:            5,
-				updateMaxUnavailable: 1,
-				// useSurge and scaleUpNum should be 0 because in-place update doesn't need surge
+			canInPlaceUpdate: true,
+			expectResult:     expectationDiffs{updateNum: 5, updateMaxUnavailable: 1},
+		},
+		{
+			name: "recreate update with maxSurge should still create surge pods",
+			set:  createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(3)),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
 			},
+			canInPlaceUpdate: false,
+			expectResult:     expectationDiffs{scaleUpNum: 3, useSurge: 3, updateNum: 5, updateMaxUnavailable: 1, scaleUpLimit: 3},
+		},
+		{
+			name: "in-place update without maxSurge should not change behavior",
+			set:  createTestCloneSet(5, intstr.FromInt(0), intstr.FromInt(1), intstr.FromInt(0)),
+			pods: []*v1.Pod{
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+				createTestPod(oldRevision, appspub.LifecycleStateNormal, true, false),
+			},
+			canInPlaceUpdate: true,
+			expectResult:     expectationDiffs{updateNum: 5, updateMaxUnavailable: 1},
 		},
 	}
 
-	utilruntime.Must(apis.AddToScheme(scheme.Scheme))
 	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreparingUpdateAsUpdate, true)()
 
 	for i := range cases {
@@ -1015,31 +1016,11 @@ func TestCalculateDiffsWithExpectation(t *testing.T) {
 			} else {
 				_ = utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=true", features.CloneSetPartitionRollback))
 			}
-
-			// Create revision objects
-			current := &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: oldRevision}}
-			update := &apps.ControllerRevision{ObjectMeta: metav1.ObjectMeta{Name: newRevision}}
-
-			// If we have revision data for in-place update testing, populate it
-			if cases[i].oldRevisionData != "" {
-				current.Data = runtime.RawExtension{Raw: []byte(cases[i].oldRevisionData)}
-			}
-			if cases[i].newRevisionData != "" {
-				update.Data = runtime.RawExtension{Raw: []byte(cases[i].newRevisionData)}
-			}
-
+			current := oldRevision
 			if cases[i].revisionConsistent {
-				current = update
+				current = newRevision
 			}
-
-			// Create inplaceControl if we have revision data (for testing CanUpdateInPlace)
-			var inplaceControl inplaceupdate.Interface
-			if cases[i].oldRevisionData != "" || cases[i].newRevisionData != "" {
-				fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
-				inplaceControl = inplaceupdate.New(fakeClient, clonesetutils.RevisionAdapterImpl)
-			}
-
-			res := calculateDiffsWithExpectation(cases[i].set, cases[i].pods, current, update, inplaceControl, cases[i].isPodUpdate)
+			res := calculateDiffsWithExpectation(cases[i].set, cases[i].pods, current, newRevision, cases[i].canInPlaceUpdate, cases[i].isPodUpdate)
 			if !reflect.DeepEqual(res, cases[i].expectResult) {
 				t.Errorf("got %#v, expect %#v", res, cases[i].expectResult)
 			}
