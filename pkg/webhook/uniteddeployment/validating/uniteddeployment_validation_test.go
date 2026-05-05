@@ -1303,3 +1303,55 @@ func TestValidateSubsetReplicasReportsMinLessThanOrEqualToMax(t *testing.T) {
 		t.Fatalf("expected updated message, got %v", errs[0])
 	}
 }
+
+// alpha adapter helpers — convert v1alpha1 objects to v1beta1 before delegating to
+// the beta validators so that test cases written against the alpha API still work.
+
+func validateUnitedDeployment(unitedDeployment *appsv1alpha1.UnitedDeployment) field.ErrorList {
+	betaObj, errList := convertAlphaUnitedDeploymentToV1beta1(unitedDeployment)
+	if len(errList) > 0 {
+		return errList
+	}
+	return validateUnitedDeploymentV1beta1(betaObj)
+}
+
+func ValidateUnitedDeploymentUpdate(unitedDeployment, oldUnitedDeployment *appsv1alpha1.UnitedDeployment) field.ErrorList {
+	betaObj, errList := convertAlphaUnitedDeploymentToV1beta1(unitedDeployment)
+	if len(errList) > 0 {
+		return errList
+	}
+
+	oldBetaObj, oldErrList := convertAlphaUnitedDeploymentToV1beta1(oldUnitedDeployment)
+	if len(oldErrList) > 0 {
+		return oldErrList
+	}
+
+	return ValidateUnitedDeploymentUpdateV1beta1(betaObj, oldBetaObj)
+}
+
+func validateSubsetReplicas(expectedReplicas *int32, subsets []appsv1alpha1.Subset, fldPath *field.Path) field.ErrorList {
+	alphaObj := &appsv1alpha1.UnitedDeployment{
+		Spec: appsv1alpha1.UnitedDeploymentSpec{
+			Replicas: expectedReplicas,
+			Topology: appsv1alpha1.Topology{
+				Subsets: subsets,
+			},
+		},
+	}
+	betaObj, errList := convertAlphaUnitedDeploymentToV1beta1(alphaObj)
+	if len(errList) > 0 {
+		return errList
+	}
+
+	return validateSubsetReplicasV1beta1(betaObj.Spec.Replicas, betaObj.Spec.Topology.Subsets, fldPath)
+}
+
+func convertAlphaUnitedDeploymentToV1beta1(alphaObj *appsv1alpha1.UnitedDeployment) (*appsv1beta1.UnitedDeployment, field.ErrorList) {
+	betaObj := &appsv1beta1.UnitedDeployment{}
+	if err := alphaObj.ConvertTo(betaObj); err != nil {
+		return nil, field.ErrorList{
+			field.InternalError(field.NewPath(""), fmt.Errorf("failed to convert v1alpha1 UnitedDeployment to v1beta1: %w", err)),
+		}
+	}
+	return betaObj, nil
+}
