@@ -67,11 +67,9 @@ const (
 // 2. err(error)
 func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1beta1.PubOperation, username string, dryRun bool) (allowed bool, reason string, err error) {
 	klog.V(3).InfoS("Validated pod operation for podUnavailableBudget", "pod", klog.KObj(pod), "operation", operation)
-	// pods that carry pub-no-protect=true or match spec.ignoredPodSelector are exempt
-	if exempt, err := isPodNoProtection(kclient, pod); err != nil {
-		return false, "", err
-	} else if exempt {
-		klog.V(3).InfoS("Pod is exempt from PUB enforcement", "pod", klog.KObj(pod))
+	// pods that carry pub-no-protect=true are exempt (annotation-only check, no GET)
+	if isPodNoProtection(pod) {
+		klog.V(3).InfoS("Pod is exempt from PUB enforcement via annotation", "pod", klog.KObj(pod))
 		return true, "", nil
 		// If the pod is not ready or state is inconsistent, it doesn't count towards healthy and we should not decrement
 	} else if !PubControl.IsPodReady(pod) || !PubControl.IsPodStateConsistent(pod) {
@@ -79,15 +77,22 @@ func PodUnavailableBudgetValidatePod(pod *corev1.Pod, operation policyv1beta1.Pu
 		return true, "", nil
 	}
 
-	// pub for pod
+	// pub for pod — single GET on the critical path
 	pub, err := PubControl.GetPubForPod(pod)
 	if err != nil {
 		return false, "", err
 		// if there is no matching PodUnavailableBudget, just return true
 	} else if pub == nil {
 		return true, "", nil
-		// if desired available == 0, then allow all request
-	} else if pub.Status.DesiredAvailable == 0 {
+	}
+	// check spec.ignoredPodSelector using the already-fetched PUB (no second GET)
+	if matched, err := isPodMatchedIgnoredPubSelector(pub, pod); err != nil {
+		return false, "", err
+	} else if matched {
+		klog.V(3).InfoS("Pod is exempt from PUB enforcement via ignoredPodSelector", "pod", klog.KObj(pod))
+		return true, "", nil
+	}
+	if pub.Status.DesiredAvailable == 0 {
 		return true, "", nil
 	} else if !isNeedPubProtection(pub, operation) {
 		klog.V(3).InfoS("Pod operation was not in pub protection", "pod", klog.KObj(pod), "operation", operation, "pubName", pub.Name)
@@ -288,18 +293,17 @@ func SetPodRelatedPubAnnotation(annotations map[string]string, pubName string) m
 	return annotations
 }
 
-// isPodNoProtection returns true if the pod should be exempt from PUB enforcement.
-// It checks two conditions in order (cheap before expensive):
-// 1. Pod carries the pub-no-protect=true annotation.
-// 2. Pod matches spec.ignoredPodSelector on its related PUB.
-func isPodNoProtection(cli client.Client, pod *corev1.Pod) (bool, error) {
+// isPodNoProtection returns true if the pod carries the pub-no-protect=true annotation.
+// The spec.ignoredPodSelector check is done separately after the PUB is fetched,
+// to avoid an extra GET call on the webhook critical path.
+func isPodNoProtection(pod *corev1.Pod) bool {
 	if pod != nil && len(pod.Annotations) > 0 {
 		value := pod.Annotations[policyv1beta1.PodPubNoProtectionAnnotation]
 		if allow, err := strconv.ParseBool(value); err == nil && allow {
-			return true, nil
+			return true
 		}
 	}
-	return isPodMatchedIgnoredPubSelector(cli, pod)
+	return false
 }
 
 // getPubProtectOperations returns the effective beta protection list.
@@ -339,23 +343,12 @@ func getPubProtectTotalReplicas(pub *policyv1beta1.PodUnavailableBudget) *int32 
 	return pub.Spec.ProtectTotalReplicas
 }
 
-func isPodMatchedIgnoredPubSelector(cli client.Client, pod *corev1.Pod) (bool, error) {
-	pubName := GetPodRelatedPubName(pod)
-	if pubName == "" {
-		return false, nil
-	}
-
-	pub := &policyv1beta1.PodUnavailableBudget{}
-	if err := cli.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pubName}, pub); err != nil {
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
+// isPodMatchedIgnoredPubSelector checks whether pod matches pub.Spec.IgnoredPodSelector.
+// The caller is responsible for fetching the PUB; no additional GET is performed here.
+func isPodMatchedIgnoredPubSelector(pub *policyv1beta1.PodUnavailableBudget, pod *corev1.Pod) (bool, error) {
 	if pub.Spec.IgnoredPodSelector == nil {
 		return false, nil
 	}
-
 	selector, err := util.ValidatedLabelSelectorAsSelector(pub.Spec.IgnoredPodSelector)
 	if err != nil || selector.Empty() {
 		return false, err

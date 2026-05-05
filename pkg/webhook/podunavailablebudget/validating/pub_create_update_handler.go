@@ -22,8 +22,6 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
-	"strings"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -122,23 +120,6 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) Handle(ctx context.Context, re
 
 func (h *PodUnavailableBudgetCreateUpdateHandler) validatingPodUnavailableBudgetFnV1beta1(obj, old *policyv1beta1.PodUnavailableBudget) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if operationsValue, ok := obj.Annotations[policyv1beta1.PubProtectOperationAnnotation]; ok {
-		operations := strings.Split(operationsValue, ",")
-		for _, operation := range operations {
-			operation = strings.TrimSpace(operation)
-			if operation == "" {
-				continue
-			}
-			if operation != string(policyv1beta1.PubUpdateOperation) && operation != string(policyv1beta1.PubDeleteOperation) &&
-				operation != string(policyv1beta1.PubEvictOperation) && operation != string(policyv1beta1.PubResizeOperation) {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(policyv1beta1.PubProtectOperationAnnotation), operationsValue, "contains unsupported operation"))
-				break
-			}
-		}
-		if len(obj.Spec.ProtectOperations) > 0 && normalizeOperations(operationsValue) != normalizeTypedOperations(obj.Spec.ProtectOperations) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(policyv1beta1.PubProtectOperationAnnotation), operationsValue, "must match spec.protectOperations when both are set"))
-		}
-	}
 	if replicasValue, ok := obj.Annotations[policyv1beta1.PubProtectTotalReplicasAnnotation]; ok {
 		if _, err := strconv.ParseInt(replicasValue, 10, 32); err != nil {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata", "annotations").Key(policyv1beta1.PubProtectTotalReplicasAnnotation), replicasValue, "must be a valid int32"))
@@ -257,31 +238,3 @@ func validatePubConflictV1beta1(pub *policyv1beta1.PodUnavailableBudget, others 
 	return allErrs
 }
 
-// normalizeOperations converts the deprecated annotation string form like
-// "DELETE, EVICT,," into a canonical comma-separated list like "DELETE,EVICT"
-// so validation can compare user input consistently.
-func normalizeOperations(value string) string {
-	normalized := make([]string, 0)
-	for _, item := range strings.Split(value, ",") {
-		item = strings.TrimSpace(item)
-		if item == "" {
-			continue
-		}
-		normalized = append(normalized, item)
-	}
-	return strings.Join(normalized, ",")
-}
-
-// normalizeTypedOperations converts the typed beta slice form like
-// []PubOperation{"DELETE", "EVICT"} into the same canonical comma-separated
-// list used for deprecated annotation comparison.
-func normalizeTypedOperations(operations []policyv1beta1.PubOperation) string {
-	normalized := make([]string, 0, len(operations))
-	for _, operation := range operations {
-		if operation == "" {
-			continue
-		}
-		normalized = append(normalized, string(operation))
-	}
-	return strings.Join(normalized, ",")
-}

@@ -67,6 +67,7 @@ type PodUnavailableBudgetSpec struct {
 	// ProtectTotalReplicas overrides the expected workload replicas when pods do not have workload management
 	// or the workload does not expose the scale subresource.
 	// +optional
+	// +kubebuilder:validation:Minimum=1
 	ProtectTotalReplicas *int32 `json:"protectTotalReplicas,omitempty"`
 
 	// IgnoredPodSelector selects pods that should always bypass PUB protection.
