@@ -23,6 +23,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -34,6 +35,7 @@ import (
 
 func TestPodEventHandler(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	pubcontrol.InitPubControl(fakeClient, nil, record.NewFakeRecorder(10))
 	handler := newEnqueueRequestForPod(fakeClient)
 
 	err := fakeClient.Create(context.TODO(), pubDemo.DeepCopy())

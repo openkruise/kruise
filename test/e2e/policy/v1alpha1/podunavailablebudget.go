@@ -1202,4 +1202,5 @@ func setPubStatus(status *policyv1alpha1.PodUnavailableBudgetStatus) {
 	status.DisruptedPods = nil
 	status.UnavailablePods = nil
 	status.ObservedGeneration = 0
+	status.UnavailablePodGroups = nil
 }
