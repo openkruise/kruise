@@ -85,7 +85,7 @@ type daemon struct {
 }
 
 // NewDaemon create a daemon
-func NewDaemon(cfg *rest.Config, bindAddress string, MaxWorkersForPullImages int) (Daemon, error) {
+func NewDaemon(cfg *rest.Config, bindAddress string, maxWorkersForPullImages, maxWorkersForContainerMeta, maxWorkersForContainerMetaRestart int) (Daemon, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("cfg can not be nil")
 	}
@@ -134,7 +134,9 @@ func NewDaemon(cfg *rest.Config, bindAddress string, MaxWorkersForPullImages int
 		RuntimeFactory: runtimeFactory,
 		Healthz:        healthz,
 
-		MaxWorkersForPullImages: MaxWorkersForPullImages,
+		MaxWorkersForPullImages:           maxWorkersForPullImages,
+		MaxWorkersForContainerMeta:        maxWorkersForContainerMeta,
+		MaxWorkersForContainerMetaRestart: maxWorkersForContainerMetaRestart,
 	}
 
 	puller, err := imagepuller.NewController(opts, secretManager, cfg)

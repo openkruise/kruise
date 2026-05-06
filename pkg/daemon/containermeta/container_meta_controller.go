@@ -59,11 +59,12 @@ import (
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
-var (
-	// TODO: make it a configurable flag
-	workers        = 5
-	restartWorkers = 10
+const (
+	defaultWorkers        = 5
+	defaultRestartWorkers = 10
+)
 
+var (
 	resourceVersionExpectation = expectations.NewResourceVersionExpectation()
 	maxExpectationWaitDuration = 30 * time.Second
 )
@@ -74,11 +75,22 @@ type Controller struct {
 	podLister      corelisters.PodLister
 	runtimeFactory daemonruntime.Factory
 
-	restarter *restartController
+	workers        int
+	restartWorkers int
+	restarter      *restartController
 }
 
 // NewController returns the Controller for containermeta reporting
 func NewController(opts daemonoptions.Options) (*Controller, error) {
+	workers := defaultWorkers
+	if opts.MaxWorkersForContainerMeta > 0 {
+		workers = opts.MaxWorkersForContainerMeta
+	}
+	restartWorkers := defaultRestartWorkers
+	if opts.MaxWorkersForContainerMetaRestart > 0 {
+		restartWorkers = opts.MaxWorkersForContainerMetaRestart
+	}
+
 	if opts.PodInformer == nil {
 		return nil, fmt.Errorf("containermeta Controller can not run without pod informer")
 	}
@@ -127,6 +139,8 @@ func NewController(opts daemonoptions.Options) (*Controller, error) {
 		runtimeClient:  opts.RuntimeClient,
 		podLister:      corelisters.NewPodLister(opts.PodInformer.GetIndexer()),
 		runtimeFactory: opts.RuntimeFactory,
+		workers:        workers,
+		restartWorkers: restartWorkers,
 		restarter: &restartController{
 			queue: workqueue.NewNamedRateLimitingQueue(
 				workqueue.NewItemExponentialFailureRateLimiter(3*time.Second, 10*time.Minute),
@@ -134,6 +148,7 @@ func NewController(opts daemonoptions.Options) (*Controller, error) {
 			),
 			eventRecorder:  recorder,
 			runtimeFactory: opts.RuntimeFactory,
+			workers:        restartWorkers,
 		},
 	}, nil
 }
@@ -201,7 +216,7 @@ func (c *Controller) Run(stop <-chan struct{}) {
 
 	klog.Info("Starting containermeta Controller")
 	go c.restarter.Run(stop)
-	for i := 0; i < workers; i++ {
+	for i := 0; i < c.workers; i++ {
 		go wait.Until(func() {
 			for c.processNextWorkItem() {
 			}

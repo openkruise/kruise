@@ -38,13 +38,14 @@ type restartController struct {
 	queue          workqueue.RateLimitingInterface
 	eventRecorder  record.EventRecorder
 	runtimeFactory daemonruntime.Factory
+	workers        int
 }
 
 func (c *restartController) Run(stop <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	for i := 0; i < restartWorkers; i++ {
+	for i := 0; i < c.workers; i++ {
 		go wait.Until(func() {
 			for c.processNextWorkItem() {
 			}
