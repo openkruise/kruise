@@ -129,7 +129,12 @@ var _ = ginkgo.Describe("BroadcastJob", ginkgo.Label("BroadcastJob", "job", "wor
 						break
 					}
 				}
-				if fakePod != nil && fakePod.Status.Phase != v1.PodSucceeded {
+
+				if fakePod == nil {
+					return -1
+				}
+
+				if fakePod.Status.Phase != v1.PodSucceeded {
 					ginkgo.By("Try to update Pod " + fakePod.Name + " to Succeeded")
 					err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 						fakePod, err := c.CoreV1().Pods(job.Namespace).Get(context.TODO(), fakePod.Name, metav1.GetOptions{})
@@ -179,13 +184,15 @@ var _ = ginkgo.Describe("BroadcastJob", ginkgo.Label("BroadcastJob", "job", "wor
 			nodes, err := nodeTester.ListRealNodesWithFake(job.Spec.Template.Spec.Tolerations)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
+			testTaintKey := "test-taint-" + randStr
+
 			ginkgo.By("Add an extra taint to Fake Node")
 			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 				node, err := c.CoreV1().Nodes().Get(context.TODO(), fakeNode.Name, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
-				node.Spec.Taints = append(node.Spec.Taints, v1.Taint{Key: "test-taint", Value: "true", Effect: v1.TaintEffectNoSchedule})
+				node.Spec.Taints = append(node.Spec.Taints, v1.Taint{Key: testTaintKey, Value: "true", Effect: v1.TaintEffectNoSchedule})
 				_, err = c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 				return err
 			})
@@ -210,7 +217,7 @@ var _ = ginkgo.Describe("BroadcastJob", ginkgo.Label("BroadcastJob", "job", "wor
 				}
 				var newTaints []v1.Taint
 				for _, t := range node.Spec.Taints {
-					if t.Key != "test-taint" {
+					if t.Key != testTaintKey {
 						newTaints = append(newTaints, t)
 					}
 				}
@@ -238,7 +245,12 @@ var _ = ginkgo.Describe("BroadcastJob", ginkgo.Label("BroadcastJob", "job", "wor
 						break
 					}
 				}
-				if fakePod != nil && fakePod.Status.Phase != v1.PodSucceeded {
+
+				if fakePod == nil {
+					return -1
+				}
+
+				if fakePod.Status.Phase != v1.PodSucceeded {
 					ginkgo.By("Try to update Pod " + fakePod.Name + " to Succeeded")
 					err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 						fakePod, err := c.CoreV1().Pods(job.Namespace).Get(context.TODO(), fakePod.Name, metav1.GetOptions{})
