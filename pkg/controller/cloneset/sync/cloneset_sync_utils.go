@@ -22,6 +22,7 @@ import (
 	"math"
 	"reflect"
 
+	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
@@ -34,6 +35,7 @@ import (
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/lifecycle"
 	"github.com/openkruise/kruise/pkg/util/specifieddelete"
 )
@@ -98,7 +100,11 @@ type IsPodUpdateFunc func(pod *v1.Pod, updateRevision string) bool
 
 // This is the most important algorithm in cloneset-controller.
 // It calculates the pod numbers to scaling and updating for current CloneSet.
-func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string, isPodUpdate IsPodUpdateFunc) (res expectationDiffs) {
+//
+// canInPlaceUpdate signals that the revision change can be applied without
+// recreating pods; when true, surge is suppressed because in-place updates do
+// not need over-provisioning. Callers compute this via canInPlaceUpdate(...).
+func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, currentRevision, updateRevision string, canInPlaceUpdate bool, isPodUpdate IsPodUpdateFunc) (res expectationDiffs) {
 	coreControl := clonesetcore.New(cs)
 	replicas := int(*cs.Spec.Replicas)
 	var partition, maxSurge, maxUnavailable, scaleMaxUnavailable int
@@ -214,9 +220,11 @@ func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, cur
 			}
 		}
 
-		// Use surge for old and new revision updating
+		// Use surge for old and new revision updating.
+		// Surge over-provisions while old pods are being replaced by new ones; in-place
+		// updates patch existing pods without replacement, so surge is not needed.
 		var updateSurge, updateOldRevisionSurge int
-		if util.IsIntPlusAndMinus(updateOldDiff, updateNewDiff) {
+		if !canInPlaceUpdate && util.IsIntPlusAndMinus(updateOldDiff, updateNewDiff) {
 			if util.IntAbs(updateOldDiff) <= util.IntAbs(updateNewDiff) {
 				updateSurge = util.IntAbs(updateOldDiff)
 				if updateOldDiff < 0 {
@@ -307,4 +315,25 @@ func IsPodAvailable(coreControl clonesetcore.Control, pod *v1.Pod, minReadySecon
 
 func shouldScalingExcludePreparingDelete(cs *appsv1beta1.CloneSet) bool {
 	return scalingExcludePreparingDelete || cs.Spec.ScaleStrategy.ExcludePreparingDelete
+}
+
+// canInPlaceUpdate reports whether the revision change from currentRevision to
+// updateRevision can be applied via in-place update for this CloneSet. It
+// returns false unless the rolling update strategy is InPlaceIfPossible or
+// InPlaceOnly — for ReCreate strategies surge must still be honored.
+func canInPlaceUpdate(
+	cs *appsv1beta1.CloneSet,
+	currentRevision, updateRevision *apps.ControllerRevision,
+	coreControl clonesetcore.Control,
+	inplaceControl inplaceupdate.Interface,
+) bool {
+	if inplaceControl == nil || cs.Spec.UpdateStrategy.RollingUpdate == nil {
+		return false
+	}
+	policy := cs.Spec.UpdateStrategy.RollingUpdate.PodUpdatePolicy
+	if policy != appsv1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType &&
+		policy != appsv1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType {
+		return false
+	}
+	return inplaceControl.CanUpdateInPlace(currentRevision, updateRevision, coreControl.GetUpdateOptions())
 }
