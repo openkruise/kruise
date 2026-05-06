@@ -25,8 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
 	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 )
 
@@ -100,11 +98,7 @@ func FuzzPubProtectionCompatibility(f *testing.F) {
 				},
 			},
 		}
-		cli := fake.NewClientBuilder().WithScheme(pubControlFuzzScheme).Build()
-		exempt, err := isPodNoProtection(cli, pod)
-		if err != nil {
-			t.Fatalf("isPodNoProtection returned unexpected error: %v", err)
-		}
+		exempt := isPodNoProtection(pod)
 		want := false
 		if parsed, parseErr := strconv.ParseBool(noProtectValue); parseErr == nil {
 			want = parsed
@@ -151,8 +145,7 @@ func FuzzIgnoredPubSelectorLookup(f *testing.F) {
 			pod.Annotations = SetPodRelatedPubAnnotation(nil, pub.Name)
 		}
 
-			cli := fake.NewClientBuilder().WithScheme(pubControlFuzzScheme).WithObjects(pub).Build()
-			matched, err := isPodMatchedIgnoredPubSelector(cli, pod)
+			matched, err := isPodMatchedIgnoredPubSelector(pub, pod)
 			if err != nil {
 				t.Fatalf("ignored selector lookup returned unexpected error: %v", err)
 			}

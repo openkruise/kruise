@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	kubeClient "github.com/openkruise/kruise/pkg/client"
