@@ -22,10 +22,10 @@ import (
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 )
 
 var pubControlFuzzScheme = runtime.NewScheme()
@@ -145,10 +145,10 @@ func FuzzIgnoredPubSelectorLookup(f *testing.F) {
 			pod.Annotations = SetPodRelatedPubAnnotation(nil, pub.Name)
 		}
 
-			matched, err := isPodMatchedIgnoredPubSelector(pub, pod)
-			if err != nil {
-				t.Fatalf("ignored selector lookup returned unexpected error: %v", err)
-			}
+		matched, err := isPodMatchedIgnoredPubSelector(pub, pod)
+		if err != nil {
+			t.Fatalf("ignored selector lookup returned unexpected error: %v", err)
+		}
 
 		want := includeSelector && includeRelatedPub
 		if matched != want {

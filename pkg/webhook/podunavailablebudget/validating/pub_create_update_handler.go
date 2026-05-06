@@ -238,4 +238,3 @@ func validatePubConflictV1beta1(pub *policyv1beta1.PodUnavailableBudget, others 
 	}
 	return allErrs
 }
-
