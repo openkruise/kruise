@@ -4988,3 +4988,136 @@ func TestStatefulSetVCTResize(t *testing.T) {
 		testFn(&c, t)
 	}
 }
+
+// TestProcessReplicaStorageMismatch verifies the fix for bug #2343:
+// When a new VolumeClaimTemplate is added to an existing StatefulSet,
+// processReplica must delete the pod (not attempt a forbidden in-place
+// spec.volumes update). On the next reconcile, the standard creation path
+// will recreate the pod with the correct volumes and new PVCs.
+func TestProcessReplicaStorageMismatch(t *testing.T) {
+	client := fake.NewSimpleClientset()
+	set := newStatefulSet(3)
+	kruiseClient := kruisefake.NewSimpleClientset(set)
+	om, _, ssc, stop := setupController(client, kruiseClient)
+	defer close(stop)
+
+	// Bring the StatefulSet fully up.
+	if err := scaleUpStatefulSetControl(set, ssc, om, assertMonotonicInvariants); err != nil {
+		t.Fatalf("Failed to scale up StatefulSet: %v", err)
+	}
+	var err error
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting StatefulSet: %v", err)
+	}
+
+	// Record the delete count before the reconcile.
+	deletesBefore := om.deletePodTracker.requests
+
+	// Simulate adding a second VolumeClaimTemplate to the StatefulSet spec.
+	// The existing pods only have 1 volume, so storageMatches returns false.
+	updatedSet := set.DeepCopy()
+	updatedSet.Spec.VolumeClaimTemplates = append(updatedSet.Spec.VolumeClaimTemplates,
+		v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: "data-2"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			},
+		},
+	)
+	updatedSet.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+		updatedSet.Spec.Template.Spec.Containers[0].VolumeMounts,
+		v1.VolumeMount{Name: "data-2", MountPath: "/data-2"},
+	)
+	om.setsIndexer.Update(updatedSet)
+
+	selector, err := metav1.LabelSelectorAsSelector(updatedSet.Spec.Selector)
+	if err != nil {
+		t.Fatalf("Error building selector: %v", err)
+	}
+	pods, err := om.podsLister.Pods(updatedSet.Namespace).List(selector)
+	if err != nil {
+		t.Fatalf("Error listing pods: %v", err)
+	}
+
+	// Run one reconcile. storageMatches returns false for all existing pods.
+	// The fix: processReplica should DELETE the first mismatching pod (not update in-place).
+	if err := ssc.UpdateStatefulSet(context.TODO(), updatedSet, pods); err != nil {
+		t.Fatalf("UpdateStatefulSet returned unexpected error: %v", err)
+	}
+
+	// The controller processes pods one at a time (OrderedReady), so exactly 1 delete
+	// should have been issued in this reconcile.
+	deletesAfter := om.deletePodTracker.requests
+	if deletesAfter-deletesBefore != 1 {
+		t.Errorf("Expected exactly 1 pod delete due to storage mismatch, got %d", deletesAfter-deletesBefore)
+	}
+}
+
+// TestProcessReplicaStorageMismatchBudgetExhausted verifies that when
+// ScaleStrategy.MaxUnavailable is set and the budget is exhausted, processReplica
+// returns shouldBreak=true without deleting any pods (the scaleMaxUnavailable guard
+// introduced alongside the storage-mismatch fix).
+func TestProcessReplicaStorageMismatchBudgetExhausted(t *testing.T) {
+	client := fake.NewSimpleClientset()
+	// Use a burst (parallel) StatefulSet with MaxUnavailable=1.
+	one := intstr.FromInt(1)
+	set := burst(newStatefulSet(3))
+	set.Spec.ScaleStrategy = &appsv1beta1.StatefulSetScaleStrategy{
+		MaxUnavailable: &one,
+	}
+	kruiseClient := kruisefake.NewSimpleClientset(set)
+	om, _, ssc, stop := setupController(client, kruiseClient)
+	defer close(stop)
+
+	// Bring all 3 pods up to Running/Ready.
+	if err := scaleUpStatefulSetControl(set, ssc, om, assertBurstInvariants); err != nil {
+		t.Fatalf("Failed to scale up StatefulSet: %v", err)
+	}
+	var err error
+	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+	if err != nil {
+		t.Fatalf("Error getting StatefulSet: %v", err)
+	}
+
+	deletesBefore := om.deletePodTracker.requests
+
+	// Add a second VolumeClaimTemplate so every pod has a storage mismatch.
+	// We intentionally do NOT change VolumeMounts (pod template) here, because
+	// a template change would create a new revision and trigger rollingUpdateStatefulsetPods,
+	// which would issue its own deletion independent of the storage-mismatch budget guard.
+	updatedSet := set.DeepCopy()
+	updatedSet.Spec.VolumeClaimTemplates = append(updatedSet.Spec.VolumeClaimTemplates,
+		v1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: "data-2"},
+			Spec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			},
+		},
+	)
+	om.setsIndexer.Update(updatedSet)
+
+	selector, err := metav1.LabelSelectorAsSelector(updatedSet.Spec.Selector)
+	if err != nil {
+		t.Fatalf("Error building selector: %v", err)
+	}
+	pods, err := om.podsLister.Pods(updatedSet.Namespace).List(selector)
+	if err != nil {
+		t.Fatalf("Error listing pods: %v", err)
+	}
+
+	// One reconcile with MaxUnavailable=1. All pods are ready/available, so the budget
+	// is not pre-consumed by any other branch. The first storage-mismatching pod will
+	// call decreaseAndCheckMaxUnavailable (budget 1→0, returns true) and break without
+	// issuing any delete, returning shouldBreak=true to the caller.
+	if err := ssc.UpdateStatefulSet(context.TODO(), updatedSet, pods); err != nil {
+		t.Fatalf("UpdateStatefulSet returned unexpected error: %v", err)
+	}
+
+	// With budget exhausted on the very first pod, 0 deletes should have been issued.
+	deletesAfter := om.deletePodTracker.requests
+	if deletesAfter-deletesBefore != 0 {
+		t.Errorf("Expected 0 pod deletes when scaleMaxUnavailable budget is exhausted, got %d",
+			deletesAfter-deletesBefore)
+	}
+}
