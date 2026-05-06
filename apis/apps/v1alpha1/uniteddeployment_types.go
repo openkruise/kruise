@@ -249,7 +249,7 @@ const (
 // AdaptiveUnitedDeploymentStrategy is used to communicate parameters when Type is AdaptiveUnitedDeploymentScheduleStrategyType.
 type AdaptiveUnitedDeploymentStrategy struct {
 	// RescheduleCriticalSeconds indicates how long controller will reschedule a schedule failed Pod to the subset that has
-	// redundant capacity after the subset where the Pod lives. If a Pod was scheduled failed and still in an unschedulabe status
+	// redundant capacity after the subset where the Pod lives. If a Pod was scheduled failed and still in an unschedulable status
 	// over RescheduleCriticalSeconds duration, the controller will reschedule it to a suitable subset. Default is 30 seconds.
 	// +optional
 	RescheduleCriticalSeconds *int32 `json:"rescheduleCriticalSeconds,omitempty"`
