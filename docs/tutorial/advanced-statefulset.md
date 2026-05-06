@@ -19,7 +19,7 @@ If you don't use helm, you need to install with YAML files as below.
 
 ## Install the Guestbook application with YAML files
 
-Below installs a redis cluster with 1 master 2 replicas
+The following commands install a Redis cluster with 1 master and 2 replicas.
 
 ```
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/redis-master-deployment.yaml
@@ -28,7 +28,7 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/t
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/redis-slave-service.yaml
 ```
 
-Below creates a guestbook application using advanced statefulset.
+The following commands create a guestbook application using an advanced StatefulSet.
 
 ```
 kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/tutorial/v1/guestbook-statefulset.yaml
@@ -65,7 +65,7 @@ Now the app has been installed.
 
 ## Verify Guestbook Started
 
-Check the guestbook are started. `statefulset.apps.kruise.io` or shortname `sts.apps.kruise.io` is the resource kind.
+Check that the guestbook pods are running. `statefulset.apps.kruise.io` or shortname `sts.apps.kruise.io` is the resource kind.
 `app.kruise.io` postfix needs to be appended due to naming collision with Kubernetes native `statefulset` kind.
  Verify that all pods are READY.
 
@@ -84,7 +84,7 @@ You can now view the Guestbook on browser.
     If you are running Kubernetes locally, to view the guestbook, navigate to `http://localhost:3000` for the guestbook
 
 * **Remote Host:**
-    To view the guestbook on a remote host, locate the external IP of the application in the **IP** column of the `kubectl get services` output.
+    To view the guestbook on a remote host, locate the external IP of the application in the EXTERNAL-IP column of the `kubectl get services` output.
     For example, run
 
 ```
@@ -134,7 +134,7 @@ kubectl apply -f https://raw.githubusercontent.com/kruiseio/kruise/master/docs/t
 ```
 
 What this command does is that it changes the image version to `v2` and changes `partition` to `15`.
-This will update pods with ordinal number >= 15 (i.e. 15 - 19)to image version `v2`. The rest pods (0 ~ 14) will remain at version `v1`.
+This will update pods with ordinal numbers >= 15 (i.e., 15 - 19) to image version `v2`. The rest pods (0 ~ 14) will remain at version `v1`.
 The YAML diff details are shown below:
 
 ```yaml
@@ -256,7 +256,7 @@ Then uninstall it:
 helm uninstall demo-v1
 ```
 
-If you are not using helm, deleting the application using below commands:
+If you are not using Helm, delete the application using the following commands:
 
 ```
 kubectl delete sts.apps.kruise.io demo-v1-guestbook-kruise
