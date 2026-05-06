@@ -15,7 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
@@ -80,11 +79,11 @@ func (a *CloneSetAdapter) SetMaxUnavailable(obj metav1.Object, val int32) metav1
 	return set
 }
 
-func (a *CloneSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subsetName, revision string, replicas, partition int32, obj runtime.Object) error {
+func (a *CloneSetAdapter) ApplySubsetTemplate(ud *beta1.UnitedDeployment, subsetName, revision string, replicas, partition int32, obj runtime.Object) error {
 
 	set := obj.(*beta1.CloneSet)
 
-	var subSetConfig *alpha1.Subset
+	var subSetConfig *beta1.Subset
 
 	for _, subset := range ud.Spec.Topology.Subsets {
 		if subset.Name == subsetName {
@@ -107,9 +106,9 @@ func (a *CloneSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subse
 	for k, v := range ud.Spec.Selector.MatchLabels {
 		set.Labels[k] = v
 	}
-	set.Labels[alpha1.ControllerRevisionHashLabelKey] = revision
+	set.Labels[beta1.ControllerRevisionHashLabelKey] = revision
 	// record the subset name as a label
-	set.Labels[alpha1.SubSetNameLabelKey] = subsetName
+	set.Labels[beta1.SubSetNameLabelKey] = subsetName
 
 	if set.Annotations == nil {
 		set.Annotations = map[string]string{}
@@ -121,7 +120,7 @@ func (a *CloneSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subse
 	set.GenerateName = getSubsetPrefix(ud.Name, subsetName)
 
 	selectors := ud.Spec.Selector.DeepCopy()
-	selectors.MatchLabels[alpha1.SubSetNameLabelKey] = subsetName
+	selectors.MatchLabels[beta1.SubSetNameLabelKey] = subsetName
 
 	if err := controllerutil.SetControllerReference(ud, set, a.Scheme); err != nil {
 		return err
@@ -141,8 +140,8 @@ func (a *CloneSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subse
 		set.Spec.Template.Labels = map[string]string{}
 	}
 
-	set.Spec.Template.Labels[alpha1.SubSetNameLabelKey] = subsetName
-	set.Spec.Template.Labels[alpha1.ControllerRevisionHashLabelKey] = revision
+	set.Spec.Template.Labels[beta1.SubSetNameLabelKey] = subsetName
+	set.Spec.Template.Labels[beta1.ControllerRevisionHashLabelKey] = revision
 
 	attachNodeAffinity(&set.Spec.Template.Spec, subSetConfig)
 	attachTolerations(&set.Spec.Template.Spec, subSetConfig)
@@ -165,11 +164,11 @@ func (a *CloneSetAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subse
 	if set.Annotations == nil {
 		set.Annotations = make(map[string]string)
 	}
-	set.Annotations[alpha1.AnnotationSubsetPatchKey] = string(subSetConfig.Patch.Raw)
+	set.Annotations[beta1.AnnotationSubsetPatchKey] = string(subSetConfig.Patch.Raw)
 	return nil
 }
 
-func (a *CloneSetAdapter) PostUpdate(_ *alpha1.UnitedDeployment, _ runtime.Object, _ string, _ int32) error {
+func (a *CloneSetAdapter) PostUpdate(_ *beta1.UnitedDeployment, _ runtime.Object, _ string, _ int32) error {
 	return nil
 }
 

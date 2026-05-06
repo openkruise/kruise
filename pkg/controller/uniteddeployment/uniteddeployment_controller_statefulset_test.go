@@ -38,7 +38,6 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruisectlutil "github.com/openkruise/kruise/pkg/controller/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -63,20 +62,20 @@ func TestStsReconcile(t *testing.T) {
 	}()
 
 	caseName := "sts-reconcile"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -101,8 +100,8 @@ func TestStsReconcile(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -144,20 +143,20 @@ func TestStsSubsetProvision(t *testing.T) {
 	}()
 
 	caseName := "test-sts-subset-provision"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -182,8 +181,8 @@ func TestStsSubsetProvision(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -225,7 +224,7 @@ func TestStsSubsetProvision(t *testing.T) {
 	g.Expect(sts.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0]).Should(gomega.BeEquivalentTo("node-a"))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	instance.Spec.Topology.Subsets = append(instance.Spec.Topology.Subsets, appsv1alpha1.Subset{
+	instance.Spec.Topology.Subsets = append(instance.Spec.Topology.Subsets, appsv1beta1.Subset{
 		Name: "subset-b",
 		NodeSelectorTerm: corev1.NodeSelectorTerm{
 			MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -394,20 +393,20 @@ func TestStsSubsetPatch(t *testing.T) {
 	imagePatchBytes, _ := json.Marshal(imagePatch)
 	resourcePatchBytes, _ := json.Marshal(resourcePatch)
 	envPatchBytes, _ := json.Marshal(envPatch)
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -432,8 +431,8 @@ func TestStsSubsetPatch(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						Patch: runtime.RawExtension{
@@ -546,20 +545,20 @@ func TestStsSubsetProvisionWithToleration(t *testing.T) {
 	}()
 
 	caseName := "test-sts-subset-provision-with-toleration"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -584,8 +583,8 @@ func TestStsSubsetProvisionWithToleration(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						Tolerations: []corev1.Toleration{
@@ -652,20 +651,20 @@ func TestStsDupSubset(t *testing.T) {
 	}()
 
 	caseName := "test-sts-dup-subset"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -690,8 +689,8 @@ func TestStsDupSubset(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -742,20 +741,20 @@ func TestStsScale(t *testing.T) {
 	}()
 
 	caseName := "test-sts-scale"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &one,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -780,8 +779,8 @@ func TestStsScale(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -838,7 +837,7 @@ func TestStsScale(t *testing.T) {
 	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(1))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	g.Expect(instance.Status.SubsetReplicas).Should(gomega.BeEquivalentTo(map[string]int32{
+	g.Expect(subsetStatusReplicas(instance.Status.SubsetStatuses)).Should(gomega.BeEquivalentTo(map[string]int32{
 		"subset-a": 1,
 		"subset-b": 1,
 	}))
@@ -854,7 +853,7 @@ func TestStsScale(t *testing.T) {
 	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(3))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	g.Expect(instance.Status.SubsetReplicas).Should(gomega.BeEquivalentTo(map[string]int32{
+	g.Expect(subsetStatusReplicas(instance.Status.SubsetStatuses)).Should(gomega.BeEquivalentTo(map[string]int32{
 		"subset-a": 3,
 		"subset-b": 3,
 	}))
@@ -870,7 +869,7 @@ func TestStsScale(t *testing.T) {
 	g.Expect(*stsList.Items[1].Spec.Replicas).Should(gomega.BeEquivalentTo(2))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	g.Expect(instance.Status.SubsetReplicas).Should(gomega.BeEquivalentTo(map[string]int32{
+	g.Expect(subsetStatusReplicas(instance.Status.SubsetStatuses)).Should(gomega.BeEquivalentTo(map[string]int32{
 		"subset-a": 2,
 		"subset-b": 2,
 	}))
@@ -885,20 +884,20 @@ func TestStsUpdate(t *testing.T) {
 	}()
 
 	caseName := "test-sts-update"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &two,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -923,8 +922,8 @@ func TestStsUpdate(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -992,7 +991,7 @@ func TestStsUpdate(t *testing.T) {
 	if v2 == v1 {
 		v2 = revisionList.Items[1].Name
 	}
-	g.Expect(instance.Status.UpdateStatus.UpdatedRevision).Should(gomega.BeEquivalentTo(v2))
+	g.Expect(instance.Status.UpdatedRevision).Should(gomega.BeEquivalentTo(v2))
 }
 
 func TestStsRollingUpdatePartition(t *testing.T) {
@@ -1004,20 +1003,20 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 	}()
 
 	caseName := "test-sts-rolling-update-partition"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &ten,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -1042,11 +1041,11 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 					},
 				},
 			},
-			UpdateStrategy: appsv1alpha1.UnitedDeploymentUpdateStrategy{
-				Type: appsv1alpha1.ManualUpdateStrategyType,
+			UpdateStrategy: appsv1beta1.UnitedDeploymentUpdateStrategy{
+				Type: appsv1beta1.ManualUpdateStrategyType,
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -1095,7 +1094,7 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 
 	// update with partition
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1beta1.ManualUpdate{
 		Partitions: map[string]int32{
 			"subset-a": 4,
 			"subset-b": 3,
@@ -1118,13 +1117,13 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 	g.Expect(*stsB.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(3))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
+	g.Expect(subsetPartitionsFromStatus(instance.Status.SubsetStatuses)).Should(gomega.BeEquivalentTo(map[string]int32{
 		"subset-a": 4,
 		"subset-b": 3,
 	}))
 
 	// move on
-	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1beta1.ManualUpdate{
 		Partitions: map[string]int32{
 			"subset-a": 0,
 			"subset-b": 3,
@@ -1146,13 +1145,13 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 	g.Expect(*stsB.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(3))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
+	g.Expect(subsetPartitionsFromStatus(instance.Status.SubsetStatuses)).Should(gomega.BeEquivalentTo(map[string]int32{
 		"subset-a": 0,
 		"subset-b": 3,
 	}))
 
 	// move on
-	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1beta1.ManualUpdate{
 		Partitions: map[string]int32{},
 	}
 	g.Expect(c.Update(context.TODO(), instance)).Should(gomega.BeNil())
@@ -1171,7 +1170,7 @@ func TestStsRollingUpdatePartition(t *testing.T) {
 	g.Expect(*stsB.Spec.UpdateStrategy.RollingUpdate.Partition).Should(gomega.BeEquivalentTo(0))
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
+	g.Expect(subsetPartitionsFromStatus(instance.Status.SubsetStatuses)).Should(gomega.BeEquivalentTo(map[string]int32{
 		"subset-a": 0,
 		"subset-b": 0,
 	}))
@@ -1186,20 +1185,20 @@ func TestStsRollingUpdateDeleteStuckPod(t *testing.T) {
 	}()
 
 	caseName := "test-sts-rolling-update-delete-stuck-pod"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &ten,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -1224,11 +1223,11 @@ func TestStsRollingUpdateDeleteStuckPod(t *testing.T) {
 					},
 				},
 			},
-			UpdateStrategy: appsv1alpha1.UnitedDeploymentUpdateStrategy{
-				Type: appsv1alpha1.ManualUpdateStrategyType,
+			UpdateStrategy: appsv1beta1.UnitedDeploymentUpdateStrategy{
+				Type: appsv1beta1.ManualUpdateStrategyType,
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -1283,7 +1282,7 @@ func TestStsRollingUpdateDeleteStuckPod(t *testing.T) {
 
 	// update with partition
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1beta1.ManualUpdate{
 		Partitions: map[string]int32{
 			"subset-a": 4,
 			"subset-b": 3,
@@ -1317,20 +1316,20 @@ func TestStsOnDelete(t *testing.T) {
 	}()
 
 	caseName := "test-sts-on-delete"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &ten,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -1358,11 +1357,11 @@ func TestStsOnDelete(t *testing.T) {
 					},
 				},
 			},
-			UpdateStrategy: appsv1alpha1.UnitedDeploymentUpdateStrategy{
-				Type: appsv1alpha1.ManualUpdateStrategyType,
+			UpdateStrategy: appsv1beta1.UnitedDeploymentUpdateStrategy{
+				Type: appsv1beta1.ManualUpdateStrategyType,
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -1414,7 +1413,7 @@ func TestStsOnDelete(t *testing.T) {
 
 	// update with partition
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1beta1.ManualUpdate{
 		Partitions: map[string]int32{
 			"subset-a": 4,
 			"subset-b": 3,
@@ -1439,13 +1438,13 @@ func TestStsOnDelete(t *testing.T) {
 	g.Expect(stsB.Spec.UpdateStrategy.RollingUpdate).Should(gomega.BeNil())
 
 	g.Expect(c.Get(context.TODO(), client.ObjectKey{Namespace: instance.Namespace, Name: instance.Name}, instance)).Should(gomega.BeNil())
-	g.Expect(instance.Status.UpdateStatus.CurrentPartitions).Should(gomega.BeEquivalentTo(map[string]int32{
+	g.Expect(subsetPartitionsFromStatus(instance.Status.SubsetStatuses)).Should(gomega.BeEquivalentTo(map[string]int32{
 		"subset-a": 4,
 		"subset-b": 3,
 	}))
 
 	// move on
-	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1beta1.ManualUpdate{
 		Partitions: map[string]int32{
 			"subset-a": 0,
 			"subset-b": 3,
@@ -1468,20 +1467,20 @@ func TestStsSubsetCount(t *testing.T) {
 	}()
 
 	caseName := "test-sts-subset-count"
-	instance := &appsv1alpha1.UnitedDeployment{
+	instance := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      caseName,
 			Namespace: "default",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Replicas: &ten,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"name": caseName,
 				},
 			},
-			Template: appsv1alpha1.SubsetTemplate{
-				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+			Template: appsv1beta1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Labels: map[string]string{
 							"name": caseName,
@@ -1506,8 +1505,8 @@ func TestStsSubsetCount(t *testing.T) {
 					},
 				},
 			},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						NodeSelectorTerm: corev1.NodeSelectorTerm{
@@ -1585,8 +1584,8 @@ func TestStsSubsetCount(t *testing.T) {
 	percentage = intstr.FromString("30%")
 	instance.Spec.Topology.Subsets[0].Replicas = &percentage
 	instance.Spec.Template.StatefulSetTemplate.Spec.Template.Spec.Containers[0].Image = "nginx:3.0"
-	instance.Spec.UpdateStrategy.Type = appsv1alpha1.ManualUpdateStrategyType
-	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1alpha1.ManualUpdate{
+	instance.Spec.UpdateStrategy.Type = appsv1beta1.ManualUpdateStrategyType
+	instance.Spec.UpdateStrategy.ManualUpdate = &appsv1beta1.ManualUpdate{
 		Partitions: map[string]int32{
 			"subset-a": 1,
 		},
@@ -1612,7 +1611,7 @@ func TestStsSubsetCount(t *testing.T) {
 	instance.Spec.UpdateStrategy.ManualUpdate.Partitions = map[string]int32{
 		"subset-a": 2,
 	}
-	instance.Spec.Topology.Subsets = append(instance.Spec.Topology.Subsets, appsv1alpha1.Subset{
+	instance.Spec.Topology.Subsets = append(instance.Spec.Topology.Subsets, appsv1beta1.Subset{
 		Name: "subset-c",
 		NodeSelectorTerm: corev1.NodeSelectorTerm{
 			MatchExpressions: []corev1.NodeSelectorRequirement{
@@ -1783,7 +1782,7 @@ func waitReconcilerProcessFinished(g *gomega.GomegaWithT, requests chan reconcil
 
 func getSubsetByName(stsList *appsv1.StatefulSetList, name string) *appsv1.StatefulSet {
 	for _, sts := range stsList.Items {
-		if sts.Labels[appsv1alpha1.SubSetNameLabelKey] == name {
+		if sts.Labels[appsv1beta1.SubSetNameLabelKey] == name {
 			return &sts
 		}
 	}
@@ -1791,7 +1790,7 @@ func getSubsetByName(stsList *appsv1.StatefulSetList, name string) *appsv1.State
 	return nil
 }
 
-func expectedStsCount(g *gomega.GomegaWithT, ud *appsv1alpha1.UnitedDeployment, count int) *appsv1.StatefulSetList {
+func expectedStsCount(g *gomega.GomegaWithT, ud *appsv1beta1.UnitedDeployment, count int) *appsv1.StatefulSetList {
 	stsList := &appsv1.StatefulSetList{}
 
 	selector, err := metav1.LabelSelectorAsSelector(ud.Spec.Selector)
@@ -1834,7 +1833,7 @@ func setUp(t *testing.T) (*gomega.GomegaWithT, chan reconcile.Request, context.C
 
 // clean can be shared amongst all subset workload tests (i.e. statefulsets, deployments, advancedStatefulsets, etc.).
 func clean(g *gomega.GomegaWithT, c client.Client) {
-	udList := &appsv1alpha1.UnitedDeploymentList{}
+	udList := &appsv1beta1.UnitedDeploymentList{}
 	if err := c.List(context.TODO(), udList); err == nil {
 		for _, ud := range udList.Items {
 			c.Delete(context.TODO(), &ud)

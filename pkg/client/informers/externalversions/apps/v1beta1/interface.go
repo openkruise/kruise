@@ -41,6 +41,8 @@ type Interface interface {
 	SidecarSets() SidecarSetInformer
 	// StatefulSets returns a StatefulSetInformer.
 	StatefulSets() StatefulSetInformer
+	// UnitedDeployments returns a UnitedDeploymentInformer.
+	UnitedDeployments() UnitedDeploymentInformer
 }
 
 type version struct {
@@ -97,4 +99,9 @@ func (v *version) SidecarSets() SidecarSetInformer {
 // StatefulSets returns a StatefulSetInformer.
 func (v *version) StatefulSets() StatefulSetInformer {
 	return &statefulSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// UnitedDeployments returns a UnitedDeploymentInformer.
+func (v *version) UnitedDeployments() UnitedDeploymentInformer {
+	return &unitedDeploymentInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

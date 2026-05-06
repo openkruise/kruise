@@ -25,7 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	"github.com/openkruise/kruise/apis/apps/v1beta1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
@@ -96,7 +95,7 @@ func TestPostUpdate(t *testing.T) {
 func TestApplySubsetTemplate(t *testing.T) {
 	var scheme = runtime.NewScheme()
 	var fakeClient = fake.NewClientBuilder().WithScheme(scheme).Build()
-	_ = appsv1alpha1.AddToScheme(scheme)
+	_ = appsv1beta1.AddToScheme(scheme)
 	_ = appsv1beta1.AddToScheme(scheme)
 	_ = appsv1.AddToScheme(scheme)
 
@@ -146,14 +145,14 @@ func TestApplySubsetTemplate(t *testing.T) {
 				t.Errorf("compare namespace failed: ud %+v, subset %+v", subset.GetNamespace(), ud.Namespace)
 			}
 			compareMap(subset.GetLabels(), map[string]string{
-				"custom-label-1":                            "custom-value-1",
-				"selector-key":                              "selector-value",
-				appsv1alpha1.SubSetNameLabelKey:             subsetName,
-				appsv1alpha1.ControllerRevisionHashLabelKey: revision,
+				"custom-label-1":                           "custom-value-1",
+				"selector-key":                             "selector-value",
+				appsv1beta1.SubSetNameLabelKey:             subsetName,
+				appsv1beta1.ControllerRevisionHashLabelKey: revision,
 			}, t)
 			compareMap(subset.GetAnnotations(), map[string]string{
-				"annotation-key":                      "annotation-value",
-				appsv1alpha1.AnnotationSubsetPatchKey: `{"metadata":{"annotations":{"patched-key":"patched-value"}}}`,
+				"annotation-key":                     "annotation-value",
+				appsv1beta1.AnnotationSubsetPatchKey: `{"metadata":{"annotations":{"patched-key":"patched-value"}}}`,
 			}, t)
 			compareMap(getPodAnnotationsFromSubset(subset), map[string]string{"patched-key": "patched-value"}, t)
 		})
@@ -176,7 +175,7 @@ func compareMap(actual, expect map[string]string, t *testing.T) {
 func getClientAndScheme() (fakeClient client.Client, scheme *runtime.Scheme) {
 	scheme = runtime.NewScheme()
 	fakeClient = fake.NewClientBuilder().WithScheme(scheme).Build()
-	_ = appsv1alpha1.AddToScheme(scheme)
+	_ = appsv1beta1.AddToScheme(scheme)
 	_ = appsv1beta1.AddToScheme(scheme)
 	_ = appsv1.AddToScheme(scheme)
 	return
@@ -196,17 +195,17 @@ func getPodAnnotationsFromSubset(object client.Object) map[string]string {
 	return nil
 }
 
-func newUnitedDeploymentWithAdapter(adapter Adapter) *appsv1alpha1.UnitedDeployment {
-	ud := &appsv1alpha1.UnitedDeployment{
+func newUnitedDeploymentWithAdapter(adapter Adapter) *appsv1beta1.UnitedDeployment {
+	ud := &appsv1beta1.UnitedDeployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
 		},
-		Spec: appsv1alpha1.UnitedDeploymentSpec{
+		Spec: appsv1beta1.UnitedDeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
 				"selector-key": "selector-value",
 			}},
-			Topology: appsv1alpha1.Topology{
-				Subsets: []appsv1alpha1.Subset{
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
 					{
 						Name: "subset-a",
 						Patch: runtime.RawExtension{
@@ -220,19 +219,19 @@ func newUnitedDeploymentWithAdapter(adapter Adapter) *appsv1alpha1.UnitedDeploym
 	object := adapter.NewResourceObject()
 	switch object.(type) {
 	case *v1beta1.StatefulSet:
-		ud.Spec.Template.AdvancedStatefulSetTemplate = &appsv1alpha1.AdvancedStatefulSetTemplateSpec{}
+		ud.Spec.Template.AdvancedStatefulSetTemplate = &appsv1beta1.AdvancedStatefulSetTemplateSpec{}
 		ud.Spec.Template.AdvancedStatefulSetTemplate.Labels = map[string]string{"custom-label-1": "custom-value-1"}
 		ud.Spec.Template.AdvancedStatefulSetTemplate.Annotations = map[string]string{"annotation-key": "annotation-value"}
 	case *appsv1beta1.CloneSet:
-		ud.Spec.Template.CloneSetTemplate = &appsv1alpha1.CloneSetTemplateSpec{}
+		ud.Spec.Template.CloneSetTemplate = &appsv1beta1.CloneSetTemplateSpec{}
 		ud.Spec.Template.CloneSetTemplate.Labels = map[string]string{"custom-label-1": "custom-value-1"}
 		ud.Spec.Template.CloneSetTemplate.Annotations = map[string]string{"annotation-key": "annotation-value"}
 	case *appsv1.Deployment:
-		ud.Spec.Template.DeploymentTemplate = &appsv1alpha1.DeploymentTemplateSpec{}
+		ud.Spec.Template.DeploymentTemplate = &appsv1beta1.DeploymentTemplateSpec{}
 		ud.Spec.Template.DeploymentTemplate.Labels = map[string]string{"custom-label-1": "custom-value-1"}
 		ud.Spec.Template.DeploymentTemplate.Annotations = map[string]string{"annotation-key": "annotation-value"}
 	case *appsv1.StatefulSet:
-		ud.Spec.Template.StatefulSetTemplate = &appsv1alpha1.StatefulSetTemplateSpec{}
+		ud.Spec.Template.StatefulSetTemplate = &appsv1beta1.StatefulSetTemplateSpec{}
 		ud.Spec.Template.StatefulSetTemplate.Labels = map[string]string{"custom-label-1": "custom-value-1"}
 		ud.Spec.Template.StatefulSetTemplate.Annotations = map[string]string{"annotation-key": "annotation-value"}
 	}

@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller/util"
 	"github.com/openkruise/kruise/pkg/util/expectations"
 )
@@ -72,21 +72,21 @@ func round(x float64) int {
 }
 
 func getSubsetNameFrom(metaObj metav1.Object) (string, error) {
-	name, exist := metaObj.GetLabels()[appsv1alpha1.SubSetNameLabelKey]
+	name, exist := metaObj.GetLabels()[appsv1beta1.SubSetNameLabelKey]
 	if !exist {
-		return "", fmt.Errorf("fail to get subSet name from label of subset %s/%s: no label %s found", metaObj.GetNamespace(), metaObj.GetName(), appsv1alpha1.SubSetNameLabelKey)
+		return "", fmt.Errorf("fail to get subSet name from label of subset %s/%s: no label %s found", metaObj.GetNamespace(), metaObj.GetName(), appsv1beta1.SubSetNameLabelKey)
 	}
 
 	if len(name) == 0 {
-		return "", fmt.Errorf("fail to get subSet name from label of subset %s/%s: label %s has an empty value", metaObj.GetNamespace(), metaObj.GetName(), appsv1alpha1.SubSetNameLabelKey)
+		return "", fmt.Errorf("fail to get subSet name from label of subset %s/%s: label %s has an empty value", metaObj.GetNamespace(), metaObj.GetName(), appsv1beta1.SubSetNameLabelKey)
 	}
 
 	return name, nil
 }
 
 // NewUnitedDeploymentCondition creates a new UnitedDeployment condition.
-func NewUnitedDeploymentCondition(condType appsv1alpha1.UnitedDeploymentConditionType, status corev1.ConditionStatus, reason, message string) *appsv1alpha1.UnitedDeploymentCondition {
-	return &appsv1alpha1.UnitedDeploymentCondition{
+func NewUnitedDeploymentCondition(condType appsv1beta1.UnitedDeploymentConditionType, status corev1.ConditionStatus, reason, message string) *appsv1beta1.UnitedDeploymentCondition {
+	return &appsv1beta1.UnitedDeploymentCondition{
 		Type:               condType,
 		Status:             status,
 		LastTransitionTime: metav1.Now(),
@@ -96,7 +96,7 @@ func NewUnitedDeploymentCondition(condType appsv1alpha1.UnitedDeploymentConditio
 }
 
 // GetUnitedDeploymentCondition returns the condition with the provided type.
-func GetUnitedDeploymentCondition(status *appsv1alpha1.UnitedDeploymentStatus, condType appsv1alpha1.UnitedDeploymentConditionType) *appsv1alpha1.UnitedDeploymentCondition {
+func GetUnitedDeploymentCondition(status *appsv1beta1.UnitedDeploymentStatus, condType appsv1beta1.UnitedDeploymentConditionType) *appsv1beta1.UnitedDeploymentCondition {
 	for i := range status.Conditions {
 		c := status.Conditions[i]
 		if c.Type == condType {
@@ -108,7 +108,7 @@ func GetUnitedDeploymentCondition(status *appsv1alpha1.UnitedDeploymentStatus, c
 
 // SetUnitedDeploymentCondition updates the UnitedDeployment to include the provided condition. If the condition that
 // we are about to add already exists and has the same status, reason and message then we are not going to update.
-func SetUnitedDeploymentCondition(status *appsv1alpha1.UnitedDeploymentStatus, condition *appsv1alpha1.UnitedDeploymentCondition) {
+func SetUnitedDeploymentCondition(status *appsv1beta1.UnitedDeploymentStatus, condition *appsv1beta1.UnitedDeploymentCondition) {
 	currentCond := GetUnitedDeploymentCondition(status, condition.Type)
 	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason {
 		return
@@ -122,12 +122,12 @@ func SetUnitedDeploymentCondition(status *appsv1alpha1.UnitedDeploymentStatus, c
 }
 
 // RemoveUnitedDeploymentCondition removes the UnitedDeployment condition with the provided type.
-func RemoveUnitedDeploymentCondition(status *appsv1alpha1.UnitedDeploymentStatus, condType appsv1alpha1.UnitedDeploymentConditionType) {
+func RemoveUnitedDeploymentCondition(status *appsv1beta1.UnitedDeploymentStatus, condType appsv1beta1.UnitedDeploymentConditionType) {
 	status.Conditions = filterOutCondition(status.Conditions, condType)
 }
 
-func filterOutCondition(conditions []appsv1alpha1.UnitedDeploymentCondition, condType appsv1alpha1.UnitedDeploymentConditionType) []appsv1alpha1.UnitedDeploymentCondition {
-	var newConditions []appsv1alpha1.UnitedDeploymentCondition
+func filterOutCondition(conditions []appsv1beta1.UnitedDeploymentCondition, condType appsv1beta1.UnitedDeploymentConditionType) []appsv1beta1.UnitedDeploymentCondition {
+	var newConditions []appsv1beta1.UnitedDeploymentCondition
 	for _, c := range conditions {
 		if c.Type == condType {
 			continue
@@ -137,7 +137,7 @@ func filterOutCondition(conditions []appsv1alpha1.UnitedDeploymentCondition, con
 	return newConditions
 }
 
-func getUnitedDeploymentKey(ud *appsv1alpha1.UnitedDeployment) string {
+func getUnitedDeploymentKey(ud *appsv1beta1.UnitedDeployment) string {
 	return ud.GetNamespace() + "/" + ud.GetName()
 }
 
@@ -157,9 +157,9 @@ var ResourceVersionExpectation = expectations.NewResourceVersionExpectation()
 // Returns:
 //   - isReserved: true if the Pod is in the Reserved state; otherwise, false.
 //   - nextCheckAfter: the duration until the next check if the Pod has not reached the Reserved state; otherwise, -1.
-func CheckPodReallyInReservedStatus(pod *corev1.Pod, subset *Subset, updatedCondition *appsv1alpha1.UnitedDeploymentCondition,
+func CheckPodReallyInReservedStatus(pod *corev1.Pod, subset *Subset, updatedCondition *appsv1beta1.UnitedDeploymentCondition,
 	pendingTimeout time.Duration, minReadySeconds time.Duration, now time.Time) (isReserved bool, nextCheckAfter time.Duration) {
-	podRevision, _ := GetPodLabel(pod, appsv1alpha1.ControllerRevisionHashLabelKey)
+	podRevision, _ := GetPodLabel(pod, appsv1beta1.ControllerRevisionHashLabelKey)
 	if reserved, _ := IsPodMarkedAsReserved(pod); reserved {
 		if pod.Status.Phase == corev1.PodRunning && podRevision == subset.Status.UpdatedRevision {
 			readyCondition := getPodCondition(pod, corev1.PodReady)
@@ -203,7 +203,7 @@ func CheckPodReallyInReservedStatus(pod *corev1.Pod, subset *Subset, updatedCond
 //   - reserved: true if the Pod is in the Reserved state; otherwise, false.
 //   - ok: true if the Pod has the "apps.kruise.io/united-deployment-reserved-pod" reserved; otherwise, false.
 func IsPodMarkedAsReserved(pod *corev1.Pod) (reserved bool, ok bool) {
-	if label, ok := GetPodLabel(pod, appsv1alpha1.ReservedPodLabelKey); ok {
+	if label, ok := GetPodLabel(pod, appsv1beta1.ReservedPodLabelKey); ok {
 		return label == "true", true
 	} else {
 		return false, false
@@ -229,13 +229,13 @@ func getPodCondition(pod *corev1.Pod, tp corev1.PodConditionType) *corev1.PodCon
 	return nil
 }
 
-func initStatus(u *appsv1alpha1.UnitedDeployment) {
+func initStatus(u *appsv1beta1.UnitedDeployment) {
 	update := len(u.Status.SubsetStatuses) > 0 // subset list changed
 	for _, subset := range u.Spec.Topology.Subsets {
 		if u.Status.GetSubsetStatus(subset.Name) == nil {
-			status := appsv1alpha1.UnitedDeploymentSubsetStatus{Name: subset.Name}
+			status := appsv1beta1.UnitedDeploymentSubsetStatus{Name: subset.Name}
 			if update && u.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
-				status.SetCondition(appsv1alpha1.UnitedDeploymentSubsetSchedulable, corev1.ConditionFalse, "created",
+				status.SetCondition(appsv1beta1.UnitedDeploymentSubsetSchedulable, corev1.ConditionFalse, "created",
 					"newly-created subsets in reservation strategy")
 			}
 			u.Status.SubsetStatuses = append(u.Status.SubsetStatuses, status)

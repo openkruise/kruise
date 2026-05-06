@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func sortToAllocator(infos subsetInfos) *specificAllocator {
@@ -280,9 +280,9 @@ func TestCapacityAllocator(t *testing.T) {
 
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			ud := appsv1alpha1.UnitedDeployment{}
+			ud := appsv1beta1.UnitedDeployment{}
 			ud.Spec.Replicas = pointer.Int32(cs.replicas)
-			ud.Spec.Topology.Subsets = []appsv1alpha1.Subset{}
+			ud.Spec.Topology.Subsets = []appsv1beta1.Subset{}
 			for index := range cs.minReplicas {
 				minReplicas := intstr.FromInt32(cs.minReplicas[index])
 				var maxReplicas *intstr.IntOrString
@@ -290,7 +290,7 @@ func TestCapacityAllocator(t *testing.T) {
 					m := intstr.FromInt32(cs.maxReplicas[index])
 					maxReplicas = &m
 				}
-				ud.Spec.Topology.Subsets = append(ud.Spec.Topology.Subsets, appsv1alpha1.Subset{
+				ud.Spec.Topology.Subsets = append(ud.Spec.Topology.Subsets, appsv1beta1.Subset{
 					Name:        fmt.Sprintf("subset-%d", index),
 					MinReplicas: &minReplicas,
 					MaxReplicas: maxReplicas,
@@ -321,13 +321,13 @@ func TestDefaultAdaptiveAllocation(t *testing.T) {
 	}
 	getUnitedDeploymentAndSubsets := func(totalReplicas int32,
 		minReplicas, maxReplicas, subsetPods, pendingPods []int32) (
-		*appsv1alpha1.UnitedDeployment, map[string]*Subset) {
-		ud := &appsv1alpha1.UnitedDeployment{
-			Spec: appsv1alpha1.UnitedDeploymentSpec{
+		*appsv1beta1.UnitedDeployment, map[string]*Subset) {
+		ud := &appsv1beta1.UnitedDeployment{
+			Spec: appsv1beta1.UnitedDeploymentSpec{
 				Replicas: &totalReplicas,
-				Topology: appsv1alpha1.Topology{
-					ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
-						Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
+				Topology: appsv1beta1.Topology{
+					ScheduleStrategy: appsv1beta1.UnitedDeploymentScheduleStrategy{
+						Type: appsv1beta1.AdaptiveUnitedDeploymentScheduleStrategyType,
 					},
 				},
 			},
@@ -337,7 +337,7 @@ func TestDefaultAdaptiveAllocation(t *testing.T) {
 			subsetName := fmt.Sprintf("subset-%d", i)
 			minR, maxR := parseInt32(minReplicas[i]), parseInt32(maxReplicas[i])
 			pending := max(0, pendingPods[i])
-			ud.Spec.Topology.Subsets = append(ud.Spec.Topology.Subsets, appsv1alpha1.Subset{
+			ud.Spec.Topology.Subsets = append(ud.Spec.Topology.Subsets, appsv1beta1.Subset{
 				Name:        subsetName,
 				MinReplicas: minR,
 				MaxReplicas: maxR,
@@ -544,14 +544,14 @@ func TestDefaultAdaptiveAllocation(t *testing.T) {
 
 func TestReservedAdaptiveAllocation(t *testing.T) {
 	getUnitedDeploymentAndSubsets := func(totalReplicas int32, minReplicas, maxReplicas, reserved, cur, newPods []int32) (
-		*appsv1alpha1.UnitedDeployment, map[string]*Subset) {
-		ud := &appsv1alpha1.UnitedDeployment{
-			Spec: appsv1alpha1.UnitedDeploymentSpec{
+		*appsv1beta1.UnitedDeployment, map[string]*Subset) {
+		ud := &appsv1beta1.UnitedDeployment{
+			Spec: appsv1beta1.UnitedDeploymentSpec{
 				Replicas: &totalReplicas,
-				Topology: appsv1alpha1.Topology{
-					ScheduleStrategy: appsv1alpha1.UnitedDeploymentScheduleStrategy{
-						Type: appsv1alpha1.AdaptiveUnitedDeploymentScheduleStrategyType,
-						Adaptive: &appsv1alpha1.AdaptiveUnitedDeploymentStrategy{
+				Topology: appsv1beta1.Topology{
+					ScheduleStrategy: appsv1beta1.UnitedDeploymentScheduleStrategy{
+						Type: appsv1beta1.AdaptiveUnitedDeploymentScheduleStrategyType,
+						Adaptive: &appsv1beta1.AdaptiveUnitedDeploymentStrategy{
 							ReserveUnschedulablePods: true,
 						},
 					},
@@ -568,7 +568,7 @@ func TestReservedAdaptiveAllocation(t *testing.T) {
 			if maxReplicas != nil && maxReplicas[i] >= 0 {
 				maxR = &intstr.IntOrString{Type: intstr.Int, IntVal: maxReplicas[i]}
 			}
-			ud.Spec.Topology.Subsets = append(ud.Spec.Topology.Subsets, appsv1alpha1.Subset{
+			ud.Spec.Topology.Subsets = append(ud.Spec.Topology.Subsets, appsv1beta1.Subset{
 				Name:        name,
 				MinReplicas: minR,
 				MaxReplicas: maxR,

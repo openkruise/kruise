@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	fuzzutils "github.com/openkruise/kruise/test/fuzz"
 )
 
@@ -54,6 +55,11 @@ func FuzzValidateUnitedDeploymentSpec(f *testing.F) {
 			return
 		}
 
-		_ = validateUnitedDeploymentSpec(&ud.Spec, field.NewPath("spec"))
+		betaObj := &appsv1beta1.UnitedDeployment{}
+		if err := ud.ConvertTo(betaObj); err != nil {
+			return
+		}
+
+		_ = validateUnitedDeploymentSpecV1beta1(&betaObj.Spec, field.NewPath("spec"))
 	})
 }

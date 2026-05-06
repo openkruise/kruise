@@ -19,6 +19,7 @@ package mutating
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"reflect"
 
@@ -29,6 +30,7 @@ import (
 
 	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
@@ -50,40 +52,79 @@ var _ admission.Handler = &UnitedDeploymentCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *UnitedDeploymentCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.UnitedDeployment{}
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		obj := &appsv1beta1.UnitedDeployment{}
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		var copy runtime.Object = obj.DeepCopy()
 
-	err := h.Decoder.Decode(req, obj)
-	if err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
-	}
-	var copy runtime.Object = obj.DeepCopy()
-
-	injectTemplateDefaults := false
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TemplateNoDefaults) {
-		if req.AdmissionRequest.Operation == admissionv1.Update {
-			oldObj := &appsv1alpha1.UnitedDeployment{}
-			if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
-				return admission.Errored(http.StatusBadRequest, err)
-			}
-			if !reflect.DeepEqual(obj.Spec.Template, oldObj.Spec.Template) {
+		injectTemplateDefaults := false
+		if !utilfeature.DefaultFeatureGate.Enabled(features.TemplateNoDefaults) {
+			if req.AdmissionRequest.Operation == admissionv1.Update {
+				oldObj := &appsv1beta1.UnitedDeployment{}
+				if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
+					return admission.Errored(http.StatusBadRequest, err)
+				}
+				if !reflect.DeepEqual(obj.Spec.Template, oldObj.Spec.Template) {
+					injectTemplateDefaults = true
+				}
+			} else {
 				injectTemplateDefaults = true
 			}
-		} else {
-			injectTemplateDefaults = true
 		}
+		defaults.SetDefaultsUnitedDeploymentV1beta1(obj, injectTemplateDefaults)
+		obj.Status = appsv1beta1.UnitedDeploymentStatus{}
+		if reflect.DeepEqual(obj, copy) {
+			return admission.Allowed("")
+		}
+		marshaled, err := json.Marshal(obj)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
+		if len(resp.Patches) > 0 {
+			klog.V(5).InfoS("Admit UnitedDeployment patches", "namespace", obj.Namespace, "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
+		}
+		return resp
+
+	case appsv1alpha1.GroupVersion.Version:
+		obj := &appsv1alpha1.UnitedDeployment{}
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		var copy runtime.Object = obj.DeepCopy()
+
+		injectTemplateDefaults := false
+		if !utilfeature.DefaultFeatureGate.Enabled(features.TemplateNoDefaults) {
+			if req.AdmissionRequest.Operation == admissionv1.Update {
+				oldObj := &appsv1alpha1.UnitedDeployment{}
+				if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
+					return admission.Errored(http.StatusBadRequest, err)
+				}
+				if !reflect.DeepEqual(obj.Spec.Template, oldObj.Spec.Template) {
+					injectTemplateDefaults = true
+				}
+			} else {
+				injectTemplateDefaults = true
+			}
+		}
+		defaults.SetDefaultsUnitedDeployment(obj, injectTemplateDefaults)
+		obj.Status = appsv1alpha1.UnitedDeploymentStatus{}
+		if reflect.DeepEqual(obj, copy) {
+			return admission.Allowed("")
+		}
+		marshaled, err := json.Marshal(obj)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
+		if len(resp.Patches) > 0 {
+			klog.V(5).InfoS("Admit UnitedDeployment patches", "namespace", obj.Namespace, "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
+		}
+		return resp
 	}
-	defaults.SetDefaultsUnitedDeployment(obj, injectTemplateDefaults)
-	obj.Status = appsv1alpha1.UnitedDeploymentStatus{}
-	if reflect.DeepEqual(obj, copy) {
-		return admission.Allowed("")
-	}
-	marshaled, err := json.Marshal(obj)
-	if err != nil {
-		return admission.Errored(http.StatusInternalServerError, err)
-	}
-	resp := admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
-	if len(resp.Patches) > 0 {
-		klog.V(5).InfoS("Admit UnitedDeployment patches", "namespace", obj.Namespace, "name", obj.Name, "patches", util.DumpJSON(resp.Patches))
-	}
-	return resp
+
+	return admission.Errored(http.StatusBadRequest, fmt.Errorf("unsupported version: %s", req.AdmissionRequest.Resource.Version))
 }

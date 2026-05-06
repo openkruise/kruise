@@ -715,7 +715,7 @@ func TestValidateUnitedDeployment(t *testing.T) {
 					field != "spec.topology.subsets[0].name" &&
 					field != "spec.topology.subsets[0].replicas" &&
 					field != "spec.topology.scheduleStrategy" &&
-					field != "spec.updateStrategy.partitions" &&
+					field != "spec.updateStrategy.manualUpdate.partitions" &&
 					field != "spec.topology.subsets[0].nodeSelectorTerm.matchExpressions[0].values" {
 					t.Errorf("%s: missing prefix for: %v", k, errs[i])
 				}
@@ -1203,4 +1203,155 @@ func setTestDefault(obj *appsv1alpha1.UnitedDeployment) {
 		obj.Spec.RevisionHistoryLimit = new(int32)
 		*obj.Spec.RevisionHistoryLimit = 10
 	}
+}
+
+func TestValidateUnitedDeploymentRejectsUnknownUpdateStrategyType(t *testing.T) {
+	validLabels := map[string]string{"app": "demo"}
+	replicas := int32(3)
+
+	ud := &appsv1alpha1.UnitedDeployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "demo", Namespace: metav1.NamespaceDefault},
+		Spec: appsv1alpha1.UnitedDeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+			Template: appsv1alpha1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1alpha1.StatefulSetTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Labels: validLabels},
+					Spec: apps.StatefulSetSpec{
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{Labels: validLabels},
+							Spec: corev1.PodSpec{
+								RestartPolicy: corev1.RestartPolicyAlways,
+								DNSPolicy:     corev1.DNSClusterFirst,
+								Containers:    []corev1.Container{{Name: "main", Image: "nginx", ImagePullPolicy: corev1.PullIfNotPresent, TerminationMessagePolicy: corev1.TerminationMessageReadFile}},
+							},
+						},
+					},
+				},
+			},
+			UpdateStrategy: appsv1alpha1.UnitedDeploymentUpdateStrategy{
+				Type: "SomethingRandom",
+			},
+			Topology: appsv1alpha1.Topology{
+				Subsets: []appsv1alpha1.Subset{{Name: "subset-a"}},
+			},
+		},
+	}
+	setTestDefault(ud)
+
+	errs := validateUnitedDeployment(ud)
+	if len(errs) == 0 {
+		t.Fatalf("expected validation error")
+	}
+
+	var found bool
+	for i := range errs {
+		if errs[i].Field == "spec.updateStrategy.type" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected updateStrategy.type error, got %v", errs)
+	}
+}
+
+func TestValidateSubsetReplicasReportsFixedFieldPaths(t *testing.T) {
+	replicas := int32(10)
+	min := intstr.FromString("bad%")
+	max := intstr.FromString("bad%")
+
+	errs := validateSubsetReplicas(&replicas, []appsv1alpha1.Subset{
+		{
+			Name:        "subset-a",
+			MinReplicas: &min,
+			MaxReplicas: &max,
+		},
+	}, field.NewPath("spec", "topology", "subsets"))
+
+	if len(errs) < 2 {
+		t.Fatalf("expected at least 2 errors, got %v", errs)
+	}
+	if errs[0].Field != "spec.topology.subsets[0].minReplicas" {
+		t.Fatalf("expected minReplicas field, got %s", errs[0].Field)
+	}
+	if errs[1].Field != "spec.topology.subsets[0].maxReplicas" {
+		t.Fatalf("expected maxReplicas field, got %s", errs[1].Field)
+	}
+}
+
+func TestValidateSubsetReplicasReportsMinLessThanOrEqualToMax(t *testing.T) {
+	replicas := int32(10)
+	min := intstr.FromInt(7)
+	max := intstr.FromInt(5)
+
+	errs := validateSubsetReplicas(&replicas, []appsv1alpha1.Subset{
+		{
+			Name:        "subset-a",
+			MinReplicas: &min,
+			MaxReplicas: &max,
+		},
+	}, field.NewPath("spec", "topology", "subsets"))
+
+	if len(errs) == 0 {
+		t.Fatalf("expected validation error")
+	}
+	if errs[0].Field != "spec.topology.subsets[0].minReplicas" {
+		t.Fatalf("expected minReplicas field, got %s", errs[0].Field)
+	}
+	if !strings.Contains(errs[0].Error(), "less than or equal to maxReplicas") {
+		t.Fatalf("expected updated message, got %v", errs[0])
+	}
+}
+
+// alpha adapter helpers — convert v1alpha1 objects to v1beta1 before delegating to
+// the beta validators so that test cases written against the alpha API still work.
+
+func validateUnitedDeployment(unitedDeployment *appsv1alpha1.UnitedDeployment) field.ErrorList {
+	betaObj, errList := convertAlphaUnitedDeploymentToV1beta1(unitedDeployment)
+	if len(errList) > 0 {
+		return errList
+	}
+	return validateUnitedDeploymentV1beta1(betaObj)
+}
+
+func ValidateUnitedDeploymentUpdate(unitedDeployment, oldUnitedDeployment *appsv1alpha1.UnitedDeployment) field.ErrorList {
+	betaObj, errList := convertAlphaUnitedDeploymentToV1beta1(unitedDeployment)
+	if len(errList) > 0 {
+		return errList
+	}
+
+	oldBetaObj, oldErrList := convertAlphaUnitedDeploymentToV1beta1(oldUnitedDeployment)
+	if len(oldErrList) > 0 {
+		return oldErrList
+	}
+
+	return ValidateUnitedDeploymentUpdateV1beta1(betaObj, oldBetaObj)
+}
+
+func validateSubsetReplicas(expectedReplicas *int32, subsets []appsv1alpha1.Subset, fldPath *field.Path) field.ErrorList {
+	alphaObj := &appsv1alpha1.UnitedDeployment{
+		Spec: appsv1alpha1.UnitedDeploymentSpec{
+			Replicas: expectedReplicas,
+			Topology: appsv1alpha1.Topology{
+				Subsets: subsets,
+			},
+		},
+	}
+	betaObj, errList := convertAlphaUnitedDeploymentToV1beta1(alphaObj)
+	if len(errList) > 0 {
+		return errList
+	}
+
+	return validateSubsetReplicasV1beta1(betaObj.Spec.Replicas, betaObj.Spec.Topology.Subsets, fldPath)
+}
+
+func convertAlphaUnitedDeploymentToV1beta1(alphaObj *appsv1alpha1.UnitedDeployment) (*appsv1beta1.UnitedDeployment, field.ErrorList) {
+	betaObj := &appsv1beta1.UnitedDeployment{}
+	if err := alphaObj.ConvertTo(betaObj); err != nil {
+		return nil, field.ErrorList{
+			field.InternalError(field.NewPath(""), fmt.Errorf("failed to convert v1alpha1 UnitedDeployment to v1beta1: %w", err)),
+		}
+	}
+	return betaObj, nil
 }

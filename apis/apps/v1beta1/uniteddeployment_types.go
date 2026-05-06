@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kruise Authors.
+Copyright 2026 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	"time"
@@ -24,8 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	"github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 // UpdateStrategyType is a string enumeration type that enumerates
@@ -119,7 +117,7 @@ type AdvancedStatefulSetTemplateSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Schemaless
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              v1beta1.StatefulSetSpec `json:"spec"`
+	Spec              StatefulSetSpec `json:"spec"`
 }
 
 // CloneSetTemplateSpec defines the subset template of CloneSet.
@@ -127,7 +125,7 @@ type CloneSetTemplateSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Schemaless
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              v1beta1.CloneSetSpec `json:"spec"`
+	Spec              CloneSetSpec `json:"spec"`
 }
 
 // DeploymentTemplateSpec defines the subset template of Deployment.
@@ -334,19 +332,15 @@ type UnitedDeploymentStatus struct {
 	// CurrentRevision, if not empty, indicates the current version of the UnitedDeployment.
 	CurrentRevision string `json:"currentRevision"`
 
-	// Records the topology detail information of the replicas of each subset.
+	// UpdatedRevision, if not empty, indicates the latest version of the UnitedDeployment.
 	// +optional
-	SubsetReplicas map[string]int32 `json:"subsetReplicas,omitempty"`
+	UpdatedRevision string `json:"updatedRevision,omitempty"`
 
-	// Record the conditions of each subset.
+	// Records the structured status of each subset.
 	SubsetStatuses []UnitedDeploymentSubsetStatus `json:"subsetStatuses,omitempty"`
 	// Represents the latest available observations of a UnitedDeployment's current state.
 	// +optional
 	Conditions []UnitedDeploymentCondition `json:"conditions,omitempty"`
-
-	// Records the information of update progress.
-	// +optional
-	UpdateStatus *UpdateStatus `json:"updateStatus,omitempty"`
 
 	// LabelSelector is label selectors for query over pods that should match the replica count used by HPA.
 	LabelSelector string `json:"labelSelector,omitempty"`
@@ -379,25 +373,14 @@ type UnitedDeploymentCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// UpdateStatus defines the observed update state of UnitedDeployment.
-type UpdateStatus struct {
-	// Records the latest revision.
-	// +optional
-	UpdatedRevision string `json:"updatedRevision,omitempty"`
-
-	// Records the current partition.
-	// +optional
-	CurrentPartitions map[string]int32 `json:"currentPartitions,omitempty"`
-}
-
 type UnitedDeploymentSubsetStatus struct {
 	// Subset name specified in Topology.Subsets
 	Name string `json:"name,omitempty"`
-	// Records the current replicas. Currently unused.
+	// Records the current target replicas for the subset.
 	Replicas int32 `json:"replicas,omitempty"`
-	// Records the current ready replicas. Currently unused.
+	// Records the current ready replicas for the subset.
 	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
-	// Records the current partition. Currently unused.
+	// Records the current partition for the subset.
 	Partition int32 `json:"partition,omitempty"`
 	// Records the reserved pods in the subset.
 	ReservedPods int32 `json:"reservedPods,omitempty"`
@@ -458,6 +441,7 @@ type UnitedDeploymentSubsetCondition struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.replicas,selectorpath=.status.labelSelector
 // +kubebuilder:resource:shortName=ud
+// +kubebuilder:storageversion
 // +kubebuilder:printcolumn:name="DESIRED",type="integer",JSONPath=".spec.replicas",description="The desired number of pods."
 // +kubebuilder:printcolumn:name="CURRENT",type="integer",JSONPath=".status.replicas",description="The number of currently all pods."
 // +kubebuilder:printcolumn:name="UPDATED",type="integer",JSONPath=".status.updatedReplicas",description="The number of pods updated."

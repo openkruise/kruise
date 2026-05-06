@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/refmanager"
 )
 
@@ -97,12 +97,12 @@ func (a *DeploymentAdapter) SetMaxUnavailable(obj metav1.Object, val int32) meta
 }
 
 // ApplySubsetTemplate updates the subset to the latest revision, depending on the DeploymentTemplate.
-func (a *DeploymentAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subsetName, revision string, replicas, _ int32, obj runtime.Object) error {
+func (a *DeploymentAdapter) ApplySubsetTemplate(ud *beta1.UnitedDeployment, subsetName, revision string, replicas, _ int32, obj runtime.Object) error {
 	// Convert to Deployment Object
 	set := obj.(*appsv1.Deployment)
 
 	// Retrieve subset configuration based on UnitedDeployment spec
-	var subSetConfig *alpha1.Subset
+	var subSetConfig *beta1.Subset
 	for _, subset := range ud.Spec.Topology.Subsets {
 		if subset.Name == subsetName {
 			subSetConfig = &subset
@@ -125,9 +125,9 @@ func (a *DeploymentAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, sub
 	for k, v := range ud.Spec.Selector.MatchLabels {
 		set.Labels[k] = v
 	}
-	set.Labels[alpha1.ControllerRevisionHashLabelKey] = revision
+	set.Labels[beta1.ControllerRevisionHashLabelKey] = revision
 	// record the subset name as a label
-	set.Labels[alpha1.SubSetNameLabelKey] = subsetName
+	set.Labels[beta1.SubSetNameLabelKey] = subsetName
 
 	// Set correct annotations
 	if set.Annotations == nil {
@@ -142,7 +142,7 @@ func (a *DeploymentAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, sub
 
 	// Set correct selectors
 	selectors := ud.Spec.Selector.DeepCopy()
-	selectors.MatchLabels[alpha1.SubSetNameLabelKey] = subsetName
+	selectors.MatchLabels[beta1.SubSetNameLabelKey] = subsetName
 
 	// Set Deployment object's owner reference to UnitedDeployment object
 	if err := controllerutil.SetControllerReference(ud, set, a.Scheme); err != nil {
@@ -155,8 +155,8 @@ func (a *DeploymentAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, sub
 	if set.Spec.Template.Labels == nil {
 		set.Spec.Template.Labels = map[string]string{}
 	}
-	set.Spec.Template.Labels[alpha1.SubSetNameLabelKey] = subsetName
-	set.Spec.Template.Labels[alpha1.ControllerRevisionHashLabelKey] = revision
+	set.Spec.Template.Labels[beta1.SubSetNameLabelKey] = subsetName
+	set.Spec.Template.Labels[beta1.ControllerRevisionHashLabelKey] = revision
 
 	attachNodeAffinity(&set.Spec.Template.Spec, subSetConfig)
 	attachTolerations(&set.Spec.Template.Spec, subSetConfig)
@@ -180,13 +180,13 @@ func (a *DeploymentAdapter) ApplySubsetTemplate(ud *alpha1.UnitedDeployment, sub
 	if set.Annotations == nil {
 		set.Annotations = make(map[string]string)
 	}
-	set.Annotations[alpha1.AnnotationSubsetPatchKey] = string(subSetConfig.Patch.Raw)
+	set.Annotations[beta1.AnnotationSubsetPatchKey] = string(subSetConfig.Patch.Raw)
 
 	return nil
 }
 
 // PostUpdate does some works after subset updated. Deployments typically don't have post update operations.
-func (a *DeploymentAdapter) PostUpdate(_ *alpha1.UnitedDeployment, _ runtime.Object, _ string, _ int32) error {
+func (a *DeploymentAdapter) PostUpdate(_ *beta1.UnitedDeployment, _ runtime.Object, _ string, _ int32) error {
 	return nil
 }
 

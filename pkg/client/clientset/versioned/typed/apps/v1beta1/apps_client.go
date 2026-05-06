@@ -36,6 +36,7 @@ type AppsV1beta1Interface interface {
 	NodeImagesGetter
 	SidecarSetsGetter
 	StatefulSetsGetter
+	UnitedDeploymentsGetter
 }
 
 // AppsV1beta1Client is used to interact with features provided by the apps.kruise.io group.
@@ -77,6 +78,10 @@ func (c *AppsV1beta1Client) SidecarSets() SidecarSetInterface {
 
 func (c *AppsV1beta1Client) StatefulSets(namespace string) StatefulSetInterface {
 	return newStatefulSets(c, namespace)
+}
+
+func (c *AppsV1beta1Client) UnitedDeployments(namespace string) UnitedDeploymentInterface {
+	return newUnitedDeployments(c, namespace)
 }
 
 // NewForConfig creates a new AppsV1beta1Client for the given config.

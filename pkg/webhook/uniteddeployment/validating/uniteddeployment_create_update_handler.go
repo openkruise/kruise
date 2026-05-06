@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/deletionprotection"
 )
@@ -46,27 +47,27 @@ var _ admission.Handler = &UnitedDeploymentCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *UnitedDeploymentCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.UnitedDeployment{}
-	oldObj := &appsv1alpha1.UnitedDeployment{}
+	obj := &appsv1beta1.UnitedDeployment{}
+	oldObj := &appsv1beta1.UnitedDeployment{}
 
 	switch req.AdmissionRequest.Operation {
 	case admissionv1.Create:
-		if err := h.Decoder.Decode(req, obj); err != nil {
+		if err := h.decodeObject(req, obj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
-		if allErrs := validateUnitedDeployment(obj); len(allErrs) > 0 {
+		if allErrs := validateUnitedDeploymentV1beta1(obj); len(allErrs) > 0 {
 			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 		}
 	case admissionv1.Update:
-		if err := h.Decoder.Decode(req, obj); err != nil {
+		if err := h.decodeObject(req, obj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
-		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
+		if err := h.decodeOldObject(req, oldObj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
-		validationErrorList := validateUnitedDeployment(obj)
-		updateErrorList := ValidateUnitedDeploymentUpdate(obj, oldObj)
+		validationErrorList := validateUnitedDeploymentV1beta1(obj)
+		updateErrorList := ValidateUnitedDeploymentUpdateV1beta1(obj, oldObj)
 		if allErrs := append(validationErrorList, updateErrorList...); len(allErrs) > 0 {
 			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 		}
@@ -75,7 +76,7 @@ func (h *UnitedDeploymentCreateUpdateHandler) Handle(ctx context.Context, req ad
 			klog.InfoS("Skip to validate UnitedDeployment deletion for no old object, maybe because of Kubernetes version < 1.16", "namespace", req.Namespace, "name", req.Name)
 			return admission.ValidationResponse(true, "")
 		}
-		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
+		if err := h.decodeOldObject(req, oldObj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 		if err := deletionprotection.ValidateWorkloadDeletion(oldObj, oldObj.Spec.Replicas); err != nil {
@@ -86,4 +87,44 @@ func (h *UnitedDeploymentCreateUpdateHandler) Handle(ctx context.Context, req ad
 	}
 
 	return admission.ValidationResponse(true, "")
+}
+
+func (h *UnitedDeploymentCreateUpdateHandler) decodeObject(req admission.Request, obj *appsv1beta1.UnitedDeployment) error {
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return err
+		}
+	case appsv1alpha1.GroupVersion.Version:
+		objV1alpha1 := &appsv1alpha1.UnitedDeployment{}
+		if err := h.Decoder.Decode(req, objV1alpha1); err != nil {
+			return err
+		}
+		if err := objV1alpha1.ConvertTo(obj); err != nil {
+			return fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err)
+		}
+	default:
+		return fmt.Errorf("unsupported version: %s", req.AdmissionRequest.Resource.Version)
+	}
+	return nil
+}
+
+func (h *UnitedDeploymentCreateUpdateHandler) decodeOldObject(req admission.Request, oldObj *appsv1beta1.UnitedDeployment) error {
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
+			return err
+		}
+	case appsv1alpha1.GroupVersion.Version:
+		objV1alpha1 := &appsv1alpha1.UnitedDeployment{}
+		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, objV1alpha1); err != nil {
+			return err
+		}
+		if err := objV1alpha1.ConvertTo(oldObj); err != nil {
+			return fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err)
+		}
+	default:
+		return fmt.Errorf("unsupported version: %s", req.AdmissionRequest.Resource.Version)
+	}
+	return nil
 }

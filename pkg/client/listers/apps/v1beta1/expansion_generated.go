@@ -80,3 +80,11 @@ type StatefulSetListerExpansion interface{}
 // StatefulSetNamespaceListerExpansion allows custom methods to be added to
 // StatefulSetNamespaceLister.
 type StatefulSetNamespaceListerExpansion interface{}
+
+// UnitedDeploymentListerExpansion allows custom methods to be added to
+// UnitedDeploymentLister.
+type UnitedDeploymentListerExpansion interface{}
+
+// UnitedDeploymentNamespaceListerExpansion allows custom methods to be added to
+// UnitedDeploymentNamespaceLister.
+type UnitedDeploymentNamespaceListerExpansion interface{}
