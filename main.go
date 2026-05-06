@@ -136,6 +136,15 @@ func main() {
 	logOptions := logs.NewOptions()
 	logsapi.AddFlags(logOptions, pflag.CommandLine)
 	klog.InitFlags(nil)
+	// Opt into the new klog behavior so that -stderrthreshold is honored even
+	// when -logtostderr=true (the default).
+	// Ref: kubernetes/klog#212, kubernetes/klog#432
+	if err := flag.Set("legacy_stderr_threshold_behavior", "false"); err != nil {
+		klog.Fatalf("Failed to set flag %q: %v", "legacy_stderr_threshold_behavior", err)
+	}
+	if err := flag.Set("stderrthreshold", "INFO"); err != nil {
+		klog.Fatalf("Failed to set flag %q: %v", "stderrthreshold", err)
+	}
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 	ctrl.SetLogger(klogr.New())
