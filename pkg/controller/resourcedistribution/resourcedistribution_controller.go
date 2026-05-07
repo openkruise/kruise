@@ -40,7 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -56,7 +56,7 @@ func init() {
 
 var (
 	concurrentReconciles = 3
-	controllerKind       = appsv1alpha1.SchemeGroupVersion.WithKind("ResourceDistribution")
+	controllerKind       = appsv1beta1.SchemeGroupVersion.WithKind("ResourceDistribution")
 )
 
 // Add creates a new ResourceDistribution Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -88,10 +88,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to ResourceDistribution
-	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1alpha1.ResourceDistribution{},
-		&handler.TypedEnqueueRequestForObject[*appsv1alpha1.ResourceDistribution]{},
-		predicate.TypedFuncs[*appsv1alpha1.ResourceDistribution]{
-			UpdateFunc: func(e event.TypedUpdateEvent[*appsv1alpha1.ResourceDistribution]) bool {
+	err = c.Watch(source.Kind(mgr.GetCache(), &appsv1beta1.ResourceDistribution{},
+		&handler.TypedEnqueueRequestForObject[*appsv1beta1.ResourceDistribution]{},
+		predicate.TypedFuncs[*appsv1beta1.ResourceDistribution]{
+			UpdateFunc: func(e event.TypedUpdateEvent[*appsv1beta1.ResourceDistribution]) bool {
 				oldObj := e.ObjectOld
 				newObj := e.ObjectNew
 				if !reflect.DeepEqual(oldObj.Spec, newObj.Spec) {
@@ -111,38 +111,20 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to Secrets
-	secret := unstructured.Unstructured{}
-	secret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
-	err = c.Watch(source.Kind(mgr.GetCache(), client.Object(&secret), handler.EnqueueRequestForOwner(
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.ResourceDistribution{}, handler.OnlyControllerOwner()),
-		predicate.Funcs{
-			CreateFunc: func(createEvent event.CreateEvent) bool {
-				return false
-			},
-			GenericFunc: func(genericEvent event.GenericEvent) bool {
-				return false
-			},
-		}))
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to ConfigMap
-	configMap := unstructured.Unstructured{}
-	configMap.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
-	err = c.Watch(source.Kind(mgr.GetCache(), client.Object(&configMap), handler.EnqueueRequestForOwner(
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.ResourceDistribution{}, handler.OnlyControllerOwner()),
-		predicate.Funcs{
-			CreateFunc: func(createEvent event.CreateEvent) bool {
-				return false
-			},
-			GenericFunc: func(genericEvent event.GenericEvent) bool {
-				return false
-			},
-		}))
-	if err != nil {
-		return err
+	for _, watchedObject := range supportedResourceWatchObjects() {
+		err = c.Watch(source.Kind(mgr.GetCache(), watchedObject, handler.EnqueueRequestForOwner(
+			mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1beta1.ResourceDistribution{}, handler.OnlyControllerOwner()),
+			predicate.Funcs{
+				CreateFunc: func(createEvent event.CreateEvent) bool {
+					return false
+				},
+				GenericFunc: func(genericEvent event.GenericEvent) bool {
+					return false
+				},
+			}))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -175,7 +157,7 @@ type ReconcileResourceDistribution struct {
 func (r *ReconcileResourceDistribution) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
 	klog.V(3).InfoS("ResourceDistribution begin to reconcile", "resourceDistribution", req)
 	// fetch resourcedistribution instance as distributor
-	distributor := &appsv1alpha1.ResourceDistribution{}
+	distributor := &appsv1beta1.ResourceDistribution{}
 	if err := r.Client.Get(context.TODO(), req.NamespacedName, distributor); err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -190,7 +172,7 @@ func (r *ReconcileResourceDistribution) Reconcile(_ context.Context, req ctrl.Re
 }
 
 // doReconcile distribute and clean resource
-func (r *ReconcileResourceDistribution) doReconcile(distributor *appsv1alpha1.ResourceDistribution) (ctrl.Result, error) {
+func (r *ReconcileResourceDistribution) doReconcile(distributor *appsv1beta1.ResourceDistribution) (ctrl.Result, error) {
 	resource, errs := utils.DeserializeResource(&distributor.Spec.Resource, field.NewPath("resource"))
 	if len(errs) != 0 || resource == nil {
 		klog.ErrorS(errs.ToAggregate(), "DeserializeResource error", "resourceDistribution", klog.KObj(distributor))
@@ -220,7 +202,7 @@ func (r *ReconcileResourceDistribution) doReconcile(distributor *appsv1alpha1.Re
 	return ctrl.Result{}, errList.ToAggregate()
 }
 
-func (r *ReconcileResourceDistribution) distributeResource(distributor *appsv1alpha1.ResourceDistribution,
+func (r *ReconcileResourceDistribution) distributeResource(distributor *appsv1beta1.ResourceDistribution,
 	matchedNamespaces []string, resource runtime.Object) (int32, []*UnexpectedError) {
 
 	resourceName := utils.ConvertToUnstructured(resource).GetName()
@@ -292,7 +274,7 @@ func (r *ReconcileResourceDistribution) distributeResource(distributor *appsv1al
 	})
 }
 
-func (r *ReconcileResourceDistribution) cleanResource(distributor *appsv1alpha1.ResourceDistribution,
+func (r *ReconcileResourceDistribution) cleanResource(distributor *appsv1beta1.ResourceDistribution,
 	unmatchedNamespaces []string, resource runtime.Object) (int32, []*UnexpectedError) {
 
 	resourceName := utils.ConvertToUnstructured(resource).GetName()
@@ -339,9 +321,9 @@ func (r *ReconcileResourceDistribution) cleanResource(distributor *appsv1alpha1.
 }
 
 // handlerErrors process all errors about resource distribution and clean, and record them to conditions
-func (r *ReconcileResourceDistribution) handleErrors(errLists ...[]*UnexpectedError) ([]appsv1alpha1.ResourceDistributionCondition, field.ErrorList) {
+func (r *ReconcileResourceDistribution) handleErrors(errLists ...[]*UnexpectedError) ([]appsv1beta1.ResourceDistributionCondition, field.ErrorList) {
 	// init a status.conditions
-	conditions := make([]appsv1alpha1.ResourceDistributionCondition, NumberOfConditionTypes)
+	conditions := make([]appsv1beta1.ResourceDistributionCondition, NumberOfConditionTypes)
 	initConditionType(conditions)
 
 	// 1. build status.conditions
@@ -360,7 +342,7 @@ func (r *ReconcileResourceDistribution) handleErrors(errLists ...[]*UnexpectedEr
 			continue
 		}
 		switch conditions[i].Type {
-		case appsv1alpha1.ResourceDistributionConflictOccurred, appsv1alpha1.ResourceDistributionNamespaceNotExists:
+		case appsv1beta1.ResourceDistributionConflictOccurred, appsv1beta1.ResourceDistributionNamespaceNotExists:
 		default:
 			errList = append(errList, field.InternalError(field.NewPath(string(conditions[i].Type)), fmt.Errorf(conditions[i].Reason)))
 		}
@@ -369,12 +351,12 @@ func (r *ReconcileResourceDistribution) handleErrors(errLists ...[]*UnexpectedEr
 }
 
 // updateDistributorStatus update distributor status after reconcile
-func (r *ReconcileResourceDistribution) updateDistributorStatus(distributor *appsv1alpha1.ResourceDistribution, newStatus *appsv1alpha1.ResourceDistributionStatus) error {
+func (r *ReconcileResourceDistribution) updateDistributorStatus(distributor *appsv1beta1.ResourceDistribution, newStatus *appsv1beta1.ResourceDistributionStatus) error {
 	if reflect.DeepEqual(distributor.Status, *newStatus) {
 		return nil
 	}
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		object := &appsv1alpha1.ResourceDistribution{}
+		object := &appsv1beta1.ResourceDistribution{}
 		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: distributor.Name}, object); err != nil {
 			return err
 		}
@@ -389,4 +371,11 @@ func (r *ReconcileResourceDistribution) SetupWithManager(mgr ctrl.Manager) error
 		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
 		// For().
 		Complete(r)
+}
+
+func supportedResourceWatchObjects() []client.Object {
+	return []client.Object{
+		&corev1.Secret{},
+		&corev1.ConfigMap{},
+	}
 }

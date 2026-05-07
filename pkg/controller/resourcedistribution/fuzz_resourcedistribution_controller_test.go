@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	fuzzutils "github.com/openkruise/kruise/test/fuzz"
 )
 
@@ -31,16 +32,28 @@ func FuzzMatchFunctions(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cf := fuzz.NewConsumer(data)
 
-		rd := &appsv1alpha1.ResourceDistribution{}
+		rd := &appsv1beta1.ResourceDistribution{}
 		if err := cf.GenerateStruct(rd); err != nil {
 			return
 		}
+		alphaRD := &appsv1alpha1.ResourceDistribution{}
 
-		if err := fuzzutils.GenerateResourceDistributionResource(cf, rd); err != nil {
+		if err := fuzzutils.GenerateResourceDistributionResource(cf, alphaRD); err != nil {
 			return
 		}
-		if err := fuzzutils.GenerateResourceDistributionTargets(cf, rd); err != nil {
+		if err := fuzzutils.GenerateResourceDistributionTargets(cf, alphaRD); err != nil {
 			return
+		}
+		rd.Spec.Resource = alphaRD.Spec.Resource
+		rd.Spec.Targets = appsv1beta1.ResourceDistributionTargets{
+			AllNamespaces:          alphaRD.Spec.Targets.AllNamespaces,
+			NamespaceLabelSelector: alphaRD.Spec.Targets.NamespaceLabelSelector,
+			IncludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
+				List: convertNamespacesToV1beta1(alphaRD.Spec.Targets.IncludedNamespaces.List),
+			},
+			ExcludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
+				List: convertNamespacesToV1beta1(alphaRD.Spec.Targets.ExcludedNamespaces.List),
+			},
 		}
 
 		matched, err := cf.GetBool()
@@ -65,6 +78,14 @@ func FuzzMatchFunctions(f *testing.F) {
 		_, _ = matchViaLabelSelector(namespace, rd)
 		_, _ = matchViaTargets(namespace, rd)
 	})
+}
+
+func convertNamespacesToV1beta1(namespaces []appsv1alpha1.ResourceDistributionNamespace) []appsv1beta1.ResourceDistributionNamespace {
+	values := make([]appsv1beta1.ResourceDistributionNamespace, 0, len(namespaces))
+	for _, namespace := range namespaces {
+		values = append(values, appsv1beta1.ResourceDistributionNamespace{Name: namespace.Name})
+	}
+	return values
 }
 
 func FuzzMergeMetadata(f *testing.F) {

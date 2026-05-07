@@ -182,7 +182,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	CloneSetEventHandlerOptimization:      {Default: false, PreRelease: featuregate.Alpha},
 	PreparingUpdateAsUpdate:               {Default: false, PreRelease: featuregate.Alpha},
 	ImagePullJobGate:                      {Default: false, PreRelease: featuregate.Alpha},
-	ResourceDistributionGate:              {Default: false, PreRelease: featuregate.Alpha},
+	ResourceDistributionGate:              {Default: false, PreRelease: featuregate.Beta},
 	DeletionProtectionForCRDCascadingGate: {Default: false, PreRelease: featuregate.Alpha},
 
 	EnhancedLivenessProbeGate:                 {Default: false, PreRelease: featuregate.Alpha},

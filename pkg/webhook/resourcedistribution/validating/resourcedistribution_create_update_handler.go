@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
@@ -38,126 +39,208 @@ import (
 
 // ResourceDistributionCreateUpdateHandler handles ResourceDistribution
 type ResourceDistributionCreateUpdateHandler struct {
-	Client client.Client
-
-	// Decoder decodes objects
+	Client  client.Client
 	Decoder admission.Decoder
 }
 
 var _ admission.Handler = &ResourceDistributionCreateUpdateHandler{}
 
-// validateResourceDistributionSpec validate Spec when creating and updating
-// (1). validate resource itself
-// (2). validate targets
-func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpec(obj, oldObj *appsv1alpha1.ResourceDistribution, fldPath *field.Path) (allErrs field.ErrorList) {
-	spec := &obj.Spec
-	// deserialize resource from runtime.rawExtension
-	resource, errs := DeserializeResource(&spec.Resource, fldPath)
-	allErrs = append(allErrs, errs...)
-	if resource == nil {
-		return
+func (h *ResourceDistributionCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourceDistributionGate) {
+		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.ResourceDistributionGate))
 	}
-	// deserialize old resource if need
-	var oldResource runtime.Object
-	if oldObj != nil {
-		oldResource, errs = DeserializeResource(&oldObj.Spec.Resource, fldPath)
-		allErrs = append(allErrs, errs...)
+
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		obj := &appsv1beta1.ResourceDistribution{}
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		var oldObj *appsv1beta1.ResourceDistribution
+		if req.AdmissionRequest.Operation == admissionv1.Update {
+			oldObj = &appsv1beta1.ResourceDistribution{}
+			if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+		}
+		if allErrs := h.validateResourceDistributionV1beta1(obj, oldObj); len(allErrs) != 0 {
+			klog.V(3).InfoS("all errors of validation", "errors", fmt.Sprintf("%v", allErrs))
+			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
+		}
+		return admission.ValidationResponse(true, "")
+	case appsv1alpha1.GroupVersion.Version:
+		obj := &appsv1alpha1.ResourceDistribution{}
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		var oldObj *appsv1alpha1.ResourceDistribution
+		if req.AdmissionRequest.Operation == admissionv1.Update {
+			oldObj = &appsv1alpha1.ResourceDistribution{}
+			if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+		}
+		if allErrs := h.validateResourceDistribution(obj, oldObj); len(allErrs) != 0 {
+			klog.V(3).InfoS("all errors of validation", "errors", fmt.Sprintf("%v", allErrs))
+			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
+		}
+		return admission.ValidationResponse(true, "")
+	default:
+		return admission.Errored(http.StatusBadRequest, fmt.Errorf("unsupported version: %s", req.AdmissionRequest.Resource.Version))
 	}
-	// 1. validate resource
-	allErrs = append(allErrs, h.validateResourceDistributionSpecResource(resource, oldResource, fldPath.Child("resource"))...)
-	// 2. validate targets
-	allErrs = append(allErrs, h.validateResourceDistributionSpecTargets(&obj.Spec.Targets, fldPath.Child("targets"))...)
-	return
 }
 
-// validateResourceDistributionResource validate Spec.Resource when creating and updating
-// (1). check whether type of the resource is supported
-// (2). detect updating conflict, i.e., GK and name cannot be modified
-// (3). dry run to check whether resource can be created
-func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpecResource(resource, oldResource runtime.Object, fldPath *field.Path) (allErrs field.ErrorList) {
-	// 1. check whether the GK of the resource is in supportedGKList
-	if !isSupportedGK(resource) {
-		return append(allErrs, field.Invalid(fldPath, resource, fmt.Sprintf("unknown or unsupported resource GroupKind, only support %v", supportedGKList)))
+func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistribution(obj, oldObj *appsv1alpha1.ResourceDistribution) (allErrs field.ErrorList) {
+	allErrs = apimachineryvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	return append(allErrs, h.validateResourceDistributionSpec(specResourceView{resource: &obj.Spec.Resource, targets: targetsViewFromV1alpha1(&obj.Spec.Targets)}, oldSpecResourceView(oldObj), field.NewPath("spec"), false)...)
+}
+
+func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionV1beta1(obj, oldObj *appsv1beta1.ResourceDistribution) (allErrs field.ErrorList) {
+	allErrs = apimachineryvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	return append(allErrs, h.validateResourceDistributionSpec(specResourceView{resource: &obj.Spec.Resource, targets: targetsViewFromV1beta1(&obj.Spec.Targets)}, oldSpecResourceViewV1beta1(oldObj), field.NewPath("spec"), true)...)
+}
+
+type specResourceView struct {
+	resource *runtime.RawExtension
+	targets  resourceDistributionTargetsView
+}
+
+type resourceDistributionTargetsView struct {
+	allNamespaces          bool
+	includedNamespaces     []string
+	excludedNamespaces     []string
+	namespaceLabelSelector metav1.LabelSelector
+}
+
+func targetsViewFromV1alpha1(targets *appsv1alpha1.ResourceDistributionTargets) resourceDistributionTargetsView {
+	if targets == nil {
+		return resourceDistributionTargetsView{}
 	}
-	// 2. validate resource group, kind and name when updating
+	return resourceDistributionTargetsView{
+		allNamespaces:          targets.AllNamespaces,
+		includedNamespaces:     namespaceNamesV1alpha1(targets.IncludedNamespaces.List),
+		excludedNamespaces:     namespaceNamesV1alpha1(targets.ExcludedNamespaces.List),
+		namespaceLabelSelector: targets.NamespaceLabelSelector,
+	}
+}
+
+func targetsViewFromV1beta1(targets *appsv1beta1.ResourceDistributionTargets) resourceDistributionTargetsView {
+	if targets == nil {
+		return resourceDistributionTargetsView{}
+	}
+	return resourceDistributionTargetsView{
+		allNamespaces:          targets.AllNamespaces,
+		includedNamespaces:     namespaceNamesV1beta1(targets.IncludedNamespaces.List),
+		excludedNamespaces:     namespaceNamesV1beta1(targets.ExcludedNamespaces.List),
+		namespaceLabelSelector: targets.NamespaceLabelSelector,
+	}
+}
+
+func namespaceNamesV1alpha1(namespaces []appsv1alpha1.ResourceDistributionNamespace) []string {
+	values := make([]string, 0, len(namespaces))
+	for _, namespace := range namespaces {
+		values = append(values, namespace.Name)
+	}
+	return values
+}
+
+func namespaceNamesV1beta1(namespaces []appsv1beta1.ResourceDistributionNamespace) []string {
+	values := make([]string, 0, len(namespaces))
+	for _, namespace := range namespaces {
+		values = append(values, namespace.Name)
+	}
+	return values
+}
+
+func oldSpecResourceView(oldObj *appsv1alpha1.ResourceDistribution) *specResourceView {
+	if oldObj == nil {
+		return nil
+	}
+	return &specResourceView{resource: &oldObj.Spec.Resource, targets: targetsViewFromV1alpha1(&oldObj.Spec.Targets)}
+}
+
+func oldSpecResourceViewV1beta1(oldObj *appsv1beta1.ResourceDistribution) *specResourceView {
+	if oldObj == nil {
+		return nil
+	}
+	return &specResourceView{resource: &oldObj.Spec.Resource, targets: targetsViewFromV1beta1(&oldObj.Spec.Targets)}
+}
+
+func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpec(view specResourceView, oldView *specResourceView, fldPath *field.Path, strict bool) (allErrs field.ErrorList) {
+	resource, errs := DeserializeResource(view.resource, fldPath.Child("resource"))
+	allErrs = append(allErrs, errs...)
+	if resource == nil {
+		return allErrs
+	}
+
+	var oldResource runtime.Object
+	if oldView != nil {
+		oldResource, errs = DeserializeResource(oldView.resource, fldPath.Child("resource"))
+		allErrs = append(allErrs, errs...)
+	}
+
+	allErrs = append(allErrs, h.validateResourceDistributionSpecResource(resource, oldResource, fldPath.Child("resource"), strict)...)
+	allErrs = append(allErrs, validateResourceDistributionTargets(view.targets, fldPath.Child("targets"), strict)...)
+	return allErrs
+}
+
+func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpecResource(resource, oldResource runtime.Object, fldPath *field.Path, strict bool) (allErrs field.ErrorList) {
+	if !isSupportedGK(resource) {
+		return append(allErrs, field.Invalid(fldPath, resource.GetObjectKind().GroupVersionKind().GroupKind(), fmt.Sprintf("unknown or unsupported resource GroupKind, only support %v", supportedGKList)))
+	}
 	if oldResource != nil && !haveSameGVKAndName(resource, oldResource) {
 		return append(allErrs, field.Invalid(fldPath, nil, "resource apiVersion, kind, and name are immutable"))
 	}
-	// 3. dry run to check the resource
+
 	mice := resource.DeepCopyObject().(client.Object)
+	if strict {
+		if resourceNamespace := ConvertToUnstructured(mice).GetNamespace(); resourceNamespace != "" {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("metadata").Child("namespace"), "spec.resource.metadata.namespace is not allowed; target namespaces come from spec.targets"))
+			return allErrs
+		}
+	}
 	ConvertToUnstructured(mice).SetNamespace(webhookutil.GetNamespace())
 	err := h.Client.Create(context.TODO(), mice, &client.CreateOptions{DryRun: []string{metav1.DryRunAll}})
-	if err != nil && !errors.IsAlreadyExists(err) {
-		return append(allErrs, field.InternalError(fldPath, fmt.Errorf("failed to dry-run to validate spec.resource, error: %v", err)))
+	if err == nil || errors.IsAlreadyExists(err) {
+		return allErrs
 	}
-	return
+	if errors.IsInvalid(err) || errors.IsBadRequest(err) {
+		return append(allErrs, field.Invalid(fldPath, nil, fmt.Sprintf("spec.resource is invalid: %v", err)))
+	}
+	if errors.IsForbidden(err) {
+		return append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("spec.resource is forbidden: %v", err)))
+	}
+	return append(allErrs, field.InternalError(fldPath, fmt.Errorf("failed to dry-run validate spec.resource: %v", err)))
 }
 
-// validateResourceDistributionSpecTargets validate Spec.Targets
-// (1). validate target namespace names
-// (2). validate conflict between existing resources
-func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpecTargets(targets *appsv1alpha1.ResourceDistributionTargets, fldPath *field.Path) (allErrs field.ErrorList) {
-	// 1. validate namespace of IncludedNamespaces.List and ExcludedNamespaces.List
+func validateResourceDistributionTargets(targets resourceDistributionTargetsView, fldPath *field.Path, strict bool) (allErrs field.ErrorList) {
 	conflicted := make([]string, 0)
 	includedNS := sets.NewString()
-	for _, namespace := range targets.IncludedNamespaces.List {
-		includedNS.Insert(namespace.Name)
-		// validate namespace name
-		for _, msg := range coreval.ValidateNamespaceName(namespace.Name, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("includedNamespaces"), targets.IncludedNamespaces, msg))
+	for _, namespace := range targets.includedNamespaces {
+		includedNS.Insert(namespace)
+		for _, msg := range coreval.ValidateNamespaceName(namespace, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("includedNamespaces"), namespace, msg))
 		}
 	}
-	for _, namespace := range targets.ExcludedNamespaces.List {
-		// validate namespace name
-		for _, msg := range coreval.ValidateNamespaceName(namespace.Name, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("excludedNamespaces"), targets.ExcludedNamespaces, msg))
+	for _, namespace := range targets.excludedNamespaces {
+		for _, msg := range coreval.ValidateNamespaceName(namespace, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("excludedNamespaces"), namespace, msg))
 		}
-		// validate conflict between IncludedNamespaces and ExcludedNamespaces
-		if includedNS.Has(namespace.Name) {
-			conflicted = append(conflicted, namespace.Name)
+		if includedNS.Has(namespace) {
+			conflicted = append(conflicted, namespace)
 		}
 	}
 	if len(conflicted) != 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, targets, fmt.Sprintf("ambiguous targets because namespace %v is in both IncludedNamespaces.List and ExcludedNamespaces.List", conflicted)))
 	}
 
-	// 2. validate targets.NamespaceLabelSelector
-	if _, err := metav1.LabelSelectorAsSelector(&targets.NamespaceLabelSelector); err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("namespaceLabelSelector"), targets.NamespaceLabelSelector, fmt.Sprintf("labelSelectorAsSelector error: %v", err)))
+	if _, err := metav1.LabelSelectorAsSelector(&targets.namespaceLabelSelector); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("namespaceLabelSelector"), targets.namespaceLabelSelector, fmt.Sprintf("labelSelectorAsSelector error: %v", err)))
 	}
 
-	return
-}
-
-// validateResourceDistribution is an entrance to validate ResourceDistribution when creating and updating
-// (1). validate ResourceDistribution ObjectMeta
-// (2). validate ResourceDistribution Spec
-func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistribution(obj, oldObj *appsv1alpha1.ResourceDistribution) (allErrs field.ErrorList) {
-	// 1. validate metadata
-	allErrs = apimachineryvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	// 2. validate spec
-	return append(allErrs, h.validateResourceDistributionSpec(obj, oldObj, field.NewPath("spec"))...)
-}
-
-// Handle handles admission requests.
-func (h *ResourceDistributionCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.ResourceDistribution{}
-	if err := h.Decoder.Decode(req, obj); err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
+	if strict && !targets.allNamespaces && len(targets.includedNamespaces) == 0 &&
+		len(targets.namespaceLabelSelector.MatchLabels) == 0 && len(targets.namespaceLabelSelector.MatchExpressions) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, "at least one target selector must be configured"))
 	}
-	var oldObj *appsv1alpha1.ResourceDistribution
-	if req.AdmissionRequest.Operation == admissionv1.Update {
-		oldObj = &appsv1alpha1.ResourceDistribution{}
-		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
-			return admission.Errored(http.StatusBadRequest, err)
-		}
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourceDistributionGate) {
-		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.ResourceDistributionGate))
-	}
-	if allErrs := h.validateResourceDistribution(obj, oldObj); len(allErrs) != 0 {
-		klog.V(3).InfoS("all errors of validation", "errors", fmt.Sprintf("%v", allErrs))
-		return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
-	}
-	return admission.ValidationResponse(true, "")
+	return allErrs
 }
