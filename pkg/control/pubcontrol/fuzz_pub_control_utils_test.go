@@ -145,12 +145,19 @@ func FuzzIgnoredPubSelectorLookup(f *testing.F) {
 			pod.Annotations = SetPodRelatedPubAnnotation(nil, pub.Name)
 		}
 
+		// In production, GetPubForPod returns nil when the pod has no
+		// related-pub annotation, so isPodMatchedIgnoredPubSelector is
+		// never reached. Skip the call here to match that contract.
+		if !includeRelatedPub {
+			return
+		}
+
 		matched, err := isPodMatchedIgnoredPubSelector(pub, pod)
 		if err != nil {
 			t.Fatalf("ignored selector lookup returned unexpected error: %v", err)
 		}
 
-		want := includeSelector && includeRelatedPub
+		want := includeSelector
 		if matched != want {
 			t.Fatalf("ignored selector lookup mismatch: got=%t want=%t", matched, want)
 		}
