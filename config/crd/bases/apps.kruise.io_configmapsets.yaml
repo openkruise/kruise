@@ -11,6 +11,8 @@ spec:
     kind: ConfigMapSet
     listKind: ConfigMapSetList
     plural: configmapsets
+    shortNames:
+    - cms
     singular: configmapset
   scope: Namespaced
   versions:

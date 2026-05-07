@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	utilpointer "k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -172,6 +173,22 @@ func setDefaultContainer(sidecarContainer *v1alpha1.SidecarContainer) {
 				v1.SetDefaults_HTTPGetAction(container.Lifecycle.PreStop.HTTPGet)
 			}
 		}
+	}
+}
+
+// SetDefaultsConfigMapSet SetDefaults_ConfigMapSet set default values for ConfigMapSet.
+func SetDefaultsConfigMapSet(obj *v1alpha1.ConfigMapSet) {
+	partitionValue := int32(0)
+	maxUnavailableValue := intstr.FromInt32(1)
+	if obj.Spec.UpdateStrategy.Partition == nil {
+		v := intstr.FromInt32(partitionValue)
+		obj.Spec.UpdateStrategy.Partition = &v
+	}
+	if obj.Spec.UpdateStrategy.MaxUnavailable == nil {
+		obj.Spec.UpdateStrategy.MaxUnavailable = &maxUnavailableValue
+	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = utilpointer.Int32(5)
 	}
 }
 
