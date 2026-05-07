@@ -142,7 +142,7 @@ func TestValidatingPub(t *testing.T) {
 			expectErrList: 1,
 		},
 		{
-			name: "invalid pub feature-gate annotation",
+			name: "deprecated operation annotation with invalid value is silently accepted in v1beta1",
 			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
@@ -150,10 +150,10 @@ func TestValidatingPub(t *testing.T) {
 				pub.Annotations[policyv1beta1.PubProtectOperationAnnotation] = "xxxxx"
 				return pub
 			},
-			expectErrList: 1,
+			expectErrList: 0,
 		},
 		{
-			name: "valid pub feature-gate annotation",
+			name: "deprecated operation annotation with valid value is silently accepted in v1beta1",
 			pub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
 				pub.Spec.Selector = nil
@@ -514,7 +514,7 @@ func TestHandle(t *testing.T) {
 			},
 			wantAllowed: false,
 		},
-		
+
 		{
 			name: "v1beta1 update valid pub — targetRef unchanged",
 			request: func() admission.Request {
