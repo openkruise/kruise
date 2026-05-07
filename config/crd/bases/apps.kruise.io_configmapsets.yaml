@@ -1,0 +1,329 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.3
+  name: configmapsets.apps.kruise.io
+spec:
+  group: apps.kruise.io
+  names:
+    kind: ConfigMapSet
+    listKind: ConfigMapSetList
+    plural: configmapsets
+    shortNames:
+    - cms
+    singular: configmapset
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: The number of pods matched.
+      jsonPath: .status.replicas
+      name: REPLICAS
+      type: integer
+    - description: The number of pods matched and updated.
+      jsonPath: .status.updatedReplicas
+      name: UPDATED
+      type: integer
+    - description: The number of pods matched and ready.
+      jsonPath: .status.readyReplicas
+      name: READY
+      type: integer
+    - description: CreationTimestamp is a timestamp representing the server time when
+        this object was created.
+      jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ConfigMapSet is the Schema for the configmapsets API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ConfigMapSetSpec defines the desired state of ConfigMapSet
+            properties:
+              containers:
+                description: Containers defines the business containers that need
+                  to be updated
+                items:
+                  properties:
+                    mountPath:
+                      type: string
+                    name:
+                      type: string
+                    nameFrom:
+                      properties:
+                        fieldRef:
+                          description: 'Selects a field of the pod: supports metadata.name,
+                            `metadata.labels[''<KEY>'']`, `metadata.annotations[''<KEY>'']`,'
+                          properties:
+                            apiVersion:
+                              description: Version of the schema the FieldPath is
+                                written in terms of, defaults to "v1".
+                              type: string
+                            fieldPath:
+                              description: Path of the field to select in the specified
+                                API version.
+                              type: string
+                          required:
+                          - fieldPath
+                          type: object
+                          x-kubernetes-map-type: atomic
+                      type: object
+                  type: object
+                type: array
+              customVersion:
+                description: CustomVersion alias for the current update revision
+                type: string
+              data:
+                additionalProperties:
+                  type: string
+                description: Data contains the configuration data to be updated
+                type: object
+              effectPolicy:
+                description: EffectPolicy defines how the configuration update takes
+                  effect
+                properties:
+                  postHook:
+                    properties:
+                      httpGet:
+                        description: HTTPGetAction describes an action based on HTTP
+                          Get requests.
+                        properties:
+                          host:
+                            description: |-
+                              Host name to connect to, defaults to the pod IP. You probably want to set
+                              "Host" in httpHeaders instead.
+                            type: string
+                          httpHeaders:
+                            description: Custom headers to set in the request. HTTP
+                              allows repeated headers.
+                            items:
+                              description: HTTPHeader describes a custom header to
+                                be used in HTTP probes
+                              properties:
+                                name:
+                                  description: |-
+                                    The header field name.
+                                    This will be canonicalized upon output, so case-variant names will be understood as the same header.
+                                  type: string
+                                value:
+                                  description: The header field value
+                                  type: string
+                              required:
+                              - name
+                              - value
+                              type: object
+                            type: array
+                            x-kubernetes-list-type: atomic
+                          path:
+                            description: Path to access on the HTTP server.
+                            type: string
+                          port:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: |-
+                              Name or number of the port to access on the container.
+                              Number must be in the range 1 to 65535.
+                              Name must be an IANA_SVC_NAME.
+                            x-kubernetes-int-or-string: true
+                          scheme:
+                            description: |-
+                              Scheme to use for connecting to the host.
+                              Defaults to HTTP.
+                            type: string
+                        required:
+                        - port
+                        type: object
+                      tcpSocket:
+                        description: TCPSocketAction describes an action based on
+                          opening a socket
+                        properties:
+                          host:
+                            description: 'Optional: Host name to connect to, defaults
+                              to the pod IP.'
+                            type: string
+                          port:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: |-
+                              Number or name of the port to access on the container.
+                              Number must be in the range 1 to 65535.
+                              Name must be an IANA_SVC_NAME.
+                            x-kubernetes-int-or-string: true
+                        required:
+                        - port
+                        type: object
+                    type: object
+                  type:
+                    type: string
+                type: object
+              reloadSidecarConfig:
+                description: ReloadSidecarConfig defines the container injected during
+                  Pod creation to update configuration files
+                properties:
+                  config:
+                    description: Config provides the configuration for the chosen
+                      type
+                    properties:
+                      command:
+                        description: Command for k8s type
+                        items:
+                          type: string
+                        type: array
+                      configMapRef:
+                        description: ConfigMapRef for custom type
+                        properties:
+                          name:
+                            type: string
+                          namespace:
+                            type: string
+                        type: object
+                      image:
+                        description: Image for k8s type
+                        type: string
+                      name:
+                        description: Name for k8s type
+                        type: string
+                      restartPolicy:
+                        description: RestartPolicy for k8s type
+                        type: string
+                      sidecarSetRef:
+                        description: SidecarSetRef for sidecarset type
+                        properties:
+                          containerName:
+                            type: string
+                          name:
+                            type: string
+                        type: object
+                    type: object
+                  type:
+                    description: Type of the reload sidecar config (k8s, sidecarset,
+                      custom)
+                    type: string
+                type: object
+              revisionHistoryLimit:
+                description: RevisionHistoryLimit indicates the maximum quantity of
+                  stored revisions about the ConfigMapSet
+                format: int32
+                type: integer
+              selector:
+                description: Selector is a label query over pods that should be updated
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
+              updateStrategy:
+                description: UpdateStrategy indicates the strategy that the ConfigMapSet
+                  controller will use to perform updates
+                properties:
+                  matchLabelKeys:
+                    items:
+                      type: string
+                    type: array
+                  maxUnavailable:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    x-kubernetes-int-or-string: true
+                  partition:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    x-kubernetes-int-or-string: true
+                type: object
+            type: object
+          status:
+            description: ConfigMapSetStatus defines the observed state of ConfigMapSet
+            properties:
+              currentCustomVersion:
+                type: string
+              currentRevision:
+                type: string
+              expectedUpdatedReplicas:
+                format: int32
+                type: integer
+              observedGeneration:
+                format: int64
+                type: integer
+              readyReplicas:
+                format: int32
+                type: integer
+              replicas:
+                format: int32
+                type: integer
+              updateCustomVersion:
+                type: string
+              updateRevision:
+                type: string
+              updatedReadyReplicas:
+                format: int32
+                type: integer
+              updatedReplicas:
+                format: int32
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

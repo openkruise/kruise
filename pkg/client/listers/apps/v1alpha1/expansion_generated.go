@@ -41,6 +41,14 @@ type CloneSetListerExpansion interface{}
 // CloneSetNamespaceLister.
 type CloneSetNamespaceListerExpansion interface{}
 
+// ConfigMapSetListerExpansion allows custom methods to be added to
+// ConfigMapSetLister.
+type ConfigMapSetListerExpansion interface{}
+
+// ConfigMapSetNamespaceListerExpansion allows custom methods to be added to
+// ConfigMapSetNamespaceLister.
+type ConfigMapSetNamespaceListerExpansion interface{}
+
 // ContainerRecreateRequestListerExpansion allows custom methods to be added to
 // ContainerRecreateRequestLister.
 type ContainerRecreateRequestListerExpansion interface{}
