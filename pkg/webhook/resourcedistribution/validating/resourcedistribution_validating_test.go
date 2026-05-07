@@ -16,6 +16,7 @@ package validating
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 var (
@@ -35,6 +37,7 @@ var (
 func init() {
 	testScheme = runtime.NewScheme()
 	utilruntime.Must(appsv1alpha1.AddToScheme(testScheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(testScheme))
 	utilruntime.Must(corev1.AddToScheme(testScheme))
 }
 
@@ -99,30 +102,41 @@ func TestResourceDistributionUpdateValidation(t *testing.T) {
 }
 
 func TestValidateResourceDistributionTargets(t *testing.T) {
-	targets := &appsv1alpha1.ResourceDistributionTargets{
-		// error 1
-		ExcludedNamespaces: appsv1alpha1.ResourceDistributionTargetNamespaces{
-			List: []appsv1alpha1.ResourceDistributionNamespace{
-				{Name: "ns-1"},
-			},
+	targets := resourceDistributionTargetsView{
+		excludedNamespaces: []string{
+			"ns-1",
 		},
-		// error 2
-		IncludedNamespaces: appsv1alpha1.ResourceDistributionTargetNamespaces{
-			List: []appsv1alpha1.ResourceDistributionNamespace{
-				{Name: "ns-1"}, {Name: "ns-2"}, {Name: "kube-system"}, {Name: ""},
-			},
+		// error 1
+		includedNamespaces: []string{
+			"ns-1", "ns-2", "kube-system", "",
 		},
 		// error 3
-		NamespaceLabelSelector: metav1.LabelSelector{
+		namespaceLabelSelector: metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				"$#%$%": "#@$@#$",
 			},
 		},
 	}
-	errs := handler.validateResourceDistributionSpecTargets(targets, field.NewPath("targets"))
+	errs := validateResourceDistributionTargets(targets, field.NewPath("targets"), false)
 	if len(errs) != 3 {
 		t.Fatalf("failed to validate the spec.targets, err: %v", errs)
 	}
+}
+
+func TestResourceDistributionV1beta1RejectsEmptyTargetsAndEmbeddedNamespace(t *testing.T) {
+	rd := buildResourceDistributionWithSecretV1beta1()
+	rd.Spec.Targets = appsv1beta1.ResourceDistributionTargets{}
+	rd.Spec.Resource.Raw = []byte(`{
+		"apiVersion":"v1",
+		"kind":"ConfigMap",
+		"metadata":{"name":"game-demo","namespace":"ignored"},
+		"data":{"k":"v"}
+	}`)
+
+	makeEnvironment()
+
+	errs := handler.validateResourceDistributionV1beta1(rd, nil)
+	require.Len(t, errs, 2)
 }
 
 func TestResourceDistributionUpdateConflict(t *testing.T) {
@@ -190,6 +204,25 @@ func buildResourceDistributionWithConfigMap() *appsv1alpha1.ResourceDistribution
 		}
 	}`
 	return buildResourceDistribution(resourceJSON)
+}
+
+func buildResourceDistributionWithSecretV1beta1() *appsv1beta1.ResourceDistribution {
+	alpha := buildResourceDistributionWithSecret()
+	return &appsv1beta1.ResourceDistribution{
+		ObjectMeta: alpha.ObjectMeta,
+		Spec: appsv1beta1.ResourceDistributionSpec{
+			Resource: alpha.Spec.Resource,
+			Targets: appsv1beta1.ResourceDistributionTargets{
+				ExcludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
+					List: []appsv1beta1.ResourceDistributionNamespace{{Name: "ns-3"}},
+				},
+				IncludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
+					List: []appsv1beta1.ResourceDistributionNamespace{{Name: "ns-1"}, {Name: "ns-2"}},
+				},
+				NamespaceLabelSelector: alpha.Spec.Targets.NamespaceLabelSelector,
+			},
+		},
+	}
 }
 
 func buildResourceDistribution(resourceYaml string) *appsv1alpha1.ResourceDistribution {

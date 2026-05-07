@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	fuzzutils "github.com/openkruise/kruise/test/fuzz"
 )
 
@@ -41,6 +42,7 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(fakeScheme)
 	_ = appsv1alpha1.AddToScheme(fakeScheme)
+	_ = appsv1beta1.AddToScheme(fakeScheme)
 }
 
 func FuzzDeserializeResource(f *testing.F) {
@@ -85,7 +87,7 @@ func FuzzValidateResourceDistributionSpec(f *testing.F) {
 				oldObj.SetGroupVersionKind(newObj.GetObjectKind().GroupVersionKind())
 			}
 		}
-		_ = h.validateResourceDistributionSpec(newObj, oldObj, field.NewPath("spec"))
+		_ = h.validateResourceDistributionSpec(specResourceView{resource: &newObj.Spec.Resource, targets: targetsViewFromV1alpha1(&newObj.Spec.Targets)}, oldSpecResourceView(oldObj), field.NewPath("spec"), false)
 	})
 }
 
@@ -102,7 +104,7 @@ func FuzzValidateResourceDistributionTargets(f *testing.F) {
 			return
 		}
 
-		_ = h.validateResourceDistributionSpecTargets(&rd.Spec.Targets, field.NewPath("targets"))
+		_ = validateResourceDistributionTargets(targetsViewFromV1alpha1(&rd.Spec.Targets), field.NewPath("targets"), false)
 	})
 }
 
@@ -128,6 +130,45 @@ func FuzzValidateResourceDistributionResource(f *testing.F) {
 			}
 		}
 
-		_ = h.validateResourceDistributionSpecResource(newObj, oldObj, field.NewPath("resource"))
+		_ = h.validateResourceDistributionSpecResource(newObj, oldObj, field.NewPath("resource"), false)
 	})
+}
+
+func FuzzValidateResourceDistributionSpecV1beta1(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		cf := fuzz.NewConsumer(data)
+
+		newObj := &appsv1beta1.ResourceDistribution{}
+		if err := cf.GenerateStruct(newObj); err != nil {
+			return
+		}
+		alphaObj := &appsv1alpha1.ResourceDistribution{}
+		if err := fuzzutils.GenerateResourceDistributionResource(cf, alphaObj); err != nil {
+			return
+		}
+		if err := fuzzutils.GenerateResourceDistributionTargets(cf, alphaObj); err != nil {
+			return
+		}
+		newObj.Spec.Resource = alphaObj.Spec.Resource
+		newObj.Spec.Targets = appsv1beta1.ResourceDistributionTargets{
+			AllNamespaces:          alphaObj.Spec.Targets.AllNamespaces,
+			NamespaceLabelSelector: alphaObj.Spec.Targets.NamespaceLabelSelector,
+			IncludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
+				List: toBetaNamespaces(alphaObj.Spec.Targets.IncludedNamespaces.List),
+			},
+			ExcludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
+				List: toBetaNamespaces(alphaObj.Spec.Targets.ExcludedNamespaces.List),
+			},
+		}
+
+		_ = h.validateResourceDistributionV1beta1(newObj, nil)
+	})
+}
+
+func toBetaNamespaces(namespaces []appsv1alpha1.ResourceDistributionNamespace) []appsv1beta1.ResourceDistributionNamespace {
+	values := make([]appsv1beta1.ResourceDistributionNamespace, 0, len(namespaces))
+	for _, namespace := range namespaces {
+		values = append(values, appsv1beta1.ResourceDistributionNamespace{Name: namespace.Name})
+	}
+	return values
 }
