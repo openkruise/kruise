@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	policyv1alpha1 "github.com/openkruise/kruise/apis/policy/v1alpha1"
+	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
@@ -41,7 +41,7 @@ func TestPubMutatingPod(t *testing.T) {
 	cases := []struct {
 		name                string
 		getPod              func() *v1.Pod
-		getPub              func() *policyv1alpha1.PodUnavailableBudget
+		getPub              func() *policyv1beta1.PodUnavailableBudget
 		getWorkload         func() *appsv1alpha1.CloneSet
 		expectedAnnotations map[string]string
 	}{
@@ -61,13 +61,13 @@ func TestPubMutatingPod(t *testing.T) {
 					},
 				}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				obj := &policyv1alpha1.PodUnavailableBudget{
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
+				obj := &policyv1beta1.PodUnavailableBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pub-1",
 						Namespace: "test",
 					},
-					Spec: policyv1alpha1.PodUnavailableBudgetSpec{
+					Spec: policyv1beta1.PodUnavailableBudgetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"app": "web",
@@ -81,6 +81,7 @@ func TestPubMutatingPod(t *testing.T) {
 			expectedAnnotations: map[string]string{
 				"version":                          "test",
 				pubcontrol.PodRelatedPubAnnotation: "pub-1",
+				pubcontrol.DeprecatedPodRelatedPubAnnotation: "pub-1",
 			},
 		},
 		{
@@ -99,13 +100,13 @@ func TestPubMutatingPod(t *testing.T) {
 					},
 				}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				obj := &policyv1alpha1.PodUnavailableBudget{
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
+				obj := &policyv1beta1.PodUnavailableBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pub-1",
 						Namespace: "test",
 					},
-					Spec: policyv1alpha1.PodUnavailableBudgetSpec{
+					Spec: policyv1beta1.PodUnavailableBudgetSpec{
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"app": "nginx",
@@ -145,14 +146,14 @@ func TestPubMutatingPod(t *testing.T) {
 					},
 				}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				obj := &policyv1alpha1.PodUnavailableBudget{
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
+				obj := &policyv1beta1.PodUnavailableBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pub-1",
 						Namespace: "test",
 					},
-					Spec: policyv1alpha1.PodUnavailableBudgetSpec{
-						TargetReference: &policyv1alpha1.TargetReference{
+					Spec: policyv1beta1.PodUnavailableBudgetSpec{
+						TargetReference: &policyv1beta1.TargetReference{
 							APIVersion: "apps.kruise.io/v1alpha1",
 							Kind:       "CloneSet",
 							Name:       "cs02",
@@ -187,6 +188,7 @@ func TestPubMutatingPod(t *testing.T) {
 			expectedAnnotations: map[string]string{
 				"version":                          "test",
 				pubcontrol.PodRelatedPubAnnotation: "pub-1",
+				pubcontrol.DeprecatedPodRelatedPubAnnotation: "pub-1",
 			},
 		},
 		{
@@ -214,14 +216,14 @@ func TestPubMutatingPod(t *testing.T) {
 					},
 				}
 			},
-			getPub: func() *policyv1alpha1.PodUnavailableBudget {
-				obj := &policyv1alpha1.PodUnavailableBudget{
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
+				obj := &policyv1beta1.PodUnavailableBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "pub-1",
 						Namespace: "test",
 					},
-					Spec: policyv1alpha1.PodUnavailableBudgetSpec{
-						TargetReference: &policyv1alpha1.TargetReference{
+					Spec: policyv1beta1.PodUnavailableBudgetSpec{
+						TargetReference: &policyv1beta1.TargetReference{
 							APIVersion: "apps.kruise.io/v1alpha1",
 							Kind:       "CloneSet",
 							Name:       "cs01",
