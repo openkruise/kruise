@@ -3,10 +3,10 @@ package containermeta
 import (
 	"testing"
 
+	"github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	criapi "k8s.io/cri-api/pkg/apis"
-	"github.com/openkruise/kruise/pkg/daemon/criruntime/imageruntime"
 )
 
 type mockRuntimeService struct {
@@ -95,6 +95,18 @@ func TestGetRuntimeForPod(t *testing.T) {
 			},
 			expectedRuntime: false,
 			expectedErr:     "not found runtime service for unknown in daemon",
+		},
+		{
+			name: "empty runtime type",
+			pod: &v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{ContainerID: "://123"},
+					},
+				},
+			},
+			expectedRuntime: false,
+			expectedErr:     "no runtime name in containerID",
 		},
 	}
 
