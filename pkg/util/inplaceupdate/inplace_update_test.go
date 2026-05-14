@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -252,6 +253,83 @@ func TestCheckInPlaceUpdateCompleted(t *testing.T) {
 		if err := DefaultCheckInPlaceUpdateCompleted(p); err == nil {
 			t.Errorf("pod %s expected check failure, got no error", p.Name)
 		}
+	}
+}
+
+func TestUpdateChecksPreviousInPlaceUpdateCompleted(t *testing.T) {
+	oldRevision := &apps.ControllerRevision{
+		ObjectMeta: metav1.ObjectMeta{Name: "old-revision"},
+		Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo2"}]}}}}`)},
+	}
+	newRevision := &apps.ControllerRevision{
+		ObjectMeta: metav1.ObjectMeta{Name: "new-revision"},
+		Data:       runtime.RawExtension{Raw: []byte(`{"spec":{"template":{"$patch":"replace","spec":{"containers":[{"name":"c1","image":"foo3"}]}}}}`)},
+	}
+
+	cases := []struct {
+		name            string
+		imageID         string
+		expectErr       bool
+		expectedImage   string
+		expectedRevHash string
+	}{
+		{
+			name:            "previous update not completed",
+			imageID:         "img01",
+			expectErr:       true,
+			expectedImage:   "foo2",
+			expectedRevHash: "old-revision",
+		},
+		{
+			name:            "previous update completed",
+			imageID:         "img02",
+			expectedImage:   "foo3",
+			expectedRevHash: "new-revision",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod",
+					Labels: map[string]string{
+						apps.ControllerRevisionHashLabelKey: "old-revision",
+					},
+					Annotations: map[string]string{
+						appspub.InPlaceUpdateStateKey: `{"revision":"old-revision","lastContainerStatuses":{"c1":{"imageID":"img01"}},"updateImages":true}`,
+					},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{Name: "c1", Image: "foo2"}},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{{Name: "c1", Image: "foo2", ImageID: tc.imageID}},
+				},
+			}
+
+			cli := fake.NewClientBuilder().WithObjects(pod).Build()
+			ctrl := New(cli, revisionadapter.NewDefaultImpl())
+			res := ctrl.Update(pod, oldRevision, newRevision, nil)
+			if tc.expectErr {
+				if res.UpdateErr == nil || !strings.Contains(res.UpdateErr.Error(), "previous in-place update has not completed") {
+					t.Fatalf("expected previous update incomplete error, got %v", res.UpdateErr)
+				}
+			} else if res.UpdateErr != nil {
+				t.Fatalf("expected update success, got %v", res.UpdateErr)
+			}
+
+			got := &v1.Pod{}
+			if err := cli.Get(context.TODO(), types.NamespacedName{Name: pod.Name}, got); err != nil {
+				t.Fatalf("failed to get pod: %v", err)
+			}
+			if got.Spec.Containers[0].Image != tc.expectedImage {
+				t.Fatalf("expected image %s, got %s", tc.expectedImage, got.Spec.Containers[0].Image)
+			}
+			if got.Labels[apps.ControllerRevisionHashLabelKey] != tc.expectedRevHash {
+				t.Fatalf("expected revision hash %s, got %s", tc.expectedRevHash, got.Labels[apps.ControllerRevisionHashLabelKey])
+			}
+		})
 	}
 }
 
