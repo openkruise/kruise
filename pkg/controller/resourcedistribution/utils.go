@@ -52,6 +52,12 @@ const (
 	OperationSucceeded     = "Succeeded"
 )
 
+// defaultSystemNamespaces are always excluded when allNamespaces is true, unless the user
+// explicitly lists them in spec.targets.excludedNamespaces (where they would already be excluded)
+// or in spec.targets.includedNamespaces (not applicable when allNamespaces is set).
+// This prevents accidental distribution of Secrets/ConfigMaps into kube-system and kube-public.
+var defaultSystemNamespaces = sets.NewString("kube-system", "kube-public")
+
 // UnexpectedError is designed to store the information about .status.conditions when error occurs
 type UnexpectedError struct {
 	err         error
@@ -77,9 +83,9 @@ func matchViaIncludedNamespaces(namespace *corev1.Namespace, distributor *appsv1
 	return false, nil
 }
 
-// matchViaLabelSelector return true if namespace matches with target.NamespacesLabelSelectors
+// matchViaLabelSelector return true if namespace matches with target.NamespaceSelector
 func matchViaLabelSelector(namespace *corev1.Namespace, distributor *appsv1beta1.ResourceDistribution) (bool, error) {
-	selector, err := util.ValidatedLabelSelectorAsSelector(&distributor.Spec.Targets.NamespaceLabelSelector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(&distributor.Spec.Targets.NamespaceSelector)
 	if err != nil {
 		return false, err
 	}
@@ -96,7 +102,9 @@ func matchViaTargets(namespace *corev1.Namespace, distributor *appsv1beta1.Resou
 		return false, nil
 	}
 	if targets.AllNamespaces {
-		return true, nil
+		// kube-system and kube-public are excluded by default when allNamespaces is true.
+		// Users who genuinely need to target these namespaces should use includedNamespaces explicitly.
+		return !defaultSystemNamespaces.Has(namespace.Name), nil
 	}
 	if isInList(namespace.Name, targets.IncludedNamespaces.List) {
 		return true, nil
@@ -276,7 +284,7 @@ func syncItSlowly(namespaces []string, initialBatchSize int, fn func(namespace s
 }
 
 // listNamespacesForDistributor returns two slices: one contains all matched namespaces, another contains all unmatched.
-// Firstly, Spec.Targets will parse .AllNamespaces, .IncludedNamespaces, and .NamespaceLabelSelector; Then calculate their
+// Firstly, Spec.Targets will parse .AllNamespaces, .IncludedNamespaces, and .NamespaceSelector; Then calculate their
 // union; At last ExcludedNamespaces will act on the union to remove the designated namespaces from it.
 func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1beta1.ResourceDistributionTargets) ([]string, []string, error) {
 	matchedSet := sets.NewString()
@@ -292,9 +300,11 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1be
 	}
 
 	if targets.AllNamespaces {
-		// 1. select all namespaces via targets.AllNamespace
+		// 1. select all namespaces via targets.AllNamespaces, excluding kube-system and kube-public by default.
 		for _, namespace := range namespacesList.Items {
-			matchedSet.Insert(namespace.Name)
+			if !defaultSystemNamespaces.Has(namespace.Name) {
+				matchedSet.Insert(namespace.Name)
+			}
 		}
 	} else {
 		// 2. select the namespaces via targets.IncludedNamespaces
@@ -303,9 +313,9 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1be
 		}
 	}
 
-	if !targets.AllNamespaces && (len(targets.NamespaceLabelSelector.MatchLabels) != 0 || len(targets.NamespaceLabelSelector.MatchExpressions) != 0) {
-		// 3. select the namespaces via targets.NamespaceLabelSelector
-		selectors, err := util.ValidatedLabelSelectorAsSelector(&targets.NamespaceLabelSelector)
+	if !targets.AllNamespaces && (len(targets.NamespaceSelector.MatchLabels) != 0 || len(targets.NamespaceSelector.MatchExpressions) != 0) {
+		// 3. select the namespaces via targets.NamespaceSelector
+		selectors, err := util.ValidatedLabelSelectorAsSelector(&targets.NamespaceSelector)
 		if err != nil {
 			return nil, nil, err
 		}

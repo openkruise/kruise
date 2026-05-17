@@ -111,7 +111,7 @@ func TestValidateResourceDistributionTargets(t *testing.T) {
 			"ns-1", "ns-2", "kube-system", "",
 		},
 		// error 3
-		namespaceLabelSelector: metav1.LabelSelector{
+		namespaceSelector: metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				"$#%$%": "#@$@#$",
 			},
@@ -123,20 +123,31 @@ func TestValidateResourceDistributionTargets(t *testing.T) {
 	}
 }
 
-func TestResourceDistributionV1beta1RejectsEmptyTargetsAndEmbeddedNamespace(t *testing.T) {
+func TestResourceDistributionV1beta1RejectsEmptyTargets(t *testing.T) {
 	rd := buildResourceDistributionWithSecretV1beta1()
 	rd.Spec.Targets = appsv1beta1.ResourceDistributionTargets{}
+
+	makeEnvironment()
+
+	errs := handler.validateResourceDistributionV1beta1(rd, nil)
+	require.Len(t, errs, 1)
+}
+
+func TestResourceDistributionV1beta1IgnoresEmbeddedNamespace(t *testing.T) {
+	rd := buildResourceDistributionWithSecretV1beta1()
+	// metadata.namespace in spec.resource is silently overridden by the controller;
+	// the webhook no longer rejects it with a hard error.
 	rd.Spec.Resource.Raw = []byte(`{
 		"apiVersion":"v1",
 		"kind":"ConfigMap",
-		"metadata":{"name":"game-demo","namespace":"ignored"},
+		"metadata":{"name":"game-demo","namespace":"should-be-ignored"},
 		"data":{"k":"v"}
 	}`)
 
 	makeEnvironment()
 
 	errs := handler.validateResourceDistributionV1beta1(rd, nil)
-	require.Len(t, errs, 2)
+	require.Len(t, errs, 0)
 }
 
 func TestResourceDistributionUpdateConflict(t *testing.T) {
@@ -219,7 +230,7 @@ func buildResourceDistributionWithSecretV1beta1() *appsv1beta1.ResourceDistribut
 				IncludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
 					List: []appsv1beta1.ResourceDistributionNamespace{{Name: "ns-1"}, {Name: "ns-2"}},
 				},
-				NamespaceLabelSelector: alpha.Spec.Targets.NamespaceLabelSelector,
+				NamespaceSelector: alpha.Spec.Targets.NamespaceLabelSelector,
 			},
 		},
 	}

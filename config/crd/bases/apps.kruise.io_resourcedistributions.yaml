@@ -298,9 +298,9 @@ spec:
                           type: object
                         type: array
                     type: object
-                  namespaceLabelSelector:
-                    description: If NamespaceLabelSelector is not empty, Resource
-                      will be distributed to the matched namespaces.
+                  namespaceSelector:
+                    description: If NamespaceSelector is not empty, Resource will
+                      be distributed to the matched namespaces.
                     properties:
                       matchExpressions:
                         description: matchExpressions is a list of label selector

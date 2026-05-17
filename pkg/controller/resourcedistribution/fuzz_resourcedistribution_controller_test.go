@@ -46,8 +46,8 @@ func FuzzMatchFunctions(f *testing.F) {
 		}
 		rd.Spec.Resource = alphaRD.Spec.Resource
 		rd.Spec.Targets = appsv1beta1.ResourceDistributionTargets{
-			AllNamespaces:          alphaRD.Spec.Targets.AllNamespaces,
-			NamespaceLabelSelector: alphaRD.Spec.Targets.NamespaceLabelSelector,
+			AllNamespaces:     alphaRD.Spec.Targets.AllNamespaces,
+			NamespaceSelector: alphaRD.Spec.Targets.NamespaceLabelSelector,
 			IncludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
 				List: convertNamespacesToV1beta1(alphaRD.Spec.Targets.IncludedNamespaces.List),
 			},
@@ -67,7 +67,7 @@ func FuzzMatchFunctions(f *testing.F) {
 			if len(rd.Spec.Targets.IncludedNamespaces.List) > 0 {
 				namespace.SetName(rd.Spec.Targets.IncludedNamespaces.List[0].Name)
 			}
-			namespace.SetLabels(rd.Spec.Targets.NamespaceLabelSelector.MatchLabels)
+			namespace.SetLabels(rd.Spec.Targets.NamespaceSelector.MatchLabels)
 		} else {
 			if err := cf.GenerateStruct(namespace); err != nil {
 				return
