@@ -50,146 +50,99 @@ func (h *ResourceDistributionCreateUpdateHandler) Handle(ctx context.Context, re
 		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.ResourceDistributionGate))
 	}
 
+	obj, err := h.decodeObject(req)
+	if err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
+	}
+
+	var oldObj *appsv1beta1.ResourceDistribution
+	if req.AdmissionRequest.Operation == admissionv1.Update {
+		oldObj, err = h.decodeOldObject(req)
+		if err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+	}
+
+	if allErrs := h.validateResourceDistribution(obj, oldObj); len(allErrs) != 0 {
+		klog.V(3).InfoS("all errors of validation", "errors", fmt.Sprintf("%v", allErrs))
+		return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
+	}
+	return admission.ValidationResponse(true, "")
+}
+
+// decodeObject decodes the incoming object as v1beta1, converting from v1alpha1 if needed.
+func (h *ResourceDistributionCreateUpdateHandler) decodeObject(req admission.Request) (*appsv1beta1.ResourceDistribution, error) {
 	switch req.AdmissionRequest.Resource.Version {
 	case appsv1beta1.GroupVersion.Version:
 		obj := &appsv1beta1.ResourceDistribution{}
 		if err := h.Decoder.Decode(req, obj); err != nil {
-			return admission.Errored(http.StatusBadRequest, err)
+			return nil, err
 		}
-		var oldObj *appsv1beta1.ResourceDistribution
-		if req.AdmissionRequest.Operation == admissionv1.Update {
-			oldObj = &appsv1beta1.ResourceDistribution{}
-			if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
-				return admission.Errored(http.StatusBadRequest, err)
-			}
-		}
-		if allErrs := h.validateResourceDistributionV1beta1(obj, oldObj); len(allErrs) != 0 {
-			klog.V(3).InfoS("all errors of validation", "errors", fmt.Sprintf("%v", allErrs))
-			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
-		}
-		return admission.ValidationResponse(true, "")
+		return obj, nil
 	case appsv1alpha1.GroupVersion.Version:
-		obj := &appsv1alpha1.ResourceDistribution{}
-		if err := h.Decoder.Decode(req, obj); err != nil {
-			return admission.Errored(http.StatusBadRequest, err)
+		alpha := &appsv1alpha1.ResourceDistribution{}
+		if err := h.Decoder.Decode(req, alpha); err != nil {
+			return nil, err
 		}
-		var oldObj *appsv1alpha1.ResourceDistribution
-		if req.AdmissionRequest.Operation == admissionv1.Update {
-			oldObj = &appsv1alpha1.ResourceDistribution{}
-			if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
-				return admission.Errored(http.StatusBadRequest, err)
-			}
+		beta := &appsv1beta1.ResourceDistribution{}
+		if err := alpha.ConvertTo(beta); err != nil {
+			return nil, fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err)
 		}
-		if allErrs := h.validateResourceDistribution(obj, oldObj); len(allErrs) != 0 {
-			klog.V(3).InfoS("all errors of validation", "errors", fmt.Sprintf("%v", allErrs))
-			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
-		}
-		return admission.ValidationResponse(true, "")
+		return beta, nil
 	default:
-		return admission.Errored(http.StatusBadRequest, fmt.Errorf("unsupported version: %s", req.AdmissionRequest.Resource.Version))
+		return nil, fmt.Errorf("unsupported version: %s", req.AdmissionRequest.Resource.Version)
 	}
 }
 
-func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistribution(obj, oldObj *appsv1alpha1.ResourceDistribution) (allErrs field.ErrorList) {
+// decodeOldObject decodes the old object (for updates) as v1beta1, converting from v1alpha1 if needed.
+func (h *ResourceDistributionCreateUpdateHandler) decodeOldObject(req admission.Request) (*appsv1beta1.ResourceDistribution, error) {
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		obj := &appsv1beta1.ResourceDistribution{}
+		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, obj); err != nil {
+			return nil, err
+		}
+		return obj, nil
+	case appsv1alpha1.GroupVersion.Version:
+		alpha := &appsv1alpha1.ResourceDistribution{}
+		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, alpha); err != nil {
+			return nil, err
+		}
+		beta := &appsv1beta1.ResourceDistribution{}
+		if err := alpha.ConvertTo(beta); err != nil {
+			return nil, fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err)
+		}
+		return beta, nil
+	default:
+		return nil, fmt.Errorf("unsupported version: %s", req.AdmissionRequest.Resource.Version)
+	}
+}
+
+func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistribution(obj, oldObj *appsv1beta1.ResourceDistribution) (allErrs field.ErrorList) {
 	allErrs = apimachineryvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	return append(allErrs, h.validateResourceDistributionSpec(specResourceView{resource: &obj.Spec.Resource, targets: targetsViewFromV1alpha1(&obj.Spec.Targets)}, oldSpecResourceView(oldObj), field.NewPath("spec"), false)...)
+	allErrs = append(allErrs, h.validateResourceDistributionSpec(obj, oldObj, field.NewPath("spec"))...)
+	return allErrs
 }
 
-func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionV1beta1(obj, oldObj *appsv1beta1.ResourceDistribution) (allErrs field.ErrorList) {
-	allErrs = apimachineryvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	return append(allErrs, h.validateResourceDistributionSpec(specResourceView{resource: &obj.Spec.Resource, targets: targetsViewFromV1beta1(&obj.Spec.Targets)}, oldSpecResourceViewV1beta1(oldObj), field.NewPath("spec"), true)...)
-}
-
-type specResourceView struct {
-	resource *runtime.RawExtension
-	targets  resourceDistributionTargetsView
-}
-
-type resourceDistributionTargetsView struct {
-	allNamespaces          bool
-	includedNamespaces     []string
-	excludedNamespaces     []string
-	namespaceLabelSelector metav1.LabelSelector
-	// selectorFieldName is the API field name used in validation error paths:
-	// "namespaceLabelSelector" for v1alpha1, "namespaceSelector" for v1beta1.
-	selectorFieldName string
-}
-
-func targetsViewFromV1alpha1(targets *appsv1alpha1.ResourceDistributionTargets) resourceDistributionTargetsView {
-	if targets == nil {
-		return resourceDistributionTargetsView{}
-	}
-	return resourceDistributionTargetsView{
-		allNamespaces:          targets.AllNamespaces,
-		includedNamespaces:     namespaceNamesV1alpha1(targets.IncludedNamespaces.List),
-		excludedNamespaces:     namespaceNamesV1alpha1(targets.ExcludedNamespaces.List),
-		namespaceLabelSelector: targets.NamespaceLabelSelector,
-		selectorFieldName:      "namespaceLabelSelector",
-	}
-}
-
-func targetsViewFromV1beta1(targets *appsv1beta1.ResourceDistributionTargets) resourceDistributionTargetsView {
-	if targets == nil {
-		return resourceDistributionTargetsView{}
-	}
-	return resourceDistributionTargetsView{
-		allNamespaces:          targets.AllNamespaces,
-		includedNamespaces:     namespaceNamesV1beta1(targets.IncludedNamespaces.List),
-		excludedNamespaces:     namespaceNamesV1beta1(targets.ExcludedNamespaces.List),
-		namespaceLabelSelector: targets.NamespaceSelector,
-		selectorFieldName:      "namespaceSelector",
-	}
-}
-
-func namespaceNamesV1alpha1(namespaces []appsv1alpha1.ResourceDistributionNamespace) []string {
-	values := make([]string, 0, len(namespaces))
-	for _, namespace := range namespaces {
-		values = append(values, namespace.Name)
-	}
-	return values
-}
-
-func namespaceNamesV1beta1(namespaces []appsv1beta1.ResourceDistributionNamespace) []string {
-	values := make([]string, 0, len(namespaces))
-	for _, namespace := range namespaces {
-		values = append(values, namespace.Name)
-	}
-	return values
-}
-
-func oldSpecResourceView(oldObj *appsv1alpha1.ResourceDistribution) *specResourceView {
-	if oldObj == nil {
-		return nil
-	}
-	return &specResourceView{resource: &oldObj.Spec.Resource, targets: targetsViewFromV1alpha1(&oldObj.Spec.Targets)}
-}
-
-func oldSpecResourceViewV1beta1(oldObj *appsv1beta1.ResourceDistribution) *specResourceView {
-	if oldObj == nil {
-		return nil
-	}
-	return &specResourceView{resource: &oldObj.Spec.Resource, targets: targetsViewFromV1beta1(&oldObj.Spec.Targets)}
-}
-
-func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpec(view specResourceView, oldView *specResourceView, fldPath *field.Path, strict bool) (allErrs field.ErrorList) {
-	resource, errs := DeserializeResource(view.resource, fldPath.Child("resource"))
+func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpec(obj, oldObj *appsv1beta1.ResourceDistribution, fldPath *field.Path) (allErrs field.ErrorList) {
+	resource, errs := DeserializeResource(&obj.Spec.Resource, fldPath.Child("resource"))
 	allErrs = append(allErrs, errs...)
 	if resource == nil {
 		return allErrs
 	}
 
 	var oldResource runtime.Object
-	if oldView != nil {
-		oldResource, errs = DeserializeResource(oldView.resource, fldPath.Child("resource"))
+	if oldObj != nil {
+		oldResource, errs = DeserializeResource(&oldObj.Spec.Resource, fldPath.Child("resource"))
 		allErrs = append(allErrs, errs...)
 	}
 
-	allErrs = append(allErrs, h.validateResourceDistributionSpecResource(resource, oldResource, fldPath.Child("resource"), strict)...)
-	allErrs = append(allErrs, validateResourceDistributionTargets(view.targets, fldPath.Child("targets"), strict)...)
+	allErrs = append(allErrs, h.validateResourceDistributionSpecResource(resource, oldResource, fldPath.Child("resource"))...)
+	allErrs = append(allErrs, validateResourceDistributionTargets(obj.Spec.Targets, fldPath.Child("targets"))...)
 	return allErrs
 }
 
-func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpecResource(resource, oldResource runtime.Object, fldPath *field.Path, strict bool) (allErrs field.ErrorList) {
+func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpecResource(resource, oldResource runtime.Object, fldPath *field.Path) (allErrs field.ErrorList) {
 	if !isSupportedGK(resource) {
 		return append(allErrs, field.Invalid(fldPath, resource.GetObjectKind().GroupVersionKind().GroupKind(), fmt.Sprintf("unknown or unsupported resource GroupKind, only support %v", supportedGKList)))
 	}
@@ -199,8 +152,7 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 
 	mice := resource.DeepCopyObject().(client.Object)
 	// metadata.namespace on spec.resource is silently ignored; the controller always
-	// overrides it with the target namespace when distributing. Document-level guidance
-	// is provided instead of a hard rejection.
+	// overrides it with the target namespace when distributing.
 	ConvertToUnstructured(mice).SetNamespace(webhookutil.GetNamespace())
 	err := h.Client.Create(context.TODO(), mice, &client.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err == nil || errors.IsAlreadyExists(err) {
@@ -215,38 +167,30 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 	return append(allErrs, field.InternalError(fldPath, fmt.Errorf("failed to dry-run validate spec.resource: %v", err)))
 }
 
-func validateResourceDistributionTargets(targets resourceDistributionTargetsView, fldPath *field.Path, strict bool) (allErrs field.ErrorList) {
+func validateResourceDistributionTargets(targets appsv1beta1.ResourceDistributionTargets, fldPath *field.Path) (allErrs field.ErrorList) {
 	conflicted := make([]string, 0)
 	includedNS := sets.NewString()
-	for _, namespace := range targets.includedNamespaces {
-		includedNS.Insert(namespace)
-		for _, msg := range coreval.ValidateNamespaceName(namespace, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("includedNamespaces"), namespace, msg))
+	for _, namespace := range targets.IncludedNamespaces.List {
+		includedNS.Insert(namespace.Name)
+		for _, msg := range coreval.ValidateNamespaceName(namespace.Name, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("includedNamespaces"), namespace.Name, msg))
 		}
 	}
-	for _, namespace := range targets.excludedNamespaces {
-		for _, msg := range coreval.ValidateNamespaceName(namespace, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("excludedNamespaces"), namespace, msg))
+	for _, namespace := range targets.ExcludedNamespaces.List {
+		for _, msg := range coreval.ValidateNamespaceName(namespace.Name, false) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("excludedNamespaces"), namespace.Name, msg))
 		}
-		if includedNS.Has(namespace) {
-			conflicted = append(conflicted, namespace)
+		if includedNS.Has(namespace.Name) {
+			conflicted = append(conflicted, namespace.Name)
 		}
 	}
 	if len(conflicted) != 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, targets, fmt.Sprintf("ambiguous targets because namespace %v is in both IncludedNamespaces.List and ExcludedNamespaces.List", conflicted)))
 	}
 
-	if _, err := metav1.LabelSelectorAsSelector(&targets.namespaceLabelSelector); err != nil {
-		fieldName := targets.selectorFieldName
-		if fieldName == "" {
-			fieldName = "namespaceLabelSelector"
-		}
-		allErrs = append(allErrs, field.Invalid(fldPath.Child(fieldName), targets.namespaceLabelSelector, fmt.Sprintf("labelSelectorAsSelector error: %v", err)))
+	if _, err := metav1.LabelSelectorAsSelector(&targets.NamespaceSelector); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("namespaceSelector"), targets.NamespaceSelector, fmt.Sprintf("labelSelectorAsSelector error: %v", err)))
 	}
 
-	if strict && !targets.allNamespaces && len(targets.includedNamespaces) == 0 &&
-		len(targets.namespaceLabelSelector.MatchLabels) == 0 && len(targets.namespaceLabelSelector.MatchExpressions) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, "at least one target selector must be configured"))
-	}
 	return allErrs
 }

@@ -87,7 +87,14 @@ func FuzzValidateResourceDistributionSpec(f *testing.F) {
 				oldObj.SetGroupVersionKind(newObj.GetObjectKind().GroupVersionKind())
 			}
 		}
-		_ = h.validateResourceDistributionSpec(specResourceView{resource: &newObj.Spec.Resource, targets: targetsViewFromV1alpha1(&newObj.Spec.Targets)}, oldSpecResourceView(oldObj), field.NewPath("spec"), false)
+		betaNew := &appsv1beta1.ResourceDistribution{}
+		_ = newObj.ConvertTo(betaNew)
+		var betaOld *appsv1beta1.ResourceDistribution
+		if oldObj.Name != "" {
+			betaOld = &appsv1beta1.ResourceDistribution{}
+			_ = oldObj.ConvertTo(betaOld)
+		}
+		_ = h.validateResourceDistributionSpec(betaNew, betaOld, field.NewPath("spec"))
 	})
 }
 
@@ -104,7 +111,9 @@ func FuzzValidateResourceDistributionTargets(f *testing.F) {
 			return
 		}
 
-		_ = validateResourceDistributionTargets(targetsViewFromV1alpha1(&rd.Spec.Targets), field.NewPath("targets"), false)
+		beta := &appsv1beta1.ResourceDistribution{}
+		_ = rd.ConvertTo(beta)
+		_ = validateResourceDistributionTargets(beta.Spec.Targets, field.NewPath("targets"))
 	})
 }
 
@@ -130,7 +139,7 @@ func FuzzValidateResourceDistributionResource(f *testing.F) {
 			}
 		}
 
-		_ = h.validateResourceDistributionSpecResource(newObj, oldObj, field.NewPath("resource"), false)
+		_ = h.validateResourceDistributionSpecResource(newObj, oldObj, field.NewPath("resource"))
 	})
 }
 
@@ -161,7 +170,7 @@ func FuzzValidateResourceDistributionSpecV1beta1(f *testing.F) {
 			},
 		}
 
-		_ = h.validateResourceDistributionV1beta1(newObj, nil)
+		_ = h.validateResourceDistribution(newObj, nil)
 	})
 }
 
