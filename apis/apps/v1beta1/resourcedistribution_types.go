@@ -38,8 +38,8 @@ type ResourceDistributionSpec struct {
 // ResourceDistributionTargets defines the targets of Resource.
 // Four options are provided to select target namespaces.
 type ResourceDistributionTargets struct {
-	// Priority: ExcludedNamespaces > AllNamespaces = IncludedNamespaces = NamespaceLabelSelector.
-	// Firstly, ResourceDistributionTargets will parse AllNamespaces, IncludedNamespaces, and NamespaceLabelSelector,
+	// Priority: ExcludedNamespaces > AllNamespaces = IncludedNamespaces = NamespaceSelector.
+	// Firstly, ResourceDistributionTargets will parse AllNamespaces, IncludedNamespaces, and NamespaceSelector,
 	// then calculate their union,
 	// At last ExcludedNamespaces will act on the union to remove and exclude the designated namespaces from it.
 
@@ -56,9 +56,9 @@ type ResourceDistributionTargets struct {
 	// +optional
 	IncludedNamespaces ResourceDistributionTargetNamespaces `json:"includedNamespaces,omitempty"`
 
-	// If NamespaceLabelSelector is not empty, Resource will be distributed to the matched namespaces.
+	// If NamespaceSelector is not empty, Resource will be distributed to the matched namespaces.
 	// +optional
-	NamespaceLabelSelector metav1.LabelSelector `json:"namespaceLabelSelector,omitempty"`
+	NamespaceSelector metav1.LabelSelector `json:"namespaceSelector,omitempty"`
 }
 
 type ResourceDistributionTargetNamespaces struct {

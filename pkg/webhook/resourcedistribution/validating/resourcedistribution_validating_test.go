@@ -230,7 +230,7 @@ func buildResourceDistributionWithSecretV1beta1() *appsv1beta1.ResourceDistribut
 				IncludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
 					List: []appsv1beta1.ResourceDistributionNamespace{{Name: "ns-1"}, {Name: "ns-2"}},
 				},
-				NamespaceLabelSelector: alpha.Spec.Targets.NamespaceLabelSelector,
+				NamespaceSelector: alpha.Spec.Targets.NamespaceLabelSelector,
 			},
 		},
 	}

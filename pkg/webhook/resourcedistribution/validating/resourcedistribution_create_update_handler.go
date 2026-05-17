@@ -110,6 +110,9 @@ type resourceDistributionTargetsView struct {
 	includedNamespaces     []string
 	excludedNamespaces     []string
 	namespaceLabelSelector metav1.LabelSelector
+	// selectorFieldName is the API field name used in validation error paths:
+	// "namespaceLabelSelector" for v1alpha1, "namespaceSelector" for v1beta1.
+	selectorFieldName string
 }
 
 func targetsViewFromV1alpha1(targets *appsv1alpha1.ResourceDistributionTargets) resourceDistributionTargetsView {
@@ -121,6 +124,7 @@ func targetsViewFromV1alpha1(targets *appsv1alpha1.ResourceDistributionTargets) 
 		includedNamespaces:     namespaceNamesV1alpha1(targets.IncludedNamespaces.List),
 		excludedNamespaces:     namespaceNamesV1alpha1(targets.ExcludedNamespaces.List),
 		namespaceLabelSelector: targets.NamespaceLabelSelector,
+		selectorFieldName:      "namespaceLabelSelector",
 	}
 }
 
@@ -132,7 +136,8 @@ func targetsViewFromV1beta1(targets *appsv1beta1.ResourceDistributionTargets) re
 		allNamespaces:          targets.AllNamespaces,
 		includedNamespaces:     namespaceNamesV1beta1(targets.IncludedNamespaces.List),
 		excludedNamespaces:     namespaceNamesV1beta1(targets.ExcludedNamespaces.List),
-		namespaceLabelSelector: targets.NamespaceLabelSelector,
+		namespaceLabelSelector: targets.NamespaceSelector,
+		selectorFieldName:      "namespaceSelector",
 	}
 }
 
@@ -232,7 +237,11 @@ func validateResourceDistributionTargets(targets resourceDistributionTargetsView
 	}
 
 	if _, err := metav1.LabelSelectorAsSelector(&targets.namespaceLabelSelector); err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("namespaceLabelSelector"), targets.namespaceLabelSelector, fmt.Sprintf("labelSelectorAsSelector error: %v", err)))
+		fieldName := targets.selectorFieldName
+		if fieldName == "" {
+			fieldName = "namespaceLabelSelector"
+		}
+		allErrs = append(allErrs, field.Invalid(fldPath.Child(fieldName), targets.namespaceLabelSelector, fmt.Sprintf("labelSelectorAsSelector error: %v", err)))
 	}
 
 	if strict && !targets.allNamespaces && len(targets.includedNamespaces) == 0 &&
