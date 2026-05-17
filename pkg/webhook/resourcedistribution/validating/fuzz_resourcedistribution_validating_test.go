@@ -151,8 +151,8 @@ func FuzzValidateResourceDistributionSpecV1beta1(f *testing.F) {
 		}
 		newObj.Spec.Resource = alphaObj.Spec.Resource
 		newObj.Spec.Targets = appsv1beta1.ResourceDistributionTargets{
-			AllNamespaces:     alphaObj.Spec.Targets.AllNamespaces,
-			NamespaceSelector: alphaObj.Spec.Targets.NamespaceLabelSelector,
+			AllNamespaces:          alphaObj.Spec.Targets.AllNamespaces,
+			NamespaceLabelSelector: alphaObj.Spec.Targets.NamespaceLabelSelector,
 			IncludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
 				List: toBetaNamespaces(alphaObj.Spec.Targets.IncludedNamespaces.List),
 			},

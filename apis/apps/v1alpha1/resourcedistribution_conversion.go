@@ -56,21 +56,19 @@ func convertResourceDistributionFromV1beta1(src *appsv1beta1.ResourceDistributio
 
 func convertResourceDistributionTargetsToV1beta1(src ResourceDistributionTargets) appsv1beta1.ResourceDistributionTargets {
 	return appsv1beta1.ResourceDistributionTargets{
-		AllNamespaces:      src.AllNamespaces,
-		ExcludedNamespaces: convertResourceDistributionTargetNamespacesToV1beta1(src.ExcludedNamespaces),
-		IncludedNamespaces: convertResourceDistributionTargetNamespacesToV1beta1(src.IncludedNamespaces),
-		// v1alpha1 uses NamespaceLabelSelector; v1beta1 renamed it to NamespaceSelector.
-		NamespaceSelector: src.NamespaceLabelSelector,
+		AllNamespaces:          src.AllNamespaces,
+		ExcludedNamespaces:     convertResourceDistributionTargetNamespacesToV1beta1(src.ExcludedNamespaces),
+		IncludedNamespaces:     convertResourceDistributionTargetNamespacesToV1beta1(src.IncludedNamespaces),
+		NamespaceLabelSelector: src.NamespaceLabelSelector,
 	}
 }
 
 func convertResourceDistributionTargetsFromV1beta1(src appsv1beta1.ResourceDistributionTargets) ResourceDistributionTargets {
 	return ResourceDistributionTargets{
-		AllNamespaces:      src.AllNamespaces,
-		ExcludedNamespaces: convertResourceDistributionTargetNamespacesFromV1beta1(src.ExcludedNamespaces),
-		IncludedNamespaces: convertResourceDistributionTargetNamespacesFromV1beta1(src.IncludedNamespaces),
-		// v1beta1 uses NamespaceSelector; v1alpha1 called it NamespaceLabelSelector.
-		NamespaceLabelSelector: src.NamespaceSelector,
+		AllNamespaces:          src.AllNamespaces,
+		ExcludedNamespaces:     convertResourceDistributionTargetNamespacesFromV1beta1(src.ExcludedNamespaces),
+		IncludedNamespaces:     convertResourceDistributionTargetNamespacesFromV1beta1(src.IncludedNamespaces),
+		NamespaceLabelSelector: src.NamespaceLabelSelector,
 	}
 }
 

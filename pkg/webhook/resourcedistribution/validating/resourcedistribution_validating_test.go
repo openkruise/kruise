@@ -111,7 +111,7 @@ func TestValidateResourceDistributionTargets(t *testing.T) {
 			"ns-1", "ns-2", "kube-system", "",
 		},
 		// error 3
-		namespaceSelector: metav1.LabelSelector{
+		namespaceLabelSelector: metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				"$#%$%": "#@$@#$",
 			},
@@ -230,7 +230,7 @@ func buildResourceDistributionWithSecretV1beta1() *appsv1beta1.ResourceDistribut
 				IncludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
 					List: []appsv1beta1.ResourceDistributionNamespace{{Name: "ns-1"}, {Name: "ns-2"}},
 				},
-				NamespaceSelector: alpha.Spec.Targets.NamespaceLabelSelector,
+				NamespaceLabelSelector: alpha.Spec.Targets.NamespaceLabelSelector,
 			},
 		},
 	}

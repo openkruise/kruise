@@ -83,7 +83,7 @@ func TestResourceDistributionConvertFromV1beta1(t *testing.T) {
 				Raw: []byte(`{"apiVersion":"v1","kind":"Secret","metadata":{"name":"demo"},"type":"Opaque"}`),
 			},
 			Targets: appsv1beta1.ResourceDistributionTargets{
-				NamespaceSelector: metav1.LabelSelector{
+				NamespaceLabelSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{"team": "platform"},
 				},
 			},

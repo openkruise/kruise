@@ -106,13 +106,10 @@ type specResourceView struct {
 }
 
 type resourceDistributionTargetsView struct {
-	allNamespaces         bool
-	includedNamespaces    []string
-	excludedNamespaces    []string
-	namespaceSelector     metav1.LabelSelector
-	// selectorFieldName is the JSON field name for namespaceSelector used in validation error paths.
-	// "namespaceLabelSelector" for v1alpha1, "namespaceSelector" for v1beta1.
-	selectorFieldName string
+	allNamespaces          bool
+	includedNamespaces     []string
+	excludedNamespaces     []string
+	namespaceLabelSelector metav1.LabelSelector
 }
 
 func targetsViewFromV1alpha1(targets *appsv1alpha1.ResourceDistributionTargets) resourceDistributionTargetsView {
@@ -120,11 +117,10 @@ func targetsViewFromV1alpha1(targets *appsv1alpha1.ResourceDistributionTargets) 
 		return resourceDistributionTargetsView{}
 	}
 	return resourceDistributionTargetsView{
-		allNamespaces:      targets.AllNamespaces,
-		includedNamespaces: namespaceNamesV1alpha1(targets.IncludedNamespaces.List),
-		excludedNamespaces: namespaceNamesV1alpha1(targets.ExcludedNamespaces.List),
-		namespaceSelector:  targets.NamespaceLabelSelector,
-		selectorFieldName:  "namespaceLabelSelector",
+		allNamespaces:          targets.AllNamespaces,
+		includedNamespaces:     namespaceNamesV1alpha1(targets.IncludedNamespaces.List),
+		excludedNamespaces:     namespaceNamesV1alpha1(targets.ExcludedNamespaces.List),
+		namespaceLabelSelector: targets.NamespaceLabelSelector,
 	}
 }
 
@@ -133,11 +129,10 @@ func targetsViewFromV1beta1(targets *appsv1beta1.ResourceDistributionTargets) re
 		return resourceDistributionTargetsView{}
 	}
 	return resourceDistributionTargetsView{
-		allNamespaces:      targets.AllNamespaces,
-		includedNamespaces: namespaceNamesV1beta1(targets.IncludedNamespaces.List),
-		excludedNamespaces: namespaceNamesV1beta1(targets.ExcludedNamespaces.List),
-		namespaceSelector:  targets.NamespaceSelector,
-		selectorFieldName:  "namespaceSelector",
+		allNamespaces:          targets.AllNamespaces,
+		includedNamespaces:     namespaceNamesV1beta1(targets.IncludedNamespaces.List),
+		excludedNamespaces:     namespaceNamesV1beta1(targets.ExcludedNamespaces.List),
+		namespaceLabelSelector: targets.NamespaceLabelSelector,
 	}
 }
 
@@ -236,16 +231,12 @@ func validateResourceDistributionTargets(targets resourceDistributionTargetsView
 		allErrs = append(allErrs, field.Invalid(fldPath, targets, fmt.Sprintf("ambiguous targets because namespace %v is in both IncludedNamespaces.List and ExcludedNamespaces.List", conflicted)))
 	}
 
-	if _, err := metav1.LabelSelectorAsSelector(&targets.namespaceSelector); err != nil {
-		fieldName := targets.selectorFieldName
-		if fieldName == "" {
-			fieldName = "namespaceSelector"
-		}
-		allErrs = append(allErrs, field.Invalid(fldPath.Child(fieldName), targets.namespaceSelector, fmt.Sprintf("labelSelectorAsSelector error: %v", err)))
+	if _, err := metav1.LabelSelectorAsSelector(&targets.namespaceLabelSelector); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("namespaceLabelSelector"), targets.namespaceLabelSelector, fmt.Sprintf("labelSelectorAsSelector error: %v", err)))
 	}
 
 	if strict && !targets.allNamespaces && len(targets.includedNamespaces) == 0 &&
-		len(targets.namespaceSelector.MatchLabels) == 0 && len(targets.namespaceSelector.MatchExpressions) == 0 {
+		len(targets.namespaceLabelSelector.MatchLabels) == 0 && len(targets.namespaceLabelSelector.MatchExpressions) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "at least one target selector must be configured"))
 	}
 	return allErrs

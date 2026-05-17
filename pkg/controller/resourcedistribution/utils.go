@@ -83,9 +83,9 @@ func matchViaIncludedNamespaces(namespace *corev1.Namespace, distributor *appsv1
 	return false, nil
 }
 
-// matchViaLabelSelector return true if namespace matches with target.NamespaceSelector
+// matchViaLabelSelector return true if namespace matches with target.NamespaceLabelSelector
 func matchViaLabelSelector(namespace *corev1.Namespace, distributor *appsv1beta1.ResourceDistribution) (bool, error) {
-	selector, err := util.ValidatedLabelSelectorAsSelector(&distributor.Spec.Targets.NamespaceSelector)
+	selector, err := util.ValidatedLabelSelectorAsSelector(&distributor.Spec.Targets.NamespaceLabelSelector)
 	if err != nil {
 		return false, err
 	}
@@ -284,7 +284,7 @@ func syncItSlowly(namespaces []string, initialBatchSize int, fn func(namespace s
 }
 
 // listNamespacesForDistributor returns two slices: one contains all matched namespaces, another contains all unmatched.
-// Firstly, Spec.Targets will parse .AllNamespaces, .IncludedNamespaces, and .NamespaceSelector; Then calculate their
+// Firstly, Spec.Targets will parse .AllNamespaces, .IncludedNamespaces, and .NamespaceLabelSelector; Then calculate their
 // union; At last ExcludedNamespaces will act on the union to remove the designated namespaces from it.
 func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1beta1.ResourceDistributionTargets) ([]string, []string, error) {
 	matchedSet := sets.NewString()
@@ -313,9 +313,9 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1be
 		}
 	}
 
-	if !targets.AllNamespaces && (len(targets.NamespaceSelector.MatchLabels) != 0 || len(targets.NamespaceSelector.MatchExpressions) != 0) {
-		// 3. select the namespaces via targets.NamespaceSelector
-		selectors, err := util.ValidatedLabelSelectorAsSelector(&targets.NamespaceSelector)
+	if !targets.AllNamespaces && (len(targets.NamespaceLabelSelector.MatchLabels) != 0 || len(targets.NamespaceLabelSelector.MatchExpressions) != 0) {
+		// 3. select the namespaces via targets.NamespaceLabelSelector
+		selectors, err := util.ValidatedLabelSelectorAsSelector(&targets.NamespaceLabelSelector)
 		if err != nil {
 			return nil, nil, err
 		}

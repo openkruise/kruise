@@ -144,7 +144,7 @@ func buildResourceDistribution(raw runtime.RawExtension) *appsv1beta1.ResourceDi
 						},
 					},
 				},
-				NamespaceSelector: metav1.LabelSelector{
+				NamespaceLabelSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"group": "one",
 					},
