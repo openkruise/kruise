@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+// +kubebuilder:validation:Enum=DELETE;UPDATE;EVICT;RESIZE
 type PubOperation string
 
 const (

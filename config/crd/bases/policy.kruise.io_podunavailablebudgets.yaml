@@ -125,7 +125,7 @@ spec:
                 x-kubernetes-map-type: atomic
               targetRef:
                 description: |-
-                  TargetReference contains enough information to let you identify an workload for PodUnavailableBudget
+                  TargetReference contains enough information to let you identify a workload for PodUnavailableBudget
                   Selector and TargetReference are mutually exclusive, TargetReference is priority to take effect
                 properties:
                   apiVersion:
@@ -308,6 +308,11 @@ spec:
                   ProtectOperations declares which voluntary disruption operations are protected by this PUB.
                   When empty, DELETE, UPDATE and EVICT are protected by default.
                 items:
+                  enum:
+                  - DELETE
+                  - UPDATE
+                  - EVICT
+                  - RESIZE
                   type: string
                 type: array
               protectTotalReplicas:
@@ -315,6 +320,7 @@ spec:
                   ProtectTotalReplicas overrides the expected workload replicas when pods do not have workload management
                   or the workload does not expose the scale subresource.
                 format: int32
+                minimum: 1
                 type: integer
               selector:
                 description: Selector label query over pods managed by the budget.
