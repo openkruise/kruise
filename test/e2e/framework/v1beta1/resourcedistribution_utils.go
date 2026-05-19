@@ -330,6 +330,11 @@ func (s *ResourceDistributionTester) GetNamespaceForDistributor(targets *appsv1b
 
 	if targets.AllNamespaces {
 		for _, ns := range nsList.Items {
+			// Mirror the controller's behaviour: kube-system and kube-public are
+			// excluded by default when allNamespaces is true.
+			if ns.Name == "kube-system" || ns.Name == "kube-public" {
+				continue
+			}
 			matched.Insert(ns.Name)
 		}
 	} else {

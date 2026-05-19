@@ -380,14 +380,22 @@ var _ = ginkgo.Describe("ResourceDistribution", ginkgo.Serial, ginkgo.Label("Res
 			_, err := kc.AppsV1alpha1().ResourceDistributions().Create(context.TODO(), alphaRD, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			ginkgo.By("reading back via v1beta1 client and verifying namespaceSelector field exists...")
+			ginkgo.By("reading back via v1beta1 client and verifying conversion populated namespaceSelector correctly...")
 			gomega.Eventually(func() error {
 				betaRD, err := kc.AppsV1beta1().ResourceDistributions().Get(context.TODO(), prefix, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
-				// namespaceSelector should be present (empty but not nil after conversion)
-				_ = betaRD.Spec.Targets.NamespaceSelector
+				// Conversion must have run: NamespaceSelector should be the zero value
+				// (alpha had no NamespaceLabelSelector set), not a missing field.
+				sel := betaRD.Spec.Targets.NamespaceSelector
+				if len(sel.MatchLabels) != 0 || len(sel.MatchExpressions) != 0 {
+					return fmt.Errorf("expected empty NamespaceSelector after conversion, got matchLabels=%v matchExpressions=%v", sel.MatchLabels, sel.MatchExpressions)
+				}
+				// IncludedNamespaces must have survived the round-trip.
+				if len(betaRD.Spec.Targets.IncludedNamespaces.List) == 0 {
+					return fmt.Errorf("IncludedNamespaces lost during alpha→beta conversion")
+				}
 				return nil
 			}, time.Minute, time.Second).Should(gomega.Succeed())
 
