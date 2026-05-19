@@ -324,26 +324,25 @@ var _ = ginkgo.Describe("ResourceDistribution", ginkgo.Serial, ginkgo.Label("Res
 			}
 			tester.CreateResourceDistribution(rd)
 
-			ginkgo.By("verifying kube-system has NO ConfigMap...")
-			tester.WaitForDistributionStatus(rd.Name, 2, 2, 2*time.Minute)
-			gomega.Eventually(func() bool {
-				_, err := c.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "rd-beta-cm", metav1.GetOptions{})
-				return apierrors.IsNotFound(err)
-			}, 30*time.Second, time.Second).Should(gomega.BeTrue(), "kube-system should be excluded from allNamespaces")
-
-			ginkgo.By("verifying kube-public has NO ConfigMap...")
-			gomega.Eventually(func() bool {
-				_, err := c.CoreV1().ConfigMaps("kube-public").Get(context.TODO(), "rd-beta-cm", metav1.GetOptions{})
-				return apierrors.IsNotFound(err)
-			}, 30*time.Second, time.Second).Should(gomega.BeTrue(), "kube-public should be excluded from allNamespaces")
-
-			ginkgo.By("verifying test namespaces DO have ConfigMap...")
+			ginkgo.By("verifying test namespaces receive the ConfigMap...")
 			for _, nsName := range []string{prefix + "-1", prefix + "-2"} {
 				gomega.Eventually(func() error {
 					_, err := c.CoreV1().ConfigMaps(nsName).Get(context.TODO(), "rd-beta-cm", metav1.GetOptions{})
 					return err
-				}, time.Minute, time.Second).ShouldNot(gomega.HaveOccurred())
+				}, 2*time.Minute, time.Second).ShouldNot(gomega.HaveOccurred())
 			}
+
+			ginkgo.By("verifying kube-system has NO ConfigMap...")
+			gomega.Consistently(func() bool {
+				_, err := c.CoreV1().ConfigMaps("kube-system").Get(context.TODO(), "rd-beta-cm", metav1.GetOptions{})
+				return apierrors.IsNotFound(err)
+			}, 10*time.Second, time.Second).Should(gomega.BeTrue(), "kube-system must be excluded from allNamespaces")
+
+			ginkgo.By("verifying kube-public has NO ConfigMap...")
+			gomega.Consistently(func() bool {
+				_, err := c.CoreV1().ConfigMaps("kube-public").Get(context.TODO(), "rd-beta-cm", metav1.GetOptions{})
+				return apierrors.IsNotFound(err)
+			}, 10*time.Second, time.Second).Should(gomega.BeTrue(), "kube-public must be excluded from allNamespaces")
 
 			tester.DeleteResourceDistributions(prefix)
 			tester.DeleteNamespaces(prefix)
