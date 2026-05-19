@@ -46,6 +46,10 @@ func TestResourceDistributionConvertToV1beta1(t *testing.T) {
 				ExcludedNamespaces: ResourceDistributionTargetNamespaces{
 					List: []ResourceDistributionNamespace{{Name: "ns-2"}},
 				},
+				// v1alpha1 field renamed to NamespaceSelector in v1beta1
+				NamespaceLabelSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"env": "prod"},
+				},
 			},
 		},
 		Status: ResourceDistributionStatus{
@@ -67,6 +71,18 @@ func TestResourceDistributionConvertToV1beta1(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, appsv1beta1.GroupVersion.String(), dst.APIVersion)
 	assert.Equal(t, "ResourceDistribution", dst.Kind)
+	// The key rename: v1alpha1.NamespaceLabelSelector → v1beta1.NamespaceSelector
+	assert.Equal(t, map[string]string{"env": "prod"}, dst.Spec.Targets.NamespaceSelector.MatchLabels)
+	assert.True(t, dst.Spec.Targets.AllNamespaces)
+	assert.Equal(t, []string{"ns-1"}, func() []string {
+		r := make([]string, len(dst.Spec.Targets.IncludedNamespaces.List))
+		for i, n := range dst.Spec.Targets.IncludedNamespaces.List {
+			r[i] = n.Name
+		}
+		return r
+	}())
+	assert.Equal(t, int32(3), dst.Status.Desired)
+	assert.Equal(t, int64(7), dst.Status.ObservedGeneration)
 	assert.Equal(t, []string{"ns-2"}, dst.Status.Conditions[0].FailedNamespaces)
 	assert.Equal(t, "failedNamespaces,omitempty", jsonTagOfFailedNamespacesV1beta1())
 }
@@ -102,6 +118,8 @@ func TestResourceDistributionConvertFromV1beta1(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, GroupVersion.String(), dst.APIVersion)
 	assert.Equal(t, "ResourceDistribution", dst.Kind)
+	// The key rename: v1beta1.NamespaceSelector → v1alpha1.NamespaceLabelSelector
+	assert.Equal(t, map[string]string{"team": "platform"}, dst.Spec.Targets.NamespaceLabelSelector.MatchLabels)
 	assert.Equal(t, []string{"ns-a", "ns-b"}, dst.Status.Conditions[0].FailedNamespaces)
 	assert.Equal(t, "failedNamespace,omitempty", jsonTagOfFailedNamespacesV1alpha1())
 	assert.Equal(t, "me", dst.Annotations["keep"])
