@@ -157,7 +157,11 @@ func (s *ResourceDistributionTester) GetSecret(namespace, name string, mustExist
 	} else {
 		time.Sleep(3 * time.Second)
 	}
-	return s.c.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	secret, err := s.c.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return secret, nil
 }
 
 func (s *ResourceDistributionTester) GetResourceDistribution(name string, mustExist bool) (*appsv1beta1.ResourceDistribution, error) {
@@ -166,7 +170,11 @@ func (s *ResourceDistributionTester) GetResourceDistribution(name string, mustEx
 		timeout = 2 * time.Minute
 	}
 	s.WaitForResourceDistributionCreated(name, timeout)
-	return s.kc.AppsV1beta1().ResourceDistributions().Get(context.TODO(), name, metav1.GetOptions{})
+	rd, err := s.kc.AppsV1beta1().ResourceDistributions().Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return rd, nil
 }
 
 func (s *ResourceDistributionTester) DeleteResourceDistributions(nsPrefix string) {
