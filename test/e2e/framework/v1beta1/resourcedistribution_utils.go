@@ -314,8 +314,7 @@ func (s *ResourceDistributionTester) DeleteSecret(namespace, name string) error 
 	return s.c.CoreV1().Secrets(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 }
 
-// GetNamespaceForDistributor returns the namespaces matched/unmatched by the given targets,
-// mirroring the v1alpha1 helper but using v1beta1 field names.
+// GetNamespaceForDistributor returns the namespaces matched/unmatched by the given targets.
 func (s *ResourceDistributionTester) GetNamespaceForDistributor(targets *appsv1beta1.ResourceDistributionTargets) (matched, unmatched sets.String, err error) {
 	matched = sets.NewString()
 	unmatched = sets.NewString()
@@ -330,8 +329,6 @@ func (s *ResourceDistributionTester) GetNamespaceForDistributor(targets *appsv1b
 
 	if targets.AllNamespaces {
 		for _, ns := range nsList.Items {
-			// Mirror the controller's behaviour: kube-system and kube-public are
-			// excluded by default when allNamespaces is true.
 			if ns.Name == "kube-system" || ns.Name == "kube-public" {
 				continue
 			}

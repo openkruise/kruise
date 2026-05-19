@@ -52,10 +52,8 @@ const (
 	OperationSucceeded     = "Succeeded"
 )
 
-// defaultSystemNamespaces are always excluded when allNamespaces is true, unless the user
-// explicitly lists them in spec.targets.excludedNamespaces (where they would already be excluded)
-// or in spec.targets.includedNamespaces (not applicable when allNamespaces is set).
-// This prevents accidental distribution of Secrets/ConfigMaps into kube-system and kube-public.
+// defaultSystemNamespaces are excluded from allNamespaces distribution.
+// Use spec.targets.includedNamespaces to target them explicitly.
 var defaultSystemNamespaces = sets.NewString("kube-system", "kube-public")
 
 // UnexpectedError is designed to store the information about .status.conditions when error occurs
@@ -102,8 +100,6 @@ func matchViaTargets(namespace *corev1.Namespace, distributor *appsv1beta1.Resou
 		return false, nil
 	}
 	if targets.AllNamespaces {
-		// kube-system and kube-public are excluded by default when allNamespaces is true.
-		// Users who genuinely need to target these namespaces should use includedNamespaces explicitly.
 		return !defaultSystemNamespaces.Has(namespace.Name), nil
 	}
 	if isInList(namespace.Name, targets.IncludedNamespaces.List) {
@@ -300,7 +296,6 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1be
 	}
 
 	if targets.AllNamespaces {
-		// 1. select all namespaces via targets.AllNamespaces, excluding kube-system and kube-public by default.
 		for _, namespace := range namespacesList.Items {
 			if !defaultSystemNamespaces.Has(namespace.Name) {
 				matchedSet.Insert(namespace.Name)

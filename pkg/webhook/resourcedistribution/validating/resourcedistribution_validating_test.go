@@ -94,8 +94,6 @@ func TestResourceDistributionUpdateValidation(t *testing.T) {
 	}
 }
 
-// TestValidateResourceDistributionSpecSuccessCases mirrors the UnitedDeployment
-// style of naming every success scenario and ensuring zero errors.
 func TestValidateResourceDistributionSpecSuccessCases(t *testing.T) {
 	makeEnvironment()
 
@@ -175,8 +173,6 @@ func TestValidateResourceDistributionSpecSuccessCases(t *testing.T) {
 	}
 }
 
-// TestValidateResourceDistributionSpecErrorCases mirrors the UnitedDeployment style
-// of naming every error scenario and asserting at least one error with a sane field path.
 func TestValidateResourceDistributionSpecErrorCases(t *testing.T) {
 	makeEnvironment()
 
@@ -318,13 +314,10 @@ func TestValidateResourceDistributionTargets(t *testing.T) {
 			List: []appsv1beta1.ResourceDistributionNamespace{{Name: "ns-1"}},
 		},
 		IncludedNamespaces: appsv1beta1.ResourceDistributionTargetNamespaces{
-			// error 1: "ns-1" also in ExcludedNamespaces → conflict
-			// error 2: "" is an invalid namespace name
 			List: []appsv1beta1.ResourceDistributionNamespace{
 				{Name: "ns-1"}, {Name: "ns-2"}, {Name: "kube-system"}, {Name: ""},
 			},
 		},
-		// error 3: invalid label selector key
 		NamespaceSelector: metav1.LabelSelector{
 			MatchLabels: map[string]string{"$#%$%": "#@$@#$"},
 		},
@@ -337,8 +330,6 @@ func TestValidateResourceDistributionTargets(t *testing.T) {
 
 func TestResourceDistributionV1beta1IgnoresEmbeddedNamespace(t *testing.T) {
 	rd := buildResourceDistributionWithSecret()
-	// metadata.namespace in spec.resource is silently overridden by the controller;
-	// the webhook does not reject it.
 	rd.Spec.Resource.Raw = []byte(`{
 		"apiVersion":"v1",
 		"kind":"ConfigMap",

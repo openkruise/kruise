@@ -362,7 +362,6 @@ var _ = ginkgo.Describe("ResourceDistribution", ginkgo.Serial, ginkgo.Label("Res
 				&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: prefix + "-1"}},
 			)
 
-			// Create with the v1alpha1 client (old API)
 			alphaRD := &appsv1alpha1.ResourceDistribution{
 				ObjectMeta: metav1.ObjectMeta{Name: prefix},
 				Spec: appsv1alpha1.ResourceDistributionSpec{
@@ -386,13 +385,10 @@ var _ = ginkgo.Describe("ResourceDistribution", ginkgo.Serial, ginkgo.Label("Res
 				if err != nil {
 					return err
 				}
-				// Conversion must have run: NamespaceSelector should be the zero value
-				// (alpha had no NamespaceLabelSelector set), not a missing field.
 				sel := betaRD.Spec.Targets.NamespaceSelector
 				if len(sel.MatchLabels) != 0 || len(sel.MatchExpressions) != 0 {
 					return fmt.Errorf("expected empty NamespaceSelector after conversion, got matchLabels=%v matchExpressions=%v", sel.MatchLabels, sel.MatchExpressions)
 				}
-				// IncludedNamespaces must have survived the round-trip.
 				if len(betaRD.Spec.Targets.IncludedNamespaces.List) == 0 {
 					return fmt.Errorf("IncludedNamespaces lost during alpha→beta conversion")
 				}

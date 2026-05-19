@@ -97,7 +97,7 @@ func FuzzResourceDistributionConversionRoundTrip(f *testing.F) {
 			t.Fatalf("condition count changed after round trip: got=%d want=%d", len(roundTrip.Status.Conditions), len(src.Status.Conditions))
 		}
 		for i := range src.Status.Conditions {
-			if !reflect.DeepEqual(src.Status.Conditions[i], roundTrip.Status.Conditions[i]) {
+			if !reflect.DeepEqual(normalizeCondition(src.Status.Conditions[i]), normalizeCondition(roundTrip.Status.Conditions[i])) {
 				t.Fatalf("condition %d changed after round trip", i)
 			}
 			if mid.Status.Conditions[i].Type != appsv1beta1.ResourceDistributionConditionType(src.Status.Conditions[i].Type) {
@@ -108,6 +108,13 @@ func FuzzResourceDistributionConversionRoundTrip(f *testing.F) {
 			}
 		}
 	})
+}
+
+func normalizeCondition(c ResourceDistributionCondition) ResourceDistributionCondition {
+	if len(c.FailedNamespaces) == 0 {
+		c.FailedNamespaces = nil
+	}
+	return c
 }
 
 func normalizeTargets(targets ResourceDistributionTargets) ResourceDistributionTargets {

@@ -59,7 +59,6 @@ func convertResourceDistributionTargetsToV1beta1(src ResourceDistributionTargets
 		AllNamespaces:      src.AllNamespaces,
 		ExcludedNamespaces: convertResourceDistributionTargetNamespacesToV1beta1(src.ExcludedNamespaces),
 		IncludedNamespaces: convertResourceDistributionTargetNamespacesToV1beta1(src.IncludedNamespaces),
-		// v1alpha1 uses NamespaceLabelSelector; v1beta1 renamed it to NamespaceSelector.
 		NamespaceSelector: src.NamespaceLabelSelector,
 	}
 }
@@ -69,7 +68,6 @@ func convertResourceDistributionTargetsFromV1beta1(src appsv1beta1.ResourceDistr
 		AllNamespaces:      src.AllNamespaces,
 		ExcludedNamespaces: convertResourceDistributionTargetNamespacesFromV1beta1(src.ExcludedNamespaces),
 		IncludedNamespaces: convertResourceDistributionTargetNamespacesFromV1beta1(src.IncludedNamespaces),
-		// v1beta1 uses NamespaceSelector; v1alpha1 called it NamespaceLabelSelector.
 		NamespaceLabelSelector: src.NamespaceSelector,
 	}
 }
@@ -113,7 +111,7 @@ func convertResourceDistributionStatusToV1beta1(src ResourceDistributionStatus) 
 			Status:             appsv1beta1.ResourceDistributionConditionStatus(condition.Status),
 			LastTransitionTime: condition.LastTransitionTime,
 			Reason:             condition.Reason,
-			FailedNamespaces:   append([]string(nil), condition.FailedNamespaces...),
+			FailedNamespaces:   normalizeStringSlice(condition.FailedNamespaces),
 		}
 	}
 	return dst
@@ -136,8 +134,18 @@ func convertResourceDistributionStatusFromV1beta1(src appsv1beta1.ResourceDistri
 			Status:             ResourceDistributionConditionStatus(condition.Status),
 			LastTransitionTime: condition.LastTransitionTime,
 			Reason:             condition.Reason,
-			FailedNamespaces:   append([]string(nil), condition.FailedNamespaces...),
+			FailedNamespaces:   normalizeStringSlice(condition.FailedNamespaces),
 		}
 	}
 	return dst
+}
+
+// normalizeStringSlice returns nil for an empty or nil slice, otherwise a copy.
+func normalizeStringSlice(s []string) []string {
+	if len(s) == 0 {
+		return nil
+	}
+	out := make([]string, len(s))
+	copy(out, s)
+	return out
 }

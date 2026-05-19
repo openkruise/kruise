@@ -151,8 +151,7 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 	}
 
 	mice := resource.DeepCopyObject().(client.Object)
-	// metadata.namespace on spec.resource is silently ignored; the controller always
-	// overrides it with the target namespace when distributing.
+	// spec.resource.metadata.namespace is always overridden by the controller per target namespace.
 	ConvertToUnstructured(mice).SetNamespace(webhookutil.GetNamespace())
 	err := h.Client.Create(context.TODO(), mice, &client.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err == nil || errors.IsAlreadyExists(err) {
