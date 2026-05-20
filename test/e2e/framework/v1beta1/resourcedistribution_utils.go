@@ -33,6 +33,7 @@ import (
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
+	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/test/e2e/framework/common"
 )
 
@@ -345,11 +346,16 @@ func (s *ResourceDistributionTester) GetNamespaceForDistributor(targets *appsv1b
 	} else {
 		sel := targets.NamespaceSelector
 		if len(sel.MatchLabels) != 0 || len(sel.MatchExpressions) != 0 {
-			// Use client-side filtering
-			for _, ns := range nsList.Items {
-				if labelsMatchSelector(ns.Labels, &sel) {
-					matched.Insert(ns.Name)
-				}
+			selector, err := util.ValidatedLabelSelectorAsSelector(&sel)
+			if err != nil {
+				return nil, nil, err
+			}
+			nsByLabel, err := s.c.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+			if err != nil {
+				return nil, nil, err
+			}
+			for _, ns := range nsByLabel.Items {
+				matched.Insert(ns.Name)
 			}
 		}
 	}
@@ -364,16 +370,6 @@ func (s *ResourceDistributionTester) GetNamespaceForDistributor(targets *appsv1b
 		unmatched.Delete(m)
 	}
 	return
-}
-
-// labelsMatchSelector is a simple client-side label selector matcher.
-func labelsMatchSelector(labels map[string]string, selector *metav1.LabelSelector) bool {
-	for k, v := range selector.MatchLabels {
-		if labels[k] != v {
-			return false
-		}
-	}
-	return true
 }
 
 // WaitForDistributionStatus polls until the RD status reflects the expected

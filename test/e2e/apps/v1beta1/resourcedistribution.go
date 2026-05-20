@@ -217,8 +217,8 @@ var _ = ginkgo.Describe("ResourceDistribution", ginkgo.Serial, ginkgo.Label("Res
 				gomega.Expect(rd.Status.Desired).Should(gomega.Equal(rd.Status.Succeeded))
 
 				ginkgo.By("checking distributed secret hash annotation...")
-				md5Hash := sha256.Sum256(rd.Spec.Resource.Raw)
-				consistentVersion := hex.EncodeToString(md5Hash[:])
+				sha256Hash := sha256.Sum256(rd.Spec.Resource.Raw)
+				consistentVersion := hex.EncodeToString(sha256Hash[:])
 				for nsName := range matched {
 					obj, err := tester.GetSecret(nsName, secretName, true)
 					ginkgo.By(fmt.Sprintf("checking distributed secret(%s/%s)", nsName, secretName))
