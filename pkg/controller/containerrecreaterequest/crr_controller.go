@@ -216,8 +216,14 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 		return reconcile.Result{RequeueAfter: duration.Get()}, nil
 	}
 
-	if err := r.syncContainerStatuses(crr, pod); err != nil {
-		return reconcile.Result{}, fmt.Errorf("sync containerStatuses error: %v", err)
+	// Only populate snapshot if not already set. The snapshot written at Phase=""
+	// is the correct pre-recreation baseline. Calling syncContainerStatuses again
+	// at Recreating when containers are being killed would produce an empty list
+	// and overwrite the baseline we already captured.
+	if len(crr.Status.ContainerStatusSnapshot) == 0 {
+		if err := r.syncContainerStatuses(crr, pod); err != nil {
+			return reconcile.Result{}, fmt.Errorf("sync containerStatuses error: %v", err)
+		}
 	}
 
 	if crr.Spec.Strategy != nil && crr.Spec.Strategy.UnreadyGracePeriodSeconds != nil && !hasPodUnreadyAcquiredCondition(crr) {
