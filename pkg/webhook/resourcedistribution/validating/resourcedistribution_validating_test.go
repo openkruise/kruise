@@ -231,7 +231,9 @@ func TestValidateResourceDistributionSpecErrorCases(t *testing.T) {
 func TestValidateResourceDistributionUpdateSuccessCases(t *testing.T) {
 	makeEnvironment()
 
-	successCases := map[string]struct{ oldRD, newRD *appsv1beta1.ResourceDistribution }{
+	successCases := map[string]struct {
+		oldRD, newRD *appsv1beta1.ResourceDistribution
+	}{
 		"add a namespace to includedNamespaces": {
 			oldRD: buildResourceDistributionWithSecret(),
 			newRD: func() *appsv1beta1.ResourceDistribution {

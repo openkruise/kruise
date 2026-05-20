@@ -75,15 +75,15 @@ func convertResourceDistributionTargetsToV1beta1(src ResourceDistributionTargets
 		AllNamespaces:      src.AllNamespaces,
 		ExcludedNamespaces: convertResourceDistributionTargetNamespacesToV1beta1(src.ExcludedNamespaces),
 		IncludedNamespaces: convertResourceDistributionTargetNamespacesToV1beta1(src.IncludedNamespaces),
-		NamespaceSelector: src.NamespaceLabelSelector,
+		NamespaceSelector:  src.NamespaceLabelSelector,
 	}
 }
 
 func convertResourceDistributionTargetsFromV1beta1(src appsv1beta1.ResourceDistributionTargets) ResourceDistributionTargets {
 	return ResourceDistributionTargets{
-		AllNamespaces:      src.AllNamespaces,
-		ExcludedNamespaces: convertResourceDistributionTargetNamespacesFromV1beta1(src.ExcludedNamespaces),
-		IncludedNamespaces: convertResourceDistributionTargetNamespacesFromV1beta1(src.IncludedNamespaces),
+		AllNamespaces:          src.AllNamespaces,
+		ExcludedNamespaces:     convertResourceDistributionTargetNamespacesFromV1beta1(src.ExcludedNamespaces),
+		IncludedNamespaces:     convertResourceDistributionTargetNamespacesFromV1beta1(src.IncludedNamespaces),
 		NamespaceLabelSelector: src.NamespaceSelector,
 	}
 }
