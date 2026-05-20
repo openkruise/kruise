@@ -145,6 +145,13 @@ and reject the request if the modification does not satisfy the desired state of
 
 Pub contains all the protection capabilities of kubernetes PDB, you can use both, or use pub independently to implement your application protection.
 
+### Operational Notes
+
+- PUB keeps at most 2000 total entries across `status.disruptedPods` and `status.unavailablePods`. When this limit is reached, new disruption requests are rejected until the controller cleans old entries.
+- The controller keeps deleted pods in `status.disruptedPods` for up to 20 seconds before it assumes the deletion never completed and removes the stale record.
+- The controller keeps in-place updated pods in `status.unavailablePods` for up to 10 seconds after the pod becomes available again. This delay exists to absorb informer cache latency and avoid releasing quota too early.
+- The controller and pod mutating webhook stamp protected pods with `pub.kruise.io/related-pub=<pub-name>`. The legacy `kruise.io/related-pub` annotation is still written and read for backward compatibility during the v1beta1 promotion.
+
 ## Implementation History
 
 - [ ] 06/14/2021: Proposal submission
