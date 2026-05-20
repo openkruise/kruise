@@ -120,7 +120,7 @@ func TestHasPodUnreadyAcquiredCondition(t *testing.T) {
 	}
 }
 
-func TestSyncContainerStatuses_SkipsNotStarted(t *testing.T) {
+func TestSyncContainerStatuses_CollectsRunningContainers(t *testing.T) {
 	createdAt := metav1.NewTime(time.Now())
 	beforeCreate := metav1.NewTime(createdAt.Add(-10 * time.Second))
 
@@ -168,10 +168,10 @@ func TestSyncContainerStatuses_SkipsNotStarted(t *testing.T) {
 		},
 	}
 
-	// "app" started after CRR creation → should be in snapshot
-	// "sidecar" started before CRR creation → should be skipped
+	// The snapshot mirrors the current running container statuses while CRR is Recreating.
 	expected := []appsv1beta1.ContainerRecreateRequestSyncContainerStatus{
 		{Name: "app", Ready: true, RestartCount: 1, ContainerID: "docker://new"},
+		{Name: "sidecar", Ready: false, RestartCount: 0, ContainerID: "docker://old"},
 	}
 
 	// Build the statuses as syncContainerStatuses() would
@@ -185,7 +185,7 @@ func TestSyncContainerStatuses_SkipsNotStarted(t *testing.T) {
 				break
 			}
 		}
-		if cs == nil || cs.State.Running == nil || cs.State.Running.StartedAt.Before(&crr.CreationTimestamp) {
+		if cs == nil || cs.State.Running == nil {
 			continue
 		}
 		got = append(got, appsv1beta1.ContainerRecreateRequestSyncContainerStatus{

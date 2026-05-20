@@ -245,7 +245,7 @@ func (r *ReconcileContainerRecreateRequest) syncContainerStatuses(crr *appsv1bet
 		if containerStatus == nil {
 			klog.InfoS("Could not find container in Pod Status for CRR", "containerName", c.Name, "containerRecreateRequest", klog.KObj(crr))
 			continue
-		} else if containerStatus.State.Running == nil || containerStatus.State.Running.StartedAt.Before(&crr.CreationTimestamp) {
+		} else if containerStatus.State.Running == nil {
 			continue
 		}
 		syncContainerStatuses = append(syncContainerStatuses, appsv1beta1.ContainerRecreateRequestSyncContainerStatus{

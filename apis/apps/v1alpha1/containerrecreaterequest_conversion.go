@@ -196,5 +196,23 @@ func (dst *ContainerRecreateRequest) ConvertFrom(srcRaw conversion.Hub) error {
 		}
 	}
 
+	if src.Status.ContainerStatusSnapshot != nil {
+		syncStatuses := make([]ContainerRecreateRequestSyncContainerStatus, len(src.Status.ContainerStatusSnapshot))
+		for i, s := range src.Status.ContainerStatusSnapshot {
+			syncStatuses[i] = ContainerRecreateRequestSyncContainerStatus{
+				Name:         s.Name,
+				Ready:        s.Ready,
+				RestartCount: s.RestartCount,
+				ContainerID:  s.ContainerID,
+			}
+		}
+		if raw, err := json.Marshal(syncStatuses); err == nil {
+			if dst.Annotations == nil {
+				dst.Annotations = map[string]string{}
+			}
+			dst.Annotations[ContainerRecreateRequestSyncContainerStatusesKey] = string(raw)
+		}
+	}
+
 	return nil
 }
