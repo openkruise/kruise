@@ -200,3 +200,71 @@ func TestSyncContainerStatuses_CollectsRunningContainers(t *testing.T) {
 		t.Errorf("snapshot mismatch: got %v, want %v", got, expected)
 	}
 }
+
+// TestSyncContainerStatuses_PendingPhaseEager verifies that the controller populates
+// containerStatusSnapshot at Phase=="" so the snapshot is present before the daemon
+// transitions to Recreating, avoiding the race where fast recreation completes before
+// the controller can reconcile at Phase==Recreating.
+func TestSyncContainerStatuses_PendingPhaseEager(t *testing.T) {
+	crr := &appsv1beta1.ContainerRecreateRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "crr-pending",
+			Namespace:         "default",
+			CreationTimestamp: metav1.Now(),
+		},
+		Spec: appsv1beta1.ContainerRecreateRequestSpec{
+			PodName:    "pod-0",
+			Containers: []appsv1beta1.ContainerRecreateRequestContainer{{Name: "app"}},
+		},
+		// Phase is "" (Pending) — daemon has not yet responded
+	}
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Namespace: "default"},
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name:        "app",
+					Ready:       true,
+					RestartCount: 0,
+					ContainerID: "docker://original",
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{
+							StartedAt: metav1.NewTime(crr.CreationTimestamp.Add(-30 * time.Second)),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// syncContainerStatuses includes any running container regardless of StartedAt
+	got := make([]appsv1beta1.ContainerRecreateRequestSyncContainerStatus, 0)
+	for i := range crr.Spec.Containers {
+		c := &crr.Spec.Containers[i]
+		var cs *corev1.ContainerStatus
+		for j := range pod.Status.ContainerStatuses {
+			if pod.Status.ContainerStatuses[j].Name == c.Name {
+				cs = &pod.Status.ContainerStatuses[j]
+				break
+			}
+		}
+		if cs == nil || cs.State.Running == nil {
+			continue
+		}
+		got = append(got, appsv1beta1.ContainerRecreateRequestSyncContainerStatus{
+			Name:         cs.Name,
+			Ready:        cs.Ready,
+			RestartCount: cs.RestartCount,
+			ContainerID:  cs.ContainerID,
+		})
+	}
+
+	expected := []appsv1beta1.ContainerRecreateRequestSyncContainerStatus{
+		{Name: "app", Ready: true, RestartCount: 0, ContainerID: "docker://original"},
+	}
+
+	if !snapshotEqual(got, expected) {
+		t.Errorf("pending phase snapshot mismatch: got %v, want %v", got, expected)
+	}
+}

@@ -193,6 +193,13 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 			return reconcile.Result{}, r.completeCRR(crr, "daemon has not responded for a long time")
 		}
 		duration.Update(leftTime)
+		// Eagerly snapshot container statuses at Pending so the typed field is
+		// already populated before Phase transitions to Recreating.  This avoids
+		// a race where the daemon completes recreation before the controller can
+		// reconcile at Phase==Recreating.
+		if err := r.syncContainerStatuses(crr, pod); err != nil {
+			return reconcile.Result{}, fmt.Errorf("sync containerStatuses error: %v", err)
+		}
 	}
 
 	// crr has running over deadline time
