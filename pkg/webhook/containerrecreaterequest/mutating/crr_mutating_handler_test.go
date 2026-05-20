@@ -388,6 +388,34 @@ func TestCRRHandler_FeatureGateDisabled(t *testing.T) {
 	}
 }
 
+// TestCRRHandler_V1alpha1_Create_RequestKindV1beta1 verifies routing uses Resource.Version,
+// not RequestKind, so v1alpha1 objects are not decoded into v1beta1 types after storage promotion.
+func TestCRRHandler_V1alpha1_Create_RequestKindV1beta1(t *testing.T) {
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.KruiseDaemon, true)()
+
+	pod := newActivePod("test-pod", "default", "node-1")
+	h := buildCRRHandler(t, pod)
+
+	crr := &appsv1alpha1.ContainerRecreateRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "crr-1", Namespace: "default"},
+		Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+			PodName:    "test-pod",
+			Containers: []appsv1alpha1.ContainerRecreateRequestContainer{{Name: "app"}},
+		},
+	}
+	req := admissionRequest(t, admissionv1.Create, "v1alpha1", crr, nil)
+	req.RequestKind = &metav1.GroupVersionKind{
+		Group:   appsv1beta1.GroupVersion.Group,
+		Version: appsv1beta1.GroupVersion.Version,
+		Kind:    "ContainerRecreateRequest",
+	}
+
+	resp := h.Handle(context.Background(), req)
+	if !resp.Allowed {
+		t.Fatalf("expected allowed, got %d: %s", resp.Result.Code, resp.Result.Message)
+	}
+}
+
 func TestCRRHandler_V1beta1_Create_PodNotFound(t *testing.T) {
 	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.KruiseDaemon, true)()
 

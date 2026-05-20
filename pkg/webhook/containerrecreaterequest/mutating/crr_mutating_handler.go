@@ -56,10 +56,12 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.KruiseDaemon))
 	}
 
-	if req.RequestKind != nil && req.RequestKind.Version == "v1beta1" {
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
 		return h.handleV1beta1(ctx, req)
+	default:
+		return h.handleV1alpha1(ctx, req)
 	}
-	return h.handleV1alpha1(ctx, req)
 }
 
 func (h *ContainerRecreateRequestHandler) handleV1alpha1(ctx context.Context, req admission.Request) admission.Response {
