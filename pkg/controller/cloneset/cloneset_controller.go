@@ -20,6 +20,7 @@ package cloneset
 import (
 	"context"
 	"flag"
+	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -133,7 +134,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		Reconciler: r, MaxConcurrentReconciles: concurrentReconciles, CacheSyncTimeout: util.GetControllerCacheSyncTimeout(),
 		RateLimiter: ratelimiter.DefaultControllerRateLimiter[reconcile.Request]()})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create cloneset controller: %w", err)
 	}
 
 	// Watch for changes to CloneSet
@@ -150,19 +151,19 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			},
 		}))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to watch CloneSet resources: %w", err)
 	}
 
 	// Watch for changes to Pod
 	err = c.Watch(source.Kind(mgr.GetCache(), &v1.Pod{}, &podEventHandler{Reader: mgr.GetCache()}))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to watch Pod resources for CloneSet controller: %w", err)
 	}
 
 	// Watch for changes to PVC, just ensure cache updated
 	err = c.Watch(source.Kind(mgr.GetCache(), &v1.PersistentVolumeClaim{}, &pvcEventHandler{}))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to watch PersistentVolumeClaim resources for CloneSet controller: %w", err)
 	}
 
 	return nil
