@@ -30,4 +30,3 @@ test/e2e/generated/bindata.go
 .DS_Store
 
 vendor/
-apis/apps/v1alpha1/testdata/
