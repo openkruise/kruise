@@ -193,13 +193,6 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 			return reconcile.Result{}, r.completeCRR(crr, "daemon has not responded for a long time")
 		}
 		duration.Update(leftTime)
-		// Eagerly snapshot container statuses at Pending so the typed field is
-		// already populated before Phase transitions to Recreating.  This avoids
-		// a race where the daemon completes recreation before the controller can
-		// reconcile at Phase==Recreating.
-		if err := r.syncContainerStatuses(crr, pod); err != nil {
-			return reconcile.Result{}, fmt.Errorf("sync containerStatuses error: %v", err)
-		}
 	}
 
 	// crr has running over deadline time
@@ -216,15 +209,11 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 		return reconcile.Result{RequeueAfter: duration.Get()}, nil
 	}
 
-	// Only populate snapshot if not already set. The snapshot written at Phase=""
-	// is the correct pre-recreation baseline. Calling syncContainerStatuses again
-	// at Recreating when containers are being killed would produce an empty list
-	// and overwrite the baseline we already captured.
-	if len(crr.Status.ContainerStatusSnapshot) == 0 {
-		if err := r.syncContainerStatuses(crr, pod); err != nil {
-			return reconcile.Result{}, fmt.Errorf("sync containerStatuses error: %v", err)
-		}
+	if err := r.syncContainerStatuses(crr, pod); err != nil {
+		return reconcile.Result{}, fmt.Errorf("sync containerStatuses error: %v", err)
 	}
+	// Poll at Recreating in case pod events are delayed (e.g. during postStart).
+	duration.Update(3 * time.Second)
 
 	if crr.Spec.Strategy != nil && crr.Spec.Strategy.UnreadyGracePeriodSeconds != nil && !hasPodUnreadyAcquiredCondition(crr) {
 		if err = r.acquirePodNotReady(crr, pod); err != nil {
