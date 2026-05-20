@@ -146,17 +146,22 @@ var _ = ginkgo.Describe("ResourceDistribution", ginkgo.Serial, ginkgo.Label("Res
 			secret.StringData = map[string]string{"updated": "yes"}
 			err := tester.UpdateSecret(secret)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Eventually(func() int {
-				secret, err = tester.GetSecret(namespaces[0].Name, secretName, true)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				return len(secret.StringData)
-			}, time.Minute, time.Second).Should(gomega.Equal(0))
+			gomega.Eventually(func() error {
+				secret, err = tester.PollSecret(namespaces[0].Name, secretName)
+				if err != nil {
+					return err
+				}
+				if len(secret.StringData) != 0 {
+					return fmt.Errorf("secret not yet reverted")
+				}
+				return nil
+			}, time.Minute, time.Second).Should(gomega.BeNil())
 
 			ginkgo.By("delete resource directly — controller must recreate it...")
 			err = tester.DeleteSecret(secret.Namespace, secret.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Eventually(func() error {
-				_, err = tester.GetSecret(namespaces[0].Name, secretName, true)
+				_, err = tester.PollSecret(namespaces[0].Name, secretName)
 				return err
 			}, time.Minute, time.Second).Should(gomega.BeNil())
 
