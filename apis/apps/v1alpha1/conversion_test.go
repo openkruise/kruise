@@ -4327,6 +4327,118 @@ func TestWorkloadSpread_ConvertTo(t *testing.T) {
 							Conditions: []WorkloadSpreadSubsetCondition{
 								{Type: SubsetSchedulable, Status: corev1.ConditionTrue, Reason: "", Message: ""},
 							},
+
+func TestContainerRecreateRequest_ConvertTo(t *testing.T) {
+	ts := metav1.Time{Time: time.Date(2024, 6, 1, 10, 0, 0, 0, time.UTC)}
+	syncJSON := `[{"name":"app","ready":true,"restartCount":3,"containerID":"docker://abc123"}]`
+
+	tests := []struct {
+		name     string
+		src      *ContainerRecreateRequest
+		expected *v1beta1.ContainerRecreateRequest
+	}{
+		{
+			name: "all fields populated with annotation promotion",
+			src: &ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr",
+					Namespace: "default",
+					Labels: map[string]string{
+						ContainerRecreateRequestPodUIDKey:   "uid-001",
+						ContainerRecreateRequestNodeNameKey: "node-1",
+						ContainerRecreateRequestActiveKey:   "true",
+					},
+					Annotations: map[string]string{
+						ContainerRecreateRequestSyncContainerStatusesKey: syncJSON,
+						ContainerRecreateRequestUnreadyAcquiredKey:       ts.UTC().Format(time.RFC3339),
+					},
+					Finalizers: []string{ContainerRecreateRequestUnreadyAcquiredKey},
+				},
+				Spec: ContainerRecreateRequestSpec{
+					PodName:                 "pod-0",
+					ActiveDeadlineSeconds:   int64Ptr(60),
+					TTLSecondsAfterFinished: int32Ptr(10),
+					Containers: []ContainerRecreateRequestContainer{
+						{
+							Name: "app",
+							StatusContext: &ContainerRecreateRequestContainerContext{
+								ContainerID:  "docker://abc123",
+								RestartCount: 3,
+							},
+						},
+					},
+					Strategy: &ContainerRecreateRequestStrategy{
+						FailurePolicy:                 ContainerRecreateRequestFailurePolicyFail,
+						OrderedRecreate:               true,
+						ForceRecreate:                 true,
+						TerminationGracePeriodSeconds: int64Ptr(30),
+						UnreadyGracePeriodSeconds:     int64Ptr(5),
+						MinStartedSeconds:             int32(10),
+					},
+				},
+				Status: ContainerRecreateRequestStatus{
+					Phase:          ContainerRecreateRequestRecreating,
+					CompletionTime: &ts,
+					Message:        "in progress",
+					ContainerRecreateStates: []ContainerRecreateRequestContainerRecreateState{
+						{Name: "app", Phase: ContainerRecreateRequestRecreating, IsKilled: true},
+					},
+				},
+			},
+			expected: &v1beta1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr",
+					Namespace: "default",
+					Labels: map[string]string{
+						v1beta1.ContainerRecreateRequestPodUIDKey:   "uid-001",
+						v1beta1.ContainerRecreateRequestNodeNameKey: "node-1",
+						v1beta1.ContainerRecreateRequestActiveKey:   "true",
+					},
+					Annotations: map[string]string{
+						v1beta1.ContainerRecreateRequestSyncContainerStatusesKey: syncJSON,
+						v1beta1.ContainerRecreateRequestUnreadyAcquiredKey:       ts.UTC().Format(time.RFC3339),
+					},
+					Finalizers: []string{v1beta1.ContainerRecreateRequestUnreadyAcquiredKey},
+				},
+				Spec: v1beta1.ContainerRecreateRequestSpec{
+					PodName:                 "pod-0",
+					ActiveDeadlineSeconds:   int64Ptr(60),
+					TTLSecondsAfterFinished: int32Ptr(10),
+					Containers: []v1beta1.ContainerRecreateRequestContainer{
+						{
+							Name: "app",
+							StatusContext: &v1beta1.ContainerRecreateRequestContainerContext{
+								ContainerID:  "docker://abc123",
+								RestartCount: 3,
+							},
+						},
+					},
+					Strategy: &v1beta1.ContainerRecreateRequestStrategy{
+						FailurePolicy:                 v1beta1.ContainerRecreateRequestFailurePolicyFail,
+						OrderedRecreate:               true,
+						ForceRecreate:                 true,
+						TerminationGracePeriodSeconds: int64Ptr(30),
+						UnreadyGracePeriodSeconds:     int64Ptr(5),
+						MinStartedSeconds:             int32(10),
+					},
+				},
+				Status: v1beta1.ContainerRecreateRequestStatus{
+					Phase:          v1beta1.ContainerRecreateRequestRecreating,
+					CompletionTime: &ts,
+					Message:        "in progress",
+					ContainerRecreateStates: []v1beta1.ContainerRecreateRequestContainerRecreateState{
+						{Name: "app", Phase: v1beta1.ContainerRecreateRequestRecreating, IsKilled: true},
+					},
+					ContainerStatusSnapshot: []v1beta1.ContainerRecreateRequestSyncContainerStatus{
+						{Name: "app", Ready: true, RestartCount: 3, ContainerID: "docker://abc123"},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               v1beta1.ContainerRecreateRequestPodUnreadyAcquiredType,
+							Status:             metav1.ConditionTrue,
+							LastTransitionTime: ts,
+							Reason:             "UnreadyAcquired",
+							Message:            "Pod has been forced to not-ready for unreadyGracePeriodSeconds drain",
 						},
 					},
 				},
@@ -4426,6 +4538,85 @@ func TestWorkloadSpread_ConvertTo(t *testing.T) {
 			err := tc.src.ConvertTo(dst)
 			assert.NoError(t, err)
 			tc.validate(t, dst)
+		},
+		{
+			name: "empty annotations produce no snapshot or conditions",
+			src: &ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "minimal", Namespace: "default"},
+				Spec: ContainerRecreateRequestSpec{
+					PodName:    "pod-0",
+					Containers: []ContainerRecreateRequestContainer{{Name: "app"}},
+				},
+			},
+			expected: &v1beta1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "minimal", Namespace: "default"},
+				Spec: v1beta1.ContainerRecreateRequestSpec{
+					PodName:    "pod-0",
+					Containers: []v1beta1.ContainerRecreateRequestContainer{{Name: "app"}},
+				},
+				Status: v1beta1.ContainerRecreateRequestStatus{},
+			},
+		},
+		{
+			name: "malformed unready-acquired time is silently ignored",
+			src: &ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "bad-time",
+					Namespace:   "default",
+					Annotations: map[string]string{ContainerRecreateRequestUnreadyAcquiredKey: "not-a-time"},
+				},
+				Spec: ContainerRecreateRequestSpec{
+					PodName:    "pod-0",
+					Containers: []ContainerRecreateRequestContainer{{Name: "app"}},
+				},
+			},
+			expected: &v1beta1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "bad-time",
+					Namespace:   "default",
+					Annotations: map[string]string{v1beta1.ContainerRecreateRequestUnreadyAcquiredKey: "not-a-time"},
+				},
+				Spec: v1beta1.ContainerRecreateRequestSpec{
+					PodName:    "pod-0",
+					Containers: []v1beta1.ContainerRecreateRequestContainer{{Name: "app"}},
+				},
+				Status: v1beta1.ContainerRecreateRequestStatus{},
+			},
+		},
+		{
+			name: "malformed sync-container-statuses JSON is silently ignored",
+			src: &ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "bad-json",
+					Namespace:   "default",
+					Annotations: map[string]string{ContainerRecreateRequestSyncContainerStatusesKey: "{invalid}"},
+				},
+				Spec: ContainerRecreateRequestSpec{
+					PodName:    "pod-0",
+					Containers: []ContainerRecreateRequestContainer{{Name: "app"}},
+				},
+			},
+			expected: &v1beta1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "bad-json",
+					Namespace:   "default",
+					Annotations: map[string]string{v1beta1.ContainerRecreateRequestSyncContainerStatusesKey: "{invalid}"},
+				},
+				Spec: v1beta1.ContainerRecreateRequestSpec{
+					PodName:    "pod-0",
+					Containers: []v1beta1.ContainerRecreateRequestContainer{{Name: "app"}},
+				},
+				Status: v1beta1.ContainerRecreateRequestStatus{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dst := &v1beta1.ContainerRecreateRequest{}
+			err := tt.src.ConvertTo(dst)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, dst)
 		})
 	}
 }
@@ -4471,6 +4662,60 @@ func TestWorkloadSpread_ConvertFrom(t *testing.T) {
 									ObservedGeneration: 7,
 								},
 							},
+func TestContainerRecreateRequest_ConvertFrom(t *testing.T) {
+	ts := metav1.Time{Time: time.Date(2024, 6, 1, 10, 0, 0, 0, time.UTC)}
+
+	tests := []struct {
+		name     string
+		src      *v1beta1.ContainerRecreateRequest
+		expected *ContainerRecreateRequest
+	}{
+		{
+			name: "all v1beta1 fields populated; new-only fields are dropped",
+			src: &v1beta1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr",
+					Namespace: "default",
+					Labels: map[string]string{
+						v1beta1.ContainerRecreateRequestPodUIDKey:   "uid-001",
+						v1beta1.ContainerRecreateRequestNodeNameKey: "node-1",
+					},
+				},
+				Spec: v1beta1.ContainerRecreateRequestSpec{
+					PodName:                 "pod-0",
+					ActiveDeadlineSeconds:   int64Ptr(60),
+					TTLSecondsAfterFinished: int32Ptr(10),
+					Containers: []v1beta1.ContainerRecreateRequestContainer{
+						{
+							Name: "app",
+							StatusContext: &v1beta1.ContainerRecreateRequestContainerContext{
+								ContainerID:  "docker://abc123",
+								RestartCount: 3,
+							},
+						},
+					},
+					Strategy: &v1beta1.ContainerRecreateRequestStrategy{
+						FailurePolicy:     v1beta1.ContainerRecreateRequestFailurePolicyIgnore,
+						OrderedRecreate:   true,
+						MinStartedSeconds: 5,
+					},
+				},
+				Status: v1beta1.ContainerRecreateRequestStatus{
+					Phase:          v1beta1.ContainerRecreateRequestCompleted,
+					CompletionTime: &ts,
+					Message:        "done",
+					ContainerRecreateStates: []v1beta1.ContainerRecreateRequestContainerRecreateState{
+						{Name: "app", Phase: v1beta1.ContainerRecreateRequestSucceeded, IsKilled: true},
+					},
+					ContainerStatusSnapshot: []v1beta1.ContainerRecreateRequestSyncContainerStatus{
+						{Name: "app", Ready: true, RestartCount: 3, ContainerID: "docker://abc123"},
+					},
+					Conditions: []metav1.Condition{
+						{
+							Type:               v1beta1.ContainerRecreateRequestPodUnreadyAcquiredType,
+							Status:             metav1.ConditionTrue,
+							LastTransitionTime: ts,
+							Reason:             "UnreadyAcquired",
 						},
 					},
 				},
@@ -4565,6 +4810,70 @@ func TestWorkloadSpread_ConvertFrom(t *testing.T) {
 			err := dst.ConvertFrom(tc.src)
 			assert.NoError(t, err)
 			tc.validate(t, dst)
+			expected: &ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crr",
+					Namespace: "default",
+					Labels: map[string]string{
+						ContainerRecreateRequestPodUIDKey:   "uid-001",
+						ContainerRecreateRequestNodeNameKey: "node-1",
+					},
+				},
+				Spec: ContainerRecreateRequestSpec{
+					PodName:                 "pod-0",
+					ActiveDeadlineSeconds:   int64Ptr(60),
+					TTLSecondsAfterFinished: int32Ptr(10),
+					Containers: []ContainerRecreateRequestContainer{
+						{
+							Name: "app",
+							StatusContext: &ContainerRecreateRequestContainerContext{
+								ContainerID:  "docker://abc123",
+								RestartCount: 3,
+							},
+						},
+					},
+					Strategy: &ContainerRecreateRequestStrategy{
+						FailurePolicy:     ContainerRecreateRequestFailurePolicyIgnore,
+						OrderedRecreate:   true,
+						MinStartedSeconds: 5,
+					},
+				},
+				Status: ContainerRecreateRequestStatus{
+					Phase:          ContainerRecreateRequestCompleted,
+					CompletionTime: &ts,
+					Message:        "done",
+					ContainerRecreateStates: []ContainerRecreateRequestContainerRecreateState{
+						{Name: "app", Phase: ContainerRecreateRequestSucceeded, IsKilled: true},
+					},
+				},
+			},
+		},
+		{
+			name: "minimal v1beta1 object converts cleanly",
+			src: &v1beta1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "min", Namespace: "default"},
+				Spec: v1beta1.ContainerRecreateRequestSpec{
+					PodName:    "pod-0",
+					Containers: []v1beta1.ContainerRecreateRequestContainer{{Name: "app"}},
+				},
+			},
+			expected: &ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "min", Namespace: "default"},
+				Spec: ContainerRecreateRequestSpec{
+					PodName:    "pod-0",
+					Containers: []ContainerRecreateRequestContainer{{Name: "app"}},
+				},
+				Status: ContainerRecreateRequestStatus{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dst := &ContainerRecreateRequest{}
+			err := dst.ConvertFrom(tt.src)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, dst)
 		})
 	}
 }
@@ -4674,6 +4983,103 @@ func FuzzWorkloadSpreadConversion(f *testing.F) {
 		}
 		if dst.Spec.TargetReference != nil && dst.Spec.TargetReference.Name != src.Spec.TargetReference.Name {
 			t.Errorf("TargetReference.Name mismatch: got %q want %q", dst.Spec.TargetReference.Name, src.Spec.TargetReference.Name)
+func TestContainerRecreateRequest_RoundTrip(t *testing.T) {
+	syncJSON := `[{"name":"app","ready":true,"restartCount":2,"containerID":"docker://xyz"}]`
+	ts := time.Date(2024, 6, 1, 12, 0, 0, 0, time.UTC)
+	tsStr := ts.UTC().Format(time.RFC3339)
+
+	original := &ContainerRecreateRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "crr-rt",
+			Namespace: "default",
+			Labels: map[string]string{
+				ContainerRecreateRequestPodUIDKey:   "uid-rt",
+				ContainerRecreateRequestNodeNameKey: "node-rt",
+				ContainerRecreateRequestActiveKey:   "true",
+			},
+			Annotations: map[string]string{
+				ContainerRecreateRequestSyncContainerStatusesKey: syncJSON,
+				ContainerRecreateRequestUnreadyAcquiredKey:       tsStr,
+			},
+		},
+		Spec: ContainerRecreateRequestSpec{
+			PodName:                 "pod-rt",
+			ActiveDeadlineSeconds:   int64Ptr(120),
+			TTLSecondsAfterFinished: int32Ptr(30),
+			Containers: []ContainerRecreateRequestContainer{
+				{
+					Name: "app",
+					StatusContext: &ContainerRecreateRequestContainerContext{
+						ContainerID:  "docker://xyz",
+						RestartCount: 2,
+					},
+				},
+			},
+			Strategy: &ContainerRecreateRequestStrategy{
+				FailurePolicy:     ContainerRecreateRequestFailurePolicyFail,
+				OrderedRecreate:   true,
+				MinStartedSeconds: 10,
+			},
+		},
+		Status: ContainerRecreateRequestStatus{
+			Phase:   ContainerRecreateRequestRecreating,
+			Message: "running",
+			ContainerRecreateStates: []ContainerRecreateRequestContainerRecreateState{
+				{Name: "app", Phase: ContainerRecreateRequestRecreating},
+			},
+		},
+	}
+
+	hub := &v1beta1.ContainerRecreateRequest{}
+	assert.NoError(t, original.ConvertTo(hub))
+
+	roundTripped := &ContainerRecreateRequest{}
+	assert.NoError(t, roundTripped.ConvertFrom(hub))
+
+	assert.Equal(t, original.ObjectMeta, roundTripped.ObjectMeta)
+	assert.Equal(t, original.Spec, roundTripped.Spec)
+	assert.Equal(t, original.Status.Phase, roundTripped.Status.Phase)
+	assert.Equal(t, original.Status.Message, roundTripped.Status.Message)
+	assert.Equal(t, original.Status.ContainerRecreateStates, roundTripped.Status.ContainerRecreateStates)
+}
+
+func FuzzContainerRecreateRequestConversion(f *testing.F) {
+	f.Add("pod-0", "app", "docker://abc", int64(60), int32(10), true, false, "2024-06-01T10:00:00Z")
+	f.Add("", "", "", int64(0), int32(0), false, false, "")
+	f.Add("pod-x", "sidecar", "containerd://def456", int64(300), int32(60), true, true, "not-a-time")
+
+	f.Fuzz(func(t *testing.T, podName, containerName, containerID string, deadlineSec int64, ttl int32, ordered, force bool, unreadyTime string) {
+		src := &ContainerRecreateRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "fuzz-crr",
+				Namespace: "default",
+				Annotations: map[string]string{
+					ContainerRecreateRequestUnreadyAcquiredKey: unreadyTime,
+				},
+			},
+			Spec: ContainerRecreateRequestSpec{
+				PodName: podName,
+				Containers: []ContainerRecreateRequestContainer{
+					{Name: containerName, StatusContext: &ContainerRecreateRequestContainerContext{ContainerID: containerID}},
+				},
+				ActiveDeadlineSeconds:   &deadlineSec,
+				TTLSecondsAfterFinished: &ttl,
+				Strategy: &ContainerRecreateRequestStrategy{
+					OrderedRecreate: ordered,
+					ForceRecreate:   force,
+				},
+			},
+		}
+		hub := &v1beta1.ContainerRecreateRequest{}
+		if err := src.ConvertTo(hub); err != nil {
+			return
+		}
+		dst := &ContainerRecreateRequest{}
+		if err := dst.ConvertFrom(hub); err != nil {
+			return
+		}
+		if dst.Spec.PodName != src.Spec.PodName {
+			t.Errorf("PodName mismatch: got %q want %q", dst.Spec.PodName, src.Spec.PodName)
 		}
 	})
 }

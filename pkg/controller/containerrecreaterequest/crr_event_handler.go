@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 type podEventHandler struct {
@@ -65,8 +65,8 @@ func (e *podEventHandler) Generic(ctx context.Context, evt event.TypedGenericEve
 }
 
 func (e *podEventHandler) handle(pod *v1.Pod, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	crrList := &appsv1alpha1.ContainerRecreateRequestList{}
-	err := e.List(context.TODO(), crrList, client.InNamespace(pod.Namespace), client.MatchingLabels{appsv1alpha1.ContainerRecreateRequestPodUIDKey: string(pod.UID)})
+	crrList := &appsv1beta1.ContainerRecreateRequestList{}
+	err := e.List(context.TODO(), crrList, client.InNamespace(pod.Namespace), client.MatchingLabels{appsv1beta1.ContainerRecreateRequestPodUIDKey: string(pod.UID)})
 	if err != nil {
 		klog.ErrorS(err, "Failed to get CRR List for Pod", "pod", klog.KObj(pod))
 		return

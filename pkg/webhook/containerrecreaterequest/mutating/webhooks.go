@@ -25,10 +25,18 @@ import (
 
 // +kubebuilder:webhook:path=/mutate-apps-kruise-io-v1alpha1-containerrecreaterequest,mutating=true,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=containerrecreaterequests,verbs=create;update,versions=v1alpha1,name=mcontainerrecreaterequest.kb.io
 
+// +kubebuilder:webhook:path=/mutate-apps-kruise-io-v1beta1-containerrecreaterequest,mutating=true,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=containerrecreaterequests,verbs=create;update,versions=v1beta1,name=mcontainerrecreaterequestv1beta1.kb.io
+
 var (
 	// HandlerGetterMap contains admission webhook handlers
 	HandlerGetterMap = map[string]types.HandlerGetter{
 		"mutate-apps-kruise-io-v1alpha1-containerrecreaterequest": func(mgr manager.Manager) admission.Handler {
+			return &ContainerRecreateRequestHandler{
+				Client:  mgr.GetClient(),
+				Decoder: admission.NewDecoder(mgr.GetScheme()),
+			}
+		},
+		"mutate-apps-kruise-io-v1beta1-containerrecreaterequest": func(mgr manager.Manager) admission.Handler {
 			return &ContainerRecreateRequestHandler{
 				Client:  mgr.GetClient(),
 				Decoder: admission.NewDecoder(mgr.GetScheme()),

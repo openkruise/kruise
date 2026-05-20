@@ -30,6 +30,7 @@ type AppsV1beta1Interface interface {
 	AdvancedCronJobsGetter
 	BroadcastJobsGetter
 	CloneSetsGetter
+	ContainerRecreateRequestsGetter
 	DaemonSetsGetter
 	ImageListPullJobsGetter
 	ImagePullJobsGetter
@@ -57,6 +58,10 @@ func (c *AppsV1beta1Client) BroadcastJobs(namespace string) BroadcastJobInterfac
 
 func (c *AppsV1beta1Client) CloneSets(namespace string) CloneSetInterface {
 	return newCloneSets(c, namespace)
+}
+
+func (c *AppsV1beta1Client) ContainerRecreateRequests(namespace string) ContainerRecreateRequestInterface {
+	return newContainerRecreateRequests(c, namespace)
 }
 
 func (c *AppsV1beta1Client) DaemonSets(namespace string) DaemonSetInterface {
