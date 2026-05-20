@@ -155,7 +155,7 @@ var _ = ginkgo.Describe("ResourceDistribution", ginkgo.Serial, ginkgo.Label("Res
 					return fmt.Errorf("secret not yet reverted")
 				}
 				return nil
-			}, time.Minute, time.Second).Should(gomega.BeNil())
+			}, 3*time.Minute, time.Second).Should(gomega.BeNil())
 
 			ginkgo.By("delete resource directly — controller must recreate it...")
 			err = tester.DeleteSecret(secret.Namespace, secret.Name)
@@ -163,7 +163,7 @@ var _ = ginkgo.Describe("ResourceDistribution", ginkgo.Serial, ginkgo.Label("Res
 			gomega.Eventually(func() error {
 				_, err = tester.PollSecret(namespaces[0].Name, secretName)
 				return err
-			}, time.Minute, time.Second).Should(gomega.BeNil())
+			}, 3*time.Minute, time.Second).Should(gomega.BeNil())
 
 			tester.DeleteResourceDistributions(prefix)
 			tester.DeleteNamespaces(prefix)

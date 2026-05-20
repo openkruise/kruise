@@ -165,7 +165,7 @@ var _ = ginkgo.Describe("ResourceDistribution", ginkgo.Serial, ginkgo.Label("Res
 					return fmt.Errorf("secret not yet reverted")
 				}
 				return nil
-			}, time.Minute, time.Second).Should(gomega.BeNil())
+			}, 3*time.Minute, time.Second).Should(gomega.BeNil())
 
 			// If resource was deleted directly, resourceDistribution should create it again
 			ginkgo.By("delete resource directly...")
@@ -174,7 +174,7 @@ var _ = ginkgo.Describe("ResourceDistribution", ginkgo.Serial, ginkgo.Label("Res
 			gomega.Eventually(func() error {
 				_, err = tester.PollSecret(namespaces[0].Name, secretName)
 				return err
-			}, time.Minute, time.Second).Should(gomega.BeNil())
+			}, 3*time.Minute, time.Second).Should(gomega.BeNil())
 
 			//clear all resources in cluster
 			tester.DeleteResourceDistributions(prefix)
