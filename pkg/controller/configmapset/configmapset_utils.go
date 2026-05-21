@@ -134,6 +134,38 @@ func GetConfigMapSetEnvFieldPath(restartKey string) string {
 	return fmt.Sprintf("metadata.annotations['%s']", restartKey)
 }
 
+// GetReloadSidecarHealthCheckScript returns the health check script for the reload-sidecar
+func GetReloadSidecarHealthCheckScript(path string) string {
+	return fmt.Sprintf(`
+TARGET_REVISION=$(cat /etc/cms_config/target_revision 2>/dev/null || true)
+if [ -z "$TARGET_REVISION" ]; then exit 0; fi
+
+# 1. Verify target revision matches local identity (requires sidecar to write .current_revision)
+# Retaining compatibility for content hash check here. Because the hash algorithm (json.marshal) 
+# differs across languages and OS, the standard practice is:
+# After reload-sidecar copies/updates the files from configmap-hub to the shared directory,
+# it generates a hidden file '.current_revision' in the shared directory to record the updated Hash.
+if [ -f %[1]s/.current_revision ]; then
+    CURRENT_REVISION=$(cat %[1]s/.current_revision)
+    if [ "$TARGET_REVISION" != "$CURRENT_REVISION" ]; then
+        exit 1
+    fi
+else
+    exit 1
+fi
+
+# 2. If PostHook is configured, check for success marker
+POST_HOOK_CONFIG=$(cat /etc/cms_config/post_hook_config 2>/dev/null || true)
+if [ -n "$POST_HOOK_CONFIG" ] && [ "$POST_HOOK_CONFIG" != "null" ]; then
+    if [ ! -f "%[1]s/.post_hook_success_${TARGET_REVISION}" ]; then
+        exit 1
+    fi
+fi
+
+exit 0
+`, path)
+}
+
 func containsString(slice []string, str string) bool {
 	for _, s := range slice {
 		if s == str {
