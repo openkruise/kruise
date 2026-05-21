@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/controller/configmapset"
 	"github.com/openkruise/kruise/pkg/util"
 )
 
@@ -62,11 +63,11 @@ func (h *ConfigMapSetCreateUpdateHandler) checkConflictsWithExistingConfigMapSet
 
 func (h *ConfigMapSetCreateUpdateHandler) getReloadSidecarName(ctx context.Context, cms *appsv1alpha1.ConfigMapSet) (string, error) {
 	if cms.Spec.ReloadSidecarConfig == nil {
-		return "", nil
+		return configmapset.GetConfigMapSetDefaultSidecarName(cms.Name), nil
 	}
 	config := cms.Spec.ReloadSidecarConfig.Config
 	if config == nil {
-		return "", nil
+		return configmapset.GetConfigMapSetDefaultSidecarName(cms.Name), nil
 	}
 
 	switch cms.Spec.ReloadSidecarConfig.Type {
