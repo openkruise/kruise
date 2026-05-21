@@ -448,14 +448,14 @@ func getDistributionByPartition(cms *appsv1alpha1.ConfigMapSet, pods []*corev1.P
 		if strings.HasSuffix(partitionStr, "%") {
 			// Handle percentage partition
 			percentStr := strings.TrimSuffix(partitionStr, "%")
-			percent, err := strconv.Atoi(percentStr)
+			percent, err := strconv.ParseInt(percentStr, 10, 32)
 			if err != nil || percent < 0 || percent > 100 {
 				return nil, fmt.Errorf("invalid partition percentage: %s", partitionStr)
 			}
 			newReplicas = replicas - int(math.Ceil(float64(percent)/100.0*float64(replicas)))
-		} else if count, err := strconv.Atoi(partitionStr); err == nil && count >= 0 {
+		} else if count, err := strconv.ParseInt(partitionStr, 10, 32); err == nil && count >= 0 {
 			// Handle integer partition
-			newReplicas = replicas - count
+			newReplicas = replicas - int(count)
 			if newReplicas < 0 { // Cannot be negative
 				newReplicas = 0
 			}
@@ -521,10 +521,10 @@ func getUpdatePodsByDistributions(cms *appsv1alpha1.ConfigMapSet, distributions 
 		maxUnavailableStr := cms.Spec.UpdateStrategy.MaxUnavailable.String()
 		if strings.HasSuffix(maxUnavailableStr, "%") {
 			percentStr := strings.TrimSuffix(maxUnavailableStr, "%")
-			if percent, err := strconv.Atoi(percentStr); err == nil && percent >= 0 && percent <= 100 {
+			if percent, err := strconv.ParseInt(percentStr, 10, 32); err == nil && percent >= 0 && percent <= 100 {
 				maxUnavailableQuota = int32(math.Ceil(float64(percent) / 100.0 * float64(totalValidPods)))
 			}
-		} else if count, err := strconv.Atoi(maxUnavailableStr); err == nil && count >= 0 {
+		} else if count, err := strconv.ParseInt(maxUnavailableStr, 10, 32); err == nil && count >= 0 {
 			maxUnavailableQuota = int32(count)
 		}
 	}
@@ -965,10 +965,10 @@ func (r *ReconcileConfigMapSet) updateStatus(ctx context.Context, request reconc
 		partitionStr := cms.Spec.UpdateStrategy.Partition.String()
 		if strings.HasSuffix(partitionStr, "%") {
 			percentStr := strings.TrimSuffix(partitionStr, "%")
-			if percent, err := strconv.Atoi(percentStr); err == nil && percent >= 0 && percent <= 100 {
+			if percent, err := strconv.ParseInt(percentStr, 10, 32); err == nil && percent >= 0 && percent <= 100 {
 				expected = int32(len(pods)) - int32(math.Ceil(float64(percent)/100.0*float64(len(pods))))
 			}
-		} else if count, err := strconv.Atoi(partitionStr); err == nil && count >= 0 {
+		} else if count, err := strconv.ParseInt(partitionStr, 10, 32); err == nil && count >= 0 {
 			expected = int32(len(pods)) - int32(count)
 		}
 		if expected < 0 {
