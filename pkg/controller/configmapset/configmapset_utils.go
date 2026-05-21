@@ -98,16 +98,46 @@ func GetConfigMapSetPostHookConfigKey(cmsName string) string {
 	return fmt.Sprintf("apps.kruise.io/configmapset-%s-post-hook-config", cmsName)
 }
 
+func GenerateDerivedName(name, suffix string) string {
+	fullName := fmt.Sprintf("%s-%s", name, suffix)
+	if len(fullName) <= 63 {
+		return fullName
+	}
+	hash := md5.Sum([]byte(name))
+	hashStr := hex.EncodeToString(hash[:])[:8]
+	maxNameLen := 53 - len(suffix)
+	truncatedName := name
+	if maxNameLen > 0 {
+		truncatedName = name[:maxNameLen]
+		// Trim trailing hyphens to avoid invalid DNS names like `xxx---hash-suffix`
+		truncatedName = strings.TrimRight(truncatedName, "-")
+	} else {
+		truncatedName = ""
+	}
+	if truncatedName != "" {
+		return fmt.Sprintf("%s-%s-%s", truncatedName, hashStr, suffix)
+	}
+	return fmt.Sprintf("%s-%s", hashStr, suffix)
+}
+
 func GetConfigMapSetHubName(cmsName string) string {
-	return fmt.Sprintf("%s-hub", cmsName)
+	return GenerateDerivedName(strings.ToLower(cmsName), "hub")
 }
 
 func GetConfigMapSetDefaultSidecarName(cmsName string) string {
-	return fmt.Sprintf("%s-reload-sidecar", strings.ToLower(cmsName))
+	return GenerateDerivedName(strings.ToLower(cmsName), "reload-sidecar")
 }
 
 func GetConfigMapSetVolumeName(cmsName string) string {
-	return fmt.Sprintf("%s-empty", strings.ToLower(cmsName))
+	return GenerateDerivedName(strings.ToLower(cmsName), "empty")
+}
+
+func GetConfigMapSetHubVolumeName(cmsName string) string {
+	return GenerateDerivedName(strings.ToLower(cmsName), "hub-volume")
+}
+
+func GetConfigMapSetDownwardAPIVolumeName(cmsName string) string {
+	return GenerateDerivedName(fmt.Sprintf("cms-%s", strings.ToLower(cmsName)), "config")
 }
 
 func GetConfigMapSetEnvRestartAnnotationName(cmsName string) string {

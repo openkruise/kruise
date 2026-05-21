@@ -259,7 +259,7 @@ func (r *ReconcileConfigMapSet) Reconcile(ctx context.Context, request reconcile
 }
 
 func (r *ReconcileConfigMapSet) cleanupConfigMap(ctx context.Context, cms *appsv1alpha1.ConfigMapSet) error {
-	cmName := fmt.Sprintf("%s-%s", strings.ToLower(cms.Name), "hub")
+	cmName := GetConfigMapSetHubName(cms.Name)
 	cm := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{Name: cmName, Namespace: cms.Namespace}, cm)
 	if err != nil {
@@ -297,7 +297,7 @@ func (r *ReconcileConfigMapSet) syncRevisions(ctx context.Context, cms *appsv1al
 	}
 
 	// ConfigMap name: cms.Name + "-hub"
-	cmName := fmt.Sprintf("%s-%s", strings.ToLower(cms.Name), "hub")
+	cmName := GetConfigMapSetHubName(cms.Name)
 	cmNamespace := cms.Namespace
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		cm := &corev1.ConfigMap{}
@@ -632,7 +632,7 @@ func getUpdatePodsByDistributions(cms *appsv1alpha1.ConfigMapSet, distributions 
 }
 
 func (r *ReconcileConfigMapSet) getReloadSidecarName(ctx context.Context, cms *appsv1alpha1.ConfigMapSet) string {
-	expectedSidecarName := fmt.Sprintf("%s-%s", strings.ToLower(cms.Name), "reload-sidecar")
+	expectedSidecarName := GetConfigMapSetDefaultSidecarName(cms.Name)
 	if cms.Spec.ReloadSidecarConfig != nil {
 		if cms.Spec.ReloadSidecarConfig.Type == appsv1alpha1.ReloadSidecarTypeK8s && cms.Spec.ReloadSidecarConfig.Config != nil && cms.Spec.ReloadSidecarConfig.Config.Name != "" {
 			expectedSidecarName = cms.Spec.ReloadSidecarConfig.Config.Name

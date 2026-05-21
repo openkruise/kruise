@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
-	"strings"
 	"time"
 
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
@@ -178,7 +177,7 @@ func (h *PodCreateHandler) injectSidecar4Pod(ctx context.Context, pod *corev1.Po
 	configMapMountPath := configmapset.GetConfigMapSetConfigMapMountPath(cms.Name)
 	// build configmap volume with reload-sidecar
 	configMapVolume := corev1.Volume{
-		Name: configMapName + "-volume",
+		Name: configmapset.GetConfigMapSetHubVolumeName(cms.Name),
 		VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{
 				LocalObjectReference: corev1.LocalObjectReference{
@@ -189,7 +188,7 @@ func (h *PodCreateHandler) injectSidecar4Pod(ctx context.Context, pod *corev1.Po
 	}
 	// build downward api volume with reload-sidecar
 	podInfoVolume := corev1.Volume{
-		Name: fmt.Sprintf("cms-%s-config", strings.ToLower(cms.Name)),
+		Name: configmapset.GetConfigMapSetDownwardAPIVolumeName(cms.Name),
 		VolumeSource: corev1.VolumeSource{
 			DownwardAPI: &corev1.DownwardAPIVolumeSource{
 				Items: []corev1.DownwardAPIVolumeFile{
