@@ -211,12 +211,12 @@ func (h *ConfigMapSetCreateUpdateHandler) validateConfigMapSetSpec(ctx context.C
 	if spec.ReloadSidecarConfig != nil {
 		reloadConfigPath := fldPath.Child("reloadSidecarConfig")
 		if spec.ReloadSidecarConfig.Type == appsv1alpha1.ReloadSidecarTypeK8s {
-			if spec.ReloadSidecarConfig.Config == nil || spec.ReloadSidecarConfig.Config.Name == "" {
+			if spec.ReloadSidecarConfig.Config == nil {
 				return field.Invalid(reloadConfigPath.Child("config", "name"), "", "name must be set when type is k8s-config")
 			}
 		} else if spec.ReloadSidecarConfig.Type == appsv1alpha1.ReloadSidecarTypeSidecarSet {
 			if spec.ReloadSidecarConfig.Config == nil || spec.ReloadSidecarConfig.Config.SidecarSetRef == nil {
-				return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef"), "", "sidecarSetRef must be set when type is SidecarSet")
+				return field.Invalid(reloadConfigPath.Child("config"), "", "config must be set when type is k8s-config")
 			}
 			sidecarSetRef := spec.ReloadSidecarConfig.Config.SidecarSetRef
 			sidecarSet := &appsv1alpha1.SidecarSet{}
