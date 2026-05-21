@@ -192,6 +192,7 @@ func TestValidateConfigMapSetSpec(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "test"},
 				},
+				Data: map[string]string{"config": "value"},
 				UpdateStrategy: &appsv1alpha1.ConfigMapSetUpdateStrategy{
 					Partition:      &validPartition,
 					MaxUnavailable: &validMaxUnavailable,
@@ -202,6 +203,7 @@ func TestValidateConfigMapSetSpec(t *testing.T) {
 		{
 			name: "missing selector",
 			spec: &appsv1alpha1.ConfigMapSetSpec{
+				Data: map[string]string{"config": "value"},
 				UpdateStrategy: &appsv1alpha1.ConfigMapSetUpdateStrategy{
 					Partition:      &validPartition,
 					MaxUnavailable: &validMaxUnavailable,
@@ -211,11 +213,26 @@ func TestValidateConfigMapSetSpec(t *testing.T) {
 			errField:  "spec.selector",
 		},
 		{
+			name: "missing data",
+			spec: &appsv1alpha1.ConfigMapSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "test"},
+				},
+				UpdateStrategy: &appsv1alpha1.ConfigMapSetUpdateStrategy{
+					Partition:      &validPartition,
+					MaxUnavailable: &validMaxUnavailable,
+				},
+			},
+			expectErr: true,
+			errField:  "spec.data",
+		},
+		{
 			name: "intersecting matchLabelKeys",
 			spec: &appsv1alpha1.ConfigMapSetSpec{
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "test", "env": "prod"},
 				},
+				Data: map[string]string{"config": "value"},
 				UpdateStrategy: &appsv1alpha1.ConfigMapSetUpdateStrategy{
 					Partition:      &validPartition,
 					MaxUnavailable: &validMaxUnavailable,
@@ -231,6 +248,7 @@ func TestValidateConfigMapSetSpec(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "test"},
 				},
+				Data: map[string]string{"config": "value"},
 				UpdateStrategy: &appsv1alpha1.ConfigMapSetUpdateStrategy{
 					Partition:      &intstr.IntOrString{Type: intstr.Int, IntVal: -1},
 					MaxUnavailable: &validMaxUnavailable,
@@ -245,6 +263,7 @@ func TestValidateConfigMapSetSpec(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "test"},
 				},
+				Data: map[string]string{"config": "value"},
 				UpdateStrategy: &appsv1alpha1.ConfigMapSetUpdateStrategy{
 					Partition:      &validPartition,
 					MaxUnavailable: &zeroMaxUnavailable,
@@ -259,6 +278,7 @@ func TestValidateConfigMapSetSpec(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "test"},
 				},
+				Data: map[string]string{"config": "value"},
 				UpdateStrategy: &appsv1alpha1.ConfigMapSetUpdateStrategy{
 					Partition:      &validPartition,
 					MaxUnavailable: &invalidStringMaxUnavailable,
@@ -273,6 +293,7 @@ func TestValidateConfigMapSetSpec(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "test"},
 				},
+				Data: map[string]string{"config": "value"},
 				Containers: []appsv1alpha1.ConfigMapSetContainer{
 					{Name: "app-container"},
 					{Name: "app-container"},
@@ -291,6 +312,7 @@ func TestValidateConfigMapSetSpec(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "test"},
 				},
+				Data: map[string]string{"config": "value"},
 				EffectPolicy: &appsv1alpha1.EffectPolicy{
 					Type: appsv1alpha1.EffectPolicyTypePostHook,
 				},
@@ -308,6 +330,7 @@ func TestValidateConfigMapSetSpec(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "test"},
 				},
+				Data: map[string]string{"config": "value"},
 				EffectPolicy: &appsv1alpha1.EffectPolicy{
 					Type: appsv1alpha1.EffectPolicyTypePostHook,
 					PostHook: &appsv1alpha1.PostHookConfig{
@@ -329,6 +352,7 @@ func TestValidateConfigMapSetSpec(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "test"},
 				},
+				Data: map[string]string{"config": "value"},
 				ReloadSidecarConfig: &appsv1alpha1.ReloadSidecarConfig{
 					Type: appsv1alpha1.ReloadSidecarTypeSidecarSet,
 					Config: &appsv1alpha1.ReloadSidecarConfigData{
@@ -366,6 +390,7 @@ func TestValidateConfigMapSetSpec(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "test"},
 				},
+				Data: map[string]string{"config": "value"},
 				ReloadSidecarConfig: &appsv1alpha1.ReloadSidecarConfig{
 					Type: appsv1alpha1.ReloadSidecarTypeCustom,
 					Config: &appsv1alpha1.ReloadSidecarConfigData{
@@ -395,6 +420,7 @@ func TestValidateConfigMapSetSpec(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "test"},
 				},
+				Data: map[string]string{"config": "value"},
 				ReloadSidecarConfig: &appsv1alpha1.ReloadSidecarConfig{
 					Type: appsv1alpha1.ReloadSidecarTypeCustom,
 					Config: &appsv1alpha1.ReloadSidecarConfigData{
@@ -418,12 +444,12 @@ func TestValidateConfigMapSetSpec(t *testing.T) {
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"app": "test"},
 				},
+				Data: map[string]string{"config": "value"},
 				ReloadSidecarConfig: &appsv1alpha1.ReloadSidecarConfig{
 					Type: appsv1alpha1.ReloadSidecarTypeSidecarSet,
 					Config: &appsv1alpha1.ReloadSidecarConfigData{
 						SidecarSetRef: &appsv1alpha1.SidecarSetRef{
-							Name:          "not-exist-sidecarset",
-							ContainerName: "reload-container",
+							Name: "not-exist-sidecarset",
 						},
 					},
 				},

@@ -293,6 +293,8 @@ spec:
                     - type: string
                     x-kubernetes-int-or-string: true
                 type: object
+            required:
+            - data
             type: object
           status:
             description: ConfigMapSetStatus defines the observed state of ConfigMapSet

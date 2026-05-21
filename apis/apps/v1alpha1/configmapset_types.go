@@ -33,8 +33,7 @@ type ConfigMapSetSpec struct {
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 
 	// Data contains the configuration data to be updated
-	// +optional
-	Data map[string]string `json:"data,omitempty"`
+	Data map[string]string `json:"data"`
 
 	// Containers defines the business containers that need to be updated
 	// +optional
