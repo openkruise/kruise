@@ -356,14 +356,14 @@ func validateMaxUnavailable(maxUnavailable *intstr.IntOrString) bool {
 		if strings.HasSuffix(s, "%") {
 			numStr := strings.TrimSuffix(s, "%")
 			num, err := strconv.Atoi(numStr)
-			if err != nil || num < 0 || num > 100 {
+			if err != nil || num <= 0 || num > 100 {
 				return false
 			}
 			return true
 		}
 		// Non-percentage case, parse as integer
 		num, err := strconv.Atoi(s)
-		if err != nil || num < 0 {
+		if err != nil || num <= 0 {
 			return false
 		}
 		return true

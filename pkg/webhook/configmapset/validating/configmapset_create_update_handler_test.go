@@ -62,11 +62,11 @@ func TestValidateMaxUnavailable(t *testing.T) {
 		{"zero int maxUnavailable", &intstr.IntOrString{Type: intstr.Int, IntVal: 0}, false}, // maxUnavailable > 0 required
 		{"negative int maxUnavailable", &intstr.IntOrString{Type: intstr.Int, IntVal: -1}, false},
 		{"valid string percent", &intstr.IntOrString{Type: intstr.String, StrVal: "10%"}, true},
-		{"zero string percent", &intstr.IntOrString{Type: intstr.String, StrVal: "0%"}, true},
+		{"zero string percent", &intstr.IntOrString{Type: intstr.String, StrVal: "0%"}, false},
 		{"100 string percent", &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}, true},
 		{"invalid string percent - over 100", &intstr.IntOrString{Type: intstr.String, StrVal: "110%"}, false},
 		{"valid string int", &intstr.IntOrString{Type: intstr.String, StrVal: "10"}, true},
-		{"zero string int", &intstr.IntOrString{Type: intstr.String, StrVal: "0"}, true},
+		{"zero string int", &intstr.IntOrString{Type: intstr.String, StrVal: "0"}, false},
 		{"negative string int", &intstr.IntOrString{Type: intstr.String, StrVal: "-1"}, false},
 	}
 
