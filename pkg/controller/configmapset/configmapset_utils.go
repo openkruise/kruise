@@ -219,12 +219,12 @@ func GetMatchedPods(ctx context.Context, reader client.Reader, cms *appsv1alpha1
 	// Get related Pods by spec.selector
 	// Get matched pods
 	podList := &corev1.PodList{}
+	if cms.Spec.Selector == nil {
+		return nil, fmt.Errorf("ConfigMapSet %s has no selector", cms.Name)
+	}
 	labelSelector, err := metav1.LabelSelectorAsSelector(cms.Spec.Selector)
 	if err != nil {
 		return nil, fmt.Errorf("invalid label selector: %v", err)
-	}
-	if cms.Spec.Selector == nil {
-		return nil, fmt.Errorf("ConfigMapSet %s has no selector", cms.Name)
 	}
 	opts := &client.ListOptions{
 		Namespace:     cms.Namespace,
