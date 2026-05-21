@@ -223,7 +223,7 @@ func (h *PodCreateHandler) injectSidecar4Pod(ctx context.Context, pod *corev1.Po
 					Command: []string{
 						"sh",
 						"-c",
-						configmapset.GetReloadSidecarHealthCheckScript("/etc/execute"),
+						configmapset.GetReloadSidecarHealthCheckScript("/etc/execution"),
 					},
 				},
 			},
