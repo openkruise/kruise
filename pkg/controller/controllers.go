@@ -24,6 +24,7 @@ import (
 	"github.com/openkruise/kruise/pkg/controller/advancedcronjob"
 	"github.com/openkruise/kruise/pkg/controller/broadcastjob"
 	"github.com/openkruise/kruise/pkg/controller/cloneset"
+	"github.com/openkruise/kruise/pkg/controller/configmapset"
 	containerlauchpriority "github.com/openkruise/kruise/pkg/controller/containerlaunchpriority"
 	"github.com/openkruise/kruise/pkg/controller/containerrecreaterequest"
 	"github.com/openkruise/kruise/pkg/controller/daemonset"
@@ -50,6 +51,7 @@ func init() {
 	controllerAddFuncs = append(controllerAddFuncs, advancedcronjob.Add)
 	controllerAddFuncs = append(controllerAddFuncs, broadcastjob.Add)
 	controllerAddFuncs = append(controllerAddFuncs, cloneset.Add)
+	controllerAddFuncs = append(controllerAddFuncs, configmapset.Add)
 	controllerAddFuncs = append(controllerAddFuncs, containerrecreaterequest.Add)
 	controllerAddFuncs = append(controllerAddFuncs, daemonset.Add)
 	controllerAddFuncs = append(controllerAddFuncs, nodeimage.Add)
