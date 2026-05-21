@@ -1133,7 +1133,8 @@ func (r *ReconcileConfigMapSet) rebootSidecarsByCrr(pod *corev1.Pod, containerNa
 	sort.Strings(sortedContainerNames)
 
 	// Combine hashStr and sortedContainerNames to form a unique hash for this specific set of containers and targetRevision
-	combinedHashStr := hex.EncodeToString(md5.New().Sum([]byte(hashStr + "-" + strings.Join(sortedContainerNames, ","))))[:10]
+	hashData := md5.Sum([]byte(hashStr + "-" + strings.Join(sortedContainerNames, ",")))
+	combinedHashStr := hex.EncodeToString(hashData[:])[:10]
 	crrName := fmt.Sprintf("%s-%s", pod.Name, combinedHashStr)
 
 	// Check if CRR already exists first
@@ -1213,7 +1214,8 @@ func (r *ReconcileConfigMapSet) waitSidecarsRebootByCrrSuccess(ctx context.Conte
 	sort.Strings(sortedContainerNames)
 
 	// Combine hashStr and sortedContainerNames to form a unique hash for this specific set of containers and targetRevision
-	combinedHashStr := hex.EncodeToString(md5.New().Sum([]byte(hashStr + "-" + strings.Join(sortedContainerNames, ","))))[:10]
+	hashData := md5.Sum([]byte(hashStr + "-" + strings.Join(sortedContainerNames, ",")))
+	combinedHashStr := hex.EncodeToString(hashData[:])[:10]
 	crrName := fmt.Sprintf("%s-%s", pod.Name, combinedHashStr)
 
 	crr := &appsv1alpha1.ContainerRecreateRequest{}
