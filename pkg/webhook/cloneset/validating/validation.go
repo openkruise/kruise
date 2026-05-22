@@ -303,6 +303,13 @@ func validateCloneSetV1beta1Spec(spec, oldSpec *v1beta1.CloneSetSpec, metadata *
 	allErrs = append(allErrs, validateScaleStrategyV1beta1(&spec.ScaleStrategy, oldScaleStrategy, metadata, fldPath.Child("scaleStrategy"))...)
 	allErrs = append(allErrs, validateUpdateStrategyV1beta1(&spec.UpdateStrategy, int(*spec.Replicas), fldPath.Child("updateStrategy"))...)
 
+	if spec.ProgressDeadlineSeconds != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.ProgressDeadlineSeconds), fldPath.Child("progressDeadlineSeconds"))...)
+		if *spec.ProgressDeadlineSeconds != math.MaxInt32 && *spec.ProgressDeadlineSeconds <= spec.MinReadySeconds {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("progressDeadlineSeconds"), spec.ProgressDeadlineSeconds, "must be greater than minReadySeconds"))
+		}
+	}
+
 	return allErrs
 }
 
