@@ -52,9 +52,10 @@ const (
 	OperationSucceeded     = "Succeeded"
 )
 
-// defaultSystemNamespaces are excluded from allNamespaces distribution.
-// Use spec.targets.includedNamespaces to target them explicitly.
-var defaultSystemNamespaces = sets.NewString("kube-system", "kube-public")
+// defaultSystemNamespaces returns the set of system namespaces excluded from allNamespaces distribution.
+func defaultSystemNamespaces() sets.String {
+	return sets.NewString("kube-system", "kube-public")
+}
 
 // UnexpectedError is designed to store the information about .status.conditions when error occurs
 type UnexpectedError struct {
@@ -100,7 +101,7 @@ func matchViaTargets(namespace *corev1.Namespace, distributor *appsv1beta1.Resou
 		return false, nil
 	}
 	if targets.AllNamespaces {
-		return !defaultSystemNamespaces.Has(namespace.Name), nil
+		return !defaultSystemNamespaces().Has(namespace.Name), nil
 	}
 	if isInList(namespace.Name, targets.IncludedNamespaces.List) {
 		return true, nil
@@ -297,7 +298,7 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1be
 
 	if targets.AllNamespaces {
 		for _, namespace := range namespacesList.Items {
-			if !defaultSystemNamespaces.Has(namespace.Name) {
+			if !defaultSystemNamespaces().Has(namespace.Name) {
 				matchedSet.Insert(namespace.Name)
 			}
 		}
