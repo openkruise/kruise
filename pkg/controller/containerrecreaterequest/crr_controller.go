@@ -205,6 +205,12 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 		duration.Update(leftTime)
 	}
 
+	if crr.Status.Phase == "" || crr.Status.Phase == appsv1beta1.ContainerRecreateRequestPending {
+		if err := r.syncContainerStatuses(crr, pod); err != nil {
+			return reconcile.Result{}, fmt.Errorf("sync containerStatuses error: %v", err)
+		}
+	}
+
 	if crr.Status.Phase != appsv1beta1.ContainerRecreateRequestRecreating {
 		return reconcile.Result{RequeueAfter: duration.Get()}, nil
 	}
@@ -256,6 +262,11 @@ func (r *ReconcileContainerRecreateRequest) syncContainerStatuses(crr *appsv1bet
 			RestartCount: containerStatus.RestartCount,
 			ContainerID:  containerStatus.ContainerID,
 		})
+	}
+
+	// Keep the last observed running snapshot while the container is between old-exited and new-running states.
+	if len(syncContainerStatuses) == 0 && len(crr.Status.ContainerStatusSnapshot) > 0 {
+		return nil
 	}
 
 	if snapshotEqual(crr.Status.ContainerStatusSnapshot, syncContainerStatuses) {

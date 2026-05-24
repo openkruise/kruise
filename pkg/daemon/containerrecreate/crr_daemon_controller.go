@@ -245,6 +245,11 @@ func (c *Controller) sync(key string) (retErr error) {
 		return c.updateCRRPhase(crr, appsv1beta1.ContainerRecreateRequestRecreating)
 	}
 
+	if len(crr.Status.ContainerStatusSnapshot) == 0 {
+		klog.InfoS("CRR is waiting for containerStatusSnapshot", "namespace", crr.Namespace, "name", crr.Name)
+		return nil
+	}
+
 	if crr.Spec.Strategy != nil && crr.Spec.Strategy.UnreadyGracePeriodSeconds != nil {
 		unreadyTime, found := getPodUnreadyAcquiredTime(crr)
 		if !found {
