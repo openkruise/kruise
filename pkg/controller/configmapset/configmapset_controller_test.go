@@ -1,19 +1,184 @@
 package configmapset
 
 import (
+	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
 
 func init() {
 	_ = appsv1alpha1.AddToScheme(scheme.Scheme)
+}
+
+func TestCleanHistoryRevision(t *testing.T) {
+	limit := int32(1)
+	cms := &appsv1alpha1.ConfigMapSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cms", Namespace: "default"},
+		Spec: appsv1alpha1.ConfigMapSetSpec{
+			RevisionHistoryLimit: &limit,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "test"},
+			},
+			UpdateStrategy: &appsv1alpha1.ConfigMapSetUpdateStrategy{},
+		},
+	}
+
+	revisions := []RevisionEntry{
+		{Hash: "hash1", CustomVersion: "v1"},
+		{Hash: "hash2", CustomVersion: "v2"},
+	}
+	revBytes, _ := json.Marshal(revisions)
+
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: GetConfigMapSetHubName("test-cms"), Namespace: "default"},
+		Data:       map[string]string{"revisions": string(revBytes)},
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(cms, cm).Build()
+	r := &ReconcileConfigMapSet{Client: fakeClient, scheme: scheme.Scheme}
+
+	err := r.cleanHistoryRevision(context.TODO(), cms)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	updatedCm := &corev1.ConfigMap{}
+	err = fakeClient.Get(context.TODO(), types.NamespacedName{Name: GetConfigMapSetHubName("test-cms"), Namespace: "default"}, updatedCm)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var updatedRevisions []RevisionEntry
+	json.Unmarshal([]byte(updatedCm.Data["revisions"]), &updatedRevisions)
+
+	if len(updatedRevisions) != 1 {
+		t.Fatalf("expected 1 revision, got %d", len(updatedRevisions))
+	}
+	if updatedRevisions[0].Hash != "hash2" {
+		t.Errorf("expected hash2, got %s", updatedRevisions[0].Hash)
+	}
+}
+
+func TestCrrOperations(t *testing.T) {
+	startTime := metav1.Time{Time: time.Now().Add(-1 * time.Hour).Truncate(time.Second)}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"},
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name: "container1",
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{
+							StartedAt: startTime,
+						},
+					},
+				},
+			},
+		},
+	}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(pod).Build()
+	r := &ReconcileConfigMapSet{Client: fakeClient, scheme: scheme.Scheme}
+
+	err := r.rebootSidecarsByCrr(pod, []string{"container1"}, "hash1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify CRR is created
+	crrList := &appsv1alpha1.ContainerRecreateRequestList{}
+	fakeClient.List(context.TODO(), crrList)
+	if len(crrList.Items) != 1 {
+		t.Fatalf("expected 1 CRR, got %d", len(crrList.Items))
+	}
+
+	crr := &crrList.Items[0]
+	if crr.Spec.Containers[0].Name != "container1" {
+		t.Errorf("expected container1, got %s", crr.Spec.Containers[0].Name)
+	}
+
+	// Verify annotation is set
+	if crr.Annotations[GetConfigMapSetContainerStartedAtKey("container1")] == "" {
+		t.Errorf("expected container1 startedAt annotation to be set")
+	} else {
+		t.Logf("Annotation is set: %s", crr.Annotations[GetConfigMapSetContainerStartedAtKey("container1")])
+	}
+
+	// Mark CRR as completed
+	crr.Status.Phase = appsv1alpha1.ContainerRecreateRequestCompleted
+	crr.Status.ContainerRecreateStates = []appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
+		{Name: "container1", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded},
+	}
+	err = fakeClient.Update(context.TODO(), crr)
+	if err != nil {
+		t.Fatalf("failed to update CRR: %v", err)
+	}
+
+	// wait should fail because StartedAt hasn't advanced
+	err = r.waitSidecarsRebootByCrrSuccess(context.TODO(), pod, []string{"container1"}, "hash1")
+	if err == nil {
+		t.Fatalf("expected error due to StartedAt not advancing, got nil")
+	}
+
+	// advance StartedAt
+	pod.Status.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: time.Now()}
+	err = r.waitSidecarsRebootByCrrSuccess(context.TODO(), pod, []string{"container1"}, "hash1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestReconcile(t *testing.T) {
+	cms := &appsv1alpha1.ConfigMapSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-cms", Namespace: "default"},
+		Spec: appsv1alpha1.ConfigMapSetSpec{
+			Data: map[string]string{"key": "val"},
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "test"},
+			},
+			UpdateStrategy: &appsv1alpha1.ConfigMapSetUpdateStrategy{},
+		},
+	}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(cms).WithStatusSubresource(&appsv1alpha1.ConfigMapSet{}).Build()
+	r := &ReconcileConfigMapSet{Client: fakeClient, scheme: scheme.Scheme}
+
+	req := reconcile.Request{
+		NamespacedName: types.NamespacedName{Name: "test-cms", Namespace: "default"},
+	}
+	res, err := r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.Requeue {
+		t.Errorf("expected no requeue")
+	}
+
+	updatedCms := &appsv1alpha1.ConfigMapSet{}
+	err = fakeClient.Get(context.TODO(), req.NamespacedName, updatedCms)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(updatedCms.Finalizers) == 0 || updatedCms.Finalizers[0] != ConfigMapFinalizerName {
+		t.Errorf("expected finalizer to be added")
+	}
+
+	hubName := GetConfigMapSetHubName("test-cms")
+	cm := &corev1.ConfigMap{}
+	err = fakeClient.Get(context.TODO(), types.NamespacedName{Name: hubName, Namespace: "default"}, cm)
+	if err != nil {
+		t.Fatalf("expected hub ConfigMap to be created, got error: %v", err)
+	}
 }
 
 func TestCalculateHash(t *testing.T) {
