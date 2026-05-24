@@ -538,8 +538,21 @@ func getUpdatePodsByDistributions(cms *appsv1alpha1.ConfigMapSet, distributions 
 
 	// Calculate how many pods are currently at the update revision
 	var currentUpdateRevisionCount int32 = 0
-	for _, pod := range validPods {
-		if pod.Annotations != nil && pod.Annotations[revisionKeys.CurrentRevisionKey] == updateDistribution.Revision {
+	for _, pod := range pods {
+		isUpdated := false
+		if pod.Annotations == nil {
+			isUpdated = true
+		} else {
+			hasCurrentRev := pod.Annotations[revisionKeys.CurrentRevisionKey] != ""
+			hasUpdateRev := pod.Annotations[revisionKeys.UpdateRevisionKey] != ""
+			// If it does not have currentVersion and UpdateVersion annotations, we treat it as updated
+			if !hasCurrentRev && !hasUpdateRev {
+				isUpdated = true
+			} else if pod.Annotations[revisionKeys.CurrentRevisionKey] == updateDistribution.Revision {
+				isUpdated = true
+			}
+		}
+		if isUpdated {
 			currentUpdateRevisionCount++
 		}
 	}
@@ -918,7 +931,20 @@ func (r *ReconcileConfigMapSet) updateStatus(ctx context.Context, request reconc
 
 	// Calculate status metrics
 	for _, pod := range pods {
-		if pod.Annotations[targetRevisionKey] == updateRevision && pod.Annotations[currentRevisionKey] == updateRevision {
+		isUpdated := false
+		if pod.Annotations == nil {
+			isUpdated = true
+		} else {
+			hasCurrentRev := pod.Annotations[currentRevisionKey] != ""
+			hasUpdateRev := pod.Annotations[targetRevisionKey] != ""
+			if !hasCurrentRev && !hasUpdateRev {
+				isUpdated = true
+			} else if pod.Annotations[targetRevisionKey] == updateRevision && pod.Annotations[currentRevisionKey] == updateRevision {
+				isUpdated = true
+			}
+		}
+
+		if isUpdated {
 			updatedPodsNum++
 			if IsPodReady(pod) {
 				klog.Infof("Pod %s/%s is ready", pod.Namespace, pod.Name)
@@ -1157,6 +1183,7 @@ func (r *ReconcileConfigMapSet) rebootSidecarsByCrr(pod *corev1.Pod, containerNa
 			Labels: map[string]string{
 				GetConfigMapSetCrrKey(): "true",
 			},
+			Annotations: make(map[string]string),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "v1",
@@ -1184,6 +1211,11 @@ func (r *ReconcileConfigMapSet) rebootSidecarsByCrr(pod *corev1.Pod, containerNa
 		crr.Spec.Containers = append(crr.Spec.Containers, appsv1alpha1.ContainerRecreateRequestContainer{
 			Name: name,
 		})
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.Name == name && status.State.Running != nil {
+				crr.Annotations[GetConfigMapSetContainerStartedAtKey(name)] = status.State.Running.StartedAt.Format(time.RFC3339)
+			}
+		}
 	}
 
 	err = r.Create(context.TODO(), crr)
@@ -1235,6 +1267,31 @@ func (r *ReconcileConfigMapSet) waitSidecarsRebootByCrrSuccess(ctx context.Conte
 	for _, cState := range crr.Status.ContainerRecreateStates {
 		if cState.Phase != appsv1alpha1.ContainerRecreateRequestSucceeded {
 			return fmt.Errorf("container %s in CRR %s is in phase %s, message: %s", cState.Name, crrName, cState.Phase, cState.Message)
+		}
+	}
+
+	// Verify that the StartedAt time of all containers is strictly greater than the time recorded in the CRR
+	for _, name := range sortedContainerNames {
+		recordedTimeStr := crr.Annotations[GetConfigMapSetContainerStartedAtKey(name)]
+		if recordedTimeStr != "" {
+			recordedTime, err := time.Parse(time.RFC3339, recordedTimeStr)
+			if err == nil {
+				found := false
+				for _, status := range pod.Status.ContainerStatuses {
+					if status.Name == name {
+						found = true
+						if status.State.Running == nil {
+							return fmt.Errorf("container %s is not running yet", name)
+						}
+						if !status.State.Running.StartedAt.After(recordedTime) {
+							return fmt.Errorf("container %s has not been restarted yet (StartedAt <= recorded time)", name)
+						}
+					}
+				}
+				if !found {
+					return fmt.Errorf("container %s not found in pod status", name)
+				}
+			}
 		}
 	}
 
