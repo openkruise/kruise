@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/utils/ptr"
 
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/pkg/util"
@@ -257,10 +259,7 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 			gomega.Expect(interval >= 5*time.Second).Should(gomega.Equal(true))
 		})
 
-		// cross-version: a CRR created via the v1beta1 client (stored as v1beta1 in etcd) is
-		// served back correctly via the same client, and status.containerStatusSnapshot is populated
-		// by the controller using the typed field (not the legacy annotation).
-		ginkgo.It("status.containerStatusSnapshot is set as typed field (not annotation)", func() {
+		ginkgo.It("serves v1alpha1-created status as v1beta1 typed fields", func() {
 			ginkgo.By("Create CloneSet and wait Pods ready")
 			pods = tester.CreateTestCloneSetAndGetPods(randStr, 1, []v1.Container{
 				{
@@ -270,34 +269,55 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 						Exec: &v1.ExecAction{Command: []string{"sleep", "8"}},
 					}},
 				},
+				{
+					Name:  "sidecar",
+					Image: common.AgnhostImage,
+					Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{
+						Exec: &v1.ExecAction{Command: []string{"sleep", "8"}},
+					}},
+				},
 			})
 
 			pod := pods[0]
 			crrName := fmt.Sprintf("crr-xver-%s", randStr)
-			crr := &appsv1beta1.ContainerRecreateRequest{
+			crr := &appsv1alpha1.ContainerRecreateRequest{
 				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: crrName},
-				Spec: appsv1beta1.ContainerRecreateRequestSpec{
-					PodName:    pod.Name,
-					Containers: []appsv1beta1.ContainerRecreateRequestContainer{{Name: "app"}},
+				Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					PodName: pod.Name,
+					Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						{Name: "app"},
+						{Name: "sidecar"},
+					},
+					Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{
+						UnreadyGracePeriodSeconds: ptr.To(int64(1)),
+					},
 				},
 			}
-			_, err = tester.CreateCRR(crr)
+			_, err = kc.AppsV1alpha1().ContainerRecreateRequests(ns).Create(context.TODO(), crr, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			ginkgo.By("Verify containerStatusSnapshot typed field is populated during recreating")
-			gomega.Eventually(func() int {
+			ginkgo.By("Verify v1beta1 status exposes typed containerStatusSnapshot and PodUnreadyAcquired condition")
+			gomega.Eventually(func() bool {
 				fetched, err2 := tester.GetCRR(crrName)
 				gomega.Expect(err2).NotTo(gomega.HaveOccurred())
-				if fetched.Status.Phase == appsv1beta1.ContainerRecreateRequestRecreating {
-					return len(fetched.Status.ContainerStatusSnapshot)
+				if fetched.Status.Phase != appsv1beta1.ContainerRecreateRequestRecreating ||
+					len(fetched.Status.ContainerStatusSnapshot) == 0 {
+					return false
 				}
-				return 0
-			}, 60*time.Second, time.Second).Should(gomega.BeNumerically(">", 0))
+				for _, condition := range fetched.Status.Conditions {
+					if condition.Type == appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType &&
+						condition.Status == metav1.ConditionTrue {
+						return true
+					}
+				}
+				return false
+			}, 60*time.Second, time.Second).Should(gomega.Equal(true))
 
-			ginkgo.By("Verify legacy annotation is absent on v1beta1 object")
+			ginkgo.By("Verify legacy status annotations are absent on v1beta1 object")
 			fetched, err := tester.GetCRR(crrName)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(fetched.Annotations[appsv1beta1.ContainerRecreateRequestSyncContainerStatusesKey]).Should(gomega.Equal(""))
+			gomega.Expect(fetched.Annotations[appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey]).Should(gomega.Equal(""))
 
 			tester.WaitForCRRCompleted(crrName, 60*time.Second)
 		})

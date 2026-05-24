@@ -200,4 +200,3 @@ func TestSyncContainerStatuses_CollectsRunningContainers(t *testing.T) {
 		t.Errorf("snapshot mismatch: got %v, want %v", got, expected)
 	}
 }
-
