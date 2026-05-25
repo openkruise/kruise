@@ -52,7 +52,8 @@ const (
 	OperationSucceeded     = "Succeeded"
 )
 
-// defaultSystemNamespaces returns the set of system namespaces excluded from allNamespaces distribution.
+// defaultSystemNamespaces returns system namespaces that are always excluded
+// from distribution, regardless of AllNamespaces, IncludedNamespaces, or NamespaceSelector.
 func defaultSystemNamespaces() sets.String {
 	return sets.NewString("kube-system", "kube-public")
 }
@@ -97,11 +98,15 @@ func matchViaLabelSelector(namespace *corev1.Namespace, distributor *appsv1beta1
 // matchViaTargets check whether Namespace matches ResourceDistribution via spec.targets
 func matchViaTargets(namespace *corev1.Namespace, distributor *appsv1beta1.ResourceDistribution) (bool, error) {
 	targets := &distributor.Spec.Targets
+	// system namespaces are always excluded, even if listed in IncludedNamespaces
+	if defaultSystemNamespaces().Has(namespace.Name) {
+		return false, nil
+	}
 	if isInList(namespace.Name, targets.ExcludedNamespaces.List) {
 		return false, nil
 	}
 	if targets.AllNamespaces {
-		return !defaultSystemNamespaces().Has(namespace.Name), nil
+		return true, nil
 	}
 	if isInList(namespace.Name, targets.IncludedNamespaces.List) {
 		return true, nil
@@ -283,6 +288,7 @@ func syncItSlowly(namespaces []string, initialBatchSize int, fn func(namespace s
 // listNamespacesForDistributor returns two slices: one contains all matched namespaces, another contains all unmatched.
 // Firstly, Spec.Targets will parse .AllNamespaces, .IncludedNamespaces, and .NamespaceSelector; Then calculate their
 // union; At last ExcludedNamespaces will act on the union to remove the designated namespaces from it.
+// Note: kube-system and kube-public are always excluded from the matched set regardless of the above settings.
 func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1beta1.ResourceDistributionTargets) ([]string, []string, error) {
 	matchedSet := sets.NewString()
 	unmatchedSet := sets.NewString()
@@ -305,7 +311,9 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1be
 	} else {
 		// 2. select the namespaces via targets.IncludedNamespaces
 		for _, namespace := range targets.IncludedNamespaces.List {
-			matchedSet.Insert(namespace.Name)
+			if !defaultSystemNamespaces().Has(namespace.Name) {
+				matchedSet.Insert(namespace.Name)
+			}
 		}
 	}
 
@@ -320,7 +328,9 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1be
 			return nil, nil, err
 		}
 		for _, namespace := range namespaces.Items {
-			matchedSet.Insert(namespace.Name)
+			if !defaultSystemNamespaces().Has(namespace.Name) {
+				matchedSet.Insert(namespace.Name)
+			}
 		}
 	}
 
