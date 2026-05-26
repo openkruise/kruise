@@ -37,7 +37,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_containerrecreaterequests.yaml
 - patches/webhook_in_resourcedistributions.yaml
 - patches/webhook_in_persistentpodstates.yaml
-#- patches/webhook_in_workloadspreads.yaml
+- patches/webhook_in_workloadspreads.yaml
 #- patches/webhook_in_ephemeraljobs.yaml
 # +kubebuilder:scaffold:crdkustomizewebhookpatch
 

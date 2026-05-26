@@ -25,11 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 )
 
-func hasPercentSubset(ws *appsv1alpha1.WorkloadSpread) (has bool) {
+func hasPercentSubset(ws *appsv1beta1.WorkloadSpread) (has bool) {
 	if ws == nil {
 		return false
 	}
@@ -78,7 +78,7 @@ func nestedMap[T any](obj map[string]any, paths ...string) (T, bool, error) {
 	}
 }
 
-func IsPodSelected(filter *appsv1alpha1.TargetFilter, podLabels map[string]string) (bool, error) {
+func IsPodSelected(filter *appsv1beta1.TargetFilter, podLabels map[string]string) (bool, error) {
 	if filter == nil {
 		return true, nil
 	}

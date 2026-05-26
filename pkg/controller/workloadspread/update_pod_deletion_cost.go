@@ -30,7 +30,7 @@ import (
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
 )
 
@@ -39,7 +39,7 @@ const (
 	RevisionAnnotation = "deployment.kubernetes.io/revision"
 )
 
-func (r *ReconcileWorkloadSpread) getWorkloadLatestVersion(ws *appsv1alpha1.WorkloadSpread) (string, error) {
+func (r *ReconcileWorkloadSpread) getWorkloadLatestVersion(ws *appsv1beta1.WorkloadSpread) (string, error) {
 	targetRef := ws.Spec.TargetReference
 	if targetRef == nil {
 		return "", nil
@@ -56,7 +56,7 @@ func (r *ReconcileWorkloadSpread) getWorkloadLatestVersion(ws *appsv1alpha1.Work
 	return wsutil.GetWorkloadVersion(r.Client, object)
 }
 
-func (r *ReconcileWorkloadSpread) updateDeletionCost(ws *appsv1alpha1.WorkloadSpread,
+func (r *ReconcileWorkloadSpread) updateDeletionCost(ws *appsv1beta1.WorkloadSpread,
 	versionedPodMap map[string]map[string][]*corev1.Pod,
 	workloadReplicas int32) error {
 	targetRef := ws.Spec.TargetReference
@@ -82,7 +82,7 @@ func (r *ReconcileWorkloadSpread) updateDeletionCost(ws *appsv1alpha1.WorkloadSp
 	return nil
 }
 
-func (r *ReconcileWorkloadSpread) updateDeletionCostBySubset(ws *appsv1alpha1.WorkloadSpread,
+func (r *ReconcileWorkloadSpread) updateDeletionCostBySubset(ws *appsv1beta1.WorkloadSpread,
 	podMap map[string][]*corev1.Pod, workloadReplicas int32, reverseOrder bool) error {
 	subsetNum := len(ws.Spec.Subsets)
 	subsetIndex := func(index int) int {
@@ -124,8 +124,8 @@ func (r *ReconcileWorkloadSpread) updateDeletionCostBySubset(ws *appsv1alpha1.Wo
 //     pods number    20            20           20
 //     deletion-cost (300,-100)    (200,-200)    100
 func (r *ReconcileWorkloadSpread) syncSubsetPodDeletionCost(
-	ws *appsv1alpha1.WorkloadSpread,
-	subset *appsv1alpha1.WorkloadSpreadSubset,
+	ws *appsv1beta1.WorkloadSpread,
+	subset *appsv1beta1.WorkloadSpreadSubset,
 	subsetIndex int,
 	pods []*corev1.Pod,
 	workloadReplicas int32) error {
@@ -187,8 +187,8 @@ func (r *ReconcileWorkloadSpread) syncSubsetPodDeletionCost(
 	return r.updateDeletionCostForSubsetPods(ws, subset, negativePods, strconv.Itoa(wsutil.PodDeletionCostNegative*(subsetIndex+1)))
 }
 
-func (r *ReconcileWorkloadSpread) updateDeletionCostForSubsetPods(ws *appsv1alpha1.WorkloadSpread,
-	subset *appsv1alpha1.WorkloadSpreadSubset, pods []*corev1.Pod, deletionCostStr string) error {
+func (r *ReconcileWorkloadSpread) updateDeletionCostForSubsetPods(ws *appsv1beta1.WorkloadSpread,
+	subset *appsv1beta1.WorkloadSpreadSubset, pods []*corev1.Pod, deletionCostStr string) error {
 	for _, pod := range pods {
 		if err := r.patchPodDeletionCost(ws, pod, deletionCostStr); err != nil {
 			subsetName := FakeSubsetName
@@ -205,7 +205,7 @@ func (r *ReconcileWorkloadSpread) updateDeletionCostForSubsetPods(ws *appsv1alph
 	return nil
 }
 
-func (r *ReconcileWorkloadSpread) patchPodDeletionCost(ws *appsv1alpha1.WorkloadSpread,
+func (r *ReconcileWorkloadSpread) patchPodDeletionCost(ws *appsv1beta1.WorkloadSpread,
 	pod *corev1.Pod, deletionCostStr string) error {
 	clone := pod.DeepCopy()
 	annotationKey := wsutil.PodDeletionCostAnnotation
@@ -252,7 +252,7 @@ func sortDeleteIndexes(pods []*corev1.Pod) []int {
 	return waitDeleteIndexes
 }
 
-func isEffectiveKindForDeletionCost(targetRef *appsv1alpha1.TargetReference) bool {
+func isEffectiveKindForDeletionCost(targetRef *appsv1beta1.TargetReference) bool {
 	switch targetRef.Kind {
 	case controllerKindRS.Kind, controllerKindDep.Kind, controllerKruiseKindCS.Kind:
 		return true

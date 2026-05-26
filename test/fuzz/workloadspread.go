@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 )
 
@@ -48,16 +48,16 @@ var (
 	}
 )
 
-type WSSubsetFunc = func(cf *fuzz.ConsumeFuzzer, subset *appsv1alpha1.WorkloadSpreadSubset) error
+type WSSubsetFunc = func(cf *fuzz.ConsumeFuzzer, subset *appsv1beta1.WorkloadSpreadSubset) error
 
-func GenerateWorkloadSpreadTargetReference(cf *fuzz.ConsumeFuzzer, ws *appsv1alpha1.WorkloadSpread) error {
+func GenerateWorkloadSpreadTargetReference(cf *fuzz.ConsumeFuzzer, ws *appsv1beta1.WorkloadSpread) error {
 	isStructured, err := cf.GetBool()
 	if err != nil {
 		return err
 	}
 
 	if !isStructured {
-		targetRef := &appsv1alpha1.TargetReference{}
+		targetRef := &appsv1beta1.TargetReference{}
 		if err := cf.GenerateStruct(targetRef); err != nil {
 			return err
 		}
@@ -65,7 +65,7 @@ func GenerateWorkloadSpreadTargetReference(cf *fuzz.ConsumeFuzzer, ws *appsv1alp
 		return nil
 	}
 
-	targetRef := &appsv1alpha1.TargetReference{}
+	targetRef := &appsv1beta1.TargetReference{}
 	kindIndex, err := cf.GetInt()
 	if err != nil {
 		return err
@@ -81,26 +81,26 @@ func GenerateWorkloadSpreadTargetReference(cf *fuzz.ConsumeFuzzer, ws *appsv1alp
 	return nil
 }
 
-func GenerateWorkloadSpreadScheduleStrategy(cf *fuzz.ConsumeFuzzer, ws *appsv1alpha1.WorkloadSpread) error {
+func GenerateWorkloadSpreadScheduleStrategy(cf *fuzz.ConsumeFuzzer, ws *appsv1beta1.WorkloadSpread) error {
 	if useAdaptive, err := cf.GetBool(); useAdaptive && err == nil {
-		ws.Spec.ScheduleStrategy.Type = appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType
+		ws.Spec.ScheduleStrategy.Type = appsv1beta1.AdaptiveWorkloadSpreadScheduleStrategyType
 		if seconds, err := cf.GetInt(); err == nil {
-			ws.Spec.ScheduleStrategy.Adaptive = &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
+			ws.Spec.ScheduleStrategy.Adaptive = &appsv1beta1.AdaptiveWorkloadSpreadStrategy{
 				RescheduleCriticalSeconds: pointer.Int32(int32(seconds%3000 - 1000)),
 			}
 		}
 	} else {
-		ws.Spec.ScheduleStrategy.Type = appsv1alpha1.FixedWorkloadSpreadScheduleStrategyType
+		ws.Spec.ScheduleStrategy.Type = appsv1beta1.FixedWorkloadSpreadScheduleStrategyType
 		if invalid, err := cf.GetBool(); invalid && err == nil {
 			if strategy, err := cf.GetString(); err == nil {
-				ws.Spec.ScheduleStrategy.Type = appsv1alpha1.WorkloadSpreadScheduleStrategyType(strategy)
+				ws.Spec.ScheduleStrategy.Type = appsv1beta1.WorkloadSpreadScheduleStrategyType(strategy)
 			}
 		}
 	}
 	return nil
 }
 
-func GenerateWorkloadSpreadTargetFilter(cf *fuzz.ConsumeFuzzer, ws *appsv1alpha1.WorkloadSpread) error {
+func GenerateWorkloadSpreadTargetFilter(cf *fuzz.ConsumeFuzzer, ws *appsv1beta1.WorkloadSpread) error {
 	selector := &metav1.LabelSelector{}
 	if err := GenerateLabelSelector(cf, selector); err != nil {
 		return err
@@ -109,14 +109,14 @@ func GenerateWorkloadSpreadTargetFilter(cf *fuzz.ConsumeFuzzer, ws *appsv1alpha1
 	if err := cf.CreateSlice(&replicasPathList); err != nil {
 		return err
 	}
-	ws.Spec.TargetFilter = &appsv1alpha1.TargetFilter{
+	ws.Spec.TargetFilter = &appsv1beta1.TargetFilter{
 		Selector:         selector,
 		ReplicasPathList: replicasPathList,
 	}
 	return nil
 }
 
-func GenerateWorkloadSpreadSubset(cf *fuzz.ConsumeFuzzer, ws *appsv1alpha1.WorkloadSpread, fns ...WSSubsetFunc) error {
+func GenerateWorkloadSpreadSubset(cf *fuzz.ConsumeFuzzer, ws *appsv1beta1.WorkloadSpread, fns ...WSSubsetFunc) error {
 	num, err := cf.GetInt()
 	if err != nil {
 		return err
@@ -133,7 +133,7 @@ func GenerateWorkloadSpreadSubset(cf *fuzz.ConsumeFuzzer, ws *appsv1alpha1.Workl
 	}
 
 	nSubsets := (num % 5) + 1
-	subsets := make([]appsv1alpha1.WorkloadSpreadSubset, nSubsets)
+	subsets := make([]appsv1beta1.WorkloadSpreadSubset, nSubsets)
 
 	for i := 0; i < nSubsets; i++ {
 		for _, fn := range fns {
@@ -147,7 +147,7 @@ func GenerateWorkloadSpreadSubset(cf *fuzz.ConsumeFuzzer, ws *appsv1alpha1.Workl
 	return nil
 }
 
-func GenerateWorkloadSpreadSubsetName(cf *fuzz.ConsumeFuzzer, subset *appsv1alpha1.WorkloadSpreadSubset) error {
+func GenerateWorkloadSpreadSubsetName(cf *fuzz.ConsumeFuzzer, subset *appsv1beta1.WorkloadSpreadSubset) error {
 	name, err := cf.GetString()
 	if err != nil {
 		return err
@@ -156,7 +156,7 @@ func GenerateWorkloadSpreadSubsetName(cf *fuzz.ConsumeFuzzer, subset *appsv1alph
 	return nil
 }
 
-func GenerateWorkloadSpreadSubsetPatch(cf *fuzz.ConsumeFuzzer, subset *appsv1alpha1.WorkloadSpreadSubset) error {
+func GenerateWorkloadSpreadSubsetPatch(cf *fuzz.ConsumeFuzzer, subset *appsv1beta1.WorkloadSpreadSubset) error {
 	rawExtension := &runtime.RawExtension{}
 	if err := GeneratePatch(cf, rawExtension); err != nil {
 		return err
@@ -165,7 +165,7 @@ func GenerateWorkloadSpreadSubsetPatch(cf *fuzz.ConsumeFuzzer, subset *appsv1alp
 	return nil
 }
 
-func GenerateWorkloadSpreadSubsetReplicas(cf *fuzz.ConsumeFuzzer, subset *appsv1alpha1.WorkloadSpreadSubset) error {
+func GenerateWorkloadSpreadSubsetReplicas(cf *fuzz.ConsumeFuzzer, subset *appsv1beta1.WorkloadSpreadSubset) error {
 	maxReplicas, err := GenerateIntOrString(cf)
 	if err != nil {
 		return err
@@ -174,16 +174,16 @@ func GenerateWorkloadSpreadSubsetReplicas(cf *fuzz.ConsumeFuzzer, subset *appsv1
 	return nil
 }
 
-func GenerateWorkloadSpreadNodeSelectorTerm(cf *fuzz.ConsumeFuzzer, subset *appsv1alpha1.WorkloadSpreadSubset) error {
+func GenerateWorkloadSpreadNodeSelectorTerm(cf *fuzz.ConsumeFuzzer, subset *appsv1beta1.WorkloadSpreadSubset) error {
 	term := corev1.NodeSelectorTerm{}
 	if err := GenerateNodeSelectorTerm(cf, &term); err != nil {
 		return err
 	}
-	subset.RequiredNodeSelectorTerm = &term
+	subset.RequiredNodeSelector = &term
 	return nil
 }
 
-func GenerateWorkloadSpreadTolerations(cf *fuzz.ConsumeFuzzer, subset *appsv1alpha1.WorkloadSpreadSubset) error {
+func GenerateWorkloadSpreadTolerations(cf *fuzz.ConsumeFuzzer, subset *appsv1beta1.WorkloadSpreadSubset) error {
 	tolerations := make([]corev1.Toleration, r.Intn(collectionMaxElements)+1)
 	for i := range tolerations {
 		if err := GenerateTolerations(cf, &tolerations[i]); err != nil {

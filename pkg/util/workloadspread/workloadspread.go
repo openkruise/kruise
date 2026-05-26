@@ -142,13 +142,13 @@ func VerifyGroupKind(ref interface{}, expectedKind string, expectedGroups []stri
 	var err error
 
 	switch ref.(type) {
-	case *appsv1alpha1.TargetReference:
-		gv, err = schema.ParseGroupVersion(ref.(*appsv1alpha1.TargetReference).APIVersion)
+	case *appsv1beta1.TargetReference:
+		gv, err = schema.ParseGroupVersion(ref.(*appsv1beta1.TargetReference).APIVersion)
 		if err != nil {
-			klog.ErrorS(err, "failed to parse GroupVersion for apiVersion", "apiVersion", ref.(*appsv1alpha1.TargetReference).APIVersion)
+			klog.ErrorS(err, "failed to parse GroupVersion for apiVersion", "apiVersion", ref.(*appsv1beta1.TargetReference).APIVersion)
 			return false, err
 		}
-		kind = ref.(*appsv1alpha1.TargetReference).Kind
+		kind = ref.(*appsv1beta1.TargetReference).Kind
 	case *metav1.OwnerReference:
 		gv, err = schema.ParseGroupVersion(ref.(*metav1.OwnerReference).APIVersion)
 		if err != nil {
@@ -214,8 +214,8 @@ func (h *Handler) HandlePodCreation(pod *corev1.Pod) (skip bool, err error) {
 		return true, nil
 	}
 
-	var matchedWS *appsv1alpha1.WorkloadSpread
-	workloadSpreadList := &appsv1alpha1.WorkloadSpreadList{}
+	var matchedWS *appsv1beta1.WorkloadSpread
+	workloadSpreadList := &appsv1beta1.WorkloadSpreadList{}
 	if err = h.Client.List(context.TODO(), workloadSpreadList, &client.ListOptions{Namespace: pod.Namespace}); err != nil {
 		return false, err
 	}
@@ -281,7 +281,7 @@ func (h *Handler) HandlePodDeletion(pod *corev1.Pod, operation Operation) error 
 		return nil
 	}
 
-	matchedWS := &appsv1alpha1.WorkloadSpread{}
+	matchedWS := &appsv1beta1.WorkloadSpread{}
 	err = h.Client.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: injectWS.Name}, matchedWS)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -300,7 +300,7 @@ func (h *Handler) HandlePodDeletion(pod *corev1.Pod, operation Operation) error 
 	return h.mutatingPod(matchedWS, pod, injectWS, operation)
 }
 
-func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
+func (h *Handler) mutatingPod(matchedWS *appsv1beta1.WorkloadSpread,
 	pod *corev1.Pod,
 	injectWS *InjectWorkloadSpread,
 	operation Operation) error {
@@ -334,7 +334,7 @@ func (h *Handler) mutatingPod(matchedWS *appsv1alpha1.WorkloadSpread,
 	return injectErr
 }
 
-func (h *Handler) acquireSuitableSubset(matchedWS *appsv1alpha1.WorkloadSpread,
+func (h *Handler) acquireSuitableSubset(matchedWS *appsv1beta1.WorkloadSpread,
 	pod *corev1.Pod,
 	injectWS *InjectWorkloadSpread,
 	operation Operation) (string, string, error) {
@@ -344,8 +344,8 @@ func (h *Handler) acquireSuitableSubset(matchedWS *appsv1alpha1.WorkloadSpread,
 	}
 
 	var refresh, changed bool
-	var wsClone *appsv1alpha1.WorkloadSpread
-	var suitableSubset *appsv1alpha1.WorkloadSpreadSubsetStatus
+	var wsClone *appsv1beta1.WorkloadSpread
+	var suitableSubset *appsv1beta1.WorkloadSpreadSubsetStatus
 	var generatedUID, suitableSubsetName string
 
 	// for debug
@@ -366,8 +366,8 @@ func (h *Handler) acquireSuitableSubset(matchedWS *appsv1alpha1.WorkloadSpread,
 		// the pods with order within [10, inf) will be assigned to subset-c.
 		currentThresholdID := int64(0)
 		for _, subset := range matchedWS.Spec.Subsets {
-			cond := getSubsetCondition(matchedWS, subset.Name, appsv1alpha1.SubsetSchedulable)
-			if cond != nil && cond.Status == corev1.ConditionFalse {
+			cond := getSubsetCondition(matchedWS, subset.Name, "Schedulable")
+			if cond != nil && cond.Status == metav1.ConditionFalse {
 				continue
 			}
 			subsetReplicasLimit := math.MaxInt32
@@ -441,14 +441,14 @@ func (h *Handler) acquireSuitableSubset(matchedWS *appsv1alpha1.WorkloadSpread,
 	return suitableSubsetName, generatedUID, nil
 }
 
-func (h *Handler) tryToGetTheLatestMatchedWS(matchedWS *appsv1alpha1.WorkloadSpread, refresh bool) (
-	*appsv1alpha1.WorkloadSpread, error) {
+func (h *Handler) tryToGetTheLatestMatchedWS(matchedWS *appsv1beta1.WorkloadSpread, refresh bool) (
+	*appsv1beta1.WorkloadSpread, error) {
 	var err error
-	var wsClone *appsv1alpha1.WorkloadSpread
+	var wsClone *appsv1beta1.WorkloadSpread
 
 	if refresh {
 		// TODO: shall we set metav1.GetOptions{resourceVersion="0"} so that we get the cached object in apiServer memory instead of etcd?
-		wsClone, err = kubeClient.GetGenericClient().KruiseClient.AppsV1alpha1().
+		wsClone, err = kubeClient.GetGenericClient().KruiseClient.AppsV1beta1().
 			WorkloadSpreads(matchedWS.Namespace).Get(context.TODO(), matchedWS.Name, metav1.GetOptions{})
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -462,14 +462,14 @@ func (h *Handler) tryToGetTheLatestMatchedWS(matchedWS *appsv1alpha1.WorkloadSpr
 		if cacheErr != nil {
 			klog.ErrorS(cacheErr, "Failed to get cached WorkloadSpread from GlobalCache", "namespace", matchedWS.Namespace, "name", matchedWS.Name)
 		}
-		if localCachedWS, ok := item.(*appsv1alpha1.WorkloadSpread); ok {
+		if localCachedWS, ok := item.(*appsv1beta1.WorkloadSpread); ok {
 			wsClone = localCachedWS.DeepCopy()
 		} else {
 			wsClone = matchedWS.DeepCopy()
 		}
 
 		// compare and use the newer version
-		informerCachedWS := &appsv1alpha1.WorkloadSpread{}
+		informerCachedWS := &appsv1beta1.WorkloadSpread{}
 		if err = h.Get(context.TODO(), types.NamespacedName{Namespace: matchedWS.Namespace,
 			Name: matchedWS.Name}, informerCachedWS); err == nil {
 			// TODO: shall we process the case of that the ResourceVersion exceeds MaxInt64?
@@ -489,10 +489,10 @@ func (h *Handler) tryToGetTheLatestMatchedWS(matchedWS *appsv1alpha1.WorkloadSpr
 // 1. changed(bool) indicates if workloadSpread.Status has changed
 // 2. suitableSubset(*struct{}) indicates which workloadSpread.Subset does this pod match
 // 3. generatedUID(types.UID) indicates which workloadSpread generate a UID for identifying Pod without a full name.
-func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
+func (h *Handler) updateSubsetForPod(ws *appsv1beta1.WorkloadSpread,
 	pod *corev1.Pod, injectWS *InjectWorkloadSpread, operation Operation) (
-	bool, *appsv1alpha1.WorkloadSpreadSubsetStatus, string, error) {
-	var suitableSubset *appsv1alpha1.WorkloadSpreadSubsetStatus
+	bool, *appsv1beta1.WorkloadSpreadSubsetStatus, string, error) {
+	var suitableSubset *appsv1beta1.WorkloadSpreadSubsetStatus
 	var generatedUID string
 
 	// We only care about the corresponding versioned subset status.
@@ -505,7 +505,7 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 			return false, nil, "", err
 		}
 		if ws.Status.VersionedSubsetStatuses == nil {
-			ws.Status.VersionedSubsetStatuses = map[string][]appsv1alpha1.WorkloadSpreadSubsetStatus{}
+			ws.Status.VersionedSubsetStatuses = map[string][]appsv1beta1.WorkloadSpreadSubsetStatus{}
 		}
 		ws.Status.VersionedSubsetStatuses[version] = subsetStatuses
 	}
@@ -582,7 +582,7 @@ func (h *Handler) updateSubsetForPod(ws *appsv1alpha1.WorkloadSpread,
 
 // return two parameters
 // 1. isRecord(bool) 2. SubsetStatuses
-func isPodRecordedInSubset(subsetStatuses []appsv1alpha1.WorkloadSpreadSubsetStatus, podName string) (bool, *appsv1alpha1.WorkloadSpreadSubsetStatus) {
+func isPodRecordedInSubset(subsetStatuses []appsv1beta1.WorkloadSpreadSubsetStatus, podName string) (bool, *appsv1beta1.WorkloadSpreadSubsetStatus) {
 	for _, subset := range subsetStatuses {
 		if _, ok := subset.CreatingPods[podName]; ok {
 			return true, &subset
@@ -594,8 +594,8 @@ func isPodRecordedInSubset(subsetStatuses []appsv1alpha1.WorkloadSpreadSubsetSta
 	return false, nil
 }
 
-func injectWorkloadSpreadIntoPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod, subsetName string, generatedUID string) (bool, error) {
-	var subset *appsv1alpha1.WorkloadSpreadSubset
+func injectWorkloadSpreadIntoPod(ws *appsv1beta1.WorkloadSpread, pod *corev1.Pod, subsetName string, generatedUID string) (bool, error) {
+	var subset *appsv1beta1.WorkloadSpreadSubset
 	for _, object := range ws.Spec.Subsets {
 		if subsetName == object.Name {
 			subset = &object
@@ -616,23 +616,25 @@ func injectWorkloadSpreadIntoPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Po
 	if pod.Spec.Affinity.NodeAffinity == nil {
 		pod.Spec.Affinity.NodeAffinity = &corev1.NodeAffinity{}
 	}
-	if len(subset.PreferredNodeSelectorTerms) > 0 {
+	// field renamed: PreferredNodeSelectorTerms → PreferredNodeSelector
+	if len(subset.PreferredNodeSelector) > 0 {
 		pod.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(pod.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-			subset.PreferredNodeSelectorTerms...)
+			subset.PreferredNodeSelector...)
 	}
-	if subset.RequiredNodeSelectorTerm != nil {
+	// field renamed: RequiredNodeSelectorTerm → RequiredNodeSelector
+	if subset.RequiredNodeSelector != nil {
 		if pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
 			pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
 		}
 		if len(pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {
 			pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = []corev1.NodeSelectorTerm{
-				*subset.RequiredNodeSelectorTerm,
+				*subset.RequiredNodeSelector,
 			}
 		} else {
 			for i := range pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
 				selectorTerm := &pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i]
-				selectorTerm.MatchExpressions = append(selectorTerm.MatchExpressions, subset.RequiredNodeSelectorTerm.MatchExpressions...)
-				selectorTerm.MatchFields = append(selectorTerm.MatchFields, subset.RequiredNodeSelectorTerm.MatchFields...)
+				selectorTerm.MatchExpressions = append(selectorTerm.MatchExpressions, subset.RequiredNodeSelector.MatchExpressions...)
+				selectorTerm.MatchFields = append(selectorTerm.MatchFields, subset.RequiredNodeSelector.MatchFields...)
 			}
 		}
 	}
@@ -676,7 +678,7 @@ func injectWorkloadSpreadIntoPod(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Po
 	return true, nil
 }
 
-func getSpecificSubset(subsetStatuses []appsv1alpha1.WorkloadSpreadSubsetStatus, specifySubset string) *appsv1alpha1.WorkloadSpreadSubsetStatus {
+func getSpecificSubset(subsetStatuses []appsv1beta1.WorkloadSpreadSubsetStatus, specifySubset string) *appsv1beta1.WorkloadSpreadSubsetStatus {
 	for _, subset := range subsetStatuses {
 		if specifySubset == subset.Name {
 			return &subset
@@ -685,12 +687,12 @@ func getSpecificSubset(subsetStatuses []appsv1alpha1.WorkloadSpreadSubsetStatus,
 	return nil
 }
 
-func (h *Handler) getSuitableSubset(subsetStatuses []appsv1alpha1.WorkloadSpreadSubsetStatus) *appsv1alpha1.WorkloadSpreadSubsetStatus {
+func (h *Handler) getSuitableSubset(subsetStatuses []appsv1beta1.WorkloadSpreadSubsetStatus) *appsv1beta1.WorkloadSpreadSubsetStatus {
 	for i := range subsetStatuses {
 		subset := &subsetStatuses[i]
 		canSchedule := true
 		for _, condition := range subset.Conditions {
-			if condition.Type == appsv1alpha1.SubsetSchedulable && condition.Status == corev1.ConditionFalse {
+			if condition.Type == "Schedulable" && condition.Status == metav1.ConditionFalse {
 				canSchedule = false
 				break
 			}
@@ -710,7 +712,7 @@ func (h *Handler) getSuitableSubset(subsetStatuses []appsv1alpha1.WorkloadSpread
 	return nil
 }
 
-func (h *Handler) isReferenceEqual(target *appsv1alpha1.TargetReference, owner *metav1.OwnerReference, namespace string) (bool, error) {
+func (h *Handler) isReferenceEqual(target *appsv1beta1.TargetReference, owner *metav1.OwnerReference, namespace string) (bool, error) {
 	if owner == nil {
 		return false, nil
 	}
@@ -763,15 +765,15 @@ func getParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
 	return parent, ordinal
 }
 
-func getSubsetCondition(ws *appsv1alpha1.WorkloadSpread, subsetName string, condType appsv1alpha1.WorkloadSpreadSubsetConditionType) *appsv1alpha1.WorkloadSpreadSubsetCondition {
+func getSubsetCondition(ws *appsv1beta1.WorkloadSpread, subsetName string, condType string) *metav1.Condition {
 	for i := range ws.Status.SubsetStatuses {
 		subset := &ws.Status.SubsetStatuses[i]
 		if subset.Name != subsetName {
 			continue
 		}
-		for _, condition := range subset.Conditions {
-			if condition.Type == condType {
-				return &condition
+		for j := range subset.Conditions {
+			if subset.Conditions[j].Type == condType {
+				return &subset.Conditions[j]
 			}
 		}
 	}
@@ -812,16 +814,16 @@ func initializeWorkloadsInWhiteList(c client.Client) {
 	workloadsInWhiteListInitialized = true
 }
 
-func (h *Handler) initializedSubsetStatuses(ws *appsv1alpha1.WorkloadSpread) ([]appsv1alpha1.WorkloadSpreadSubsetStatus, error) {
+func (h *Handler) initializedSubsetStatuses(ws *appsv1beta1.WorkloadSpread) ([]appsv1beta1.WorkloadSpreadSubsetStatus, error) {
 	replicas, err := h.getWorkloadReplicas(ws)
 	klog.V(5).InfoS("get workload replicas", "replicas", replicas, "err", err, "workloadSpread", klog.KObj(ws))
 	if err != nil {
 		return nil, err
 	}
-	var subsetStatuses []appsv1alpha1.WorkloadSpreadSubsetStatus
+	var subsetStatuses []appsv1beta1.WorkloadSpreadSubsetStatus
 	for i := range ws.Spec.Subsets {
 		subset := ws.Spec.Subsets[i]
-		subsetStatus := appsv1alpha1.WorkloadSpreadSubsetStatus{Name: subset.Name}
+		subsetStatus := appsv1beta1.WorkloadSpreadSubsetStatus{Name: subset.Name}
 		if subset.MaxReplicas == nil {
 			subsetStatus.MissingReplicas = -1
 		} else {
@@ -833,7 +835,7 @@ func (h *Handler) initializedSubsetStatuses(ws *appsv1alpha1.WorkloadSpread) ([]
 	return subsetStatuses, nil
 }
 
-func (h *Handler) getWorkloadReplicas(ws *appsv1alpha1.WorkloadSpread) (int32, error) {
+func (h *Handler) getWorkloadReplicas(ws *appsv1beta1.WorkloadSpread) (int32, error) {
 	if ws.Spec.TargetReference == nil || !hasPercentSubset(ws) {
 		return 0, nil
 	}
@@ -933,7 +935,7 @@ func GetReplicasFromCustomWorkload(reader client.Reader, object *unstructured.Un
 	return 0
 }
 
-func GetReplicasFromWorkloadWithTargetFilter(object client.Object, targetFilter *appsv1alpha1.TargetFilter) (int32, error) {
+func GetReplicasFromWorkloadWithTargetFilter(object client.Object, targetFilter *appsv1beta1.TargetFilter) (int32, error) {
 	objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(object)
 	if err != nil {
 		return 0, err
