@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -176,7 +177,7 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "vk-node",
 			Labels: map[string]string{
-				DefaultVKLabelKey: DefaultVKLabelValue,
+				util.VirtualKubeletLabelKey: util.VirtualKubeletLabelValue,
 			},
 		},
 		Spec: corev1.NodeSpec{
