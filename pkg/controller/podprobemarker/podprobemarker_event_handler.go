@@ -100,7 +100,7 @@ func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.TypedUpdate
 		klog.ErrorS(err, "Failed to get Node", "nodeName", newObj.Spec.NodeName)
 		return
 	}
-	if node.Labels["type"] == VirtualKubelet {
+	if node.Labels[util.VirtualKubeletLabelKey] == util.VirtualKubeletLabelValue {
 		isServerlessPod = true
 	}
 
