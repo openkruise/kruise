@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsalphav1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 var _ handler.TypedEventHandler[*appsalphav1.NodePodProbe] = &enqueueRequestForNodePodProbe{}
@@ -121,10 +122,6 @@ func (p *enqueueRequestForPod) Update(ctx context.Context, evt event.TypedUpdate
 	}
 }
 
-const (
-	VirtualKubelet = "virtual-kubelet"
-)
-
 type enqueueRequestForNode struct {
 	client.Reader
 }
@@ -133,7 +130,7 @@ var _ handler.TypedEventHandler[*corev1.Node] = &enqueueRequestForNode{}
 
 func (e *enqueueRequestForNode) Create(ctx context.Context, evt event.TypedCreateEvent[*corev1.Node], q workqueue.RateLimitingInterface) {
 	node := evt.Object
-	if node.Labels["type"] == VirtualKubelet {
+	if node.Labels[util.VirtualKubeletLabelKey] == util.VirtualKubeletLabelValue {
 		return
 	}
 	if node.DeletionTimestamp != nil {
@@ -148,7 +145,7 @@ func (e *enqueueRequestForNode) Generic(ctx context.Context, evt event.TypedGene
 
 func (e *enqueueRequestForNode) Update(ctx context.Context, evt event.TypedUpdateEvent[*corev1.Node], q workqueue.RateLimitingInterface) {
 	node := evt.ObjectNew
-	if node.Labels["type"] == VirtualKubelet {
+	if node.Labels[util.VirtualKubeletLabelKey] == util.VirtualKubeletLabelValue {
 		return
 	}
 	if node.DeletionTimestamp != nil {
@@ -160,7 +157,7 @@ func (e *enqueueRequestForNode) Update(ctx context.Context, evt event.TypedUpdat
 
 func (e *enqueueRequestForNode) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Node], q workqueue.RateLimitingInterface) {
 	node := evt.Object
-	if node.Labels["type"] == VirtualKubelet {
+	if node.Labels[util.VirtualKubeletLabelKey] == util.VirtualKubeletLabelValue {
 		return
 	}
 	e.nodeDelete(node, q)

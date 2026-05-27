@@ -507,7 +507,7 @@ func TestPodUpdateEventHandler_v2(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-node",
 						Labels: map[string]string{
-							"type": VirtualKubelet,
+							util.VirtualKubeletLabelKey: util.VirtualKubeletLabelValue,
 						},
 					},
 				}

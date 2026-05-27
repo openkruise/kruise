@@ -132,8 +132,15 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 		return admission.Errored(http.StatusBadRequest, fmt.Errorf("not allowed to recreate containers in a pending Pod"))
 	}
 
-	err = injectPodIntoContainerRecreateRequest(obj, pod)
-	if err != nil {
+	node := &v1.Node{}
+	if err := h.Client.Get(ctx, types.NamespacedName{Name: pod.Spec.NodeName}, node); err != nil {
+		if errors.IsNotFound(err) {
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to get Node %s: %v", pod.Spec.NodeName, err))
+		}
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("failed to get Node %s: %v", pod.Spec.NodeName, err))
+	}
+
+	if err := injectPodIntoContainerRecreateRequest(obj, pod, node); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
@@ -156,9 +163,13 @@ func isTerminatedBySidecarTerminator(pod *v1.Pod) bool {
 	return false
 }
 
-func injectPodIntoContainerRecreateRequest(obj *appsv1alpha1.ContainerRecreateRequest, pod *v1.Pod) error {
+func injectPodIntoContainerRecreateRequest(obj *appsv1alpha1.ContainerRecreateRequest, pod *v1.Pod, node *v1.Node) error {
 	obj.Labels[appsv1alpha1.ContainerRecreateRequestNodeNameKey] = pod.Spec.NodeName
 	obj.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey] = string(pod.UID)
+
+	if node != nil && node.Labels[util.VirtualKubeletLabelKey] == util.VirtualKubeletLabelValue {
+		obj.Labels[util.VirtualKubeletLabelKey] = util.VirtualKubeletLabelValue
+	}
 
 	if obj.Spec.Strategy.TerminationGracePeriodSeconds == nil {
 		obj.Spec.Strategy.TerminationGracePeriodSeconds = pod.Spec.TerminationGracePeriodSeconds

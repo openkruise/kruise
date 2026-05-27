@@ -64,8 +64,6 @@ var (
 const (
 	// PodProbeMarkerFinalizer is on PodProbeMarker, and used to remove podProbe from NodePodProbe.Spec
 	PodProbeMarkerFinalizer = "kruise.io/node-pod-probe-cleanup"
-
-	VirtualKubelet = "virtual-kubelet"
 )
 
 /**
@@ -469,7 +467,7 @@ func (r *ReconcilePodProbeMarker) getMatchingPods(ppm *appsv1alpha1.PodProbeMark
 			nodes[node.Name] = node
 		}
 
-		if node.Labels["type"] == VirtualKubelet {
+		if node.Labels[util.VirtualKubeletLabelKey] == util.VirtualKubeletLabelValue {
 			serverlessPods = append(serverlessPods, pod)
 		} else {
 			normalPods = append(normalPods, pod)
