@@ -37,6 +37,8 @@ type Interface interface {
 	ImagePullJobs() ImagePullJobInformer
 	// NodeImages returns a NodeImageInformer.
 	NodeImages() NodeImageInformer
+	// ResourceDistributions returns a ResourceDistributionInformer.
+	ResourceDistributions() ResourceDistributionInformer
 	// SidecarSets returns a SidecarSetInformer.
 	SidecarSets() SidecarSetInformer
 	// StatefulSets returns a StatefulSetInformer.
@@ -89,6 +91,11 @@ func (v *version) ImagePullJobs() ImagePullJobInformer {
 // NodeImages returns a NodeImageInformer.
 func (v *version) NodeImages() NodeImageInformer {
 	return &nodeImageInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// ResourceDistributions returns a ResourceDistributionInformer.
+func (v *version) ResourceDistributions() ResourceDistributionInformer {
+	return &resourceDistributionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // SidecarSets returns a SidecarSetInformer.

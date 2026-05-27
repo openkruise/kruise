@@ -190,6 +190,11 @@ func (s *ResourceDistributionTester) GetSecret(namespace, name string, mustExist
 	} else {
 		time.Sleep(3 * time.Second)
 	}
+	return s.PollSecret(namespace, name)
+}
+
+// PollSecret returns the current secret without blocking; for use inside gomega.Eventually.
+func (s *ResourceDistributionTester) PollSecret(namespace, name string) (*corev1.Secret, error) {
 	secret, err := s.c.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err

@@ -55,6 +55,10 @@ func (c *FakeAppsV1beta1) NodeImages() v1beta1.NodeImageInterface {
 	return newFakeNodeImages(c)
 }
 
+func (c *FakeAppsV1beta1) ResourceDistributions() v1beta1.ResourceDistributionInterface {
+	return newFakeResourceDistributions(c)
+}
+
 func (c *FakeAppsV1beta1) SidecarSets() v1beta1.SidecarSetInterface {
 	return newFakeSidecarSets(c)
 }
