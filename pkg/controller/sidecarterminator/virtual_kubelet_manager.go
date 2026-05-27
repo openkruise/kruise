@@ -19,12 +19,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 const (
-	DefaultVKLabelKey   = "type"
-	DefaultVKLabelValue = "virtual-kubelet"
-	DefaultVKTaintKey   = "virtual-kubelet.io/provider"
+	DefaultVKTaintKey = "virtual-kubelet.io/provider"
 )
 
 func IsPodRunningOnVirtualKubelet(pod *corev1.Pod, reader client.Reader) (bool, error) {
@@ -41,5 +41,5 @@ func IsPodRunningOnVirtualKubelet(pod *corev1.Pod, reader client.Reader) (bool, 
 }
 
 func isVirtualKubelet(node *corev1.Node) bool {
-	return node.Labels[DefaultVKLabelKey] == DefaultVKLabelValue
+	return node.Labels[util.VirtualKubeletLabelKey] == util.VirtualKubeletLabelValue
 }

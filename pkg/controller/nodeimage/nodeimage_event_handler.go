@@ -31,11 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/util"
 	utilimagejob "github.com/openkruise/kruise/pkg/util/imagejob"
-)
-
-const (
-	VirtualKubelet = "virtual-kubelet"
 )
 
 type nodeHandler struct {
@@ -46,7 +43,7 @@ var _ handler.TypedEventHandler[*v1.Node, reconcile.Request] = &nodeHandler{}
 
 func (e *nodeHandler) Create(ctx context.Context, evt event.TypedCreateEvent[*v1.Node], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	node := evt.Object
-	if node.Labels["type"] == VirtualKubelet {
+	if node.Labels[util.VirtualKubeletLabelKey] == util.VirtualKubeletLabelValue {
 		return
 	}
 	if node.DeletionTimestamp != nil {
@@ -61,7 +58,7 @@ func (e *nodeHandler) Generic(ctx context.Context, evt event.TypedGenericEvent[*
 
 func (e *nodeHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1.Node], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	node := evt.ObjectNew
-	if node.Labels["type"] == VirtualKubelet {
+	if node.Labels[util.VirtualKubeletLabelKey] == util.VirtualKubeletLabelValue {
 		return
 	}
 	if node.DeletionTimestamp != nil {
@@ -73,7 +70,7 @@ func (e *nodeHandler) Update(ctx context.Context, evt event.TypedUpdateEvent[*v1
 
 func (e *nodeHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*v1.Node], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	node := evt.Object
-	if node.Labels["type"] == VirtualKubelet {
+	if node.Labels[util.VirtualKubeletLabelKey] == util.VirtualKubeletLabelValue {
 		return
 	}
 	e.nodeDelete(node, q)
