@@ -23,6 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -74,22 +75,43 @@ var _ = ginkgo.Describe("PersistentPodState", ginkgo.Label("PersistentPodState",
 			sts.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] = ppsBetaNodeTopologyLabel
 			ginkgo.By(fmt.Sprintf("Creating StatefulSet %s", sts.Name))
 			tester.CreateStatefulset(sts)
-			time.Sleep(3 * time.Second)
 
 			ginkgo.By("verify auto-generated PersistentPodState uses v1beta1 keys field")
-			pps, err := kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(pps.APIVersion).To(gomega.Equal(appsv1beta1.GroupVersion.String()))
-			gomega.Expect(pps.Spec.RequiredPersistentTopology).NotTo(gomega.BeNil())
+			var pps *appsv1beta1.PersistentPodState
+			gomega.Eventually(func() error {
+				var err error
+				pps, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if pps.Spec.RequiredPersistentTopology == nil || len(pps.Spec.RequiredPersistentTopology.Keys) == 0 {
+					return fmt.Errorf("required topology keys not ready yet")
+				}
+				if len(pps.Spec.PreferredPersistentTopology) == 0 || len(pps.Spec.PreferredPersistentTopology[0].Preference.Keys) == 0 {
+					return fmt.Errorf("preferred topology keys not ready yet")
+				}
+				return nil
+			}, common.PodStartShortTimeout, common.Poll).Should(gomega.Succeed())
 			gomega.Expect(pps.Spec.RequiredPersistentTopology.Keys).To(gomega.ContainElement(ppsBetaOsTopologyLabel))
 			gomega.Expect(pps.Spec.PreferredPersistentTopology).To(gomega.HaveLen(1))
 			gomega.Expect(pps.Spec.PreferredPersistentTopology[0].Preference.Keys).To(gomega.ContainElement(ppsBetaNodeTopologyLabel))
 
-			pods, err := tester.ListPodsInKruiseSts(sts)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(pods).To(gomega.HaveLen(int(*sts.Spec.Replicas)))
-			gomega.Expect(pps.Status.PodStates).To(gomega.HaveLen(len(pods)))
+			var pods []*corev1.Pod
+			gomega.Eventually(func() int {
+				var err error
+				pods, err = tester.ListPodsInKruiseSts(sts)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return len(pods)
+			}, common.PodStartShortTimeout, common.Poll).Should(gomega.Equal(int(*sts.Spec.Replicas)))
 
+			gomega.Eventually(func() int {
+				pps, err := kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return len(pps.Status.PodStates)
+			}, common.PodStartShortTimeout, common.Poll).Should(gomega.Equal(len(pods)))
+
+			pps, err := kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, pod := range pods {
 				podState, ok := pps.Status.PodStates[pod.Name]
 				gomega.Expect(ok).To(gomega.BeTrue())
@@ -116,10 +138,6 @@ var _ = ginkgo.Describe("PersistentPodState", ginkgo.Label("PersistentPodState",
 			gomega.Expect(pps.Status.PodStates).To(gomega.HaveLen(len(pods)))
 
 			other := &appsv1beta1.PersistentPodState{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: appsv1beta1.GroupVersion.String(),
-					Kind:       "PersistentPodState",
-				},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns,
 					Name:      "pps-test",
@@ -163,10 +181,6 @@ var _ = ginkgo.Describe("PersistentPodState", ginkgo.Label("PersistentPodState",
 
 			ginkgo.By("create PersistentPodState via v1alpha1 with nodeTopologyKeys")
 			alphaPPS := &appsv1alpha1.PersistentPodState{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: appsv1alpha1.GroupVersion.String(),
-					Kind:       "PersistentPodState",
-				},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns,
 					Name:      "pps-cross-version",
@@ -194,10 +208,21 @@ var _ = ginkgo.Describe("PersistentPodState", ginkgo.Label("PersistentPodState",
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("read via v1beta1 and verify keys field (not nodeTopologyKeys)")
-			betaPPS, err := kc.AppsV1beta1().PersistentPodStates(ns).Get(context.TODO(), alphaPPS.Name, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(betaPPS.APIVersion).To(gomega.Equal(appsv1beta1.GroupVersion.String()))
-			gomega.Expect(betaPPS.Spec.RequiredPersistentTopology).NotTo(gomega.BeNil())
+			var betaPPS *appsv1beta1.PersistentPodState
+			gomega.Eventually(func() error {
+				var getErr error
+				betaPPS, getErr = kc.AppsV1beta1().PersistentPodStates(ns).Get(context.TODO(), alphaPPS.Name, metav1.GetOptions{})
+				if getErr != nil {
+					return getErr
+				}
+				if betaPPS.Spec.RequiredPersistentTopology == nil {
+					return fmt.Errorf("required topology not converted yet")
+				}
+				if len(betaPPS.Spec.RequiredPersistentTopology.Keys) == 0 {
+					return fmt.Errorf("keys not populated yet")
+				}
+				return nil
+			}, common.PodStartShortTimeout, common.Poll).Should(gomega.Succeed())
 			gomega.Expect(betaPPS.Spec.RequiredPersistentTopology.Keys).To(gomega.Equal([]string{ppsBetaNodeTopologyLabel}))
 			gomega.Expect(betaPPS.Spec.PreferredPersistentTopology[0].Preference.Keys).To(gomega.Equal([]string{ppsBetaOsTopologyLabel}))
 
@@ -206,9 +231,16 @@ var _ = ginkgo.Describe("PersistentPodState", ginkgo.Label("PersistentPodState",
 			_, err = kc.AppsV1beta1().PersistentPodStates(ns).Update(context.TODO(), betaPPS, metav1.UpdateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			alphaRead, err := kc.AppsV1alpha1().PersistentPodStates(ns).Get(context.TODO(), alphaPPS.Name, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(alphaRead.Spec.RequiredPersistentTopology.NodeTopologyKeys).To(
+			var alphaRead *appsv1alpha1.PersistentPodState
+			gomega.Eventually(func() []string {
+				var getErr error
+				alphaRead, getErr = kc.AppsV1alpha1().PersistentPodStates(ns).Get(context.TODO(), alphaPPS.Name, metav1.GetOptions{})
+				gomega.Expect(getErr).NotTo(gomega.HaveOccurred())
+				if alphaRead.Spec.RequiredPersistentTopology == nil {
+					return nil
+				}
+				return alphaRead.Spec.RequiredPersistentTopology.NodeTopologyKeys
+			}, common.PodStartShortTimeout, common.Poll).Should(
 				gomega.Equal([]string{ppsBetaOsTopologyLabel, ppsBetaNodeTopologyLabel}))
 
 			err = kc.AppsV1beta1().PersistentPodStates(ns).Delete(context.TODO(), alphaPPS.Name, metav1.DeleteOptions{})
