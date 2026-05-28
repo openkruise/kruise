@@ -205,12 +205,6 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 		duration.Update(leftTime)
 	}
 
-	if crr.Status.Phase == "" || crr.Status.Phase == appsv1beta1.ContainerRecreateRequestPending {
-		if err := r.syncContainerStatuses(crr, pod); err != nil {
-			return reconcile.Result{}, fmt.Errorf("sync containerStatuses error: %v", err)
-		}
-	}
-
 	if crr.Status.Phase != appsv1beta1.ContainerRecreateRequestRecreating {
 		return reconcile.Result{RequeueAfter: duration.Get()}, nil
 	}
@@ -253,7 +247,8 @@ func (r *ReconcileContainerRecreateRequest) syncContainerStatuses(crr *appsv1bet
 		if containerStatus == nil {
 			klog.InfoS("Could not find container in Pod Status for CRR", "containerName", c.Name, "containerRecreateRequest", klog.KObj(crr))
 			continue
-		} else if containerStatus.State.Running == nil {
+		} else if containerStatus.State.Running == nil || containerStatus.State.Running.StartedAt.Before(&crr.CreationTimestamp) {
+			// ignore non-running and history status
 			continue
 		}
 		syncContainerStatuses = append(syncContainerStatuses, appsv1beta1.ContainerRecreateRequestSyncContainerStatus{

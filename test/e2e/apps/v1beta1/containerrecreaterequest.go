@@ -171,19 +171,18 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 			}
 		})
 
-		ginkgo.It("v1beta1 status.containerStatusSnapshot is populated during recreating phase", func() {
+		ginkgo.It("v1beta1 status.containerStatusSnapshot is populated on completion", func() {
 			ginkgo.By("Create CloneSet and wait Pods ready")
 			pods = tester.CreateTestCloneSetAndGetPods(randStr, 1, []v1.Container{
 				{
 					Name:  "app",
 					Image: common.WebserverImage,
-					Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{
-						Exec: &v1.ExecAction{Command: []string{"sleep", "10"}},
-					}},
 				},
 			})
 
 			pod := pods[0]
+			oldContainerID := util.GetContainerStatus("app", pod).ContainerID
+
 			crr := &appsv1beta1.ContainerRecreateRequest{
 				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "crr-snap-" + randStr},
 				Spec: appsv1beta1.ContainerRecreateRequestSpec{
@@ -194,22 +193,19 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 			crr, err = tester.CreateCRR(crr)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			ginkgo.By("Wait until CRR enters Recreating phase and check containerStatusSnapshot")
-			gomega.Eventually(func() int {
-				crr, err = tester.GetCRR(crr.Name)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				if crr.Status.Phase == appsv1beta1.ContainerRecreateRequestRecreating {
-					return len(crr.Status.ContainerStatusSnapshot)
-				}
-				return -1
-			}, 30*time.Second, time.Second).Should(gomega.BeNumerically(">", 0))
+			ginkgo.By("Wait for CRR to complete and verify typed status fields")
+			crr = tester.WaitForCRRCompleted(crr.Name, 60*time.Second)
 
-			klog.Infof("CRR containerStatusSnapshot: %v", util.DumpJSON(crr.Status.ContainerStatusSnapshot))
+			// Verify typed status field was written (not the legacy annotation).
+			gomega.Expect(crr.Status.ContainerStatusSnapshot).ShouldNot(gomega.BeEmpty())
 			gomega.Expect(crr.Status.ContainerStatusSnapshot[0].Name).Should(gomega.Equal("app"))
+			// The snapshot must contain the NEW container ID, not the old one.
 			gomega.Expect(crr.Status.ContainerStatusSnapshot[0].ContainerID).ShouldNot(gomega.BeEmpty())
+			gomega.Expect(crr.Status.ContainerStatusSnapshot[0].ContainerID).ShouldNot(gomega.Equal(oldContainerID))
+			// Legacy annotation must be absent on v1beta1 objects.
+			gomega.Expect(crr.Annotations[appsv1beta1.ContainerRecreateRequestSyncContainerStatusesKey]).Should(gomega.Equal(""))
 
-			ginkgo.By("Wait CRR completion")
-			tester.WaitForCRRCompleted(crr.Name, 60*time.Second)
+			klog.Infof("CRR containerStatusSnapshot at completion: %v", util.DumpJSON(crr.Status.ContainerStatusSnapshot))
 		})
 
 		ginkgo.It("orderedRecreate works via v1beta1", func() {
@@ -265,16 +261,10 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 				{
 					Name:  "app",
 					Image: common.WebserverImage,
-					Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{
-						Exec: &v1.ExecAction{Command: []string{"sleep", "8"}},
-					}},
 				},
 				{
 					Name:  "sidecar",
 					Image: common.AgnhostImage,
-					Lifecycle: &v1.Lifecycle{PostStart: &v1.LifecycleHandler{
-						Exec: &v1.ExecAction{Command: []string{"sleep", "8"}},
-					}},
 				},
 			})
 
@@ -296,30 +286,27 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 			_, err = kc.AppsV1alpha1().ContainerRecreateRequests(ns).Create(context.TODO(), crr, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			ginkgo.By("Verify v1beta1 status exposes typed containerStatusSnapshot and PodUnreadyAcquired condition")
-			gomega.Eventually(func() bool {
-				fetched, err2 := tester.GetCRR(crrName)
-				gomega.Expect(err2).NotTo(gomega.HaveOccurred())
-				if fetched.Status.Phase != appsv1beta1.ContainerRecreateRequestRecreating ||
-					len(fetched.Status.ContainerStatusSnapshot) == 0 {
-					return false
+			ginkgo.By("Wait for completion and verify v1beta1 typed fields are populated")
+			completed := tester.WaitForCRRCompleted(crrName, 90*time.Second)
+
+			// typed status.containerStatusSnapshot must be written (not the legacy annotation)
+			gomega.Expect(completed.Status.ContainerStatusSnapshot).ShouldNot(gomega.BeEmpty())
+			gomega.Expect(completed.Status.ContainerStatusSnapshot[0].ContainerID).ShouldNot(gomega.BeEmpty())
+
+			// PodUnreadyAcquired condition must have been written (replaces unready-acquired annotation)
+			var foundCondition bool
+			for _, condition := range completed.Status.Conditions {
+				if condition.Type == appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType &&
+					condition.Status == metav1.ConditionTrue {
+					foundCondition = true
+					break
 				}
-				for _, condition := range fetched.Status.Conditions {
-					if condition.Type == appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType &&
-						condition.Status == metav1.ConditionTrue {
-						return true
-					}
-				}
-				return false
-			}, 60*time.Second, time.Second).Should(gomega.Equal(true))
+			}
+			gomega.Expect(foundCondition).Should(gomega.BeTrue(), "expected PodUnreadyAcquired condition to be present")
 
 			ginkgo.By("Verify legacy status annotations are absent on v1beta1 object")
-			fetched, err := tester.GetCRR(crrName)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(fetched.Annotations[appsv1beta1.ContainerRecreateRequestSyncContainerStatusesKey]).Should(gomega.Equal(""))
-			gomega.Expect(fetched.Annotations[appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey]).Should(gomega.Equal(""))
-
-			tester.WaitForCRRCompleted(crrName, 60*time.Second)
+			gomega.Expect(completed.Annotations[appsv1beta1.ContainerRecreateRequestSyncContainerStatusesKey]).Should(gomega.Equal(""))
+			gomega.Expect(completed.Annotations[appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey]).Should(gomega.Equal(""))
 		})
 
 	})

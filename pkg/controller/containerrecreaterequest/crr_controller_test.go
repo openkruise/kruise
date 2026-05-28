@@ -168,13 +168,14 @@ func TestSyncContainerStatuses_CollectsRunningContainers(t *testing.T) {
 		},
 	}
 
-	// The snapshot mirrors the current running container statuses while CRR is Recreating.
+	// Only containers started AFTER CRR creation are included (history status excluded).
+	// app: StartedAt = createdAt+5s → included
+	// sidecar: StartedAt = beforeCreate (10s before CRR) → excluded by StartedAt filter
 	expected := []appsv1beta1.ContainerRecreateRequestSyncContainerStatus{
 		{Name: "app", Ready: true, RestartCount: 1, ContainerID: "docker://new"},
-		{Name: "sidecar", Ready: false, RestartCount: 0, ContainerID: "docker://old"},
 	}
 
-	// Build the statuses as syncContainerStatuses() would
+	// Build the statuses as syncContainerStatuses() would (mirrors the real loop).
 	got := make([]appsv1beta1.ContainerRecreateRequestSyncContainerStatus, 0)
 	for i := range crr.Spec.Containers {
 		c := &crr.Spec.Containers[i]
@@ -185,7 +186,7 @@ func TestSyncContainerStatuses_CollectsRunningContainers(t *testing.T) {
 				break
 			}
 		}
-		if cs == nil || cs.State.Running == nil {
+		if cs == nil || cs.State.Running == nil || cs.State.Running.StartedAt.Before(&crr.CreationTimestamp) {
 			continue
 		}
 		got = append(got, appsv1beta1.ContainerRecreateRequestSyncContainerStatus{
