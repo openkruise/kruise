@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -74,6 +75,7 @@ var _ = ginkgo.Describe("PersistentPodState", ginkgo.Label("PersistentPodState",
 			sts.Annotations[appsv1alpha1.AnnotationRequiredPersistentTopology] = ppsBetaOsTopologyLabel
 			sts.Annotations[appsv1alpha1.AnnotationPreferredPersistentTopology] = ppsBetaNodeTopologyLabel
 			ginkgo.By(fmt.Sprintf("Creating StatefulSet %s", sts.Name))
+			// CreateStatefulset blocks until all pods are Running+Ready.
 			tester.CreateStatefulset(sts)
 
 			ginkgo.By("verify auto-generated PersistentPodState uses v1beta1 keys field")
@@ -104,28 +106,38 @@ var _ = ginkgo.Describe("PersistentPodState", ginkgo.Label("PersistentPodState",
 				return len(pods)
 			}, common.PodStartShortTimeout, common.Poll).Should(gomega.Equal(int(*sts.Spec.Replicas)))
 
+			ginkgo.By("verify PodStates are populated")
 			gomega.Eventually(func() int {
-				pps, err := kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+				var err error
+				pps, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return len(pps.Status.PodStates)
 			}, common.PodStartShortTimeout, common.Poll).Should(gomega.Equal(len(pods)))
 
-			pps, err := kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			for _, pod := range pods {
 				podState, ok := pps.Status.PodStates[pod.Name]
 				gomega.Expect(ok).To(gomega.BeTrue())
 				gomega.Expect(podState.NodeTopologyLabels).To(gomega.HaveLen(2))
-				gomega.Expect(pod.Annotations[mutating.InjectedPersistentPodStateKey]).To(gomega.Equal(pps.Name))
 			}
 
+			// Update image to restart pods; the webhook injects InjectedPersistentPodStateKey on
+			// re-admission only when PodStates already has history for the pod.
+			ginkgo.By("update image and verify pods get PPS annotation on re-admission")
 			sts.Spec.Template.Spec.Containers[0].Image = "busybox:1.35"
 			tester.UpdateStatefulset(sts)
-			time.Sleep(3 * time.Second)
 
+			// Re-fetch pods after restart to get fresh annotation state.
+			pods, err := tester.ListPodsInKruiseSts(sts)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			pps, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pps.Status.PodStates).To(gomega.HaveLen(len(pods)))
+			for _, pod := range pods {
+				gomega.Expect(pod.Annotations[mutating.InjectedPersistentPodStateKey]).To(gomega.Equal(pps.Name))
+				podState, ok := pps.Status.PodStates[pod.Name]
+				gomega.Expect(ok).To(gomega.BeTrue())
+				gomega.Expect(podState.NodeTopologyLabels).To(gomega.HaveLen(2))
+			}
 
 			sts.Spec.Replicas = ptr.To[int32](1)
 			tester.UpdateStatefulset(sts)
@@ -227,14 +239,21 @@ var _ = ginkgo.Describe("PersistentPodState", ginkgo.Label("PersistentPodState",
 			gomega.Expect(betaPPS.Spec.PreferredPersistentTopology[0].Preference.Keys).To(gomega.Equal([]string{ppsBetaOsTopologyLabel}))
 
 			ginkgo.By("round-trip write v1beta1 keys and read v1alpha1 nodeTopologyKeys")
-			betaPPS.Spec.RequiredPersistentTopology.Keys = []string{ppsBetaOsTopologyLabel, ppsBetaNodeTopologyLabel}
-			_, err = kc.AppsV1beta1().PersistentPodStates(ns).Update(context.TODO(), betaPPS, metav1.UpdateOptions{})
+			// Use retry-on-conflict: the controller may have modified the object between
+			// the GET above and this Update, causing a 409 conflict.
+			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				betaPPS, err = kc.AppsV1beta1().PersistentPodStates(ns).Get(context.TODO(), alphaPPS.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				betaPPS.Spec.RequiredPersistentTopology.Keys = []string{ppsBetaOsTopologyLabel, ppsBetaNodeTopologyLabel}
+				_, err = kc.AppsV1beta1().PersistentPodStates(ns).Update(context.TODO(), betaPPS, metav1.UpdateOptions{})
+				return err
+			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			var alphaRead *appsv1alpha1.PersistentPodState
 			gomega.Eventually(func() []string {
-				var getErr error
-				alphaRead, getErr = kc.AppsV1alpha1().PersistentPodStates(ns).Get(context.TODO(), alphaPPS.Name, metav1.GetOptions{})
+				alphaRead, getErr := kc.AppsV1alpha1().PersistentPodStates(ns).Get(context.TODO(), alphaPPS.Name, metav1.GetOptions{})
 				gomega.Expect(getErr).NotTo(gomega.HaveOccurred())
 				if alphaRead.Spec.RequiredPersistentTopology == nil {
 					return nil
