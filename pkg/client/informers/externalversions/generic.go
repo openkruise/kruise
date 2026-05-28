@@ -105,6 +105,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().ImagePullJobs().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("nodeimages"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().NodeImages().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("persistentpodstates"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().PersistentPodStates().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("resourcedistributions"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().ResourceDistributions().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("sidecarsets"):

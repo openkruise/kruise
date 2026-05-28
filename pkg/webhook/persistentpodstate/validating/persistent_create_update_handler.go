@@ -23,24 +23,20 @@ import (
 	"reflect"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 )
 
 // PersistentPodStateCreateUpdateHandler handles PersistentPodState
 type PersistentPodStateCreateUpdateHandler struct {
-	// To use the client, you need to do the following:
-	// - uncomment it
-	// - import sigs.k8s.io/controller-runtime/pkg/client
-	// - uncomment the InjectClient method at the bottom of this file.
 	Client client.Client
 
-	// Decoder decodes objects
 	Decoder admission.Decoder
 }
 
@@ -48,21 +44,19 @@ var _ admission.Handler = &PersistentPodStateCreateUpdateHandler{}
 
 // Handle handles admission requests.
 func (h *PersistentPodStateCreateUpdateHandler) Handle(ctx context.Context, req admission.Request) admission.Response {
-	obj := &appsv1alpha1.PersistentPodState{}
-	err := h.Decoder.Decode(req, obj)
+	obj, err := h.decodeObject(req)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	var old *appsv1alpha1.PersistentPodState
-	//when Operation is update, decode older object
+
+	var old *appsv1beta1.PersistentPodState
 	if req.AdmissionRequest.Operation == admissionv1.Update {
-		old = new(appsv1alpha1.PersistentPodState)
-		if err := h.Decoder.Decode(
-			admission.Request{AdmissionRequest: admissionv1.AdmissionRequest{Object: req.AdmissionRequest.OldObject}},
-			old); err != nil {
+		old, err = h.decodeOldObject(req)
+		if err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 	}
+
 	allErrs := h.validatingPersistentPodStateFn(obj, old)
 	if len(allErrs) != 0 {
 		return admission.Errored(http.StatusBadRequest, allErrs.ToAggregate())
@@ -70,24 +64,64 @@ func (h *PersistentPodStateCreateUpdateHandler) Handle(ctx context.Context, req 
 	return admission.ValidationResponse(true, "")
 }
 
-func (h *PersistentPodStateCreateUpdateHandler) validatingPersistentPodStateFn(obj, old *appsv1alpha1.PersistentPodState) field.ErrorList {
-	//validate pps.Spec
+func (h *PersistentPodStateCreateUpdateHandler) decodeObject(req admission.Request) (*appsv1beta1.PersistentPodState, error) {
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		obj := &appsv1beta1.PersistentPodState{}
+		if err := h.Decoder.Decode(req, obj); err != nil {
+			return nil, err
+		}
+		return obj, nil
+	case appsv1alpha1.GroupVersion.Version:
+		alpha := &appsv1alpha1.PersistentPodState{}
+		if err := h.Decoder.Decode(req, alpha); err != nil {
+			return nil, err
+		}
+		beta := &appsv1beta1.PersistentPodState{}
+		if err := alpha.ConvertTo(beta); err != nil {
+			return nil, fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err)
+		}
+		return beta, nil
+	default:
+		return nil, fmt.Errorf("unsupported version: %s", req.AdmissionRequest.Resource.Version)
+	}
+}
+
+func (h *PersistentPodStateCreateUpdateHandler) decodeOldObject(req admission.Request) (*appsv1beta1.PersistentPodState, error) {
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		obj := &appsv1beta1.PersistentPodState{}
+		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, obj); err != nil {
+			return nil, err
+		}
+		return obj, nil
+	case appsv1alpha1.GroupVersion.Version:
+		alpha := &appsv1alpha1.PersistentPodState{}
+		if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, alpha); err != nil {
+			return nil, err
+		}
+		beta := &appsv1beta1.PersistentPodState{}
+		if err := alpha.ConvertTo(beta); err != nil {
+			return nil, fmt.Errorf("failed to convert v1alpha1->v1beta1: %v", err)
+		}
+		return beta, nil
+	default:
+		return nil, fmt.Errorf("unsupported version: %s", req.AdmissionRequest.Resource.Version)
+	}
+}
+
+func (h *PersistentPodStateCreateUpdateHandler) validatingPersistentPodStateFn(obj, old *appsv1beta1.PersistentPodState) field.ErrorList {
 	allErrs := field.ErrorList{}
 	whiteList, err := configuration.GetPPSWatchCustomWorkloadWhiteList(h.Client)
 	if err != nil {
 		allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("failed to get persistent pod state config white list, error: %v", err)))
 		return allErrs
 	}
-	errs := validatePersistentPodStateSpec(obj, field.NewPath("spec"), whiteList)
-	if len(errs) != 0 {
-		allErrs = append(allErrs, errs...)
-	}
-	// when operation is update, validating whether old and new pps conflict
+	allErrs = append(allErrs, validatePersistentPodStateSpec(obj, field.NewPath("spec"), whiteList)...)
 	if old != nil {
 		allErrs = append(allErrs, validateUpdateObjImmutable(obj, old, field.NewPath("spec"))...)
 	}
-	//validate whether pps is in conflict with others
-	ppsList := &appsv1alpha1.PersistentPodStateList{}
+	ppsList := &appsv1beta1.PersistentPodStateList{}
 	if err := h.Client.List(context.TODO(), ppsList, &client.ListOptions{Namespace: obj.Namespace}); err != nil {
 		allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("query other PersistentPodState failed, err: %v", err)))
 	} else {
@@ -96,19 +130,17 @@ func (h *PersistentPodStateCreateUpdateHandler) validatingPersistentPodStateFn(o
 	return allErrs
 }
 
-func validateUpdateObjImmutable(obj, old *appsv1alpha1.PersistentPodState, fldPath *field.Path) field.ErrorList {
+func validateUpdateObjImmutable(obj, old *appsv1beta1.PersistentPodState, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	// targetRef can't be changed
 	if !reflect.DeepEqual(obj.Spec.TargetReference, old.Spec.TargetReference) {
 		allErrs = append(allErrs, field.Required(fldPath.Child("targetRef"), "targetRef cannot be modified"))
 	}
 	return allErrs
 }
 
-func validatePersistentPodStateSpec(obj *appsv1alpha1.PersistentPodState, fldPath *field.Path, whiteList *configuration.CustomWorkloadWhiteList) field.ErrorList {
+func validatePersistentPodStateSpec(obj *appsv1beta1.PersistentPodState, fldPath *field.Path, whiteList *configuration.CustomWorkloadWhiteList) field.ErrorList {
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
-	// targetRef
 	if spec.TargetReference.APIVersion == "" || spec.TargetReference.Name == "" || spec.TargetReference.Kind == "" {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("TargetReference"), spec.TargetReference, "empty TargetReference is not valid for PersistentPodState."))
 	}
@@ -125,20 +157,16 @@ func validatePersistentPodStateSpec(obj *appsv1alpha1.PersistentPodState, fldPat
 	return allErrs
 }
 
-func validatePerConflict(pps *appsv1alpha1.PersistentPodState, others []appsv1alpha1.PersistentPodState, fldPath *field.Path) field.ErrorList {
+func validatePerConflict(pps *appsv1beta1.PersistentPodState, others []appsv1beta1.PersistentPodState, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	for _, other := range others {
 		if pps.Name == other.Name {
 			continue
 		}
-		// pod cannot be controlled by multiple ppss
 		curRef := pps.Spec.TargetReference
 		otherRef := other.Spec.TargetReference
-		// The previous has been verified, there is no possibility of error here
-		curGv, _ := schema.ParseGroupVersion(curRef.APIVersion)
-		otherGv, _ := schema.ParseGroupVersion(otherRef.APIVersion)
-		if curGv.Group == otherGv.Group && curRef.Kind == otherRef.Kind && curRef.Name == otherRef.Name {
+		if util.IsReferenceEqualV1beta1(curRef, otherRef) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("targetReference"), pps.Spec.TargetReference, fmt.Sprintf(
 				"targetReference is in conflict with other PersistentPodState %s", other.Name)))
 			return allErrs
