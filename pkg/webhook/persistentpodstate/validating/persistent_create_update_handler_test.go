@@ -121,7 +121,11 @@ func TestPersistentPodStateCreateUpdateHandler_Handle(t *testing.T) {
 				},
 			}
 			resp := handler.Handle(context.Background(), req)
-			require.Equal(t, tc.wantAllowed, resp.Allowed, "response: %s", string(resp.Result.Message))
+			var resultMsg string
+			if resp.Result != nil {
+				resultMsg = resp.Result.Message
+			}
+			require.Equal(t, tc.wantAllowed, resp.Allowed, "response: %s", resultMsg)
 		})
 	}
 }

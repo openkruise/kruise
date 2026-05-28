@@ -133,7 +133,7 @@ func (h *PersistentPodStateCreateUpdateHandler) validatingPersistentPodStateFn(o
 func validateUpdateObjImmutable(obj, old *appsv1beta1.PersistentPodState, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if !reflect.DeepEqual(obj.Spec.TargetReference, old.Spec.TargetReference) {
-		allErrs = append(allErrs, field.Required(fldPath.Child("targetRef"), "targetRef cannot be modified"))
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("targetRef"), "targetRef is immutable"))
 	}
 	return allErrs
 }
@@ -142,12 +142,12 @@ func validatePersistentPodStateSpec(obj *appsv1beta1.PersistentPodState, fldPath
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
 	if spec.TargetReference.APIVersion == "" || spec.TargetReference.Name == "" || spec.TargetReference.Kind == "" {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("TargetReference"), spec.TargetReference, "empty TargetReference is not valid for PersistentPodState."))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "empty targetRef is not valid for PersistentPodState."))
 	}
 
 	apiVersion, kind := spec.TargetReference.APIVersion, spec.TargetReference.Kind
 	if !whiteList.ValidateAPIVersionAndKind(apiVersion, kind) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("TargetReference"), spec.TargetReference, "TargetReference.Kind must be StatefulSet or in PPS_Watch_Custom_Workload_WhiteList"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "targetRef.Kind must be StatefulSet or in PPS_Watch_Custom_Workload_WhiteList"))
 	}
 
 	if spec.RequiredPersistentTopology == nil && len(spec.PreferredPersistentTopology) == 0 {

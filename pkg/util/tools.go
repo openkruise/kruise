@@ -186,7 +186,7 @@ func CalculatePartitionReplicas(partition *intstrutil.IntOrString, replicasPoint
 	return pValue, nil
 }
 
-// IsReferenceEqualV1beta1 checks APIVersion, Kind, Name for v1beta1 TargetReference.
+// IsReferenceEqualV1beta1 checks API group (not full APIVersion), Kind, and Name for v1beta1 TargetReference.
 func IsReferenceEqualV1beta1(ref1, ref2 appsv1beta1.TargetReference) bool {
 	return IsReferenceEqual(appsv1alpha1.TargetReference{
 		APIVersion: ref1.APIVersion,
@@ -199,7 +199,7 @@ func IsReferenceEqualV1beta1(ref1, ref2 appsv1beta1.TargetReference) bool {
 	})
 }
 
-// IsReferenceEqual checks APIVersion, Kind, Name
+// IsReferenceEqual checks API group (not full APIVersion), Kind, and Name.
 func IsReferenceEqual(ref1, ref2 appsv1alpha1.TargetReference) bool {
 	gv1, err := schema.ParseGroupVersion(ref1.APIVersion)
 	if err != nil {

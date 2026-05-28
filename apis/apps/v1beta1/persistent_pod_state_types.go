@@ -41,7 +41,6 @@ type PersistentPodStateSpec struct {
 	// PersistentPodStateRetentionPolicy describes the policy used for PodState.
 	// The default policy of 'WhenScaled' causes when scale down statefulSet, deleting it.
 	// +optional
-	// +kubebuilder:validation:Enum=WhenScaled;WhenDeleted
 	PersistentPodStateRetentionPolicy PersistentPodStateRetentionPolicyType `json:"persistentPodStateRetentionPolicy,omitempty"`
 }
 
