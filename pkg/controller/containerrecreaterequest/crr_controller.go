@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -313,20 +314,37 @@ func (r *ReconcileContainerRecreateRequest) acquirePodNotReady(crr *appsv1beta1.
 			"containerRecreateRequest", klog.KObj(crr), "pod", klog.KObj(pod), "readinessGate", appspub.KruisePodReadyConditionType)
 	}
 
-	now := metav1.NewTime(r.clock.Now())
-	condition := metav1.Condition{
-		Type:               appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType,
-		Status:             metav1.ConditionTrue,
-		LastTransitionTime: now,
-		Reason:             "UnreadyAcquired",
-		Message:            "Pod has been forced to not-ready for unreadyGracePeriodSeconds drain",
-	}
-	type conditionsPatch struct {
-		Conditions []metav1.Condition `json:"conditions"`
-	}
-	patchData := statusPatchBody{Status: conditionsPatch{Conditions: []metav1.Condition{condition}}}
-	body, _ := json.Marshal(patchData)
-	return r.Status().Patch(context.TODO(), crr, client.RawPatch(types.MergePatchType, body))
+	// Set the PodUnreadyAcquired condition idempotently. The kruise-daemon derives the
+	// unreadyGracePeriod drain deadline from this condition's LastTransitionTime, so a
+	// repeated reconcile must NOT push the timestamp forward (that would keep extending
+	// the drain and the grace period would never elapse). meta.SetStatusCondition
+	// preserves the existing LastTransitionTime when the condition is already present
+	// with the same status, and we re-read the live object first to avoid acting on a
+	// stale cache. The whole conditions slice is patched (not just our single entry) so
+	// any other conditions are preserved through the merge-patch array replacement.
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		newCRR := &appsv1beta1.ContainerRecreateRequest{}
+		if err := r.Get(context.TODO(), types.NamespacedName{Namespace: crr.Namespace, Name: crr.Name}, newCRR); err != nil {
+			return err
+		}
+		conditions := newCRR.Status.Conditions
+		if changed := meta.SetStatusCondition(&conditions, metav1.Condition{
+			Type:               appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType,
+			Status:             metav1.ConditionTrue,
+			LastTransitionTime: metav1.NewTime(r.clock.Now()),
+			Reason:             "UnreadyAcquired",
+			Message:            "Pod has been forced to not-ready for unreadyGracePeriodSeconds drain",
+		}); !changed {
+			// Condition already present with the same status/reason/message: nothing to write.
+			return nil
+		}
+		type conditionsPatch struct {
+			Conditions []metav1.Condition `json:"conditions"`
+		}
+		patchData := statusPatchBody{Status: conditionsPatch{Conditions: conditions}}
+		body, _ := json.Marshal(patchData)
+		return r.Status().Patch(context.TODO(), newCRR, client.RawPatch(types.MergePatchType, body))
+	})
 }
 
 func (r *ReconcileContainerRecreateRequest) releasePodNotReady(crr *appsv1beta1.ContainerRecreateRequest, pod *v1.Pod) error {

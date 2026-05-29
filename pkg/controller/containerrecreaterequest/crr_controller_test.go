@@ -17,15 +17,22 @@ limitations under the License.
 package containerrecreaterequest
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	testingclock "k8s.io/utils/clock/testing"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/util/podadapter"
+	utilpodreadiness "github.com/openkruise/kruise/pkg/util/podreadiness"
 )
 
 func newTestScheme() *runtime.Scheme {
@@ -120,6 +127,12 @@ func TestHasPodUnreadyAcquiredCondition(t *testing.T) {
 	}
 }
 
+// TestSyncContainerStatuses_CollectsRunningContainers drives the real
+// syncContainerStatuses() through a fake client and asserts the persisted
+// status.containerStatusSnapshot, rather than re-implementing the loop. This
+// covers the snapshot-promotion path (the v1alpha1 sync-container-statuses
+// annotation is now a typed status field) including the StartedAt history
+// filter and the Status().Patch write.
 func TestSyncContainerStatuses_CollectsRunningContainers(t *testing.T) {
 	createdAt := metav1.NewTime(time.Now())
 	beforeCreate := metav1.NewTime(createdAt.Add(-10 * time.Second))
@@ -175,29 +188,85 @@ func TestSyncContainerStatuses_CollectsRunningContainers(t *testing.T) {
 		{Name: "app", Ready: true, RestartCount: 1, ContainerID: "docker://new"},
 	}
 
-	// Build the statuses as syncContainerStatuses() would (mirrors the real loop).
-	got := make([]appsv1beta1.ContainerRecreateRequestSyncContainerStatus, 0)
-	for i := range crr.Spec.Containers {
-		c := &crr.Spec.Containers[i]
-		var cs *corev1.ContainerStatus
-		for j := range pod.Status.ContainerStatuses {
-			if pod.Status.ContainerStatuses[j].Name == c.Name {
-				cs = &pod.Status.ContainerStatuses[j]
-				break
-			}
-		}
-		if cs == nil || cs.State.Running == nil || cs.State.Running.StartedAt.Before(&crr.CreationTimestamp) {
-			continue
-		}
-		got = append(got, appsv1beta1.ContainerRecreateRequestSyncContainerStatus{
-			Name:         cs.Name,
-			Ready:        cs.Ready,
-			RestartCount: cs.RestartCount,
-			ContainerID:  cs.ContainerID,
-		})
+	cli := fake.NewClientBuilder().
+		WithScheme(newTestScheme()).
+		WithObjects(crr).
+		WithStatusSubresource(crr).
+		Build()
+	r := &ReconcileContainerRecreateRequest{Client: cli}
+
+	if err := r.syncContainerStatuses(crr, pod); err != nil {
+		t.Fatalf("syncContainerStatuses() error: %v", err)
 	}
 
-	if !snapshotEqual(got, expected) {
-		t.Errorf("snapshot mismatch: got %v, want %v", got, expected)
+	got := &appsv1beta1.ContainerRecreateRequest{}
+	if err := cli.Get(context.TODO(), types.NamespacedName{Namespace: "default", Name: "crr-0"}, got); err != nil {
+		t.Fatalf("get crr error: %v", err)
+	}
+	if !snapshotEqual(got.Status.ContainerStatusSnapshot, expected) {
+		t.Errorf("snapshot mismatch: got %v, want %v", got.Status.ContainerStatusSnapshot, expected)
+	}
+}
+
+// TestAcquirePodNotReady_PreservesConditionTimestamp guards the idempotency fix:
+// repeated acquirePodNotReady calls must keep the original PodUnreadyAcquired
+// LastTransitionTime, because the kruise-daemon derives the unreadyGracePeriod
+// drain deadline from it. If the timestamp were rewritten on every reconcile the
+// grace period would never elapse.
+func TestAcquirePodNotReady_PreservesConditionTimestamp(t *testing.T) {
+	crr := &appsv1beta1.ContainerRecreateRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "crr-0", Namespace: "default"},
+		Spec: appsv1beta1.ContainerRecreateRequestSpec{
+			PodName: "pod-0",
+			Strategy: &appsv1beta1.ContainerRecreateRequestStrategy{
+				UnreadyGracePeriodSeconds: func() *int64 { v := int64(30); return &v }(),
+			},
+		},
+	}
+	// Pod without the Kruise readiness gate → acquirePodNotReady skips the
+	// readiness-gate/finalizer path and only writes the condition.
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Namespace: "default"}}
+
+	cli := fake.NewClientBuilder().
+		WithScheme(newTestScheme()).
+		WithObjects(crr).
+		WithStatusSubresource(crr).
+		Build()
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	r := &ReconcileContainerRecreateRequest{
+		Client:              cli,
+		clock:               fakeClock,
+		podReadinessControl: utilpodreadiness.NewForAdapter(&podadapter.AdapterRuntimeClient{Client: cli}),
+	}
+
+	if err := r.acquirePodNotReady(crr, pod); err != nil {
+		t.Fatalf("first acquirePodNotReady() error: %v", err)
+	}
+	first := &appsv1beta1.ContainerRecreateRequest{}
+	if err := cli.Get(context.TODO(), types.NamespacedName{Namespace: "default", Name: "crr-0"}, first); err != nil {
+		t.Fatalf("get crr error: %v", err)
+	}
+	cond := meta.FindStatusCondition(first.Status.Conditions, appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType)
+	if cond == nil || cond.Status != metav1.ConditionTrue {
+		t.Fatalf("expected PodUnreadyAcquired=True after first acquire, got %+v", first.Status.Conditions)
+	}
+	firstTime := cond.LastTransitionTime
+
+	// Advance the clock and acquire again. The condition already exists with the
+	// same status, so the timestamp must be preserved (and no write performed).
+	fakeClock.Step(15 * time.Second)
+	if err := r.acquirePodNotReady(first.DeepCopy(), pod); err != nil {
+		t.Fatalf("second acquirePodNotReady() error: %v", err)
+	}
+	second := &appsv1beta1.ContainerRecreateRequest{}
+	if err := cli.Get(context.TODO(), types.NamespacedName{Namespace: "default", Name: "crr-0"}, second); err != nil {
+		t.Fatalf("get crr error: %v", err)
+	}
+	secondCond := meta.FindStatusCondition(second.Status.Conditions, appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType)
+	if secondCond == nil {
+		t.Fatalf("PodUnreadyAcquired condition disappeared after second acquire")
+	}
+	if !secondCond.LastTransitionTime.Equal(&firstTime) {
+		t.Errorf("LastTransitionTime was rewritten: first=%v second=%v (should be preserved)", firstTime, secondCond.LastTransitionTime)
 	}
 }
