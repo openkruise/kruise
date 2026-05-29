@@ -125,8 +125,6 @@ func TestPersistentPodState_ConvertTo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dst := &v1beta1.PersistentPodState{}
 			require.NoError(t, tt.src.ConvertTo(dst))
-			assert.Equal(t, v1beta1.GroupVersion.String(), dst.APIVersion)
-			assert.Equal(t, "PersistentPodState", dst.Kind)
 			assert.Equal(t, tt.want.Spec, dst.Spec)
 			assert.Equal(t, tt.want.Status, dst.Status)
 		})
@@ -137,16 +135,43 @@ func TestPersistentPodState_ConvertFrom(t *testing.T) {
 	src := &v1beta1.PersistentPodState{
 		ObjectMeta: metav1.ObjectMeta{Name: "pps", Namespace: "ns"},
 		Spec: v1beta1.PersistentPodStateSpec{
-			TargetReference: v1beta1.TargetReference{APIVersion: "apps/v1", Kind: "StatefulSet", Name: "web"},
+			TargetReference:          v1beta1.TargetReference{APIVersion: "apps/v1", Kind: "StatefulSet", Name: "web"},
+			PersistentPodAnnotations: []v1beta1.PersistentPodAnnotation{{Key: "foo"}},
 			RequiredPersistentTopology: &v1beta1.NodeTopologyTerm{
 				Keys: []string{"kubernetes.io/hostname", "topology.kubernetes.io/zone"},
+			},
+			PreferredPersistentTopology: []v1beta1.PreferredTopologyTerm{
+				{Weight: 100, Preference: v1beta1.NodeTopologyTerm{Keys: []string{"topology.kubernetes.io/zone"}}},
+			},
+			PersistentPodStateRetentionPolicy: v1beta1.PersistentPodStateRetentionPolicyWhenDeleted,
+		},
+		Status: v1beta1.PersistentPodStateStatus{
+			ObservedGeneration: 5,
+			PodStates: map[string]v1beta1.PodState{
+				"web-0": {
+					NodeName:           "node-1",
+					NodeTopologyLabels: map[string]string{"kubernetes.io/hostname": "node-1"},
+					Annotations:        map[string]string{"foo": "bar"},
+				},
 			},
 		},
 	}
 	dst := &PersistentPodState{}
 	require.NoError(t, dst.ConvertFrom(src))
-	assert.Equal(t, GroupVersion.String(), dst.APIVersion)
+
+	// All spec fields map faithfully, with keys renamed back to nodeTopologyKeys.
+	assert.Equal(t, src.Spec.TargetReference.Name, dst.Spec.TargetReference.Name)
+	assert.Equal(t, []PersistentPodAnnotation{{Key: "foo"}}, dst.Spec.PersistentPodAnnotations)
 	assert.Equal(t, []string{"kubernetes.io/hostname", "topology.kubernetes.io/zone"}, dst.Spec.RequiredPersistentTopology.NodeTopologyKeys)
+	assert.Equal(t, []string{"topology.kubernetes.io/zone"}, dst.Spec.PreferredPersistentTopology[0].Preference.NodeTopologyKeys)
+	assert.Equal(t, int32(100), dst.Spec.PreferredPersistentTopology[0].Weight)
+	assert.Equal(t, PersistentPodStateRetentionPolicyType(PersistentPodStateRetentionPolicyWhenDeleted), dst.Spec.PersistentPodStateRetentionPolicy)
+
+	// Status fields map faithfully.
+	assert.Equal(t, int64(5), dst.Status.ObservedGeneration)
+	assert.Equal(t, "node-1", dst.Status.PodStates["web-0"].NodeName)
+	assert.Equal(t, map[string]string{"kubernetes.io/hostname": "node-1"}, dst.Status.PodStates["web-0"].NodeTopologyLabels)
+	assert.Equal(t, map[string]string{"foo": "bar"}, dst.Status.PodStates["web-0"].Annotations)
 }
 
 func TestPersistentPodState_RoundTrip(t *testing.T) {

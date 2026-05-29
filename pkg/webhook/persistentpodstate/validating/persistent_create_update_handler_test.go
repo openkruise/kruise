@@ -55,72 +55,106 @@ func TestPersistentPodStateCreateUpdateHandler_Handle(t *testing.T) {
 		Decoder: admission.NewDecoder(testScheme),
 	}
 
+	newBeta := func(name, stsName string) *appsv1beta1.PersistentPodState {
+		return &appsv1beta1.PersistentPodState{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+			Spec: appsv1beta1.PersistentPodStateSpec{
+				TargetReference: appsv1beta1.TargetReference{
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					Name:       stsName,
+				},
+				RequiredPersistentTopology: &appsv1beta1.NodeTopologyTerm{
+					Keys: []string{"kubernetes.io/hostname"},
+				},
+			},
+		}
+	}
+	newAlpha := func(name, stsName string) *appsv1alpha1.PersistentPodState {
+		return &appsv1alpha1.PersistentPodState{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
+			Spec: appsv1alpha1.PersistentPodStateSpec{
+				TargetReference: appsv1alpha1.TargetReference{
+					APIVersion: "apps/v1",
+					Kind:       "StatefulSet",
+					Name:       stsName,
+				},
+				RequiredPersistentTopology: &appsv1alpha1.NodeTopologyTerm{
+					NodeTopologyKeys: []string{"kubernetes.io/hostname"},
+				},
+			},
+		}
+	}
+
 	cases := []struct {
 		name        string
 		version     string
+		operation   admissionv1.Operation
 		buildObj    func() runtime.Object
+		buildOldObj func() runtime.Object
 		wantAllowed bool
 	}{
 		{
-			name:    "v1beta1 create with keys",
-			version: appsv1beta1.GroupVersion.Version,
-			buildObj: func() runtime.Object {
-				return &appsv1beta1.PersistentPodState{
-					ObjectMeta: metav1.ObjectMeta{Name: "pps-beta", Namespace: "default"},
-					Spec: appsv1beta1.PersistentPodStateSpec{
-						TargetReference: appsv1beta1.TargetReference{
-							APIVersion: "apps/v1",
-							Kind:       "StatefulSet",
-							Name:       "sts",
-						},
-						RequiredPersistentTopology: &appsv1beta1.NodeTopologyTerm{
-							Keys: []string{"kubernetes.io/hostname"},
-						},
-					},
-				}
-			},
+			name:        "v1beta1 create with keys",
+			version:     appsv1beta1.GroupVersion.Version,
+			operation:   admissionv1.Create,
+			buildObj:    func() runtime.Object { return newBeta("pps-beta", "sts") },
 			wantAllowed: true,
 		},
 		{
-			name:    "v1alpha1 create with nodeTopologyKeys",
-			version: appsv1alpha1.GroupVersion.Version,
-			buildObj: func() runtime.Object {
-				return &appsv1alpha1.PersistentPodState{
-					ObjectMeta: metav1.ObjectMeta{Name: "pps-alpha", Namespace: "default"},
-					Spec: appsv1alpha1.PersistentPodStateSpec{
-						TargetReference: appsv1alpha1.TargetReference{
-							APIVersion: "apps/v1",
-							Kind:       "StatefulSet",
-							Name:       "sts",
-						},
-						RequiredPersistentTopology: &appsv1alpha1.NodeTopologyTerm{
-							NodeTopologyKeys: []string{"kubernetes.io/hostname"},
-						},
-					},
-				}
-			},
+			name:        "v1alpha1 create with nodeTopologyKeys",
+			version:     appsv1alpha1.GroupVersion.Version,
+			operation:   admissionv1.Create,
+			buildObj:    func() runtime.Object { return newAlpha("pps-alpha", "sts") },
 			wantAllowed: true,
+		},
+		{
+			name:        "v1beta1 update with unchanged targetRef is allowed",
+			version:     appsv1beta1.GroupVersion.Version,
+			operation:   admissionv1.Update,
+			buildObj:    func() runtime.Object { return newBeta("pps-beta", "sts") },
+			buildOldObj: func() runtime.Object { return newBeta("pps-beta", "sts") },
+			wantAllowed: true,
+		},
+		{
+			name:        "v1beta1 update changing targetRef is rejected (immutable)",
+			version:     appsv1beta1.GroupVersion.Version,
+			operation:   admissionv1.Update,
+			buildObj:    func() runtime.Object { return newBeta("pps-beta", "sts-changed") },
+			buildOldObj: func() runtime.Object { return newBeta("pps-beta", "sts") },
+			wantAllowed: false,
+		},
+		{
+			name:        "v1alpha1 update changing targetRef is rejected (immutable)",
+			version:     appsv1alpha1.GroupVersion.Version,
+			operation:   admissionv1.Update,
+			buildObj:    func() runtime.Object { return newAlpha("pps-alpha", "sts-changed") },
+			buildOldObj: func() runtime.Object { return newAlpha("pps-alpha", "sts") },
+			wantAllowed: false,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			obj := tc.buildObj()
-			raw, err := json.Marshal(obj)
+			raw, err := json.Marshal(tc.buildObj())
 			require.NoError(t, err)
 
-			req := admission.Request{
-				AdmissionRequest: admissionv1.AdmissionRequest{
-					Operation: admissionv1.Create,
-					Resource: metav1.GroupVersionResource{
-						Group:    "apps.kruise.io",
-						Version:  tc.version,
-						Resource: "persistentpodstates",
-					},
-					Object: runtime.RawExtension{Raw: raw},
+			ar := admissionv1.AdmissionRequest{
+				Operation: tc.operation,
+				Resource: metav1.GroupVersionResource{
+					Group:    "apps.kruise.io",
+					Version:  tc.version,
+					Resource: "persistentpodstates",
 				},
+				Object: runtime.RawExtension{Raw: raw},
 			}
-			resp := handler.Handle(context.Background(), req)
+			if tc.buildOldObj != nil {
+				oldRaw, err := json.Marshal(tc.buildOldObj())
+				require.NoError(t, err)
+				ar.OldObject = runtime.RawExtension{Raw: oldRaw}
+			}
+
+			resp := handler.Handle(context.Background(), admission.Request{AdmissionRequest: ar})
 			var resultMsg string
 			if resp.Result != nil {
 				resultMsg = resp.Result.Message

@@ -274,14 +274,16 @@ func (r *ReconcilePersistentPodState) updatePersistentPodStateStatus(pps *appsv1
 	if reflect.DeepEqual(pps.Status, newStatus) {
 		return nil
 	}
-	// update PersistentPodState status
+	// patch PersistentPodState status so we only mutate the status subresource and avoid
+	// clobbering concurrent writes to the rest of the object.
 	persistentPodStateClone := &appsv1beta1.PersistentPodState{}
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		if err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: pps.Namespace, Name: pps.Name}, persistentPodStateClone); err != nil {
 			return err
 		}
+		base := persistentPodStateClone.DeepCopy()
 		persistentPodStateClone.Status = newStatus
-		return r.Client.Status().Update(context.TODO(), persistentPodStateClone)
+		return r.Client.Status().Patch(context.TODO(), persistentPodStateClone, client.MergeFrom(base))
 	}); err != nil {
 		klog.ErrorS(err, "Failed to update PersistentPodState status", "persistentPodState", klog.KObj(pps))
 		return err

@@ -42,9 +42,6 @@ func (dst *PersistentPodState) ConvertFrom(srcRaw conversion.Hub) error {
 
 func convertPersistentPodStateToV1beta1(src *PersistentPodState, dst *appsv1beta1.PersistentPodState) error {
 	dst.ObjectMeta = src.ObjectMeta
-	dst.TypeMeta = src.TypeMeta
-	dst.APIVersion = appsv1beta1.GroupVersion.String()
-	dst.Kind = "PersistentPodState"
 
 	dst.Spec = appsv1beta1.PersistentPodStateSpec{
 		TargetReference: appsv1beta1.TargetReference{
@@ -82,9 +79,6 @@ func convertPersistentPodStateToV1beta1(src *PersistentPodState, dst *appsv1beta
 
 func convertPersistentPodStateFromV1beta1(src *appsv1beta1.PersistentPodState, dst *PersistentPodState) error {
 	dst.ObjectMeta = src.ObjectMeta
-	dst.TypeMeta = src.TypeMeta
-	dst.APIVersion = GroupVersion.String()
-	dst.Kind = "PersistentPodState"
 
 	dst.Spec = PersistentPodStateSpec{
 		TargetReference: TargetReference{

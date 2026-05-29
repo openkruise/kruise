@@ -192,16 +192,12 @@ spec:
                   type: object
                 type: array
               persistentPodStateRetentionPolicy:
-                allOf:
-                - enum:
-                  - WhenScaled
-                  - WhenDeleted
-                - enum:
-                  - WhenScaled
-                  - WhenDeleted
                 description: |-
                   PersistentPodStateRetentionPolicy describes the policy used for PodState.
                   The default policy of 'WhenScaled' causes when scale down statefulSet, deleting it.
+                enum:
+                - WhenScaled
+                - WhenDeleted
                 type: string
               preferredPersistentTopology:
                 description: |-
