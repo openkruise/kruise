@@ -309,5 +309,61 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 			gomega.Expect(completed.Annotations[appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey]).Should(gomega.Equal(""))
 		})
 
+		ginkgo.It("exposes v1beta1-native PodUnreadyAcquired condition as unready-acquired annotation for v1alpha1 clients", func() {
+			ginkgo.By("Create CloneSet and wait Pods ready")
+			pods = tester.CreateTestCloneSetAndGetPods(randStr, 1, []v1.Container{
+				{
+					Name:  "app",
+					Image: common.WebserverImage,
+				},
+				{
+					Name:  "sidecar",
+					Image: common.AgnhostImage,
+				},
+			})
+
+			pod := pods[0]
+			crrName := fmt.Sprintf("crr-beta-rt-%s", randStr)
+
+			ginkgo.By("Create CRR via v1beta1 API with UnreadyGracePeriodSeconds set")
+			crrBeta := &appsv1beta1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: crrName},
+				Spec: appsv1beta1.ContainerRecreateRequestSpec{
+					PodName: pod.Name,
+					Containers: []appsv1beta1.ContainerRecreateRequestContainer{
+						{Name: "app"},
+						{Name: "sidecar"},
+					},
+					Strategy: &appsv1beta1.ContainerRecreateRequestStrategy{
+						UnreadyGracePeriodSeconds: ptr.To(int64(1)),
+					},
+				},
+			}
+			_, err = kc.AppsV1beta1().ContainerRecreateRequests(ns).Create(context.TODO(), crrBeta, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Wait for v1beta1 CRR to complete and carry PodUnreadyAcquired condition")
+			completedBeta := tester.WaitForCRRCompleted(crrName, 90*time.Second)
+			var foundBetaCond bool
+			for _, cond := range completedBeta.Status.Conditions {
+				if cond.Type == appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType &&
+					cond.Status == metav1.ConditionTrue {
+					foundBetaCond = true
+					break
+				}
+			}
+			gomega.Expect(foundBetaCond).Should(gomega.BeTrue(), "v1beta1 CRR should have PodUnreadyAcquired condition")
+
+			ginkgo.By("Read the same CRR back via v1alpha1 API and verify unready-acquired annotation is present")
+			gomega.Eventually(func() string {
+				alphaObj, err2 := kc.AppsV1alpha1().ContainerRecreateRequests(ns).Get(context.TODO(), crrName, metav1.GetOptions{})
+				if err2 != nil {
+					return ""
+				}
+				return alphaObj.Annotations[appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey]
+			}, 30*time.Second, 2*time.Second).ShouldNot(gomega.BeEmpty(),
+				"v1alpha1 client should see unready-acquired annotation demoted from v1beta1 Conditions")
+		})
+
 	})
 })

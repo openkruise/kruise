@@ -214,5 +214,19 @@ func (dst *ContainerRecreateRequest) ConvertFrom(srcRaw conversion.Hub) error {
 		}
 	}
 
+	// Demote status.conditions[PodUnreadyAcquired] → annotation crr.apps.kruise.io/unready-acquired
+	// so that v1alpha1 clients can still observe when the pod was made not-ready.
+	for _, cond := range src.Status.Conditions {
+		if cond.Type == v1beta1.ContainerRecreateRequestPodUnreadyAcquiredType &&
+			cond.Status == metav1.ConditionTrue {
+			if dst.Annotations == nil {
+				dst.Annotations = map[string]string{}
+			}
+			dst.Annotations[ContainerRecreateRequestUnreadyAcquiredKey] =
+				cond.LastTransitionTime.UTC().Format(time.RFC3339)
+			break
+		}
+	}
+
 	return nil
 }

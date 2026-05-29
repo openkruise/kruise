@@ -4821,6 +4821,7 @@ func TestContainerRecreateRequest_ConvertFrom(t *testing.T) {
 					},
 					Annotations: map[string]string{
 						ContainerRecreateRequestSyncContainerStatusesKey: syncJSON,
+						ContainerRecreateRequestUnreadyAcquiredKey:       ts.UTC().Format(time.RFC3339),
 					},
 				},
 				Spec: ContainerRecreateRequestSpec{
@@ -4850,6 +4851,34 @@ func TestContainerRecreateRequest_ConvertFrom(t *testing.T) {
 						{Name: "app", Phase: ContainerRecreateRequestSucceeded, IsKilled: true},
 					},
 				},
+			},
+		},
+		{
+			name: "conditions ConditionFalse does not produce annotation",
+			src: &v1beta1.ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "crr-false-cond", Namespace: "default"},
+				Spec: v1beta1.ContainerRecreateRequestSpec{
+					PodName:    "pod-0",
+					Containers: []v1beta1.ContainerRecreateRequestContainer{{Name: "app"}},
+				},
+				Status: v1beta1.ContainerRecreateRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:               v1beta1.ContainerRecreateRequestPodUnreadyAcquiredType,
+							Status:             metav1.ConditionFalse,
+							LastTransitionTime: ts,
+							Reason:             "NotAcquired",
+						},
+					},
+				},
+			},
+			expected: &ContainerRecreateRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: "crr-false-cond", Namespace: "default"},
+				Spec: ContainerRecreateRequestSpec{
+					PodName:    "pod-0",
+					Containers: []ContainerRecreateRequestContainer{{Name: "app"}},
+				},
+				Status: ContainerRecreateRequestStatus{},
 			},
 		},
 		{
