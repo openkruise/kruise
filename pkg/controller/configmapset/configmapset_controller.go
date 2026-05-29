@@ -733,8 +733,8 @@ func (r *ReconcileConfigMapSet) UpdateByDistribution(ctx context.Context, cms *a
 			if cms.Spec.EffectPolicy != nil {
 				switch cms.Spec.EffectPolicy.Type {
 				case appsv1alpha1.EffectPolicyTypeReStart:
-					if latestPod.Labels == nil {
-						latestPod.Labels = make(map[string]string)
+					if latestPod.Annotations == nil {
+						latestPod.Annotations = make(map[string]string)
 					}
 
 					reloadSidecarName := r.getReloadSidecarName(ctx, cms)
@@ -748,6 +748,11 @@ func (r *ReconcileConfigMapSet) UpdateByDistribution(ctx context.Context, cms *a
 
 					if needRestart {
 						klog.Infof("Triggering reload-sidecar container inplace-update for Pod %s/%s to revision %s", latestPod.Namespace, latestPod.Name, targetRevision)
+						for _, status := range latestPod.Status.ContainerStatuses {
+							if status.Name == reloadSidecarName && status.State.Running != nil {
+								latestPod.Annotations[GetConfigMapSetContainerStartedAtKey(reloadSidecarName)] = status.State.Running.StartedAt.Format(time.RFC3339)
+							}
+						}
 						err = r.rebootSidecarByCrr(latestPod, reloadSidecarName, expectHash)
 						if err != nil {
 							return err
@@ -766,6 +771,8 @@ func (r *ReconcileConfigMapSet) UpdateByDistribution(ctx context.Context, cms *a
 						return err
 					}
 
+					time.Sleep(time.Second * 3)
+
 					// wait reload-sidecar is ready
 					isReloadSidecarReady := false
 					for _, cs := range latestPod.Status.ContainerStatuses {
@@ -782,6 +789,7 @@ func (r *ReconcileConfigMapSet) UpdateByDistribution(ctx context.Context, cms *a
 						return nil
 					}
 
+					allContainerNames := []string{}
 					rebootContainerNames := []string{}
 					for _, c := range cms.Spec.Containers {
 						cName := GetContainerName(latestPod, c)
@@ -789,6 +797,7 @@ func (r *ReconcileConfigMapSet) UpdateByDistribution(ctx context.Context, cms *a
 							klog.Warningf("Pod %s/%s cannot determine container name from spec %v", latestPod.Namespace, latestPod.Name, c)
 							continue
 						}
+						allContainerNames = append(allContainerNames, cName)
 						annotationKey := GetConfigMapSetContainerRestartKey(cms.Name, cName)
 						if latestPod.Annotations[annotationKey] != expectHash {
 							latestPod.Annotations[annotationKey] = expectHash
@@ -799,10 +808,18 @@ func (r *ReconcileConfigMapSet) UpdateByDistribution(ctx context.Context, cms *a
 
 					if needRestart {
 						klog.Infof("Triggering business container inplace-update for Pod %s/%s to revision %s", latestPod.Namespace, latestPod.Name, targetRevision)
-						err = r.rebootSidecarsByCrr(latestPod, rebootContainerNames, expectHash)
-						if err != nil {
-							return err
+						for _, name := range rebootContainerNames {
+							for _, status := range latestPod.Status.ContainerStatuses {
+								if status.Name == name && status.State.Running != nil {
+									latestPod.Annotations[GetConfigMapSetContainerStartedAtKey(name)] = status.State.Running.StartedAt.Format(time.RFC3339)
+								}
+							}
+							err = r.rebootSidecarByCrr(latestPod, name, expectHash)
+							if err != nil {
+								return err
+							}
 						}
+
 						err = r.Update(ctx, latestPod)
 						if err == nil {
 							requeue = true
@@ -811,11 +828,13 @@ func (r *ReconcileConfigMapSet) UpdateByDistribution(ctx context.Context, cms *a
 					}
 
 					// wait business-sidecar reboot success
-					err = r.waitSidecarsRebootByCrrSuccess(ctx, latestPod, rebootContainerNames, expectHash)
-					if err != nil {
-						klog.Infof("Pod %s/%s business-sidecars (%v) is not rebooted yet, waiting...", latestPod.Namespace, latestPod.Name, rebootContainerNames)
-						requeue = true
-						return nil
+					for _, containerName := range allContainerNames {
+						err = r.waitSidecarRebootByCrrSuccess(ctx, latestPod, containerName, expectHash)
+						if err != nil {
+							klog.Infof("Pod %s/%s business-sidecars (%v) is not rebooted yet, waiting...", latestPod.Namespace, latestPod.Name, rebootContainerNames)
+							requeue = true
+							return err
+						}
 					}
 				case appsv1alpha1.EffectPolicyTypeHotUpdate:
 					// wait reload-sidecar is ready
@@ -856,6 +875,11 @@ func (r *ReconcileConfigMapSet) UpdateByDistribution(ctx context.Context, cms *a
 
 					if needRestart {
 						klog.Infof("Triggering reload-sidecar container inplace-update for Pod %s/%s to revision %s", latestPod.Namespace, latestPod.Name, targetRevision)
+						for _, status := range latestPod.Status.ContainerStatuses {
+							if status.Name == reloadSidecarName && status.State.Running != nil {
+								latestPod.Annotations[GetConfigMapSetContainerStartedAtKey(reloadSidecarName)] = status.State.Running.StartedAt.Format(time.RFC3339)
+							}
+						}
 						err = r.rebootSidecarByCrr(latestPod, reloadSidecarName, hashStr)
 						if err != nil {
 							return err
@@ -1144,30 +1168,23 @@ func GetContainerName(pod *corev1.Pod, containerSpec appsv1alpha1.ConfigMapSetCo
 	return ""
 }
 
-func (r *ReconcileConfigMapSet) rebootSidecarByCrr(pod *corev1.Pod, containerName string, hashStr string) error {
-	return r.rebootSidecarsByCrr(pod, []string{containerName}, hashStr)
+func (r *ReconcileConfigMapSet) genContainerRecreateRequestName(pod *corev1.Pod, containerName string, hashStr string) string {
+	// Combine hashStr and sortedContainerNames to form a unique hash for this specific set of containers and targetRevision
+	sum := md5.Sum([]byte(fmt.Sprintf("%s-%s", hashStr, containerName)))
+	combinedHashStr := hex.EncodeToString(sum[:])[:10]
+	return fmt.Sprintf("%s-%s", pod.Name, combinedHashStr)
 }
 
-func (r *ReconcileConfigMapSet) rebootSidecarsByCrr(pod *corev1.Pod, containerNames []string, hashStr string) error {
-	if len(containerNames) == 0 {
+func (r *ReconcileConfigMapSet) rebootSidecarByCrr(pod *corev1.Pod, containerName string, hashStr string) error {
+	if len(containerName) == 0 {
 		return nil
 	}
-
-	// Sort containerNames to make sure the CRR has deterministic containers order
-	sortedContainerNames := make([]string, len(containerNames))
-	copy(sortedContainerNames, containerNames)
-	sort.Strings(sortedContainerNames)
-
-	// Combine hashStr and sortedContainerNames to form a unique hash for this specific set of containers and targetRevision
-	hashData := md5.Sum([]byte(hashStr + "-" + strings.Join(sortedContainerNames, ",")))
-	combinedHashStr := hex.EncodeToString(hashData[:])[:10]
-	crrName := fmt.Sprintf("%s-%s", pod.Name, combinedHashStr)
-
+	crrName := r.genContainerRecreateRequestName(pod, containerName, hashStr)
 	// Check if CRR already exists first
 	existingCrr := &appsv1alpha1.ContainerRecreateRequest{}
 	err := r.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: crrName}, existingCrr)
 	if err == nil {
-		klog.Infof("CRR %s already exists for pod %s/%s to reboot containers %v", crrName, pod.Namespace, pod.Name, containerNames)
+		klog.Infof("CRR %s already exists for pod %s/%s to reboot container %s", crrName, pod.Namespace, pod.Name, containerName)
 		return nil
 	} else if !errors.IsNotFound(err) {
 		klog.Errorf("Failed to get CRR %s for pod %s/%s: %v", crrName, pod.Namespace, pod.Name, err)
@@ -1197,6 +1214,7 @@ func (r *ReconcileConfigMapSet) rebootSidecarsByCrr(pod *corev1.Pod, containerNa
 		Spec: appsv1alpha1.ContainerRecreateRequestSpec{
 			PodName: pod.Name,
 			Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{
+				ForceRecreate:             true,
 				FailurePolicy:             appsv1alpha1.ContainerRecreateRequestFailurePolicyFail,
 				OrderedRecreate:           true,
 				UnreadyGracePeriodSeconds: ptr.To[int64](5),
@@ -1207,14 +1225,10 @@ func (r *ReconcileConfigMapSet) rebootSidecarsByCrr(pod *corev1.Pod, containerNa
 		},
 	}
 
-	for _, name := range sortedContainerNames {
-		crr.Spec.Containers = append(crr.Spec.Containers, appsv1alpha1.ContainerRecreateRequestContainer{
-			Name: name,
-		})
-		for _, status := range pod.Status.ContainerStatuses {
-			if status.Name == name && status.State.Running != nil {
-				crr.Annotations[GetConfigMapSetContainerStartedAtKey(name)] = status.State.Running.StartedAt.Format(time.RFC3339)
-			}
+	crr.Spec.Containers = []appsv1alpha1.ContainerRecreateRequestContainer{{Name: containerName}}
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.Name == containerName && status.State.Running != nil {
+			crr.Annotations[GetConfigMapSetContainerStartedAtKey(containerName)] = status.State.Running.StartedAt.Format(time.RFC3339)
 		}
 	}
 
@@ -1223,37 +1237,47 @@ func (r *ReconcileConfigMapSet) rebootSidecarsByCrr(pod *corev1.Pod, containerNa
 		if errors.IsAlreadyExists(err) {
 			return nil
 		}
-		klog.Errorf("Failed to create CRR for pod %s/%s containers %v: %v", pod.Namespace, pod.Name, containerNames, err)
+		klog.Errorf("Failed to create CRR for pod %s/%s container %s: %v", pod.Namespace, pod.Name, containerName, err)
 		return err
 	}
 
-	klog.Infof("Created CRR %s for pod %s/%s to reboot containers %v", crr.Name, pod.Namespace, pod.Name, containerNames)
+	klog.Infof("Created CRR %s for pod %s/%s to reboot container %s", crr.Name, pod.Namespace, pod.Name, containerName)
 	return nil
 }
 
 func (r *ReconcileConfigMapSet) waitSidecarRebootByCrrSuccess(ctx context.Context, pod *corev1.Pod, containerName string, hashStr string) error {
-	return r.waitSidecarsRebootByCrrSuccess(ctx, pod, []string{containerName}, hashStr)
-}
-
-func (r *ReconcileConfigMapSet) waitSidecarsRebootByCrrSuccess(ctx context.Context, pod *corev1.Pod, containerNames []string, hashStr string) error {
-	if len(containerNames) == 0 {
+	if len(containerName) == 0 {
 		return nil
 	}
 
-	// Sort containerNames to make sure the CRR has deterministic containers order
-	sortedContainerNames := make([]string, len(containerNames))
-	copy(sortedContainerNames, containerNames)
-	sort.Strings(sortedContainerNames)
-
 	// Combine hashStr and sortedContainerNames to form a unique hash for this specific set of containers and targetRevision
-	hashData := md5.Sum([]byte(hashStr + "-" + strings.Join(sortedContainerNames, ",")))
-	combinedHashStr := hex.EncodeToString(hashData[:])[:10]
+	combinedHashStr := hex.EncodeToString(md5.New().Sum([]byte(fmt.Sprintf("%s-%s", hashStr, containerName))))[:10]
 	crrName := fmt.Sprintf("%s-%s", pod.Name, combinedHashStr)
 
 	crr := &appsv1alpha1.ContainerRecreateRequest{}
 	err := r.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: crrName}, crr)
 	if err != nil {
 		if errors.IsNotFound(err) {
+			klog.Infof("CRR %s not found in waitSidecarRebootByCrrSuccess", crrName)
+			// Fallback to check if the pod's container has actually restarted
+			recordedTimeStr := pod.Annotations[GetConfigMapSetContainerStartedAtKey(containerName)]
+			if recordedTimeStr == "" {
+				return fmt.Errorf("CRR %s not found startAt annotation", crrName)
+			}
+			recordedTime, parseErr := time.Parse(time.RFC3339, recordedTimeStr)
+			if parseErr != nil {
+				return parseErr
+			}
+			for _, status := range pod.Status.ContainerStatuses {
+				if status.Name == containerName {
+					if status.State.Running == nil {
+						return fmt.Errorf("CRR %s not found and container %s is not running", crrName, containerName)
+					}
+					if !status.State.Running.StartedAt.After(recordedTime) {
+						return fmt.Errorf("CRR %s not found and container %s has not restarted yet", crrName, containerName)
+					}
+				}
+			}
 			return nil
 		}
 		return fmt.Errorf("failed to get CRR %s: %v", crrName, err)
@@ -1271,26 +1295,24 @@ func (r *ReconcileConfigMapSet) waitSidecarsRebootByCrrSuccess(ctx context.Conte
 	}
 
 	// Verify that the StartedAt time of all containers is strictly greater than the time recorded in the CRR
-	for _, name := range sortedContainerNames {
-		recordedTimeStr := crr.Annotations[GetConfigMapSetContainerStartedAtKey(name)]
-		if recordedTimeStr != "" {
-			recordedTime, err := time.Parse(time.RFC3339, recordedTimeStr)
-			if err == nil {
-				found := false
-				for _, status := range pod.Status.ContainerStatuses {
-					if status.Name == name {
-						found = true
-						if status.State.Running == nil {
-							return fmt.Errorf("container %s is not running yet", name)
-						}
-						if !status.State.Running.StartedAt.After(recordedTime) {
-							return fmt.Errorf("container %s has not been restarted yet (StartedAt <= recorded time)", name)
-						}
+	recordedTimeStr := crr.Annotations[GetConfigMapSetContainerStartedAtKey(containerName)]
+	if recordedTimeStr != "" {
+		recordedTime, err := time.Parse(time.RFC3339, recordedTimeStr)
+		if err == nil {
+			found := false
+			for _, status := range pod.Status.ContainerStatuses {
+				if status.Name == containerName {
+					found = true
+					if status.State.Running == nil {
+						return fmt.Errorf("container %s is not running yet", containerName)
+					}
+					if !status.State.Running.StartedAt.After(recordedTime) {
+						return fmt.Errorf("container %s has not been restarted yet (StartedAt <= recorded time)", containerName)
 					}
 				}
-				if !found {
-					return fmt.Errorf("container %s not found in pod status", name)
-				}
+			}
+			if !found {
+				return fmt.Errorf("container %s not found in pod status", containerName)
 			}
 		}
 	}
@@ -1300,8 +1322,6 @@ func (r *ReconcileConfigMapSet) waitSidecarsRebootByCrrSuccess(ctx context.Conte
 	if err != nil && !errors.IsNotFound(err) {
 		klog.Errorf("Failed to delete completed CRR %s for pod %s/%s: %v", crrName, pod.Namespace, pod.Name, err)
 		return err
-	} else {
-		klog.Infof("Successfully deleted completed CRR %s for pod %s/%s", crrName, pod.Namespace, pod.Name)
 	}
 
 	return nil

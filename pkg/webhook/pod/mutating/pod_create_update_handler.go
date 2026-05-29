@@ -280,49 +280,57 @@ func (h *PodCreateHandler) injectSidecar4Pod(ctx context.Context, pod *corev1.Po
 		} else if cms.Spec.ReloadSidecarConfig.Type == appsv1alpha1.ReloadSidecarTypeSidecarSet {
 			klog.Infof("pod %s/%s will be injected by SidecarSet, skip full sidecar injection in ConfigMapSet webhook, just merge VolumeMounts and Env", pod.Namespace, pod.Name)
 
-			// find reload-sidecar in Pod (because already injected by sidecarSet)
-			targetSidecarName := cms.Spec.ReloadSidecarConfig.Config.SidecarSetRef.ContainerName
-			var container *corev1.Container
-			for _, c := range pod.Spec.Containers {
-				if c.Name == targetSidecarName {
-					container = c.DeepCopy()
-					break
-				}
-			}
-			if container == nil {
-				klog.Errorf("target container %s not found", targetSidecarName)
-				return fmt.Errorf("target container %s not found", targetSidecarName)
-			}
-
-			// Merge VolumeMounts
-			for _, newMount := range reloadSidecar.VolumeMounts {
-				mountExists := false
-				for _, existingMount := range container.VolumeMounts {
-					if existingMount.Name == newMount.Name || existingMount.MountPath == newMount.MountPath {
-						mountExists = true
+			if cms.Spec.ReloadSidecarConfig.Config != nil && cms.Spec.ReloadSidecarConfig.Config.SidecarSetRef != nil {
+				// find reload-sidecar in Pod (because already injected by sidecarSet)
+				targetSidecarName := cms.Spec.ReloadSidecarConfig.Config.SidecarSetRef.ContainerName
+				var container *corev1.Container
+				for _, c := range pod.Spec.Containers {
+					if c.Name == targetSidecarName {
+						container = c.DeepCopy()
 						break
 					}
 				}
-				if !mountExists {
-					container.VolumeMounts = append(container.VolumeMounts, newMount)
+				if container == nil {
+					klog.Errorf("target container %s not found", targetSidecarName)
+					return fmt.Errorf("target container %s not found", targetSidecarName)
 				}
-			}
 
-			// Merge Env
-			for _, newEnv := range reloadSidecar.Env {
-				envExists := false
-				for j, existingEnv := range container.Env {
-					if existingEnv.Name == newEnv.Name {
-						container.Env[j] = newEnv
-						envExists = true
-						break
+				// Merge VolumeMounts
+				for _, newMount := range reloadSidecar.VolumeMounts {
+					mountExists := false
+					for _, existingMount := range container.VolumeMounts {
+						if existingMount.Name == newMount.Name || existingMount.MountPath == newMount.MountPath {
+							mountExists = true
+							break
+						}
+					}
+					if !mountExists {
+						container.VolumeMounts = append(container.VolumeMounts, newMount)
 					}
 				}
-				if !envExists {
-					container.Env = append(container.Env, newEnv)
+
+				// Merge Env
+				for _, newEnv := range reloadSidecar.Env {
+					envExists := false
+					for j, existingEnv := range container.Env {
+						if existingEnv.Name == newEnv.Name {
+							container.Env[j] = newEnv
+							envExists = true
+							break
+						}
+					}
+					if !envExists {
+						container.Env = append(container.Env, newEnv)
+					}
 				}
+
+				// Merge ReadinessProbe
+				if container.ReadinessProbe == nil {
+					container.ReadinessProbe = reloadSidecar.ReadinessProbe
+				}
+
+				reloadSidecar = container
 			}
-			reloadSidecar = container
 		}
 	}
 

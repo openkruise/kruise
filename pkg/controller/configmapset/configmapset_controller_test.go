@@ -90,7 +90,7 @@ func TestCrrOperations(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(pod).Build()
 	r := &ReconcileConfigMapSet{Client: fakeClient, scheme: scheme.Scheme}
 
-	err := r.rebootSidecarsByCrr(pod, []string{"container1"}, "hash1")
+	err := r.rebootSidecarByCrr(pod, "container1", "hash1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -125,14 +125,14 @@ func TestCrrOperations(t *testing.T) {
 	}
 
 	// wait should fail because StartedAt hasn't advanced
-	err = r.waitSidecarsRebootByCrrSuccess(context.TODO(), pod, []string{"container1"}, "hash1")
+	err = r.waitSidecarRebootByCrrSuccess(context.TODO(), pod, "container1", "hash1")
 	if err == nil {
 		t.Fatalf("expected error due to StartedAt not advancing, got nil")
 	}
 
 	// advance StartedAt
 	pod.Status.ContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: time.Now()}
-	err = r.waitSidecarsRebootByCrrSuccess(context.TODO(), pod, []string{"container1"}, "hash1")
+	err = r.waitSidecarRebootByCrrSuccess(context.TODO(), pod, "container1", "hash1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
