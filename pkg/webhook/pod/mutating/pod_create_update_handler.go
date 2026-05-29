@@ -217,20 +217,7 @@ func (h *PodCreateHandler) injectSidecar4Pod(ctx context.Context, pod *corev1.Po
 			{Name: configMapVolume.Name, MountPath: configMapMountPath},
 			{Name: podInfoVolume.Name, MountPath: fmt.Sprintf("/etc/cms_config")},
 		},
-		ReadinessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{
-					Command: []string{
-						"sh",
-						"-c",
-						configmapset.GetReloadSidecarHealthCheckScript("/etc/execution"),
-					},
-				},
-			},
-			InitialDelaySeconds: 1,
-			PeriodSeconds:       3,
-			TimeoutSeconds:      5,
-		},
+		ReadinessProbe: configmapset.GetReloadSidecarReadinessProbe(),
 		Env: []corev1.EnvVar{{
 			Name:  configmapset.GetConfigMapSetEnvConfigPathName(),
 			Value: configMapMountPath,
