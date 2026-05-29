@@ -208,39 +208,39 @@ func (h *ConfigMapSetCreateUpdateHandler) validateConfigMapSetSpec(ctx context.C
 	}
 
 	// validate ReloadSidecarConfig
-	if spec.ReloadSidecarConfig != nil {
+	if spec.ReloadSidecarConfig == nil {
 		reloadConfigPath := fldPath.Child("reloadSidecarConfig")
-		if spec.ReloadSidecarConfig.Type == appsv1alpha1.ReloadSidecarTypeK8s {
-			if spec.ReloadSidecarConfig.Config == nil {
-				return field.Invalid(reloadConfigPath.Child("config", "name"), "", "name must be set when type is k8s-config")
-			}
-		} else if spec.ReloadSidecarConfig.Type == appsv1alpha1.ReloadSidecarTypeSidecarSet {
+		if spec.ReloadSidecarConfig.Type == appsv1alpha1.ReloadSidecarTypeSidecarSet {
+			var sidecarName string
+			var sidecarContainerName string
 			if spec.ReloadSidecarConfig.Config == nil || spec.ReloadSidecarConfig.Config.SidecarSetRef == nil {
-				return field.Invalid(reloadConfigPath.Child("config"), "", "config must be set when type is k8s-config")
+				sidecarName, sidecarContainerName = configmapset.GetDefaultCmsSidecarSet()
+			} else {
+				sidecarName = spec.ReloadSidecarConfig.Config.SidecarSetRef.Name
+				sidecarContainerName = spec.ReloadSidecarConfig.Config.SidecarSetRef.ContainerName
 			}
-			sidecarSetRef := spec.ReloadSidecarConfig.Config.SidecarSetRef
 			sidecarSet := &appsv1alpha1.SidecarSet{}
-			err = h.Client.Get(ctx, types.NamespacedName{Name: sidecarSetRef.Name}, sidecarSet)
+			err = h.Client.Get(ctx, types.NamespacedName{Name: sidecarName}, sidecarSet)
 			if err != nil {
 				if errors.IsNotFound(err) {
-					return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarSetRef.Name, "SidecarSet not found")
+					return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarName, "SidecarSet not found")
 				}
 				return field.InternalError(reloadConfigPath.Child("config", "sidecarSetRef", "name"), fmt.Errorf("failed to get SidecarSet: %v", err))
 			}
 			containerFound := false
 			for _, c := range sidecarSet.Spec.Containers {
-				if c.Name == sidecarSetRef.ContainerName && c.Image != "" {
+				if c.Name == sidecarContainerName && c.Image != "" {
 					containerFound = true
 					break
 				}
 			}
 			if !containerFound {
-				return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "containerName"), sidecarSetRef.ContainerName, "container not found in SidecarSet")
+				return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "containerName"), sidecarContainerName, "container not found in SidecarSet")
 			}
 
 			// Validate if SidecarSet includes the current ConfigMapSet's Pods
 			if sidecarSet.Spec.Namespace != "" && sidecarSet.Spec.Namespace != namespace {
-				return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarSetRef.Name, fmt.Sprintf("SidecarSet targets namespace %s which does not match ConfigMapSet namespace %s", sidecarSet.Spec.Namespace, namespace))
+				return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarName, fmt.Sprintf("SidecarSet targets namespace %s which does not match ConfigMapSet namespace %s", sidecarSet.Spec.Namespace, namespace))
 			}
 
 			// Validate NamespaceSelector
@@ -255,41 +255,32 @@ func (h *ConfigMapSetCreateUpdateHandler) validateConfigMapSetSpec(ctx context.C
 				}
 				selector, err := util.ValidatedLabelSelectorAsSelector(sidecarSet.Spec.NamespaceSelector)
 				if err != nil {
-					return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarSetRef.Name, fmt.Sprintf("invalid NamespaceSelector in SidecarSet: %v", err))
+					return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarName, fmt.Sprintf("invalid NamespaceSelector in SidecarSet: %v", err))
 				}
 				if !selector.Matches(labels.Set(nsObj.Labels)) {
-					return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarSetRef.Name, fmt.Sprintf("SidecarSet NamespaceSelector does not match ConfigMapSet namespace %s", namespace))
-				}
-			}
-
-			// Validate if ConfigMapSet selector is a subset of SidecarSet selector
-			if sidecarSet.Spec.Selector != nil {
-				sidecarSetSelector, err := util.ValidatedLabelSelectorAsSelector(sidecarSet.Spec.Selector)
-				if err != nil {
-					return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarSetRef.Name, fmt.Sprintf("invalid selector in SidecarSet: %v", err))
-				}
-				// Here we use a simplified approach as requested:
-				// We just check if the ConfigMapSet's MatchLabels satisfy the SidecarSet's Selector.
-				// This assumes ConfigMapSet pods will at least have these MatchLabels.
-				if !sidecarSetSelector.Matches(labels.Set(spec.Selector.MatchLabels)) {
-					return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarSetRef.Name, "ConfigMapSet MatchLabels do not satisfy SidecarSet selector")
+					return field.Invalid(reloadConfigPath.Child("config", "sidecarSetRef", "name"), sidecarName, fmt.Sprintf("SidecarSet NamespaceSelector does not match ConfigMapSet namespace %s", namespace))
 				}
 			}
 		} else if spec.ReloadSidecarConfig.Type == appsv1alpha1.ReloadSidecarTypeCustom {
+			var namespacedName types.NamespacedName
 			if spec.ReloadSidecarConfig.Config == nil || spec.ReloadSidecarConfig.Config.ConfigMapRef == nil {
-				return field.Invalid(reloadConfigPath.Child("config", "configMapRef"), "", "configMapRef must be set when type is custom")
+				namespacedName = configmapset.GetDefaultCmsConfigMap()
+			} else {
+				namespacedName = types.NamespacedName{
+					Name:      spec.ReloadSidecarConfig.Config.ConfigMapRef.Name,
+					Namespace: spec.ReloadSidecarConfig.Config.ConfigMapRef.Namespace,
+				}
 			}
-			cmRef := spec.ReloadSidecarConfig.Config.ConfigMapRef
 			customerCM := &corev1.ConfigMap{}
 			// Use the ConfigMapSet's namespace if the ConfigMapRef namespace is not specified
-			cmRefNamespace := cmRef.Namespace
+			cmRefNamespace := namespacedName.Namespace
 			if cmRefNamespace == "" {
 				cmRefNamespace = namespace
 			}
-			err = h.Client.Get(ctx, types.NamespacedName{Name: cmRef.Name, Namespace: cmRefNamespace}, customerCM)
+			err = h.Client.Get(ctx, types.NamespacedName{Name: namespacedName.Name, Namespace: cmRefNamespace}, customerCM)
 			if err != nil {
 				if errors.IsNotFound(err) {
-					return field.Invalid(reloadConfigPath.Child("config", "configMapRef", "name"), cmRef.Name, "custom sidecar ConfigMap not found")
+					return field.Invalid(reloadConfigPath.Child("config", "configMapRef", "name"), namespacedName.Name, "custom sidecar ConfigMap not found")
 				}
 				return field.InternalError(reloadConfigPath.Child("config", "configMapRef", "name"), fmt.Errorf("failed to get custom sidecar ConfigMap: %v", err))
 			}
@@ -297,22 +288,15 @@ func (h *ConfigMapSetCreateUpdateHandler) validateConfigMapSetSpec(ctx context.C
 			// Validate if the specific key "reload-sidecar" exists and can be unmarshaled into a valid Container
 			containerData, exists := customerCM.Data["reload-sidecar"]
 			if !exists {
-				return field.Invalid(reloadConfigPath.Child("config", "configMapRef", "name"), cmRef.Name, "custom sidecar ConfigMap must contain key 'reload-sidecar'")
+				return field.Invalid(reloadConfigPath.Child("config", "configMapRef", "name"), namespacedName.Name, "custom sidecar ConfigMap must contain key 'reload-sidecar'")
 			}
 
 			var reloadSidecar corev1.Container
 			if err = json.Unmarshal([]byte(containerData), &reloadSidecar); err != nil {
-				return field.Invalid(reloadConfigPath.Child("config", "configMapRef", "name"), cmRef.Name, fmt.Sprintf("failed to unmarshal 'reload-sidecar' data to Container: %v", err))
+				return field.Invalid(reloadConfigPath.Child("config", "configMapRef", "name"), namespacedName.Name, fmt.Sprintf("failed to unmarshal 'reload-sidecar' data to Container: %v", err))
 			}
-
-			if reloadSidecar.Image == "" {
-				return field.Invalid(reloadConfigPath.Child("config", "configMapRef", "name"), cmRef.Name, "container defined in 'reload-sidecar' must have image specified")
-			}
-		} else {
-			return field.Invalid(reloadConfigPath.Child("type"), spec.ReloadSidecarConfig.Type, "invalid type, must be k8s, sidecarset or custom")
 		}
 	}
-
 	return nil
 }
 

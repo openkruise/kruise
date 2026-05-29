@@ -246,76 +246,39 @@ func (h *PodCreateHandler) injectSidecar4Pod(ctx context.Context, pod *corev1.Po
 		} else if cms.Spec.ReloadSidecarConfig.Type == appsv1alpha1.ReloadSidecarTypeCustom {
 			if cms.Spec.ReloadSidecarConfig.Config != nil && cms.Spec.ReloadSidecarConfig.Config.ConfigMapRef != nil {
 				cmRef := cms.Spec.ReloadSidecarConfig.Config.ConfigMapRef
-				customerCM := &corev1.ConfigMap{}
 				cmNamespace := cmRef.Namespace
 				if cmNamespace == "" {
 					cmNamespace = cms.Namespace
 				}
-				if err := h.Client.Get(ctx, types.NamespacedName{Name: cmRef.Name, Namespace: cmNamespace}, customerCM); err != nil {
-					klog.Errorf("failed to get custom sidecar configmap %s/%s: %v", cmNamespace, cmRef.Name, err)
+				container, err := h.parseReloadSidecarByConfigMap(ctx, cmRef.Name, cmNamespace, reloadSidecar)
+				if err != nil {
 					return err
 				}
-				if _, exists := customerCM.Data["reload-sidecar"]; !exists {
-					klog.Errorf("custom sidecar configmap %s/%s missing key 'reload-sidecar'", cmNamespace, cmRef.Name)
-					return fmt.Errorf("custom sidecar configmap %s/%s missing key 'reload-sidecar'", cmNamespace, cmRef.Name)
+				reloadSidecar = container
+			} else {
+				namespacedName := configmapset.GetDefaultCmsConfigMap()
+				container, err := h.parseReloadSidecarByConfigMap(ctx, namespacedName.Name, namespacedName.Namespace, reloadSidecar)
+				if err != nil {
+					return err
 				}
-				if unmarshalErr := json.Unmarshal([]byte(customerCM.Data["reload-sidecar"]), &reloadSidecar); unmarshalErr != nil {
-					klog.Errorf("failed to unmarshal custom sidecar configmap %s/%s data 'reload-sidecar': %v", cmNamespace, cmRef.Name, unmarshalErr)
-					return unmarshalErr
-				}
+				reloadSidecar = container
 			}
 		} else if cms.Spec.ReloadSidecarConfig.Type == appsv1alpha1.ReloadSidecarTypeSidecarSet {
 			klog.Infof("pod %s/%s will be injected by SidecarSet, skip full sidecar injection in ConfigMapSet webhook, just merge VolumeMounts and Env", pod.Namespace, pod.Name)
-
 			if cms.Spec.ReloadSidecarConfig.Config != nil && cms.Spec.ReloadSidecarConfig.Config.SidecarSetRef != nil {
 				// find reload-sidecar in Pod (because already injected by sidecarSet)
 				targetSidecarName := cms.Spec.ReloadSidecarConfig.Config.SidecarSetRef.ContainerName
-				var container *corev1.Container
-				for _, c := range pod.Spec.Containers {
-					if c.Name == targetSidecarName {
-						container = c.DeepCopy()
-						break
-					}
+				container, err := h.praseReloadSidecarBySidecarSet(pod, reloadSidecar, targetSidecarName)
+				if err != nil {
+					return err
 				}
-				if container == nil {
-					klog.Errorf("target container %s not found", targetSidecarName)
-					return fmt.Errorf("target container %s not found", targetSidecarName)
+				reloadSidecar = container
+			} else {
+				_, containerName := configmapset.GetDefaultCmsSidecarSet()
+				container, err := h.praseReloadSidecarBySidecarSet(pod, reloadSidecar, containerName)
+				if err != nil {
+					return err
 				}
-
-				// Merge VolumeMounts
-				for _, newMount := range reloadSidecar.VolumeMounts {
-					mountExists := false
-					for _, existingMount := range container.VolumeMounts {
-						if existingMount.Name == newMount.Name || existingMount.MountPath == newMount.MountPath {
-							mountExists = true
-							break
-						}
-					}
-					if !mountExists {
-						container.VolumeMounts = append(container.VolumeMounts, newMount)
-					}
-				}
-
-				// Merge Env
-				for _, newEnv := range reloadSidecar.Env {
-					envExists := false
-					for j, existingEnv := range container.Env {
-						if existingEnv.Name == newEnv.Name {
-							container.Env[j] = newEnv
-							envExists = true
-							break
-						}
-					}
-					if !envExists {
-						container.Env = append(container.Env, newEnv)
-					}
-				}
-
-				// Merge ReadinessProbe
-				if container.ReadinessProbe == nil {
-					container.ReadinessProbe = reloadSidecar.ReadinessProbe
-				}
-
 				reloadSidecar = container
 			}
 		}
@@ -339,6 +302,85 @@ func (h *PodCreateHandler) injectSidecar4Pod(ctx context.Context, pod *corev1.Po
 	}
 
 	return h.injectVolumes(pod, configMapVolume, podInfoVolume)
+}
+
+func (h *PodCreateHandler) praseReloadSidecarBySidecarSet(pod *corev1.Pod, reloadSidecar *corev1.Container, targetSidecarName string) (*corev1.Container, error) {
+	var container *corev1.Container
+	for _, c := range pod.Spec.Containers {
+		if c.Name == targetSidecarName {
+			container = c.DeepCopy()
+			break
+		}
+	}
+	if container == nil {
+		klog.Errorf("target container %s not found", targetSidecarName)
+		return nil, fmt.Errorf("target container %s not found", targetSidecarName)
+	}
+	return h.mergeReloadSidecar(reloadSidecar, container), nil
+}
+
+func (h *PodCreateHandler) parseReloadSidecarByConfigMap(ctx context.Context, namespace string, name string, reloadSidecar *corev1.Container) (*corev1.Container, error) {
+	defaultCM := &corev1.ConfigMap{}
+	if err := h.Client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, defaultCM); err != nil {
+		klog.Errorf("failed to get custom sidecar configmap %s/%s: %v", namespace, name, err)
+		return nil, err
+	}
+	if _, exists := defaultCM.Data["reload-sidecar"]; !exists {
+		klog.Errorf("custom sidecar configmap %s/%s missing key 'reload-sidecar'", namespace, name)
+		return nil, fmt.Errorf("custom sidecar configmap %s/%s missing key 'reload-sidecar'", namespace, name)
+	}
+	container := &corev1.Container{}
+	if unmarshalErr := json.Unmarshal([]byte(defaultCM.Data["reload-sidecar"]), container); unmarshalErr != nil {
+		klog.Errorf("failed to unmarshal custom sidecar configmap %s/%s data 'reload-sidecar': %v", namespace, name, unmarshalErr)
+		return nil, unmarshalErr
+	}
+	return h.mergeReloadSidecar(reloadSidecar, container), nil
+}
+
+func (h *PodCreateHandler) mergeReloadSidecar(reloadSidecar *corev1.Container, container *corev1.Container) *corev1.Container {
+	if container.Name == "" {
+		container.Name = reloadSidecar.Name
+	}
+
+	if container.Image == "" {
+		container.Image = reloadSidecar.Image
+	}
+
+	// Merge VolumeMounts
+	for _, newMount := range reloadSidecar.VolumeMounts {
+		mountExists := false
+		for _, existingMount := range container.VolumeMounts {
+			if existingMount.Name == newMount.Name || existingMount.MountPath == newMount.MountPath {
+				mountExists = true
+				break
+			}
+		}
+		if !mountExists {
+			container.VolumeMounts = append(container.VolumeMounts, newMount)
+		}
+	}
+
+	// Merge Env
+	for _, newEnv := range reloadSidecar.Env {
+		envExists := false
+		for j, existingEnv := range container.Env {
+			if existingEnv.Name == newEnv.Name {
+				container.Env[j] = newEnv
+				envExists = true
+				break
+			}
+		}
+		if !envExists {
+			container.Env = append(container.Env, newEnv)
+		}
+	}
+
+	// Merge ReadinessProbe
+	if container.ReadinessProbe == nil {
+		container.ReadinessProbe = reloadSidecar.ReadinessProbe
+	}
+
+	return container
 }
 
 func (h *PodCreateHandler) injectVolumes(pod *corev1.Pod, configMapVolume corev1.Volume, podInfoVolume corev1.Volume) error {
