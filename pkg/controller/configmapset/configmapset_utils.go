@@ -21,7 +21,9 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"flag"
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 	"sort"
 	"strings"
 
@@ -35,6 +37,17 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 )
+
+var (
+	defaultReloadConfigMap  string
+	defaultReloadSidecarSet string
+)
+
+func init() {
+	flag.StringVar(&defaultReloadConfigMap, "default-reload-configmap", "kruise-system/default-cms-reloadsidecar-cm", "Default reload sidecar image to use if not explicitly specified in ConfigMapSet.")
+	flag.StringVar(&defaultReloadSidecarSet, "default-reload-sidecarset", "default-cms-reloadsidecar-sidecarset/reload-sidecar", "Default reload sidecar image to use if not explicitly specified in ConfigMapSet.")
+
+}
 
 const (
 	ConfigMapSetAnnotationPrefix                         = "apps.kruise.io/configmapset."
@@ -145,8 +158,14 @@ func GetConfigMapSetDownwardAPIVolumeName(cmsName string) string {
 	return GenerateDerivedName(fmt.Sprintf("cms-%s", strings.ToLower(cmsName)), "config")
 }
 
-func GetConfigMapSetEnvRestartAnnotationName(cmsName string) string {
-	return fmt.Sprintf("CMS_%s_RESTART_ANNOTATION", strings.ToUpper(strings.ReplaceAll(cmsName, "-", "_")))
+func GetDefaultCmsConfigMap() types.NamespacedName {
+	defaultReloadConfigMapArray := strings.Split(defaultReloadConfigMap, "/")
+	return types.NamespacedName{Namespace: defaultReloadConfigMapArray[0], Name: defaultReloadConfigMapArray[1]}
+}
+
+func GetDefaultCmsSidecarSet() (string, string) {
+	defaultReloadSidecarSetArray := strings.Split(defaultReloadSidecarSet, "/")
+	return defaultReloadSidecarSetArray[0], defaultReloadSidecarSetArray[1]
 }
 
 func GetConfigMapSetEnvConfigPathName() string {
