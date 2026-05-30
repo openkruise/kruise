@@ -216,8 +216,8 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 	// Poll at Recreating in case pod events are delayed (e.g. during postStart).
 	duration.Update(3 * time.Second)
 
-	if crr.Spec.Strategy != nil && crr.Spec.Strategy.UnreadyGracePeriodSeconds != nil && !hasPodUnreadyAcquiredCondition(crr) {
-		if err = r.acquirePodNotReady(crr, pod); err != nil {
+	if crr.Spec.Strategy != nil && crr.Spec.Strategy.UnreadyGracePeriodSeconds != nil && !hasPreRecreateGraceCondition(crr) {
+		if err = r.waitRecreateGracePeriod(crr, pod); err != nil {
 			return reconcile.Result{}, err
 		}
 	}
@@ -225,10 +225,10 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 	return reconcile.Result{RequeueAfter: duration.Get()}, nil
 }
 
-// hasPodUnreadyAcquiredCondition returns true if the PodUnreadyAcquired condition is present.
-func hasPodUnreadyAcquiredCondition(crr *appsv1beta1.ContainerRecreateRequest) bool {
+// hasPreRecreateGraceCondition returns true if the PreRecreateGrace condition is present.
+func hasPreRecreateGraceCondition(crr *appsv1beta1.ContainerRecreateRequest) bool {
 	for _, c := range crr.Status.Conditions {
-		if c.Type == appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType && c.Status == metav1.ConditionTrue {
+		if c.Type == appsv1beta1.ContainerRecreateRequestPreRecreateGraceType && c.Status == metav1.ConditionTrue {
 			return true
 		}
 	}
@@ -289,7 +289,7 @@ func snapshotEqual(a, b []appsv1beta1.ContainerRecreateRequestSyncContainerStatu
 	return true
 }
 
-func (r *ReconcileContainerRecreateRequest) acquirePodNotReady(crr *appsv1beta1.ContainerRecreateRequest, pod *v1.Pod) error {
+func (r *ReconcileContainerRecreateRequest) waitRecreateGracePeriod(crr *appsv1beta1.ContainerRecreateRequest, pod *v1.Pod) error {
 	if r.podReadinessControl.ContainsReadinessGate(pod) {
 		if !slice.ContainsString(crr.Finalizers, appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey, nil) {
 			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -314,7 +314,7 @@ func (r *ReconcileContainerRecreateRequest) acquirePodNotReady(crr *appsv1beta1.
 			"containerRecreateRequest", klog.KObj(crr), "pod", klog.KObj(pod), "readinessGate", appspub.KruisePodReadyConditionType)
 	}
 
-	// Set the PodUnreadyAcquired condition idempotently. The kruise-daemon derives the
+	// Set the PreRecreateGrace condition idempotently. The kruise-daemon derives the
 	// unreadyGracePeriod drain deadline from this condition's LastTransitionTime, so a
 	// repeated reconcile must NOT push the timestamp forward (that would keep extending
 	// the drain and the grace period would never elapse). meta.SetStatusCondition
@@ -329,10 +329,10 @@ func (r *ReconcileContainerRecreateRequest) acquirePodNotReady(crr *appsv1beta1.
 		}
 		conditions := newCRR.Status.Conditions
 		if changed := meta.SetStatusCondition(&conditions, metav1.Condition{
-			Type:               appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType,
+			Type:               appsv1beta1.ContainerRecreateRequestPreRecreateGraceType,
 			Status:             metav1.ConditionTrue,
 			LastTransitionTime: metav1.NewTime(r.clock.Now()),
-			Reason:             "UnreadyAcquired",
+			Reason:             "PreRecreateGrace",
 			Message:            "Pod has been forced to not-ready for unreadyGracePeriodSeconds drain",
 		}); !changed {
 			// Condition already present with the same status/reason/message: nothing to write.

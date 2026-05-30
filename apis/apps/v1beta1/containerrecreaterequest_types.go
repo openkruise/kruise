@@ -31,17 +31,14 @@ const (
 	// It will be removed in labels since a ContainerRecreateRequest has completed.
 	ContainerRecreateRequestActiveKey = "crr.apps.kruise.io/active"
 
-	// Deprecated: ContainerRecreateRequestSyncContainerStatusesKey is superseded by
-	// status.containerStatusSnapshot in v1beta1. Kept for compile compatibility only.
-	ContainerRecreateRequestSyncContainerStatusesKey = "crr.apps.kruise.io/sync-container-statuses"
-	// Deprecated: ContainerRecreateRequestUnreadyAcquiredKey is superseded by
-	// status.conditions[type=PodUnreadyAcquired] in v1beta1. Kept for compile compatibility only.
+	// ContainerRecreateRequestUnreadyAcquiredKey is the finalizer added to a CRR while the
+	// controller is waiting for the unreadyGracePeriodSeconds drain to elapse.
 	ContainerRecreateRequestUnreadyAcquiredKey = "crr.apps.kruise.io/unready-acquired"
 
-	// ContainerRecreateRequestPodUnreadyAcquiredType is the condition type written to
+	// ContainerRecreateRequestPreRecreateGraceType is the condition type written to
 	// status.conditions when the controller has forced the Pod not-ready for the
 	// unreadyGracePeriodSeconds drain. LastTransitionTime records the exact moment.
-	ContainerRecreateRequestPodUnreadyAcquiredType = "PodUnreadyAcquired"
+	ContainerRecreateRequestPreRecreateGraceType = "PreRecreateGrace"
 )
 
 // ContainerRecreateRequestSpec defines the desired state of ContainerRecreateRequest
@@ -143,7 +140,7 @@ type ContainerRecreateRequestStatus struct {
 	// Replaces the crr.apps.kruise.io/sync-container-statuses annotation.
 	ContainerStatusSnapshot []ContainerRecreateRequestSyncContainerStatus `json:"containerStatusSnapshot,omitempty"`
 	// Conditions contains condition entries for this ContainerRecreateRequest.
-	// The PodUnreadyAcquired condition is written by the controller when it marks the Pod
+	// The PreRecreateGrace condition is written by the controller when it marks the Pod
 	// not-ready for the unreadyGracePeriodSeconds drain; LastTransitionTime records the exact moment.
 	// Replaces the crr.apps.kruise.io/unready-acquired annotation.
 	// +patchMergeKey=type

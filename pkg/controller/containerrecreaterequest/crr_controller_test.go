@@ -61,7 +61,7 @@ func TestSnapshotEqual(t *testing.T) {
 	}
 }
 
-func TestHasPodUnreadyAcquiredCondition(t *testing.T) {
+func TestHasPreRecreateGraceCondition(t *testing.T) {
 	now := metav1.Now()
 
 	tests := []struct {
@@ -78,10 +78,10 @@ func TestHasPodUnreadyAcquiredCondition(t *testing.T) {
 			name: "condition present and true",
 			conditions: []metav1.Condition{
 				{
-					Type:               appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType,
+					Type:               appsv1beta1.ContainerRecreateRequestPreRecreateGraceType,
 					Status:             metav1.ConditionTrue,
 					LastTransitionTime: now,
-					Reason:             "UnreadyAcquired",
+					Reason:             "PreRecreateGrace",
 				},
 			},
 			want: true,
@@ -90,7 +90,7 @@ func TestHasPodUnreadyAcquiredCondition(t *testing.T) {
 			name: "condition present but false",
 			conditions: []metav1.Condition{
 				{
-					Type:               appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType,
+					Type:               appsv1beta1.ContainerRecreateRequestPreRecreateGraceType,
 					Status:             metav1.ConditionFalse,
 					LastTransitionTime: now,
 					Reason:             "Released",
@@ -119,9 +119,9 @@ func TestHasPodUnreadyAcquiredCondition(t *testing.T) {
 					Conditions: tt.conditions,
 				},
 			}
-			got := hasPodUnreadyAcquiredCondition(crr)
+			got := hasPreRecreateGraceCondition(crr)
 			if got != tt.want {
-				t.Errorf("hasPodUnreadyAcquiredCondition() = %v, want %v", got, tt.want)
+				t.Errorf("hasPreRecreateGraceCondition() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -208,12 +208,12 @@ func TestSyncContainerStatuses_CollectsRunningContainers(t *testing.T) {
 	}
 }
 
-// TestAcquirePodNotReady_PreservesConditionTimestamp guards the idempotency fix:
-// repeated acquirePodNotReady calls must keep the original PodUnreadyAcquired
+// TestWaitRecreateGracePeriod_PreservesConditionTimestamp guards the idempotency fix:
+// repeated waitRecreateGracePeriod calls must keep the original PreRecreateGrace
 // LastTransitionTime, because the kruise-daemon derives the unreadyGracePeriod
 // drain deadline from it. If the timestamp were rewritten on every reconcile the
 // grace period would never elapse.
-func TestAcquirePodNotReady_PreservesConditionTimestamp(t *testing.T) {
+func TestWaitRecreateGracePeriod_PreservesConditionTimestamp(t *testing.T) {
 	crr := &appsv1beta1.ContainerRecreateRequest{
 		ObjectMeta: metav1.ObjectMeta{Name: "crr-0", Namespace: "default"},
 		Spec: appsv1beta1.ContainerRecreateRequestSpec{
@@ -223,7 +223,7 @@ func TestAcquirePodNotReady_PreservesConditionTimestamp(t *testing.T) {
 			},
 		},
 	}
-	// Pod without the Kruise readiness gate → acquirePodNotReady skips the
+	// Pod without the Kruise readiness gate → waitRecreateGracePeriod skips the
 	// readiness-gate/finalizer path and only writes the condition.
 	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod-0", Namespace: "default"}}
 
@@ -239,32 +239,32 @@ func TestAcquirePodNotReady_PreservesConditionTimestamp(t *testing.T) {
 		podReadinessControl: utilpodreadiness.NewForAdapter(&podadapter.AdapterRuntimeClient{Client: cli}),
 	}
 
-	if err := r.acquirePodNotReady(crr, pod); err != nil {
-		t.Fatalf("first acquirePodNotReady() error: %v", err)
+	if err := r.waitRecreateGracePeriod(crr, pod); err != nil {
+		t.Fatalf("first waitRecreateGracePeriod() error: %v", err)
 	}
 	first := &appsv1beta1.ContainerRecreateRequest{}
 	if err := cli.Get(context.TODO(), types.NamespacedName{Namespace: "default", Name: "crr-0"}, first); err != nil {
 		t.Fatalf("get crr error: %v", err)
 	}
-	cond := meta.FindStatusCondition(first.Status.Conditions, appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType)
+	cond := meta.FindStatusCondition(first.Status.Conditions, appsv1beta1.ContainerRecreateRequestPreRecreateGraceType)
 	if cond == nil || cond.Status != metav1.ConditionTrue {
-		t.Fatalf("expected PodUnreadyAcquired=True after first acquire, got %+v", first.Status.Conditions)
+		t.Fatalf("expected PreRecreateGrace=True after first acquire, got %+v", first.Status.Conditions)
 	}
 	firstTime := cond.LastTransitionTime
 
 	// Advance the clock and acquire again. The condition already exists with the
 	// same status, so the timestamp must be preserved (and no write performed).
 	fakeClock.Step(15 * time.Second)
-	if err := r.acquirePodNotReady(first.DeepCopy(), pod); err != nil {
-		t.Fatalf("second acquirePodNotReady() error: %v", err)
+	if err := r.waitRecreateGracePeriod(first.DeepCopy(), pod); err != nil {
+		t.Fatalf("second waitRecreateGracePeriod() error: %v", err)
 	}
 	second := &appsv1beta1.ContainerRecreateRequest{}
 	if err := cli.Get(context.TODO(), types.NamespacedName{Namespace: "default", Name: "crr-0"}, second); err != nil {
 		t.Fatalf("get crr error: %v", err)
 	}
-	secondCond := meta.FindStatusCondition(second.Status.Conditions, appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType)
+	secondCond := meta.FindStatusCondition(second.Status.Conditions, appsv1beta1.ContainerRecreateRequestPreRecreateGraceType)
 	if secondCond == nil {
-		t.Fatalf("PodUnreadyAcquired condition disappeared after second acquire")
+		t.Fatalf("PreRecreateGrace condition disappeared after second acquire")
 	}
 	if !secondCond.LastTransitionTime.Equal(&firstTime) {
 		t.Errorf("LastTransitionTime was rewritten: first=%v second=%v (should be preserved)", firstTime, secondCond.LastTransitionTime)

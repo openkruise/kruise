@@ -4395,7 +4395,7 @@ func TestContainerRecreateRequest_ConvertTo(t *testing.T) {
 						v1beta1.ContainerRecreateRequestActiveKey:   "true",
 					},
 					Annotations: map[string]string{
-						v1beta1.ContainerRecreateRequestSyncContainerStatusesKey: syncJSON,
+						ContainerRecreateRequestSyncContainerStatusesKey: syncJSON,
 						v1beta1.ContainerRecreateRequestUnreadyAcquiredKey:       ts.UTC().Format(time.RFC3339),
 					},
 					Finalizers: []string{v1beta1.ContainerRecreateRequestUnreadyAcquiredKey},
@@ -4434,10 +4434,10 @@ func TestContainerRecreateRequest_ConvertTo(t *testing.T) {
 					},
 					Conditions: []metav1.Condition{
 						{
-							Type:               v1beta1.ContainerRecreateRequestPodUnreadyAcquiredType,
+							Type:               v1beta1.ContainerRecreateRequestPreRecreateGraceType,
 							Status:             metav1.ConditionTrue,
 							LastTransitionTime: ts,
-							Reason:             "UnreadyAcquired",
+							Reason:             "PreRecreateGrace",
 							Message:            "Pod has been forced to not-ready for unreadyGracePeriodSeconds drain",
 						},
 					},
@@ -4600,7 +4600,7 @@ func TestContainerRecreateRequest_ConvertTo(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "bad-json",
 					Namespace:   "default",
-					Annotations: map[string]string{v1beta1.ContainerRecreateRequestSyncContainerStatusesKey: "{invalid}"},
+					Annotations: map[string]string{ContainerRecreateRequestSyncContainerStatusesKey: "{invalid}"},
 				},
 				Spec: v1beta1.ContainerRecreateRequestSpec{
 					PodName:    "pod-0",
@@ -4713,10 +4713,10 @@ func TestContainerRecreateRequest_ConvertFrom(t *testing.T) {
 					},
 					Conditions: []metav1.Condition{
 						{
-							Type:               v1beta1.ContainerRecreateRequestPodUnreadyAcquiredType,
+							Type:               v1beta1.ContainerRecreateRequestPreRecreateGraceType,
 							Status:             metav1.ConditionTrue,
 							LastTransitionTime: ts,
-							Reason:             "UnreadyAcquired",
+							Reason:             "PreRecreateGrace",
 						},
 					},
 				},
@@ -4864,7 +4864,7 @@ func TestContainerRecreateRequest_ConvertFrom(t *testing.T) {
 				Status: v1beta1.ContainerRecreateRequestStatus{
 					Conditions: []metav1.Condition{
 						{
-							Type:               v1beta1.ContainerRecreateRequestPodUnreadyAcquiredType,
+							Type:               v1beta1.ContainerRecreateRequestPreRecreateGraceType,
 							Status:             metav1.ConditionFalse,
 							LastTransitionTime: ts,
 							Reason:             "NotAcquired",

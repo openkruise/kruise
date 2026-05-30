@@ -203,7 +203,7 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 			gomega.Expect(crr.Status.ContainerStatusSnapshot[0].ContainerID).ShouldNot(gomega.BeEmpty())
 			gomega.Expect(crr.Status.ContainerStatusSnapshot[0].ContainerID).ShouldNot(gomega.Equal(oldContainerID))
 			// Legacy annotation must be absent on v1beta1 objects.
-			gomega.Expect(crr.Annotations[appsv1beta1.ContainerRecreateRequestSyncContainerStatusesKey]).Should(gomega.Equal(""))
+			gomega.Expect(crr.Annotations[appsv1alpha1.ContainerRecreateRequestSyncContainerStatusesKey]).Should(gomega.Equal(""))
 
 			klog.Infof("CRR containerStatusSnapshot at completion: %v", util.DumpJSON(crr.Status.ContainerStatusSnapshot))
 		})
@@ -293,23 +293,23 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 			gomega.Expect(completed.Status.ContainerStatusSnapshot).ShouldNot(gomega.BeEmpty())
 			gomega.Expect(completed.Status.ContainerStatusSnapshot[0].ContainerID).ShouldNot(gomega.BeEmpty())
 
-			// PodUnreadyAcquired condition must have been written (replaces unready-acquired annotation)
+			// PreRecreateGrace condition must have been written (replaces unready-acquired annotation)
 			var foundCondition bool
 			for _, condition := range completed.Status.Conditions {
-				if condition.Type == appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType &&
+				if condition.Type == appsv1beta1.ContainerRecreateRequestPreRecreateGraceType &&
 					condition.Status == metav1.ConditionTrue {
 					foundCondition = true
 					break
 				}
 			}
-			gomega.Expect(foundCondition).Should(gomega.BeTrue(), "expected PodUnreadyAcquired condition to be present")
+			gomega.Expect(foundCondition).Should(gomega.BeTrue(), "expected PreRecreateGrace condition to be present")
 
 			ginkgo.By("Verify legacy status annotations are absent on v1beta1 object")
-			gomega.Expect(completed.Annotations[appsv1beta1.ContainerRecreateRequestSyncContainerStatusesKey]).Should(gomega.Equal(""))
-			gomega.Expect(completed.Annotations[appsv1beta1.ContainerRecreateRequestUnreadyAcquiredKey]).Should(gomega.Equal(""))
+			gomega.Expect(completed.Annotations[appsv1alpha1.ContainerRecreateRequestSyncContainerStatusesKey]).Should(gomega.Equal(""))
+			gomega.Expect(completed.Annotations[appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey]).Should(gomega.Equal(""))
 		})
 
-		ginkgo.It("exposes v1beta1-native PodUnreadyAcquired condition as unready-acquired annotation for v1alpha1 clients", func() {
+		ginkgo.It("exposes v1beta1-native PreRecreateGrace condition as unready-acquired annotation for v1alpha1 clients", func() {
 			ginkgo.By("Create CloneSet and wait Pods ready")
 			pods = tester.CreateTestCloneSetAndGetPods(randStr, 1, []v1.Container{
 				{
@@ -342,17 +342,17 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 			_, err = kc.AppsV1beta1().ContainerRecreateRequests(ns).Create(context.TODO(), crrBeta, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			ginkgo.By("Wait for v1beta1 CRR to complete and carry PodUnreadyAcquired condition")
+			ginkgo.By("Wait for v1beta1 CRR to complete and carry PreRecreateGrace condition")
 			completedBeta := tester.WaitForCRRCompleted(crrName, 90*time.Second)
 			var foundBetaCond bool
 			for _, cond := range completedBeta.Status.Conditions {
-				if cond.Type == appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType &&
+				if cond.Type == appsv1beta1.ContainerRecreateRequestPreRecreateGraceType &&
 					cond.Status == metav1.ConditionTrue {
 					foundBetaCond = true
 					break
 				}
 			}
-			gomega.Expect(foundBetaCond).Should(gomega.BeTrue(), "v1beta1 CRR should have PodUnreadyAcquired condition")
+			gomega.Expect(foundBetaCond).Should(gomega.BeTrue(), "v1beta1 CRR should have PreRecreateGrace condition")
 
 			ginkgo.By("Read the same CRR back via v1alpha1 API and verify unready-acquired annotation is present")
 			gomega.Eventually(func() string {

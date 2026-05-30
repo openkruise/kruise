@@ -246,7 +246,7 @@ func (c *Controller) sync(key string) (retErr error) {
 	}
 
 	if crr.Spec.Strategy != nil && crr.Spec.Strategy.UnreadyGracePeriodSeconds != nil {
-		unreadyTime, found := getPodUnreadyAcquiredTime(crr)
+		unreadyTime, found := getPreRecreateGraceTime(crr)
 		if !found {
 			klog.InfoS("CRR is waiting for unready acquirement", "namespace", crr.Namespace, "name", crr.Name)
 			return nil
@@ -263,10 +263,10 @@ func (c *Controller) sync(key string) (retErr error) {
 	return c.manage(crr)
 }
 
-// getPodUnreadyAcquiredTime returns the LastTransitionTime of the PodUnreadyAcquired condition.
-func getPodUnreadyAcquiredTime(crr *appsv1beta1.ContainerRecreateRequest) (time.Time, bool) {
+// getPreRecreateGraceTime returns the LastTransitionTime of the PreRecreateGrace condition.
+func getPreRecreateGraceTime(crr *appsv1beta1.ContainerRecreateRequest) (time.Time, bool) {
 	for _, c := range crr.Status.Conditions {
-		if c.Type == appsv1beta1.ContainerRecreateRequestPodUnreadyAcquiredType && c.Status == metav1.ConditionTrue {
+		if c.Type == appsv1beta1.ContainerRecreateRequestPreRecreateGraceType && c.Status == metav1.ConditionTrue {
 			return c.LastTransitionTime.Time, true
 		}
 	}

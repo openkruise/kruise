@@ -22,6 +22,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	"github.com/openkruise/kruise/apis/apps/v1beta1"
@@ -97,7 +98,10 @@ func (src *ContainerRecreateRequest) ConvertTo(dstRaw conversion.Hub) error {
 	// Promote annotation crr.apps.kruise.io/sync-container-statuses → status.containerStatusSnapshot
 	if raw, ok := src.Annotations[ContainerRecreateRequestSyncContainerStatusesKey]; ok && raw != "" {
 		var syncStatuses []ContainerRecreateRequestSyncContainerStatus
-		if err := json.Unmarshal([]byte(raw), &syncStatuses); err == nil {
+		if err := json.Unmarshal([]byte(raw), &syncStatuses); err != nil {
+			klog.Warningf("CRR %s/%s: failed to parse %s annotation, data will be lost during upgrade: %v",
+				src.Namespace, src.Name, ContainerRecreateRequestSyncContainerStatusesKey, err)
+		} else {
 			dst.Status.ContainerStatusSnapshot = make([]v1beta1.ContainerRecreateRequestSyncContainerStatus, len(syncStatuses))
 			for i, s := range syncStatuses {
 				dst.Status.ContainerStatusSnapshot[i] = v1beta1.ContainerRecreateRequestSyncContainerStatus{
@@ -110,16 +114,19 @@ func (src *ContainerRecreateRequest) ConvertTo(dstRaw conversion.Hub) error {
 		}
 	}
 
-	// Promote annotation crr.apps.kruise.io/unready-acquired → status.conditions[PodUnreadyAcquired]
+	// Promote annotation crr.apps.kruise.io/unready-acquired → status.conditions[PreRecreateGrace]
 	if timeStr, ok := src.Annotations[ContainerRecreateRequestUnreadyAcquiredKey]; ok && timeStr != "" {
 		t, err := time.Parse(time.RFC3339, timeStr)
-		if err == nil {
+		if err != nil {
+			klog.Warningf("CRR %s/%s: failed to parse %s annotation as RFC3339 time, data will be lost during upgrade: %v",
+				src.Namespace, src.Name, ContainerRecreateRequestUnreadyAcquiredKey, err)
+		} else {
 			dst.Status.Conditions = []metav1.Condition{
 				{
-					Type:               v1beta1.ContainerRecreateRequestPodUnreadyAcquiredType,
+					Type:               v1beta1.ContainerRecreateRequestPreRecreateGraceType,
 					Status:             metav1.ConditionTrue,
 					LastTransitionTime: metav1.NewTime(t),
-					Reason:             "UnreadyAcquired",
+					Reason:             "PreRecreateGrace",
 					Message:            "Pod has been forced to not-ready for unreadyGracePeriodSeconds drain",
 				},
 			}
@@ -214,10 +221,10 @@ func (dst *ContainerRecreateRequest) ConvertFrom(srcRaw conversion.Hub) error {
 		}
 	}
 
-	// Demote status.conditions[PodUnreadyAcquired] → annotation crr.apps.kruise.io/unready-acquired
+	// Demote status.conditions[PreRecreateGrace] → annotation crr.apps.kruise.io/unready-acquired
 	// so that v1alpha1 clients can still observe when the pod was made not-ready.
 	for _, cond := range src.Status.Conditions {
-		if cond.Type == v1beta1.ContainerRecreateRequestPodUnreadyAcquiredType &&
+		if cond.Type == v1beta1.ContainerRecreateRequestPreRecreateGraceType &&
 			cond.Status == metav1.ConditionTrue {
 			if dst.Annotations == nil {
 				dst.Annotations = map[string]string{}
