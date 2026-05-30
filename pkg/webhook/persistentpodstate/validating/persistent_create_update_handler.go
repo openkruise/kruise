@@ -167,8 +167,8 @@ func validatePerConflict(pps *appsv1beta1.PersistentPodState, others []appsv1bet
 		curRef := pps.Spec.TargetReference
 		otherRef := other.Spec.TargetReference
 		if util.IsReferenceEqualV1beta1(curRef, otherRef) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("targetReference"), pps.Spec.TargetReference, fmt.Sprintf(
-				"targetReference is in conflict with other PersistentPodState %s", other.Name)))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), pps.Spec.TargetReference, fmt.Sprintf(
+				"targetRef is in conflict with other PersistentPodState %s", other.Name)))
 			return allErrs
 		}
 	}

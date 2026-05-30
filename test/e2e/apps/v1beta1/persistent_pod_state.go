@@ -19,7 +19,6 @@ package v1beta1
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -141,13 +140,13 @@ var _ = ginkgo.Describe("PersistentPodState", ginkgo.Label("PersistentPodState",
 
 			sts.Spec.Replicas = ptr.To[int32](1)
 			tester.UpdateStatefulset(sts)
-			time.Sleep(3 * time.Second)
 
-			pps, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			pods, err = tester.ListPodsInKruiseSts(sts)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(pps.Status.PodStates).To(gomega.HaveLen(len(pods)))
+			ginkgo.By("verify PodStates converge after scale down")
+			gomega.Eventually(func() int {
+				pps, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return len(pps.Status.PodStates)
+			}, common.PodStartShortTimeout, common.Poll).Should(gomega.Equal(1))
 
 			other := &appsv1beta1.PersistentPodState{
 				ObjectMeta: metav1.ObjectMeta{
@@ -178,9 +177,12 @@ var _ = ginkgo.Describe("PersistentPodState", ginkgo.Label("PersistentPodState",
 
 			err = c.AppsV1().StatefulSets(sts.Namespace).Delete(context.TODO(), sts.Name, metav1.DeleteOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			time.Sleep(3 * time.Second)
-			_, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
-			gomega.Expect(err).To(gomega.HaveOccurred())
+
+			ginkgo.By("verify PersistentPodState is cleaned up after StatefulSet deletion")
+			gomega.Eventually(func() error {
+				_, err = kc.AppsV1beta1().PersistentPodStates(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+				return err
+			}, common.PodStartShortTimeout, common.Poll).Should(gomega.HaveOccurred())
 		})
 
 		ginkgo.It("cross-version: v1alpha1 nodeTopologyKeys converts to v1beta1 keys", func() {
@@ -189,7 +191,6 @@ var _ = ginkgo.Describe("PersistentPodState", ginkgo.Label("PersistentPodState",
 			sts.Spec.Selector.MatchLabels["app"] = "pps-cross"
 			sts.Spec.Template.ObjectMeta.Labels["app"] = "pps-cross"
 			tester.CreateStatefulset(sts)
-			time.Sleep(3 * time.Second)
 
 			ginkgo.By("create PersistentPodState via v1alpha1 with nodeTopologyKeys")
 			alphaPPS := &appsv1alpha1.PersistentPodState{
