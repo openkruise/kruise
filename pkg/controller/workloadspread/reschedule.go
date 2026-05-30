@@ -29,9 +29,6 @@ import (
 	wsutil "github.com/openkruise/kruise/pkg/webhook/workloadspread/validating"
 )
 
-// subsetSchedulableConditionType is the condition type string for subset schedulability.
-const subsetSchedulableConditionType = "Schedulable"
-
 // rescheduleSubset will delete some unschedulable Pods that still in pending status. Some subsets have no
 // sufficient resource can lead to some Pods scheduled failed. WorkloadSpread has multiple subset, so these
 // unschedulable Pods should be rescheduled to other subsets.
@@ -54,12 +51,12 @@ func (r *ReconcileWorkloadSpread) rescheduleSubset(ws *appsv1beta1.WorkloadSprea
 		klog.V(3).InfoS("Subset of WorkloadSpread is unschedulable", "subsetName", subsetStatus.Name, "workloadSpread", klog.KObj(ws))
 	}
 
-	oldCondition := GetWorkloadSpreadSubsetCondition(oldSubsetStatus, subsetSchedulableConditionType)
+	oldCondition := GetWorkloadSpreadSubsetCondition(oldSubsetStatus, appsv1beta1.SubsetSchedulable)
 	if oldCondition == nil {
 		if unschedulable {
-			setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(subsetSchedulableConditionType, metav1.ConditionFalse, "PodUnschedulable", ""))
+			setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1beta1.SubsetSchedulable, metav1.ConditionFalse, "PodUnschedulable", ""))
 		} else {
-			setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(subsetSchedulableConditionType, metav1.ConditionTrue, "Sufficient", ""))
+			setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1beta1.SubsetSchedulable, metav1.ConditionTrue, "Sufficient", ""))
 		}
 		return scheduleFailedPods
 	}
@@ -68,7 +65,7 @@ func (r *ReconcileWorkloadSpread) rescheduleSubset(ws *appsv1beta1.WorkloadSprea
 	oldCopy := *oldCondition
 	setWorkloadSpreadSubsetCondition(subsetStatus, &oldCopy)
 	if unschedulable {
-		setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(subsetSchedulableConditionType, metav1.ConditionFalse, "PodUnschedulable", ""))
+		setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1beta1.SubsetSchedulable, metav1.ConditionFalse, "PodUnschedulable", ""))
 	} else {
 		// consider to recover
 		if oldCondition.Status == metav1.ConditionFalse {
@@ -79,7 +76,7 @@ func (r *ReconcileWorkloadSpread) rescheduleSubset(ws *appsv1beta1.WorkloadSprea
 				r.recorder.Eventf(ws, corev1.EventTypeNormal,
 					"RecoverSchedulable", "Subset %s of WorkloadSpread %s/%s is recovered from unschedulable to schedulable",
 					subsetStatus.Name, ws.Namespace, ws.Name)
-				setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(subsetSchedulableConditionType, metav1.ConditionTrue, "Sufficient", ""))
+				setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1beta1.SubsetSchedulable, metav1.ConditionTrue, "Sufficient", ""))
 			} else {
 				// less 5 minutes, keep unschedulable.
 				durationStore.Push(getWorkloadSpreadKey(ws), expectReschedule.Sub(currentTime))

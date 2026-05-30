@@ -38,7 +38,7 @@ type WorkloadSpreadSpec struct {
 	// +patchStrategy=merge
 	Subsets []WorkloadSpreadSubset `json:"subsets" patchStrategy:"merge" patchMergeKey:"name"`
 
-	// ScheduleStrategy indicates the strategy the WorkloadSpread used to preform the schedule between each of subsets.
+	// ScheduleStrategy indicates the strategy the WorkloadSpread used to perform the schedule between each of subsets.
 	// +optional
 	ScheduleStrategy WorkloadSpreadScheduleStrategy `json:"scheduleStrategy,omitempty"`
 }
@@ -140,7 +140,7 @@ type AdaptiveWorkloadSpreadStrategy struct {
 	DisableSimulationSchedule bool `json:"disableSimulationSchedule,omitempty"`
 
 	// RescheduleCriticalSeconds indicates how long controller will reschedule a schedule failed Pod to the subset that has
-	// redundant capacity after the subset where the Pod lives. If a Pod was scheduled failed and still in a unschedulabe status
+	// redundant capacity after the subset where the Pod lives. If a Pod was scheduled failed and still in a unschedulable status
 	// over RescheduleCriticalSeconds duration, the controller will reschedule it to a suitable subset.
 	// +optional
 	RescheduleCriticalSeconds *int32 `json:"rescheduleCriticalSeconds,omitempty"`
@@ -190,6 +190,12 @@ type WorkloadSpreadStatus struct {
 	// each version.
 	VersionedSubsetStatuses map[string][]WorkloadSpreadSubsetStatus `json:"versionedSubsetStatuses,omitempty"`
 }
+
+const (
+	// SubsetSchedulable is the subset condition type indicating whether the nodes in this
+	// subset have sufficient resources to schedule the workload's Pods.
+	SubsetSchedulable = "Schedulable"
+)
 
 // WorkloadSpreadSubsetStatus defines the observed state of subset
 type WorkloadSpreadSubsetStatus struct {

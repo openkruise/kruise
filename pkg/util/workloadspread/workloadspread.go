@@ -366,7 +366,7 @@ func (h *Handler) acquireSuitableSubset(matchedWS *appsv1beta1.WorkloadSpread,
 		// the pods with order within [10, inf) will be assigned to subset-c.
 		currentThresholdID := int64(0)
 		for _, subset := range matchedWS.Spec.Subsets {
-			cond := getSubsetCondition(matchedWS, subset.Name, "Schedulable")
+			cond := getSubsetCondition(matchedWS, subset.Name, appsv1beta1.SubsetSchedulable)
 			if cond != nil && cond.Status == metav1.ConditionFalse {
 				continue
 			}
@@ -692,7 +692,7 @@ func (h *Handler) getSuitableSubset(subsetStatuses []appsv1beta1.WorkloadSpreadS
 		subset := &subsetStatuses[i]
 		canSchedule := true
 		for _, condition := range subset.Conditions {
-			if condition.Type == "Schedulable" && condition.Status == metav1.ConditionFalse {
+			if condition.Type == appsv1beta1.SubsetSchedulable && condition.Status == metav1.ConditionFalse {
 				canSchedule = false
 				break
 			}

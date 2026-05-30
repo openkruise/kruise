@@ -212,7 +212,7 @@ func TestMatchSubset(t *testing.T) {
 			getSubset: func() *appsv1beta1.WorkloadSpreadSubset {
 				subset := matchSubsetDemo.DeepCopy()
 				subset.Tolerations[0].Value = "false"
-				return subsetDemo.DeepCopy()
+				return subset
 			},
 			getNode: func() *corev1.Node {
 				return matchNodeDemo.DeepCopy()
