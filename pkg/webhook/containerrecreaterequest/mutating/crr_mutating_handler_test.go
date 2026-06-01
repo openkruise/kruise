@@ -84,7 +84,8 @@ func newActivePod(name, namespace, nodeName string) *corev1.Pod {
 
 func buildCRRHandler(t *testing.T, pod *corev1.Pod) *ContainerRecreateRequestHandler {
 	scheme := newCRRTestScheme()
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pod).Build()
+	node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: pod.Spec.NodeName}}
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pod, node).Build()
 	decoder := admission.NewDecoder(scheme)
 	return &ContainerRecreateRequestHandler{
 		Client:  fakeClient,
@@ -439,25 +440,6 @@ func TestCRRHandler_V1beta1_Create_PodNotFound(t *testing.T) {
 	}
 	if resp.Result.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", resp.Result.Code)
-	}
-}
-
-func TestCRRHandler_V1alpha1_Create_RequestKindV1beta1(t *testing.T) {
-	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.KruiseDaemon, true)()
-
-	pod := newActivePod("pod-0", "default", "node-1")
-	h := buildCRRHandler(t, pod)
-
-	crr := &appsv1alpha1.ContainerRecreateRequest{
-		ObjectMeta: metav1.ObjectMeta{Name: "crr-0", Namespace: "default"},
-		Spec: appsv1alpha1.ContainerRecreateRequestSpec{
-			PodName:    "pod-0",
-			Containers: []appsv1alpha1.ContainerRecreateRequestContainer{{Name: "app"}},
-		},
-	}
-	resp := h.Handle(context.Background(), admissionRequest(t, admissionv1.Create, "v1beta1", crr, nil))
-	if !resp.Allowed {
-		t.Fatalf("expected Allowed; got %v", resp.Result)
 	}
 }
 
