@@ -23,7 +23,7 @@ import (
 	"github.com/openkruise/kruise/pkg/webhook/types"
 )
 
-// +kubebuilder:webhook:path=/validate-apps-kruise-io-persistentpodstate,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=persistentpodstates,verbs=create;update,versions=v1alpha1,name=vpersistentpodstate.kb.io
+// +kubebuilder:webhook:path=/validate-apps-kruise-io-persistentpodstate,mutating=false,failurePolicy=fail,sideEffects=None,admissionReviewVersions=v1;v1beta1,groups=apps.kruise.io,resources=persistentpodstates,verbs=create;update,versions=v1alpha1;v1beta1,name=vpersistentpodstate.kb.io
 
 var (
 	// HandlerGetterMap contains admission webhook handlers

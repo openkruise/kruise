@@ -55,6 +55,10 @@ func (c *FakeAppsV1beta1) NodeImages() v1beta1.NodeImageInterface {
 	return newFakeNodeImages(c)
 }
 
+func (c *FakeAppsV1beta1) PersistentPodStates(namespace string) v1beta1.PersistentPodStateInterface {
+	return newFakePersistentPodStates(c, namespace)
+}
+
 func (c *FakeAppsV1beta1) ResourceDistributions() v1beta1.ResourceDistributionInterface {
 	return newFakeResourceDistributions(c)
 }

@@ -37,6 +37,8 @@ type Interface interface {
 	ImagePullJobs() ImagePullJobInformer
 	// NodeImages returns a NodeImageInformer.
 	NodeImages() NodeImageInformer
+	// PersistentPodStates returns a PersistentPodStateInformer.
+	PersistentPodStates() PersistentPodStateInformer
 	// ResourceDistributions returns a ResourceDistributionInformer.
 	ResourceDistributions() ResourceDistributionInformer
 	// SidecarSets returns a SidecarSetInformer.
@@ -91,6 +93,11 @@ func (v *version) ImagePullJobs() ImagePullJobInformer {
 // NodeImages returns a NodeImageInformer.
 func (v *version) NodeImages() NodeImageInformer {
 	return &nodeImageInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// PersistentPodStates returns a PersistentPodStateInformer.
+func (v *version) PersistentPodStates() PersistentPodStateInformer {
+	return &persistentPodStateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // ResourceDistributions returns a ResourceDistributionInformer.
