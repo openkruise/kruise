@@ -71,6 +71,18 @@ func TestUpdateColdUpgradeSidecar(t *testing.T) {
 	testUpdateColdUpgradeSidecar(t, podInput, sidecarSetInput, handlers)
 }
 
+func TestUpdatePodSidecarAndHashPodNotFound(t *testing.T) {
+	sidecarSet := sidecarSetDemo.DeepCopy()
+	pod := podDemo.DeepCopy()
+	// pod is intentionally not added to the client, so Get returns NotFound
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet).Build()
+	processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
+	control := sidecarcontrol.New(sidecarSet)
+	if err := processor.updatePodSidecarAndHash(control, pod); err == nil {
+		t.Fatalf("expect updatePodSidecarAndHash to return error when pod not found, but got nil")
+	}
+}
+
 func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetInput *appsv1beta1.SidecarSet, handlers map[string]HandlePod) {
 	podInput1 := podDemo.DeepCopy()
 	podInput2 := podDemo.DeepCopy()
