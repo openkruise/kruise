@@ -39,7 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
-	appsvbeta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
@@ -55,11 +55,11 @@ var (
 	controllerKindRS             = appsv1.SchemeGroupVersion.WithKind("ReplicaSet")
 	controllerKindDep            = appsv1.SchemeGroupVersion.WithKind("Deployment")
 	controllerKindJob            = batchv1.SchemeGroupVersion.WithKind("Job")
-	controllerKruiseKindBetaSts  = appsvbeta1.SchemeGroupVersion.WithKind("StatefulSet")
+	controllerKruiseKindBetaSts  = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
 	controllerKruiseKindAlphaSts = appsv1alpha1.SchemeGroupVersion.WithKind("StatefulSet")
 )
 
-func verifyGroupKind(ref *appsv1alpha1.TargetReference, expectedKind string, expectedGroups []string) (bool, error) {
+func verifyGroupKind(ref *appsv1beta1.TargetReference, expectedKind string, expectedGroups []string) (bool, error) {
 	gv, err := schema.ParseGroupVersion(ref.APIVersion)
 	if err != nil {
 		klog.ErrorS(err, "failed to parse GroupVersion for apiVersion", "apiVersion", ref.APIVersion)
@@ -79,12 +79,12 @@ func verifyGroupKind(ref *appsv1alpha1.TargetReference, expectedKind string, exp
 	return false, nil
 }
 
-func (h *WorkloadSpreadCreateUpdateHandler) validatingWorkloadSpreadFn(obj *appsv1alpha1.WorkloadSpread) field.ErrorList {
+func (h *WorkloadSpreadCreateUpdateHandler) validatingWorkloadSpreadFn(obj *appsv1beta1.WorkloadSpread) field.ErrorList {
 	// validate ws.spec.
 	allErrs := validateWorkloadSpreadSpec(h, obj, field.NewPath("spec"))
 
 	// validate whether ws.spec.targetRef is in conflict with others.
-	wsList := &appsv1alpha1.WorkloadSpreadList{}
+	wsList := &appsv1beta1.WorkloadSpreadList{}
 	if err := h.Client.List(context.TODO(), wsList, &client.ListOptions{Namespace: obj.Namespace}); err != nil {
 		allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("query other WorkloadSpread failed, err: %v", err)))
 	} else {
@@ -94,7 +94,7 @@ func (h *WorkloadSpreadCreateUpdateHandler) validatingWorkloadSpreadFn(obj *apps
 	return allErrs
 }
 
-func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv1alpha1.WorkloadSpread, fldPath *field.Path) field.ErrorList {
+func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv1beta1.WorkloadSpread, fldPath *field.Path) field.ErrorList {
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
 	var workloadTemplate client.Object
@@ -182,14 +182,14 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 
 	// validate scheduleStrategy
 	if spec.ScheduleStrategy.Type != "" &&
-		spec.ScheduleStrategy.Type != appsv1alpha1.FixedWorkloadSpreadScheduleStrategyType &&
-		spec.ScheduleStrategy.Type != appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType {
+		spec.ScheduleStrategy.Type != appsv1beta1.FixedWorkloadSpreadScheduleStrategyType &&
+		spec.ScheduleStrategy.Type != appsv1beta1.AdaptiveWorkloadSpreadScheduleStrategyType {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("scheduleStrategy").Child("type"),
 			spec.ScheduleStrategy.Type, "ScheduleStrategy's type is not valid"))
 	}
 
 	if spec.ScheduleStrategy.Adaptive != nil {
-		if spec.ScheduleStrategy.Type != appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType {
+		if spec.ScheduleStrategy.Type != appsv1beta1.AdaptiveWorkloadSpreadScheduleStrategyType {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("scheduleStrategy").Child("type"),
 				spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, "the scheduleStrategy's type must be adaptive when using adaptive scheduleStrategy"))
 		}
@@ -223,7 +223,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 	return allErrs
 }
 
-func validateWorkloadSpreadSubsets(ws *appsv1alpha1.WorkloadSpread, subsets []appsv1alpha1.WorkloadSpreadSubset, workloadTemplate client.Object, fldPath *field.Path) field.ErrorList {
+func validateWorkloadSpreadSubsets(ws *appsv1beta1.WorkloadSpread, subsets []appsv1beta1.WorkloadSpreadSubset, workloadTemplate client.Object, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	//if len(subsets) < 2 {
@@ -253,39 +253,40 @@ func validateWorkloadSpreadSubsets(ws *appsv1alpha1.WorkloadSpread, subsets []ap
 		}
 
 		// at least one of requiredNodeSelectorTerm, preferredNodeSelectorTerms, tolerations.
-		//if subset.RequiredNodeSelectorTerm == nil && subset.PreferredNodeSelectorTerms == nil && subset.Tolerations == nil {
-		//	allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelectorTerm"), subset.RequiredNodeSelectorTerm, "The requiredNodeSelectorTerm, preferredNodeSelectorTerms and tolerations are empty that is not valid for WorkloadSpread"))
+		//if subset.RequiredNodeSelector == nil && subset.PreferredNodeSelector == nil && subset.Tolerations == nil {
+		//	allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelector"), subset.RequiredNodeSelector, "The requiredNodeSelector, preferredNodeSelector and tolerations are empty that is not valid for WorkloadSpread"))
 		//} else {
-		if subset.RequiredNodeSelectorTerm != nil {
+		// field renamed: RequiredNodeSelectorTerm → RequiredNodeSelector
+		if subset.RequiredNodeSelector != nil {
 			coreNodeSelectorTerm := &core.NodeSelectorTerm{}
-			if err := corev1.Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm(subset.RequiredNodeSelectorTerm.DeepCopy(), coreNodeSelectorTerm, nil); err != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelectorTerm"), subset.RequiredNodeSelectorTerm, fmt.Sprintf("Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm failed: %v", err)))
+			if err := corev1.Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm(subset.RequiredNodeSelector.DeepCopy(), coreNodeSelectorTerm, nil); err != nil {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("requiredNodeSelector"), subset.RequiredNodeSelector, fmt.Sprintf("Convert_v1_NodeSelectorTerm_To_core_NodeSelectorTerm failed: %v", err)))
 			} else {
-				allErrs = append(allErrs, corevalidation.ValidateNodeSelectorTerm(*coreNodeSelectorTerm, false, fldPath.Index(i).Child("requiredNodeSelectorTerm"))...)
+				allErrs = append(allErrs, corevalidation.ValidateNodeSelectorTerm(*coreNodeSelectorTerm, false, fldPath.Index(i).Child("requiredNodeSelector"))...)
 			}
 		}
 
-		if subset.PreferredNodeSelectorTerms != nil {
-			corePreferredSchedulingTerms := make([]core.PreferredSchedulingTerm, 0, len(subset.PreferredNodeSelectorTerms))
-			for i, term := range subset.PreferredNodeSelectorTerms {
+		// field renamed: PreferredNodeSelectorTerms → PreferredNodeSelector
+		if subset.PreferredNodeSelector != nil {
+			corePreferredSchedulingTerms := make([]core.PreferredSchedulingTerm, 0, len(subset.PreferredNodeSelector))
+			for j, term := range subset.PreferredNodeSelector {
 				corePreferredSchedulingTerm := &core.PreferredSchedulingTerm{}
 				if err := corev1.Convert_v1_PreferredSchedulingTerm_To_core_PreferredSchedulingTerm(term.DeepCopy(), corePreferredSchedulingTerm, nil); err != nil {
-					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("preferredSchedulingTerms"), subset.PreferredNodeSelectorTerms, fmt.Sprintf("Convert_v1_PreferredSchedulingTerm_To_core_PreferredSchedulingTerm failed: %v", err)))
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("preferredNodeSelector").Index(j), subset.PreferredNodeSelector, fmt.Sprintf("Convert_v1_PreferredSchedulingTerm_To_core_PreferredSchedulingTerm failed: %v", err)))
 				} else {
 					corePreferredSchedulingTerms = append(corePreferredSchedulingTerms, *corePreferredSchedulingTerm)
 				}
 			}
-
-			allErrs = append(allErrs, corevalidation.ValidatePreferredSchedulingTerms(corePreferredSchedulingTerms, fldPath.Index(i).Child("preferredSchedulingTerms"))...)
+			allErrs = append(allErrs, corevalidation.ValidatePreferredSchedulingTerms(corePreferredSchedulingTerms, fldPath.Index(i).Child("preferredNodeSelector"))...)
 		}
 		//}
 
 		if subset.Tolerations != nil {
 			var coreTolerations []core.Toleration
-			for i, toleration := range subset.Tolerations {
+			for j, toleration := range subset.Tolerations {
 				coreToleration := &core.Toleration{}
 				if err := corev1.Convert_v1_Toleration_To_core_Toleration(&toleration, coreToleration, nil); err != nil {
-					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("tolerations"), subset.Tolerations, fmt.Sprintf("Convert_v1_Toleration_To_core_Toleration failed: %v", err)))
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("tolerations").Index(j), subset.Tolerations, fmt.Sprintf("Convert_v1_Toleration_To_core_Toleration failed: %v", err)))
 				} else {
 					coreTolerations = append(coreTolerations, *coreToleration)
 				}
@@ -323,7 +324,7 @@ func validateWorkloadSpreadSubsets(ws *appsv1alpha1.WorkloadSpread, subsets []ap
 				}
 				coreNewPod, CovErr := convertor.ConvertPod(newPod)
 				if CovErr != nil {
-					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("patch"), newPod, fmt.Sprintf("Convert_v1_Pod_To_core_Pod failed: %v", err)))
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("patch"), newPod, fmt.Sprintf("Convert_v1_Pod_To_core_Pod failed: %v", CovErr)))
 				}
 				allErrs = append(allErrs, corevalidation.ValidatePodSpec(&coreNewPod.Spec, &coreNewPod.ObjectMeta, fldPath.Index(i).Child("patch"), webhookutil.DefaultPodValidationOptions)...)
 			}
@@ -381,7 +382,7 @@ func withVolumeClaimTemplates(pod v1.PodTemplateSpec, claims []v1.PersistentVolu
 	return pod
 }
 
-func validateWorkloadSpreadConflict(ws *appsv1alpha1.WorkloadSpread, others []appsv1alpha1.WorkloadSpread, fldPath *field.Path) field.ErrorList {
+func validateWorkloadSpreadConflict(ws *appsv1beta1.WorkloadSpread, others []appsv1beta1.WorkloadSpread, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, other := range others {
 		if other.Name == ws.Name {
@@ -405,7 +406,7 @@ func validateWorkloadSpreadConflict(ws *appsv1alpha1.WorkloadSpread, others []ap
 	return allErrs
 }
 
-func validateWorkloadSpreadUpdate(new, old *appsv1alpha1.WorkloadSpread) field.ErrorList {
+func validateWorkloadSpreadUpdate(new, old *appsv1beta1.WorkloadSpread) field.ErrorList {
 	// validate metadata
 	allErrs := corevalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
 	// validate targetRef
@@ -413,7 +414,7 @@ func validateWorkloadSpreadUpdate(new, old *appsv1alpha1.WorkloadSpread) field.E
 	return allErrs
 }
 
-func validateWorkloadSpreadTargetRefUpdate(targetRef, oldTargetRef *appsv1alpha1.TargetReference, fldPath *field.Path) field.ErrorList {
+func validateWorkloadSpreadTargetRefUpdate(targetRef, oldTargetRef *appsv1beta1.TargetReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if targetRef != nil && oldTargetRef != nil {
 		gv1, _ := schema.ParseGroupVersion(targetRef.APIVersion)

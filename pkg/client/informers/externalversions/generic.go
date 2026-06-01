@@ -115,6 +115,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().StatefulSets().Informer()}, nil
 	case v1beta1.SchemeGroupVersion.WithResource("uniteddeployments"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().UnitedDeployments().Informer()}, nil
+	case v1beta1.SchemeGroupVersion.WithResource("workloadspreads"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().WorkloadSpreads().Informer()}, nil
 
 		// Group=policy.kruise.io, Version=v1alpha1
 	case policyv1alpha1.SchemeGroupVersion.WithResource("podunavailablebudgets"):

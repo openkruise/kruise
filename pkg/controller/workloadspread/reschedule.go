@@ -21,9 +21,10 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller/util"
 	wsutil "github.com/openkruise/kruise/pkg/webhook/workloadspread/validating"
 )
@@ -36,9 +37,9 @@ import (
 // should be recovered schedulable status to try scheduling Pods again.
 // TODO optimize the unschedulable duration of subset.
 // return one parameters - unschedulable Pods belongs to this subset.
-func (r *ReconcileWorkloadSpread) rescheduleSubset(ws *appsv1alpha1.WorkloadSpread,
+func (r *ReconcileWorkloadSpread) rescheduleSubset(ws *appsv1beta1.WorkloadSpread,
 	pods []*corev1.Pod,
-	subsetStatus, oldSubsetStatus *appsv1alpha1.WorkloadSpreadSubsetStatus) []*corev1.Pod {
+	subsetStatus, oldSubsetStatus *appsv1beta1.WorkloadSpreadSubsetStatus) []*corev1.Pod {
 	scheduleFailedPods := make([]*corev1.Pod, 0)
 	for i := range pods {
 		if PodUnscheduledTimeout(ws, pods[i]) {
@@ -50,23 +51,24 @@ func (r *ReconcileWorkloadSpread) rescheduleSubset(ws *appsv1alpha1.WorkloadSpre
 		klog.V(3).InfoS("Subset of WorkloadSpread is unschedulable", "subsetName", subsetStatus.Name, "workloadSpread", klog.KObj(ws))
 	}
 
-	oldCondition := GetWorkloadSpreadSubsetCondition(oldSubsetStatus, appsv1alpha1.SubsetSchedulable)
+	oldCondition := GetWorkloadSpreadSubsetCondition(oldSubsetStatus, appsv1beta1.SubsetSchedulable)
 	if oldCondition == nil {
 		if unschedulable {
-			setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1alpha1.SubsetSchedulable, corev1.ConditionFalse, "", ""))
+			setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1beta1.SubsetSchedulable, metav1.ConditionFalse, "PodUnschedulable", ""))
 		} else {
-			setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1alpha1.SubsetSchedulable, corev1.ConditionTrue, "", ""))
+			setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1beta1.SubsetSchedulable, metav1.ConditionTrue, "Sufficient", ""))
 		}
 		return scheduleFailedPods
 	}
 
 	// copy old condition to avoid unnecessary update.
-	setWorkloadSpreadSubsetCondition(subsetStatus, oldCondition.DeepCopy())
+	oldCopy := *oldCondition
+	setWorkloadSpreadSubsetCondition(subsetStatus, &oldCopy)
 	if unschedulable {
-		setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1alpha1.SubsetSchedulable, corev1.ConditionFalse, "", ""))
+		setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1beta1.SubsetSchedulable, metav1.ConditionFalse, "PodUnschedulable", ""))
 	} else {
 		// consider to recover
-		if oldCondition.Status == corev1.ConditionFalse {
+		if oldCondition.Status == metav1.ConditionFalse {
 			expectReschedule := oldCondition.LastTransitionTime.Add(wsutil.MaxScheduledFailedDuration)
 			currentTime := time.Now()
 			// the duration of unschedule status more than 5 minutes, recover to schedulable.
@@ -74,7 +76,7 @@ func (r *ReconcileWorkloadSpread) rescheduleSubset(ws *appsv1alpha1.WorkloadSpre
 				r.recorder.Eventf(ws, corev1.EventTypeNormal,
 					"RecoverSchedulable", "Subset %s of WorkloadSpread %s/%s is recovered from unschedulable to schedulable",
 					subsetStatus.Name, ws.Namespace, ws.Name)
-				setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1alpha1.SubsetSchedulable, corev1.ConditionTrue, "", ""))
+				setWorkloadSpreadSubsetCondition(subsetStatus, NewWorkloadSpreadSubsetCondition(appsv1beta1.SubsetSchedulable, metav1.ConditionTrue, "Sufficient", ""))
 			} else {
 				// less 5 minutes, keep unschedulable.
 				durationStore.Push(getWorkloadSpreadKey(ws), expectReschedule.Sub(currentTime))
@@ -85,7 +87,7 @@ func (r *ReconcileWorkloadSpread) rescheduleSubset(ws *appsv1alpha1.WorkloadSpre
 	return scheduleFailedPods
 }
 
-func (r *ReconcileWorkloadSpread) cleanupUnscheduledPods(ws *appsv1alpha1.WorkloadSpread,
+func (r *ReconcileWorkloadSpread) cleanupUnscheduledPods(ws *appsv1beta1.WorkloadSpread,
 	scheduleFailedPodsMap map[string][]*corev1.Pod) error {
 	for subsetName, pods := range scheduleFailedPodsMap {
 		if err := r.deletePodsForSubset(ws, pods, subsetName); err != nil {
@@ -95,7 +97,7 @@ func (r *ReconcileWorkloadSpread) cleanupUnscheduledPods(ws *appsv1alpha1.Worklo
 	return nil
 }
 
-func (r *ReconcileWorkloadSpread) deletePodsForSubset(ws *appsv1alpha1.WorkloadSpread,
+func (r *ReconcileWorkloadSpread) deletePodsForSubset(ws *appsv1beta1.WorkloadSpread,
 	pods []*corev1.Pod, subsetName string) error {
 	for _, pod := range pods {
 		if err := r.Client.Delete(context.TODO(), pod); err != nil {
@@ -111,7 +113,7 @@ func (r *ReconcileWorkloadSpread) deletePodsForSubset(ws *appsv1alpha1.WorkloadS
 }
 
 // PodUnscheduledTimeout return true when Pod was scheduled failed and timeout.
-func PodUnscheduledTimeout(ws *appsv1alpha1.WorkloadSpread, pod *corev1.Pod) bool {
+func PodUnscheduledTimeout(ws *appsv1beta1.WorkloadSpread, pod *corev1.Pod) bool {
 	timeouted, nextCheckAfter := util.GetTimeBeforePendingTimeout(pod, time.Second*time.Duration(*ws.Spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds), time.Now())
 	if nextCheckAfter > 0 {
 		durationStore.Push(getWorkloadSpreadKey(ws), nextCheckAfter)

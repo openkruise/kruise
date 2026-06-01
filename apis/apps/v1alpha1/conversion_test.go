@@ -4245,3 +4245,435 @@ func TestCloneSet_ConvertFrom(t *testing.T) {
 		})
 	}
 }
+func TestWorkloadSpread_ConvertTo(t *testing.T) {
+	tests := []struct {
+		name     string
+		src      *WorkloadSpread
+		validate func(t *testing.T, dst *v1beta1.WorkloadSpread)
+	}{
+		{
+			name: "all fields populated with node selectors and conditions",
+			src: &WorkloadSpread{
+				ObjectMeta: metav1.ObjectMeta{Name: "ws-test", Namespace: "default"},
+				Spec: WorkloadSpreadSpec{
+					TargetReference: &TargetReference{APIVersion: "apps/v1", Kind: "Deployment", Name: "my-deploy"},
+					TargetFilter: &TargetFilter{
+						ReplicasPathList: []string{"spec.replicas"},
+					},
+					Subsets: []WorkloadSpreadSubset{
+						{
+							Name: "zone-a",
+							RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{Key: "zone", Operator: corev1.NodeSelectorOpIn, Values: []string{"a"}},
+								},
+							},
+							PreferredNodeSelectorTerms: []corev1.PreferredSchedulingTerm{
+								{Weight: 10, Preference: corev1.NodeSelectorTerm{}},
+							},
+							MaxReplicas: intstrIntPtr(5),
+						},
+					},
+					ScheduleStrategy: WorkloadSpreadScheduleStrategy{
+						Type: AdaptiveWorkloadSpreadScheduleStrategyType,
+						Adaptive: &AdaptiveWorkloadSpreadStrategy{
+							DisableSimulationSchedule: true,
+							RescheduleCriticalSeconds: int32Ptr(30),
+						},
+					},
+				},
+				Status: WorkloadSpreadStatus{
+					ObservedGeneration: 3,
+					SubsetStatuses: []WorkloadSpreadSubsetStatus{
+						{
+							Name:            "zone-a",
+							Replicas:        2,
+							MissingReplicas: 1,
+							Conditions: []WorkloadSpreadSubsetCondition{
+								{
+									Type:    SubsetSchedulable,
+									Status:  corev1.ConditionFalse,
+									Reason:  "InsufficientResources",
+									Message: "no CPU",
+								},
+							},
+						},
+					},
+				},
+			},
+			validate: func(t *testing.T, dst *v1beta1.WorkloadSpread) {
+				assert.Equal(t, "ws-test", dst.Name)
+				assert.Equal(t, "my-deploy", dst.Spec.TargetReference.Name)
+				// field renames
+				assert.NotNil(t, dst.Spec.Subsets[0].RequiredNodeSelector)
+				assert.Equal(t, "zone", dst.Spec.Subsets[0].RequiredNodeSelector.MatchExpressions[0].Key)
+				assert.Len(t, dst.Spec.Subsets[0].PreferredNodeSelector, 1)
+				// conditions
+				assert.Len(t, dst.Status.SubsetStatuses[0].Conditions, 1)
+				assert.Equal(t, "Schedulable", dst.Status.SubsetStatuses[0].Conditions[0].Type)
+				assert.Equal(t, metav1.ConditionFalse, dst.Status.SubsetStatuses[0].Conditions[0].Status)
+				assert.Equal(t, "InsufficientResources", dst.Status.SubsetStatuses[0].Conditions[0].Reason)
+				assert.Equal(t, int64(3), dst.Status.ObservedGeneration)
+			},
+		},
+		{
+			name: "empty reason in alpha condition becomes Unknown in beta",
+			src: &WorkloadSpread{
+				ObjectMeta: metav1.ObjectMeta{Name: "ws-noreason"},
+				Status: WorkloadSpreadStatus{
+					SubsetStatuses: []WorkloadSpreadSubsetStatus{
+						{
+							Name: "s1",
+							Conditions: []WorkloadSpreadSubsetCondition{
+								{Type: SubsetSchedulable, Status: corev1.ConditionTrue, Reason: "", Message: ""},
+							},
+						},
+					},
+				},
+			},
+			validate: func(t *testing.T, dst *v1beta1.WorkloadSpread) {
+				assert.Equal(t, "Unknown", dst.Status.SubsetStatuses[0].Conditions[0].Reason)
+			},
+		},
+		{
+			name: "nil RequiredNodeSelectorTerm stays nil RequiredNodeSelector",
+			src: &WorkloadSpread{
+				ObjectMeta: metav1.ObjectMeta{Name: "ws-nil"},
+				Spec: WorkloadSpreadSpec{
+					Subsets: []WorkloadSpreadSubset{{Name: "s1", RequiredNodeSelectorTerm: nil}},
+				},
+			},
+			validate: func(t *testing.T, dst *v1beta1.WorkloadSpread) {
+				assert.Nil(t, dst.Spec.Subsets[0].RequiredNodeSelector)
+			},
+		},
+		{
+			name: "empty PreferredNodeSelectorTerms stays nil PreferredNodeSelector",
+			src: &WorkloadSpread{
+				ObjectMeta: metav1.ObjectMeta{Name: "ws-empty-pref"},
+				Spec: WorkloadSpreadSpec{
+					Subsets: []WorkloadSpreadSubset{{Name: "s1", PreferredNodeSelectorTerms: nil}},
+				},
+			},
+			validate: func(t *testing.T, dst *v1beta1.WorkloadSpread) {
+				assert.Nil(t, dst.Spec.Subsets[0].PreferredNodeSelector)
+			},
+		},
+		{
+			name: "versioned subset statuses conditions are converted",
+			src: &WorkloadSpread{
+				ObjectMeta: metav1.ObjectMeta{Name: "ws-versioned"},
+				Status: WorkloadSpreadStatus{
+					VersionedSubsetStatuses: map[string][]WorkloadSpreadSubsetStatus{
+						"v1": {
+							{
+								Name: "zone-a",
+								Conditions: []WorkloadSpreadSubsetCondition{
+									{Type: SubsetSchedulable, Status: corev1.ConditionTrue, Reason: "OK"},
+								},
+							},
+						},
+					},
+				},
+			},
+			validate: func(t *testing.T, dst *v1beta1.WorkloadSpread) {
+				conds := dst.Status.VersionedSubsetStatuses["v1"][0].Conditions
+				assert.Len(t, conds, 1)
+				assert.Equal(t, "Schedulable", conds[0].Type)
+				assert.Equal(t, "OK", conds[0].Reason)
+			},
+		},
+		{
+			name: "nil subsets slice does not panic",
+			src: &WorkloadSpread{
+				ObjectMeta: metav1.ObjectMeta{Name: "ws-no-subsets"},
+				Spec:       WorkloadSpreadSpec{Subsets: nil},
+			},
+			validate: func(t *testing.T, dst *v1beta1.WorkloadSpread) {
+				assert.Nil(t, dst.Spec.Subsets)
+			},
+		},
+		{
+			name: "nil VersionedSubsetStatuses map does not panic",
+			src: &WorkloadSpread{
+				ObjectMeta: metav1.ObjectMeta{Name: "ws-nil-versioned"},
+				Status: WorkloadSpreadStatus{
+					VersionedSubsetStatuses: nil,
+				},
+			},
+			validate: func(t *testing.T, dst *v1beta1.WorkloadSpread) {
+				assert.Nil(t, dst.Status.VersionedSubsetStatuses)
+			},
+		},
+		{
+			name: "subset with no conditions converts without panic",
+			src: &WorkloadSpread{
+				ObjectMeta: metav1.ObjectMeta{Name: "ws-no-conds"},
+				Status: WorkloadSpreadStatus{
+					SubsetStatuses: []WorkloadSpreadSubsetStatus{
+						{Name: "zone-a", Replicas: 1, Conditions: nil},
+					},
+				},
+			},
+			validate: func(t *testing.T, dst *v1beta1.WorkloadSpread) {
+				assert.Nil(t, dst.Status.SubsetStatuses[0].Conditions)
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dst := &v1beta1.WorkloadSpread{}
+			err := tc.src.ConvertTo(dst)
+			assert.NoError(t, err)
+			tc.validate(t, dst)
+		})
+	}
+}
+
+func TestWorkloadSpread_ConvertFrom(t *testing.T) {
+	tests := []struct {
+		name     string
+		src      *v1beta1.WorkloadSpread
+		validate func(t *testing.T, dst *WorkloadSpread)
+	}{
+		{
+			name: "all fields populated - field renames reversed",
+			src: &v1beta1.WorkloadSpread{
+				ObjectMeta: metav1.ObjectMeta{Name: "ws-test", Namespace: "default"},
+				Spec: v1beta1.WorkloadSpreadSpec{
+					TargetReference: &v1beta1.TargetReference{APIVersion: "apps/v1", Kind: "CloneSet", Name: "cs"},
+					Subsets: []v1beta1.WorkloadSpreadSubset{
+						{
+							Name: "zone-b",
+							RequiredNodeSelector: &corev1.NodeSelectorTerm{
+								MatchExpressions: []corev1.NodeSelectorRequirement{
+									{Key: "zone", Operator: corev1.NodeSelectorOpIn, Values: []string{"b"}},
+								},
+							},
+							PreferredNodeSelector: []corev1.PreferredSchedulingTerm{
+								{Weight: 5, Preference: corev1.NodeSelectorTerm{}},
+							},
+						},
+					},
+				},
+				Status: v1beta1.WorkloadSpreadStatus{
+					ObservedGeneration: 7,
+					SubsetStatuses: []v1beta1.WorkloadSpreadSubsetStatus{
+						{
+							Name: "zone-b",
+							Conditions: []metav1.Condition{
+								{
+									Type:               "Schedulable",
+									Status:             metav1.ConditionTrue,
+									Reason:             "OK",
+									Message:            "all good",
+									LastTransitionTime: metav1.Now(),
+									ObservedGeneration: 7,
+								},
+							},
+						},
+					},
+				},
+			},
+			validate: func(t *testing.T, dst *WorkloadSpread) {
+				assert.Equal(t, "cs", dst.Spec.TargetReference.Name)
+				// reverse field renames
+				assert.NotNil(t, dst.Spec.Subsets[0].RequiredNodeSelectorTerm)
+				assert.Equal(t, "zone", dst.Spec.Subsets[0].RequiredNodeSelectorTerm.MatchExpressions[0].Key)
+				assert.Len(t, dst.Spec.Subsets[0].PreferredNodeSelectorTerms, 1)
+				// ObservedGeneration dropped from condition, rest preserved
+				assert.Equal(t, SubsetSchedulable, dst.Status.SubsetStatuses[0].Conditions[0].Type)
+				assert.Equal(t, corev1.ConditionTrue, dst.Status.SubsetStatuses[0].Conditions[0].Status)
+				assert.Equal(t, "OK", dst.Status.SubsetStatuses[0].Conditions[0].Reason)
+				assert.Equal(t, int64(7), dst.Status.ObservedGeneration)
+			},
+		},
+		{
+			name: "nil RequiredNodeSelector stays nil RequiredNodeSelectorTerm",
+			src: &v1beta1.WorkloadSpread{
+				ObjectMeta: metav1.ObjectMeta{Name: "ws-nil"},
+				Spec: v1beta1.WorkloadSpreadSpec{
+					Subsets: []v1beta1.WorkloadSpreadSubset{{Name: "s1", RequiredNodeSelector: nil}},
+				},
+			},
+			validate: func(t *testing.T, dst *WorkloadSpread) {
+				assert.Nil(t, dst.Spec.Subsets[0].RequiredNodeSelectorTerm)
+			},
+		},
+		{
+			name: "versioned subset statuses conditions are converted back",
+			src: &v1beta1.WorkloadSpread{
+				ObjectMeta: metav1.ObjectMeta{Name: "ws-v"},
+				Status: v1beta1.WorkloadSpreadStatus{
+					VersionedSubsetStatuses: map[string][]v1beta1.WorkloadSpreadSubsetStatus{
+						"v2": {
+							{
+								Name: "zone-a",
+								Conditions: []metav1.Condition{
+									{Type: "Schedulable", Status: metav1.ConditionFalse, Reason: "Drained", Message: "no nodes"},
+								},
+							},
+						},
+					},
+				},
+			},
+			validate: func(t *testing.T, dst *WorkloadSpread) {
+				conds := dst.Status.VersionedSubsetStatuses["v2"][0].Conditions
+				assert.Len(t, conds, 1)
+				assert.Equal(t, SubsetSchedulable, conds[0].Type)
+				assert.Equal(t, "Drained", conds[0].Reason)
+			},
+		},
+		{
+			name: "nil subsets in beta does not panic on ConvertFrom",
+			src: &v1beta1.WorkloadSpread{
+				ObjectMeta: metav1.ObjectMeta{Name: "ws-nil-subs"},
+				Spec:       v1beta1.WorkloadSpreadSpec{Subsets: nil},
+			},
+			validate: func(t *testing.T, dst *WorkloadSpread) {
+				assert.Nil(t, dst.Spec.Subsets)
+			},
+		},
+		{
+			name: "nil VersionedSubsetStatuses in beta does not panic",
+			src: &v1beta1.WorkloadSpread{
+				ObjectMeta: metav1.ObjectMeta{Name: "ws-nil-ver"},
+				Status:     v1beta1.WorkloadSpreadStatus{VersionedSubsetStatuses: nil},
+			},
+			validate: func(t *testing.T, dst *WorkloadSpread) {
+				assert.Nil(t, dst.Status.VersionedSubsetStatuses)
+			},
+		},
+		{
+			name: "subset with no conditions in beta converts without panic",
+			src: &v1beta1.WorkloadSpread{
+				ObjectMeta: metav1.ObjectMeta{Name: "ws-no-conds"},
+				Status: v1beta1.WorkloadSpreadStatus{
+					SubsetStatuses: []v1beta1.WorkloadSpreadSubsetStatus{
+						{Name: "zone-a", Replicas: 2, Conditions: nil},
+					},
+				},
+			},
+			validate: func(t *testing.T, dst *WorkloadSpread) {
+				assert.Nil(t, dst.Status.SubsetStatuses[0].Conditions)
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dst := &WorkloadSpread{}
+			err := dst.ConvertFrom(tc.src)
+			assert.NoError(t, err)
+			tc.validate(t, dst)
+		})
+	}
+}
+
+func TestWorkloadSpread_RoundTrip(t *testing.T) {
+	src := &WorkloadSpread{
+		ObjectMeta: metav1.ObjectMeta{Name: "ws-rt", Namespace: "default", Labels: map[string]string{"env": "prod"}},
+		Spec: WorkloadSpreadSpec{
+			TargetReference: &TargetReference{APIVersion: "apps.kruise.io/v1beta1", Kind: "CloneSet", Name: "cs-rt"},
+			Subsets: []WorkloadSpreadSubset{
+				{
+					Name: "zone-a",
+					RequiredNodeSelectorTerm: &corev1.NodeSelectorTerm{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{Key: "topology.kubernetes.io/zone", Operator: corev1.NodeSelectorOpIn, Values: []string{"us-east-1a"}},
+						},
+					},
+					PreferredNodeSelectorTerms: []corev1.PreferredSchedulingTerm{
+						{Weight: 100, Preference: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{Key: "node-type", Operator: corev1.NodeSelectorOpIn, Values: []string{"fast"}},
+							},
+						}},
+					},
+					MaxReplicas: intstrIntPtr(3),
+				},
+			},
+			ScheduleStrategy: WorkloadSpreadScheduleStrategy{
+				Type: FixedWorkloadSpreadScheduleStrategyType,
+			},
+		},
+		Status: WorkloadSpreadStatus{
+			ObservedGeneration: 5,
+			SubsetStatuses: []WorkloadSpreadSubsetStatus{
+				{
+					Name:            "zone-a",
+					Replicas:        3,
+					MissingReplicas: 0,
+					Conditions: []WorkloadSpreadSubsetCondition{
+						{
+							Type:    SubsetSchedulable,
+							Status:  corev1.ConditionTrue,
+							Reason:  "Sufficient",
+							Message: "all nodes available",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	hub := &v1beta1.WorkloadSpread{}
+	if err := src.ConvertTo(hub); err != nil {
+		t.Fatalf("ConvertTo failed: %v", err)
+	}
+
+	dst := &WorkloadSpread{}
+	if err := dst.ConvertFrom(hub); err != nil {
+		t.Fatalf("ConvertFrom failed: %v", err)
+	}
+
+	assert.Equal(t, src.Name, dst.Name)
+	assert.Equal(t, src.Spec.TargetReference.Name, dst.Spec.TargetReference.Name)
+	assert.Equal(t, src.Spec.Subsets[0].Name, dst.Spec.Subsets[0].Name)
+	assert.Equal(t, src.Spec.Subsets[0].RequiredNodeSelectorTerm, dst.Spec.Subsets[0].RequiredNodeSelectorTerm)
+	assert.Equal(t, src.Spec.Subsets[0].PreferredNodeSelectorTerms, dst.Spec.Subsets[0].PreferredNodeSelectorTerms)
+	assert.Equal(t, src.Spec.Subsets[0].MaxReplicas, dst.Spec.Subsets[0].MaxReplicas)
+	assert.Equal(t, src.Spec.ScheduleStrategy.Type, dst.Spec.ScheduleStrategy.Type)
+	assert.Equal(t, src.Status.ObservedGeneration, dst.Status.ObservedGeneration)
+	assert.Equal(t, src.Status.SubsetStatuses[0].Name, dst.Status.SubsetStatuses[0].Name)
+	assert.Equal(t, src.Status.SubsetStatuses[0].Replicas, dst.Status.SubsetStatuses[0].Replicas)
+	assert.Equal(t, src.Status.SubsetStatuses[0].Conditions[0].Type, dst.Status.SubsetStatuses[0].Conditions[0].Type)
+	assert.Equal(t, src.Status.SubsetStatuses[0].Conditions[0].Reason, dst.Status.SubsetStatuses[0].Conditions[0].Reason)
+}
+
+func FuzzWorkloadSpreadConversion(f *testing.F) {
+	f.Add("ws-0", "zone-a", "apps/v1", "Deployment", "my-deploy", int32(3), true)
+	f.Add("ws-1", "", "apps.kruise.io/v1beta1", "CloneSet", "cs", int32(0), false)
+
+	f.Fuzz(func(t *testing.T, wsName, subsetName, apiVersion, kind, targetName string, maxReplicas int32, disableSim bool) {
+		maxR := intstr.FromInt32(maxReplicas)
+		src := &WorkloadSpread{
+			ObjectMeta: metav1.ObjectMeta{Name: wsName, Namespace: "default"},
+			Spec: WorkloadSpreadSpec{
+				TargetReference: &TargetReference{APIVersion: apiVersion, Kind: kind, Name: targetName},
+				Subsets: []WorkloadSpreadSubset{
+					{
+						Name:        subsetName,
+						MaxReplicas: &maxR,
+					},
+				},
+				ScheduleStrategy: WorkloadSpreadScheduleStrategy{
+					Type: AdaptiveWorkloadSpreadScheduleStrategyType,
+					Adaptive: &AdaptiveWorkloadSpreadStrategy{
+						DisableSimulationSchedule: disableSim,
+					},
+				},
+			},
+		}
+		hub := &v1beta1.WorkloadSpread{}
+		if err := src.ConvertTo(hub); err != nil {
+			return
+		}
+		dst := &WorkloadSpread{}
+		if err := dst.ConvertFrom(hub); err != nil {
+			return
+		}
+		if dst.Spec.TargetReference != nil && dst.Spec.TargetReference.Name != src.Spec.TargetReference.Name {
+			t.Errorf("TargetReference.Name mismatch: got %q want %q", dst.Spec.TargetReference.Name, src.Spec.TargetReference.Name)
+		}
+	})
+}
