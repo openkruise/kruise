@@ -18,7 +18,6 @@ package containerrecreate
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -36,6 +35,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -397,41 +397,36 @@ func (c *Controller) patchCRRContainerRecreateStates(crr *appsv1beta1.ContainerR
 }
 
 func (c *Controller) updateCRRPhase(crr *appsv1beta1.ContainerRecreateRequest, phase appsv1beta1.ContainerRecreateRequestPhase) error {
-	crr = crr.DeepCopy()
-	oldRev := crr.ResourceVersion
-	defer func() {
-		if crr.ResourceVersion != oldRev {
-			resourceVersionExpectation.Expect(crr)
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		fresh := &appsv1beta1.ContainerRecreateRequest{}
+		if err := c.runtimeClient.Get(context.TODO(), types.NamespacedName{Namespace: crr.Namespace, Name: crr.Name}, fresh); err != nil {
+			return err
 		}
-	}()
-	body := fmt.Sprintf(`{"status":{"phase":%q}}`, phase)
-	return c.runtimeClient.Status().Patch(context.TODO(), crr, runtimeclient.RawPatch(types.MergePatchType, []byte(body)))
+		fresh.Status.Phase = phase
+		if err := c.runtimeClient.Status().Update(context.TODO(), fresh); err != nil {
+			return err
+		}
+		resourceVersionExpectation.Expect(fresh)
+		return nil
+	})
 }
 
 func (c *Controller) completeCRRStatus(crr *appsv1beta1.ContainerRecreateRequest, msg string) error {
-	crr = crr.DeepCopy()
 	now := metav1.Now()
-	oldRev := crr.ResourceVersion
-	defer func() {
-		if crr.ResourceVersion != oldRev {
-			resourceVersionExpectation.Expect(crr)
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		fresh := &appsv1beta1.ContainerRecreateRequest{}
+		if err := c.runtimeClient.Get(context.TODO(), types.NamespacedName{Namespace: crr.Namespace, Name: crr.Name}, fresh); err != nil {
+			return err
 		}
-	}()
-	type completePatch struct {
-		Phase          appsv1beta1.ContainerRecreateRequestPhase `json:"phase"`
-		CompletionTime *metav1.Time                              `json:"completionTime"`
-		Message        string                                    `json:"message,omitempty"`
-	}
-	type statusWrapper struct {
-		Status completePatch `json:"status"`
-	}
-	patch := statusWrapper{Status: completePatch{
-		Phase:          appsv1beta1.ContainerRecreateRequestCompleted,
-		CompletionTime: &now,
-		Message:        msg,
-	}}
-	body, _ := json.Marshal(patch)
-	return c.runtimeClient.Status().Patch(context.TODO(), crr, runtimeclient.RawPatch(types.MergePatchType, body))
+		fresh.Status.Phase = appsv1beta1.ContainerRecreateRequestCompleted
+		fresh.Status.CompletionTime = &now
+		fresh.Status.Message = msg
+		if err := c.runtimeClient.Status().Update(context.TODO(), fresh); err != nil {
+			return err
+		}
+		resourceVersionExpectation.Expect(fresh)
+		return nil
+	})
 }
 
 func (c *Controller) newRuntimeManager(runtimeFactory daemonruntime.Factory, crr *appsv1beta1.ContainerRecreateRequest) (kuberuntime.Runtime, error) {
