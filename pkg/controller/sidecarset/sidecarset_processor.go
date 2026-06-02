@@ -205,6 +205,7 @@ func (p *Processor) updatePodSidecarAndHash(control sidecarcontrol.SidecarContro
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		if err := p.Client.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, podClone); err != nil {
 			klog.ErrorS(err, "SidecarSet got updated pod from client failed", "sidecarSet", klog.KObj(sidecarSet), "pod", klog.KObj(pod))
+			return err
 		}
 		// update pod sidecar container
 		updatePodSidecarContainer(control, podClone)
