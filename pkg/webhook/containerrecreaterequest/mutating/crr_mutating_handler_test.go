@@ -532,3 +532,94 @@ func TestInjectPodIntoContainerRecreateRequestV1alpha1_VirtualKubeletLabel(t *te
 		})
 	}
 }
+
+// TestInjectPodIntoContainerRecreateRequestV1beta1_VirtualKubeletLabel verifies
+// that the virtual-kubelet label is propagated from the node to the CRR on the
+// v1beta1 path, matching the v1alpha1 behavior.
+func TestInjectPodIntoContainerRecreateRequestV1beta1_VirtualKubeletLabel(t *testing.T) {
+	basePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "default",
+			UID:       types.UID("pod-uid-123"),
+		},
+		Spec: v1.PodSpec{
+			NodeName:   "test-node",
+			Containers: []v1.Container{{Name: "main"}},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{Name: "main", ContainerID: "docker://abc123"},
+			},
+		},
+	}
+
+	baseCRR := func() *appsv1beta1.ContainerRecreateRequest {
+		return &appsv1beta1.ContainerRecreateRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-crr",
+				Namespace: "default",
+				Labels:    map[string]string{},
+			},
+			Spec: appsv1beta1.ContainerRecreateRequestSpec{
+				PodName:    "test-pod",
+				Containers: []appsv1beta1.ContainerRecreateRequestContainer{{Name: "main"}},
+				Strategy:   &appsv1beta1.ContainerRecreateRequestStrategy{},
+			},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		node        *v1.Node
+		expectLabel bool
+	}{
+		{
+			name: "node has virtual-kubelet label, CRR should get the label",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-node",
+					Labels: map[string]string{util.VirtualKubeletLabelKey: util.VirtualKubeletLabelValue},
+				},
+			},
+			expectLabel: true,
+		},
+		{
+			name: "node does not have virtual-kubelet label, CRR should not get the label",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-node",
+					Labels: map[string]string{"foo": "bar"},
+				},
+			},
+			expectLabel: false,
+		},
+		{
+			name:        "node not found, should not error and CRR should not get the label",
+			node:        nil,
+			expectLabel: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			crr := baseCRR()
+			err := injectPodIntoContainerRecreateRequestV1beta1(crr, basePod, tt.node)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			labelVal, hasLabel := crr.Labels[util.VirtualKubeletLabelKey]
+			if tt.expectLabel {
+				if !hasLabel || labelVal != util.VirtualKubeletLabelValue {
+					t.Errorf("expected CRR to have label %s=%s, got labels: %v",
+						util.VirtualKubeletLabelKey, util.VirtualKubeletLabelValue, crr.Labels)
+				}
+			} else {
+				if hasLabel {
+					t.Errorf("expected CRR not to have label %s, got labels: %v",
+						util.VirtualKubeletLabelKey, crr.Labels)
+				}
+			}
+		})
+	}
+}
