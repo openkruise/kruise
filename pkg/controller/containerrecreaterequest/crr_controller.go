@@ -205,6 +205,24 @@ func (r *ReconcileContainerRecreateRequest) Reconcile(_ context.Context, request
 		leftTime := time.Duration(*crr.Spec.ActiveDeadlineSeconds)*time.Second - time.Since(crr.CreationTimestamp.Time)
 		if leftTime <= 0 {
 			klog.InfoS("Completed CRR as failure for recreating has exceeded the activeDeadlineSeconds", "containerRecreateRequest", klog.KObj(crr))
+			// Mark existing container states as Failed if not Succeeded
+			existingStates := map[string]*appsv1alpha1.ContainerRecreateRequestContainerRecreateState{}
+			for i := range crr.Status.ContainerRecreateStates {
+				state := &crr.Status.ContainerRecreateStates[i]
+				if state.Phase != appsv1alpha1.ContainerRecreateRequestSucceeded {
+					state.Phase = appsv1alpha1.ContainerRecreateRequestFailed
+				}
+				existingStates[state.Name] = state
+			}
+			// Add Failed state for containers not yet populated by daemon
+			for _, c := range crr.Spec.Containers {
+				if _, exists := existingStates[c.Name]; !exists {
+					crr.Status.ContainerRecreateStates = append(crr.Status.ContainerRecreateStates, appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
+						Name:  c.Name,
+						Phase: appsv1alpha1.ContainerRecreateRequestFailed,
+					})
+				}
+			}
 			return reconcile.Result{}, r.completeCRR(crr, "recreating has exceeded the activeDeadlineSeconds")
 		}
 		duration.Update(leftTime)

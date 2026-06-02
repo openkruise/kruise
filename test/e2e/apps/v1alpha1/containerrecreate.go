@@ -410,8 +410,8 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
 				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
 				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{
-					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestPending},
-					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestPending},
+					{Name: "app", Phase: appsv1alpha1.ContainerRecreateRequestFailed},
+					{Name: "sidecar", Phase: appsv1alpha1.ContainerRecreateRequestFailed},
 				}))
 
 				ginkgo.By("Check the app container should still be recreated")
