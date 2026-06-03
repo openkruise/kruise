@@ -39,6 +39,10 @@ func (c *FakeAppsV1beta1) CloneSets(namespace string) v1beta1.CloneSetInterface 
 	return newFakeCloneSets(c, namespace)
 }
 
+func (c *FakeAppsV1beta1) ContainerRecreateRequests(namespace string) v1beta1.ContainerRecreateRequestInterface {
+	return newFakeContainerRecreateRequests(c, namespace)
+}
+
 func (c *FakeAppsV1beta1) DaemonSets(namespace string) v1beta1.DaemonSetInterface {
 	return newFakeDaemonSets(c, namespace)
 }

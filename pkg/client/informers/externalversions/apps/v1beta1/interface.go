@@ -29,6 +29,8 @@ type Interface interface {
 	BroadcastJobs() BroadcastJobInformer
 	// CloneSets returns a CloneSetInformer.
 	CloneSets() CloneSetInformer
+	// ContainerRecreateRequests returns a ContainerRecreateRequestInformer.
+	ContainerRecreateRequests() ContainerRecreateRequestInformer
 	// DaemonSets returns a DaemonSetInformer.
 	DaemonSets() DaemonSetInformer
 	// ImageListPullJobs returns a ImageListPullJobInformer.
@@ -75,6 +77,11 @@ func (v *version) BroadcastJobs() BroadcastJobInformer {
 // CloneSets returns a CloneSetInformer.
 func (v *version) CloneSets() CloneSetInformer {
 	return &cloneSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ContainerRecreateRequests returns a ContainerRecreateRequestInformer.
+func (v *version) ContainerRecreateRequests() ContainerRecreateRequestInformer {
+	return &containerRecreateRequestInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // DaemonSets returns a DaemonSetInformer.

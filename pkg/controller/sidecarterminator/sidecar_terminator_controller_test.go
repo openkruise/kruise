@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 )
 
@@ -144,9 +145,9 @@ var (
 		},
 	}
 
-	crrDemo = &appsv1alpha1.ContainerRecreateRequest{
+		crrDemo = &appsv1beta1.ContainerRecreateRequest{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: appsv1alpha1.SchemeGroupVersion.String(),
+			APIVersion: appsv1beta1.SchemeGroupVersion.String(),
 			Kind:       "ContainerRecreateRequest",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -157,14 +158,14 @@ var (
 				*metav1.NewControllerRef(podDemo, podDemo.GroupVersionKind()),
 			},
 		},
-		Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+		Spec: appsv1beta1.ContainerRecreateRequestSpec{
 			PodName: podDemo.Name,
-			Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+			Containers: []appsv1beta1.ContainerRecreateRequestContainer{
 				{Name: "sidecar"},
 			},
-			Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{
+			Strategy: &appsv1beta1.ContainerRecreateRequestStrategy{
 				ForceRecreate: true,
-				FailurePolicy: appsv1alpha1.ContainerRecreateRequestFailurePolicyIgnore,
+				FailurePolicy: appsv1beta1.ContainerRecreateRequestFailurePolicyIgnore,
 			},
 		},
 	}
@@ -197,6 +198,7 @@ func init() {
 	scheme = runtime.NewScheme()
 	utilruntime.Must(corev1.AddToScheme(scheme))
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 }
 
 func sidecarContainerFactory(name string, strategy string) corev1.Container {
@@ -220,7 +222,7 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 	cases := []struct {
 		name        string
 		getIn       func() *corev1.Pod
-		getCRR      func() *appsv1alpha1.ContainerRecreateRequest
+		getCRR      func() *appsv1beta1.ContainerRecreateRequest
 		expectedPod func() *corev1.Pod
 	}{
 		{
@@ -231,22 +233,22 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 				podIn.Status.ContainerStatuses[1] = runningSidecarContainerStatus
 				return podIn
 			},
-			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
-				return nil
-			},
-			expectedPod: func() *corev1.Pod {
-				return podDemo.DeepCopy()
-			},
+		getCRR: func() *appsv1beta1.ContainerRecreateRequest {
+			return nil
 		},
-		{
-			name: "normal pod with sidecar, restartPolicy=Never, main containers failed and sidecar running",
+		expectedPod: func() *corev1.Pod {
+			return podDemo.DeepCopy()
+		},
+	},
+	{
+		name: "normal pod with sidecar, restartPolicy=Never, main containers failed and sidecar running",
 			getIn: func() *corev1.Pod {
 				podIn := podDemo.DeepCopy()
 				podIn.Status.ContainerStatuses[0] = failedMainContainerStatus
 				podIn.Status.ContainerStatuses[1] = runningSidecarContainerStatus
 				return podIn
 			},
-			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
+			getCRR: func() *appsv1beta1.ContainerRecreateRequest {
 				return crrDemo.DeepCopy()
 			},
 			expectedPod: func() *corev1.Pod {
@@ -263,7 +265,7 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 				podIn.Status.Phase = corev1.PodFailed //todo
 				return podIn
 			},
-			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
+			getCRR: func() *appsv1beta1.ContainerRecreateRequest {
 				return nil
 			},
 			expectedPod: func() *corev1.Pod {
@@ -280,7 +282,7 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 				podIn.Status.ContainerStatuses[1] = runningSidecarContainerStatus
 				return podIn
 			},
-			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
+			getCRR: func() *appsv1beta1.ContainerRecreateRequest {
 				return crrDemo.DeepCopy()
 			},
 			expectedPod: func() *corev1.Pod {
@@ -297,7 +299,7 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 				podIn.Status.ContainerStatuses[1] = runningSidecarContainerStatus
 				return podIn
 			},
-			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
+			getCRR: func() *appsv1beta1.ContainerRecreateRequest {
 				return nil
 			},
 			expectedPod: func() *corev1.Pod {
@@ -314,7 +316,7 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 				podIn.Status.ContainerStatuses[1] = completedSidecarContainerStatus
 				return podIn
 			},
-			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
+			getCRR: func() *appsv1beta1.ContainerRecreateRequest {
 				return nil
 			},
 			expectedPod: func() *corev1.Pod {
@@ -332,7 +334,7 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 				podIn.Status.ContainerStatuses[1] = completedSidecarContainerStatus
 				return podIn
 			},
-			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
+			getCRR: func() *appsv1beta1.ContainerRecreateRequest {
 				return nil
 			},
 			expectedPod: func() *corev1.Pod {
@@ -360,9 +362,9 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 				}
 				return podIn
 			},
-			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
+			getCRR: func() *appsv1beta1.ContainerRecreateRequest {
 				crr := crrDemo.DeepCopy()
-				crr.Spec.Containers = []appsv1alpha1.ContainerRecreateRequestContainer{
+				crr.Spec.Containers = []appsv1beta1.ContainerRecreateRequestContainer{
 					{Name: "sidecar-1"}, {Name: "sidecar-2"},
 				}
 				return crr
@@ -391,9 +393,9 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 				}
 				return podIn
 			},
-			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
+			getCRR: func() *appsv1beta1.ContainerRecreateRequest {
 				crr := crrDemo.DeepCopy()
-				crr.Spec.Containers = []appsv1alpha1.ContainerRecreateRequestContainer{
+				crr.Spec.Containers = []appsv1beta1.ContainerRecreateRequestContainer{
 					{Name: "sidecar-1"}, {Name: "sidecar-2"},
 				}
 				return crr
@@ -422,9 +424,9 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 				}
 				return podIn
 			},
-			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
+			getCRR: func() *appsv1beta1.ContainerRecreateRequest {
 				crr := crrDemo.DeepCopy()
-				crr.Spec.Containers = []appsv1alpha1.ContainerRecreateRequestContainer{
+				crr.Spec.Containers = []appsv1beta1.ContainerRecreateRequestContainer{
 					{Name: "sidecar-2"},
 				}
 				return crr
@@ -453,7 +455,7 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 				}
 				return podIn
 			},
-			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
+			getCRR: func() *appsv1beta1.ContainerRecreateRequest {
 				return nil
 			},
 			expectedPod: func() *corev1.Pod {
@@ -486,9 +488,9 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 				}
 				return podIn
 			},
-			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
+			getCRR: func() *appsv1beta1.ContainerRecreateRequest {
 				crr := crrDemo.DeepCopy()
-				crr.Spec.Containers = []appsv1alpha1.ContainerRecreateRequestContainer{
+				crr.Spec.Containers = []appsv1beta1.ContainerRecreateRequestContainer{
 					{Name: "sidecar-2"},
 					{Name: "sidecar-1"},
 				}
@@ -524,9 +526,9 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 				}
 				return podIn
 			},
-			getCRR: func() *appsv1alpha1.ContainerRecreateRequest {
+			getCRR: func() *appsv1beta1.ContainerRecreateRequest {
 				crr := crrDemo.DeepCopy()
-				crr.Spec.Containers = []appsv1alpha1.ContainerRecreateRequestContainer{
+				crr.Spec.Containers = []appsv1beta1.ContainerRecreateRequestContainer{
 					{Name: "sidecar-3"},
 				}
 				return crr
@@ -559,14 +561,14 @@ func TestKruiseDaemonStrategy(t *testing.T) {
 				t.Fatalf("Failed to reconcile, error: %v", err)
 			}
 
-			realCRR := &appsv1alpha1.ContainerRecreateRequest{}
+			realCRR := &appsv1beta1.ContainerRecreateRequest{}
 			err = fakeClient.Get(context.TODO(), types.NamespacedName{
 				Name:      getCRRName(podDemo),
 				Namespace: podDemo.Namespace,
 			}, realCRR)
 			expectCRR := cs.getCRR()
 
-			realCRR.TypeMeta.APIVersion = appsv1alpha1.SchemeGroupVersion.String()
+			realCRR.TypeMeta.APIVersion = appsv1beta1.SchemeGroupVersion.String()
 			realCRR.TypeMeta.Kind = "ContainerRecreateRequest"
 
 			if realCRR != nil {
@@ -773,7 +775,7 @@ func TestInPlaceUpdateStrategy(t *testing.T) {
 				t.Fatalf("get unexpected new sidecar image number, expected %v, actual %v", cs.expectedNumber, actualNumber)
 			}
 
-			crr := &appsv1alpha1.ContainerRecreateRequest{}
+			crr := &appsv1beta1.ContainerRecreateRequest{}
 			err = fakeClient.Get(context.TODO(), types.NamespacedName{
 				Name:      getCRRName(podDemo),
 				Namespace: podDemo.Namespace,
@@ -797,7 +799,7 @@ func rename(status *corev1.ContainerStatus, name string) corev1.ContainerStatus 
 	return *status
 }
 
-type SortContainers []appsv1alpha1.ContainerRecreateRequestContainer
+type SortContainers []appsv1beta1.ContainerRecreateRequestContainer
 
 func (s SortContainers) Len() int {
 	return len(s)

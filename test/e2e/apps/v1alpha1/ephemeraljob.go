@@ -14,9 +14,11 @@ import (
 	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclientset "github.com/openkruise/kruise/pkg/client/clientset/versioned"
 	"github.com/openkruise/kruise/test/e2e/framework/common"
 	"github.com/openkruise/kruise/test/e2e/framework/v1alpha1"
+	frameworkv1beta1 "github.com/openkruise/kruise/test/e2e/framework/v1beta1"
 )
 
 var _ = ginkgo.Describe("EphemeralJob", ginkgo.Label("EphemeralJob", "job", "workload"), func() {
@@ -550,17 +552,17 @@ var _ = ginkgo.Describe("EphemeralJob", ginkgo.Label("EphemeralJob", "job", "wor
 			oldEphemeralContainers := pods[0].Status.EphemeralContainerStatuses[0]
 
 			{
-				restartContainerTester := v1alpha1.NewContainerRecreateTester(c, kc, ns)
+				restartContainerTester := frameworkv1beta1.NewContainerRecreateTester(c, kc, ns)
 				ginkgo.By("Create CRR for pods[0], recreate container: app")
 				pod := pods[0]
-				crr := &appsv1alpha1.ContainerRecreateRequest{
+				crr := &appsv1beta1.ContainerRecreateRequest{
 					ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "crr-" + randStr + "-0"},
-					Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+					Spec: appsv1beta1.ContainerRecreateRequestSpec{
 						PodName: pod.Name,
-						Containers: []appsv1alpha1.ContainerRecreateRequestContainer{
+						Containers: []appsv1beta1.ContainerRecreateRequestContainer{
 							{Name: "nginx"},
 						},
-						Strategy:                &appsv1alpha1.ContainerRecreateRequestStrategy{MinStartedSeconds: 5},
+						Strategy:                &appsv1beta1.ContainerRecreateRequestStrategy{MinStartedSeconds: 5},
 						TTLSecondsAfterFinished: ptr.To[int32](99999),
 					},
 				}
@@ -569,26 +571,22 @@ var _ = ginkgo.Describe("EphemeralJob", ginkgo.Label("EphemeralJob", "job", "wor
 
 				// wait webhook
 				gomega.Eventually(func() string {
-					return crr.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey]
+					return crr.Labels[appsv1beta1.ContainerRecreateRequestPodUIDKey]
 				}, 60*time.Second, 3*time.Second).Should(gomega.Equal(string(pod.UID)))
 
-				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestNodeNameKey]).Should(gomega.Equal(pod.Spec.NodeName))
-				gomega.Expect(crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]).Should(gomega.Equal("true"))
-				gomega.Expect(crr.Spec.Strategy.FailurePolicy).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestFailurePolicyFail))
+				gomega.Expect(crr.Labels[appsv1beta1.ContainerRecreateRequestNodeNameKey]).Should(gomega.Equal(pod.Spec.NodeName))
+				gomega.Expect(crr.Labels[appsv1beta1.ContainerRecreateRequestActiveKey]).Should(gomega.Equal("true"))
+				gomega.Expect(crr.Spec.Strategy.FailurePolicy).Should(gomega.Equal(appsv1beta1.ContainerRecreateRequestFailurePolicyFail))
 				gomega.Expect(crr.Spec.Containers[0].StatusContext.ContainerID).Should(gomega.Equal(pod.Status.ContainerStatuses[0].ContainerID))
 				ginkgo.By("Wait CRR recreate completion")
-				gomega.Eventually(func() appsv1alpha1.ContainerRecreateRequestPhase {
-					crr, err = restartContainerTester.GetCRR(crr.Name)
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return crr.Status.Phase
-				}, 70*time.Second, time.Second).Should(gomega.Equal(appsv1alpha1.ContainerRecreateRequestCompleted))
+				crr = restartContainerTester.WaitForCRRCompleted(crr.Name, 70*time.Second)
 				gomega.Expect(crr.Status.CompletionTime).ShouldNot(gomega.BeNil())
 				gomega.Eventually(func() string {
 					crr, err = restartContainerTester.GetCRR(crr.Name)
 					gomega.Expect(err).NotTo(gomega.HaveOccurred())
-					return crr.Labels[appsv1alpha1.ContainerRecreateRequestActiveKey]
+					return crr.Labels[appsv1beta1.ContainerRecreateRequestActiveKey]
 				}, 5*time.Second, 1*time.Second).Should(gomega.Equal(""))
-				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1alpha1.ContainerRecreateRequestContainerRecreateState{{Name: "nginx", Phase: appsv1alpha1.ContainerRecreateRequestSucceeded, IsKilled: true}}))
+				gomega.Expect(crr.Status.ContainerRecreateStates).Should(gomega.Equal([]appsv1beta1.ContainerRecreateRequestContainerRecreateState{{Name: "nginx", Phase: appsv1beta1.ContainerRecreateRequestSucceeded, IsKilled: true}}))
 
 				ginkgo.By("Check Pod containers recreated and started for minStartedSeconds")
 				pod, err = restartContainerTester.GetPod(pod.Name)

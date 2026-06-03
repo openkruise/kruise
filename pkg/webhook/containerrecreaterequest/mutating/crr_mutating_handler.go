@@ -26,7 +26,6 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
@@ -34,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/controller/sidecarterminator"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
@@ -56,12 +56,21 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 		return admission.Errored(http.StatusForbidden, fmt.Errorf("feature-gate %s is not enabled", features.KruiseDaemon))
 	}
 
+	switch req.AdmissionRequest.Resource.Version {
+	case appsv1beta1.GroupVersion.Version:
+		return h.handleV1beta1(ctx, req)
+	default:
+		return h.handleV1alpha1(ctx, req)
+	}
+}
+
+func (h *ContainerRecreateRequestHandler) handleV1alpha1(ctx context.Context, req admission.Request) admission.Response {
 	obj := &appsv1alpha1.ContainerRecreateRequest{}
 	err := h.Decoder.Decode(req, obj)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	var copy runtime.Object = obj.DeepCopy()
+	var copyObj = obj.DeepCopy()
 
 	if req.AdmissionRequest.Operation == admissionv1.Update {
 		oldObj := &appsv1alpha1.ContainerRecreateRequest{}
@@ -108,7 +117,6 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 		return admission.Errored(http.StatusBadRequest, fmt.Errorf("unreadyGracePeriodSeconds must be non-negative integer"))
 	}
 
-	// defaults
 	switch obj.Spec.Strategy.FailurePolicy {
 	case "":
 		obj.Spec.Strategy.FailurePolicy = appsv1alpha1.ContainerRecreateRequestFailurePolicyFail
@@ -124,8 +132,6 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 		}
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("failed to find Pod %s: %v", obj.Spec.PodName, err))
 	}
-	// check isTerminatedBySidecarTerminator,
-	// because we need create CRR to kill sidecar container after change pod phase to terminal phase in SidecarTerminator Controller.
 	if !kubecontroller.IsPodActive(pod) && !isTerminatedBySidecarTerminator(pod) {
 		return admission.Errored(http.StatusBadRequest, fmt.Errorf("not allowed to recreate containers in an inactive Pod"))
 	} else if pod.Spec.NodeName == "" {
@@ -140,11 +146,103 @@ func (h *ContainerRecreateRequestHandler) Handle(ctx context.Context, req admiss
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("failed to get Node %s: %v", pod.Spec.NodeName, err))
 	}
 
-	if err := injectPodIntoContainerRecreateRequest(obj, pod, node); err != nil {
+	if err := injectPodIntoContainerRecreateRequestV1alpha1(obj, pod, node); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	if reflect.DeepEqual(obj, copy) {
+	if reflect.DeepEqual(obj, copyObj) {
+		return admission.Allowed("")
+	}
+	marshaled, err := json.Marshal(obj)
+	if err != nil {
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+	return admission.PatchResponseFromRaw(req.AdmissionRequest.Object.Raw, marshaled)
+}
+
+func (h *ContainerRecreateRequestHandler) handleV1beta1(ctx context.Context, req admission.Request) admission.Response {
+	obj := &appsv1beta1.ContainerRecreateRequest{}
+	err := h.Decoder.Decode(req, obj)
+	if err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
+	}
+	var copyObj = obj.DeepCopy()
+
+	if req.AdmissionRequest.Operation == admissionv1.Update {
+		oldObj := &appsv1beta1.ContainerRecreateRequest{}
+		if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		if !reflect.DeepEqual(obj.Spec, oldObj.Spec) {
+			return admission.Errored(http.StatusForbidden, fmt.Errorf("spec of ContainerRecreateRequest is immutable"))
+		}
+		if obj.Labels[appsv1beta1.ContainerRecreateRequestPodUIDKey] != oldObj.Labels[appsv1beta1.ContainerRecreateRequestPodUIDKey] {
+			return admission.Errored(http.StatusForbidden, fmt.Errorf("not allowed to update immutable label %s", appsv1beta1.ContainerRecreateRequestPodUIDKey))
+		}
+		if obj.Labels[appsv1beta1.ContainerRecreateRequestNodeNameKey] != oldObj.Labels[appsv1beta1.ContainerRecreateRequestNodeNameKey] {
+			return admission.Errored(http.StatusForbidden, fmt.Errorf("not allowed to update immutable label %s", appsv1beta1.ContainerRecreateRequestNodeNameKey))
+		}
+		return admission.Allowed("")
+	}
+
+	if obj.Labels == nil {
+		obj.Labels = map[string]string{}
+	}
+
+	if obj.Spec.PodName == "" {
+		return admission.Errored(http.StatusBadRequest, fmt.Errorf("podName can not be empty"))
+	}
+	if obj.Spec.Strategy == nil {
+		obj.Spec.Strategy = &appsv1beta1.ContainerRecreateRequestStrategy{}
+	}
+	obj.Labels[appsv1beta1.ContainerRecreateRequestActiveKey] = "true"
+	if len(obj.Spec.Containers) == 0 {
+		return admission.Errored(http.StatusBadRequest, fmt.Errorf("containers list can not be null"))
+	}
+	if obj.Spec.ActiveDeadlineSeconds != nil && *obj.Spec.ActiveDeadlineSeconds < minDeadlineSeconds {
+		return admission.Errored(http.StatusBadRequest, fmt.Errorf("activeDeadlineSeconds can not be less than %ds", minDeadlineSeconds))
+	}
+	if obj.Spec.Strategy.TerminationGracePeriodSeconds != nil && *obj.Spec.Strategy.TerminationGracePeriodSeconds < 0 {
+		return admission.Errored(http.StatusBadRequest, fmt.Errorf("terminationGracePeriodSeconds must be non-negative integer"))
+	}
+	if obj.Spec.Strategy.UnreadyGracePeriodSeconds != nil && *obj.Spec.Strategy.UnreadyGracePeriodSeconds < 0 {
+		return admission.Errored(http.StatusBadRequest, fmt.Errorf("unreadyGracePeriodSeconds must be non-negative integer"))
+	}
+
+	switch obj.Spec.Strategy.FailurePolicy {
+	case "":
+		obj.Spec.Strategy.FailurePolicy = appsv1beta1.ContainerRecreateRequestFailurePolicyFail
+	case appsv1beta1.ContainerRecreateRequestFailurePolicyFail, appsv1beta1.ContainerRecreateRequestFailurePolicyIgnore:
+	default:
+		return admission.Errored(http.StatusBadRequest, fmt.Errorf("unknown failurePolicy %s", obj.Spec.Strategy.FailurePolicy))
+	}
+
+	pod := &v1.Pod{}
+	if err := h.Client.Get(ctx, types.NamespacedName{Namespace: obj.Namespace, Name: obj.Spec.PodName}, pod); err != nil {
+		if errors.IsNotFound(err) {
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("no found Pod named %s", obj.Spec.PodName))
+		}
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("failed to find Pod %s: %v", obj.Spec.PodName, err))
+	}
+	if !kubecontroller.IsPodActive(pod) && !isTerminatedBySidecarTerminator(pod) {
+		return admission.Errored(http.StatusBadRequest, fmt.Errorf("not allowed to recreate containers in an inactive Pod"))
+	} else if pod.Spec.NodeName == "" {
+		return admission.Errored(http.StatusBadRequest, fmt.Errorf("not allowed to recreate containers in a pending Pod"))
+	}
+
+	node := &v1.Node{}
+	if err := h.Client.Get(ctx, types.NamespacedName{Name: pod.Spec.NodeName}, node); err != nil {
+		if errors.IsNotFound(err) {
+			return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to get Node %s: %v", pod.Spec.NodeName, err))
+		}
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("failed to get Node %s: %v", pod.Spec.NodeName, err))
+	}
+
+	if err := injectPodIntoContainerRecreateRequestV1beta1(obj, pod, node); err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
+	}
+
+	if reflect.DeepEqual(obj, copyObj) {
 		return admission.Allowed("")
 	}
 	marshaled, err := json.Marshal(obj)
@@ -163,7 +261,7 @@ func isTerminatedBySidecarTerminator(pod *v1.Pod) bool {
 	return false
 }
 
-func injectPodIntoContainerRecreateRequest(obj *appsv1alpha1.ContainerRecreateRequest, pod *v1.Pod, node *v1.Node) error {
+func injectPodIntoContainerRecreateRequestV1alpha1(obj *appsv1alpha1.ContainerRecreateRequest, pod *v1.Pod, node *v1.Node) error {
 	obj.Labels[appsv1alpha1.ContainerRecreateRequestNodeNameKey] = pod.Spec.NodeName
 	obj.Labels[appsv1alpha1.ContainerRecreateRequestPodUIDKey] = string(pod.UID)
 
@@ -213,6 +311,63 @@ func injectPodIntoContainerRecreateRequest(obj *appsv1alpha1.ContainerRecreateRe
 			ContainerID:  podContainerStatus.ContainerID,
 			RestartCount: podContainerStatus.RestartCount,
 		}
+		restartNames.Insert(c.Name)
+	}
+
+	return nil
+}
+
+func injectPodIntoContainerRecreateRequestV1beta1(obj *appsv1beta1.ContainerRecreateRequest, pod *v1.Pod, node *v1.Node) error {
+	obj.Labels[appsv1beta1.ContainerRecreateRequestNodeNameKey] = pod.Spec.NodeName
+	obj.Labels[appsv1beta1.ContainerRecreateRequestPodUIDKey] = string(pod.UID)
+
+	if node != nil && node.Labels[util.VirtualKubeletLabelKey] == util.VirtualKubeletLabelValue {
+		obj.Labels[util.VirtualKubeletLabelKey] = util.VirtualKubeletLabelValue
+	}
+
+	if obj.Spec.Strategy.TerminationGracePeriodSeconds == nil {
+		obj.Spec.Strategy.TerminationGracePeriodSeconds = pod.Spec.TerminationGracePeriodSeconds
+	}
+
+	restartNames := sets.NewString()
+	for i := range obj.Spec.Containers {
+		c := &obj.Spec.Containers[i]
+		if restartNames.Has(c.Name) {
+			return fmt.Errorf("can not recreate %s multi times", c.Name)
+		}
+
+		if c.PreStop != nil || c.Ports != nil || c.StatusContext != nil {
+			return fmt.Errorf("preStop, ports, statusContext in container are ready-only fields")
+		}
+
+		podContainer := util.GetContainer(c.Name, pod)
+		if podContainer == nil {
+			return fmt.Errorf("container %s not found in Pod", c.Name)
+		}
+		podContainerStatus := util.GetContainerStatus(c.Name, pod)
+		if podContainerStatus == nil {
+			return fmt.Errorf("not found %s containerStatus in Pod Status", c.Name)
+		} else if podContainerStatus.ContainerID == "" {
+			return fmt.Errorf("no containerID in %s containerStatus, maybe the container has not been initialized", c.Name)
+		}
+
+		if podContainer.Lifecycle != nil && podContainer.Lifecycle.PreStop != nil {
+			c.PreStop = &appsv1beta1.CRRProbeHandler{
+				Exec:      podContainer.Lifecycle.PreStop.Exec,
+				HTTPGet:   podContainer.Lifecycle.PreStop.HTTPGet,
+				TCPSocket: podContainer.Lifecycle.PreStop.TCPSocket,
+			}
+		}
+
+		if c.PreStop != nil && c.PreStop.HTTPGet != nil {
+			c.Ports = podContainer.Ports
+		}
+
+		c.StatusContext = &appsv1beta1.ContainerRecreateRequestContainerContext{
+			ContainerID:  podContainerStatus.ContainerID,
+			RestartCount: podContainerStatus.RestartCount,
+		}
+		restartNames.Insert(c.Name)
 	}
 
 	return nil

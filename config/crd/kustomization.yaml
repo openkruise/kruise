@@ -34,7 +34,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_nodeimages.yaml
 #- patches/webhook_in_imagepulljobs.yaml
 #- patches/webhook_in_advancedcronjobs.yaml
-#- patches/webhook_in_containerrecreaterequests.yaml
+- patches/webhook_in_containerrecreaterequests.yaml
 - patches/webhook_in_resourcedistributions.yaml
 - patches/webhook_in_persistentpodstates.yaml
 - patches/webhook_in_workloadspreads.yaml
