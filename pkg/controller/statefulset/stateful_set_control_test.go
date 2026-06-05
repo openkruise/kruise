@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -2964,6 +2965,8 @@ func TestUpdateWithLifecycleHook(t *testing.T) {
 						Name:      "sts-0",
 						Namespace: testNs,
 						Labels: map[string]string{
+							apps.PodIndexLabel:                   "0",
+							"statefulset.kubernetes.io/pod-name": "sts-0",
 							"preDeleteHooked":                    "true",
 							"test":                               "asts",
 							apps.ControllerRevisionHashLabelKey:  "rev_old",
@@ -3013,6 +3016,8 @@ func TestUpdateWithLifecycleHook(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "sts-0",
 						Namespace: testNs,
 						Labels: map[string]string{
+							apps.PodIndexLabel:                   "0",
+							"statefulset.kubernetes.io/pod-name": "sts-0",
 							"test":                               "asts",
 							apps.ControllerRevisionHashLabelKey:  "rev_old",
 							apps.DefaultDeploymentUniqueLabelKey: "rev_old",
@@ -3278,6 +3283,8 @@ func TestUpdateWithLifecycleHook(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{Name: "sts-0",
 						Namespace: testNs,
 						Labels: map[string]string{
+							apps.PodIndexLabel:                   "0",
+							"statefulset.kubernetes.io/pod-name": "sts-0",
 							"test":                               "asts",
 							apps.ControllerRevisionHashLabelKey:  "rev_old",
 							apps.DefaultDeploymentUniqueLabelKey: "rev_old",
@@ -3304,6 +3311,8 @@ func TestUpdateWithLifecycleHook(t *testing.T) {
 						Name:      "sts-0",
 						Namespace: testNs,
 						Labels: map[string]string{
+							apps.PodIndexLabel:                   "0",
+							"statefulset.kubernetes.io/pod-name": "sts-0",
 							"test":                               "asts",
 							apps.ControllerRevisionHashLabelKey:  "rev_old",
 							apps.DefaultDeploymentUniqueLabelKey: "rev_old",
@@ -3385,6 +3394,8 @@ func TestUpdateWithLifecycleHook(t *testing.T) {
 						Name:      "sts-0",
 						Namespace: testNs,
 						Labels: map[string]string{
+							apps.PodIndexLabel:                   "0",
+							"statefulset.kubernetes.io/pod-name": "sts-0",
 							"test":                               "asts",
 							apps.ControllerRevisionHashLabelKey:  "rev_old",
 							apps.DefaultDeploymentUniqueLabelKey: "rev_old",
@@ -3461,6 +3472,8 @@ func TestUpdateWithLifecycleHook(t *testing.T) {
 				p.ResourceVersion = gotPod.ResourceVersion
 
 				if !reflect.DeepEqual(gotPod, p) {
+					diff := cmp.Diff(gotPod, p)
+					t.Errorf("diff: %s", diff)
 					t.Fatalf("Failed to test %s, unexpected pod %s, expected \n%v\n got \n%v", mc.name, p.Name, util.DumpJSON(p), util.DumpJSON(gotPod))
 				}
 			}
