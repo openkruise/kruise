@@ -137,7 +137,7 @@ func TestScatterPodsByRule(t *testing.T) {
 		{
 			desc:            "even scattered pods + even ordinary pods + scattered pods more than ordinary pods",
 			podLabels:       []string{"", "", "labelA=AAA", "labelA=AAA", "labelA=AAA", "labelA=AAA"},
-			expectedIndexes: []int{2, 3, 0, 4, 1, 5},
+			expectedIndexes: []int{2, 0, 3, 1, 4, 5},
 		},
 		{
 			desc:            "odd scattered pods + odd ordinary pods + scattered pods more than ordinary pods",
@@ -147,7 +147,7 @@ func TestScatterPodsByRule(t *testing.T) {
 		{
 			desc:            "even scattered pods + odd ordinary pods + scattered pods more than ordinary pods",
 			podLabels:       []string{"", "", "labelA=AAA", "", "labelA=AAA", "labelA=AAA", "labelA=AAA", "labelA=AAA", "labelA=AAA"},
-			expectedIndexes: []int{2, 4, 0, 5, 6, 1, 7, 3, 8},
+			expectedIndexes: []int{2, 0, 4, 1, 5, 3, 6, 7, 8},
 		},
 		{
 			desc:            "odd scattered pods + even ordinary pods + scattered pods more than ordinary pods",
