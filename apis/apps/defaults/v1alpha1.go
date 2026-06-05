@@ -180,6 +180,9 @@ func setDefaultContainer(sidecarContainer *v1alpha1.SidecarContainer) {
 func SetDefaultsConfigMapSet(obj *v1alpha1.ConfigMapSet) {
 	partitionValue := int32(0)
 	maxUnavailableValue := intstr.FromInt32(1)
+	if obj.Spec.UpdateStrategy == nil {
+		obj.Spec.UpdateStrategy = &v1alpha1.ConfigMapSetUpdateStrategy{}
+	}
 	if obj.Spec.UpdateStrategy.Partition == nil {
 		v := intstr.FromInt32(partitionValue)
 		obj.Spec.UpdateStrategy.Partition = &v
