@@ -208,7 +208,7 @@ func (h *ConfigMapSetCreateUpdateHandler) validateConfigMapSetSpec(ctx context.C
 	}
 
 	// validate ReloadSidecarConfig
-	if spec.ReloadSidecarConfig == nil {
+	if spec.ReloadSidecarConfig != nil {
 		reloadConfigPath := fldPath.Child("reloadSidecarConfig")
 		if spec.ReloadSidecarConfig.Type == appsv1alpha1.ReloadSidecarTypeSidecarSet {
 			var sidecarName string

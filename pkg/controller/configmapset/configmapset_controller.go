@@ -1251,8 +1251,7 @@ func (r *ReconcileConfigMapSet) waitSidecarRebootByCrrSuccess(ctx context.Contex
 	}
 
 	// Combine hashStr and sortedContainerNames to form a unique hash for this specific set of containers and targetRevision
-	combinedHashStr := hex.EncodeToString(md5.New().Sum([]byte(fmt.Sprintf("%s-%s", hashStr, containerName))))[:10]
-	crrName := fmt.Sprintf("%s-%s", pod.Name, combinedHashStr)
+	crrName := r.genContainerRecreateRequestName(pod, containerName, hashStr)
 
 	crr := &appsv1alpha1.ContainerRecreateRequest{}
 	err := r.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: crrName}, crr)
