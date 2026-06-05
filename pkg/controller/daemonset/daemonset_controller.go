@@ -761,6 +761,22 @@ func (dsc *ReconcileDaemonSet) syncNodes(ctx context.Context, ds *appsv1beta1.Da
 					podTemplate.Spec.NodeName = nodesNeedingDaemonPods[ix]
 				}
 
+				// Apply per-node patches if configured.
+				if len(ds.Spec.NodePatches) > 0 {
+					node, nodeErr := dsc.nodeLister.Get(nodesNeedingDaemonPods[ix])
+					if nodeErr != nil {
+						// Treat a node lookup failure as a creation error so we don't
+						// permanently create an unpatched pod — the controller will retry.
+						klog.ErrorS(nodeErr, "Failed to get node for applying nodePatches, will retry",
+							"node", nodesNeedingDaemonPods[ix], "daemonSet", klog.KObj(ds))
+						dsc.expectations.CreationObserved(logger, dsKey)
+						errCh <- nodeErr
+						utilruntime.HandleError(nodeErr)
+						return
+					}
+					applyNodePatches(podTemplate, node, ds.Spec.NodePatches)
+				}
+
 				err = dsc.podControl.CreatePods(ctx, ds.Namespace, podTemplate, ds, metav1.NewControllerRef(ds, controllerKind))
 
 				if err != nil {

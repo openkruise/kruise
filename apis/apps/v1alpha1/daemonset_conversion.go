@@ -73,6 +73,35 @@ func (ds *DaemonSet) ConvertTo(dst conversion.Hub) error {
 			}
 		}
 
+		// Convert NodePatches
+		if len(ds.Spec.NodePatches) > 0 {
+			dsv1beta1.Spec.NodePatches = make([]v1beta1.DaemonSetNodePatch, len(ds.Spec.NodePatches))
+			for i, p := range ds.Spec.NodePatches {
+				v1b1p := v1beta1.DaemonSetNodePatch{
+					Selector: p.Selector,
+					Patch: v1beta1.DaemonSetNodeTemplatePatch{},
+				}
+				if p.Patch.Metadata != nil {
+					v1b1p.Patch.Metadata = &v1beta1.DaemonSetNodePatchObjectMeta{
+						Labels:      p.Patch.Metadata.Labels,
+						Annotations: p.Patch.Metadata.Annotations,
+					}
+				}
+				if p.Patch.Spec != nil {
+					v1b1p.Patch.Spec = &v1beta1.DaemonSetNodePatchPodSpec{}
+					for _, c := range p.Patch.Spec.Containers {
+						v1b1c := v1beta1.DaemonSetNodePatchContainer{
+							Name:      c.Name,
+							Env:       c.Env,
+							Resources: c.Resources,
+						}
+						v1b1p.Patch.Spec.Containers = append(v1b1p.Patch.Spec.Containers, v1b1c)
+					}
+				}
+				dsv1beta1.Spec.NodePatches[i] = v1b1p
+			}
+		}
+
 		// status
 		dsv1beta1.Status = v1beta1.DaemonSetStatus{
 			CurrentNumberScheduled: ds.Status.CurrentNumberScheduled,
@@ -132,6 +161,35 @@ func (ds *DaemonSet) ConvertFrom(src conversion.Hub) error {
 				ds.Annotations = make(map[string]string)
 			}
 			ds.Annotations[ProgressiveCreatePodAnnotation] = "true"
+		}
+
+		// Convert NodePatches
+		if len(dsv1beta1.Spec.NodePatches) > 0 {
+			ds.Spec.NodePatches = make([]DaemonSetNodePatch, len(dsv1beta1.Spec.NodePatches))
+			for i, p := range dsv1beta1.Spec.NodePatches {
+				alp := DaemonSetNodePatch{
+					Selector: p.Selector,
+					Patch:    DaemonSetNodeTemplatePatch{},
+				}
+				if p.Patch.Metadata != nil {
+					alp.Patch.Metadata = &DaemonSetNodePatchObjectMeta{
+						Labels:      p.Patch.Metadata.Labels,
+						Annotations: p.Patch.Metadata.Annotations,
+					}
+				}
+				if p.Patch.Spec != nil {
+					alp.Patch.Spec = &DaemonSetNodePatchPodSpec{}
+					for _, c := range p.Patch.Spec.Containers {
+						alpc := DaemonSetNodePatchContainer{
+							Name:      c.Name,
+							Env:       c.Env,
+							Resources: c.Resources,
+						}
+						alp.Patch.Spec.Containers = append(alp.Patch.Spec.Containers, alpc)
+					}
+				}
+				ds.Spec.NodePatches[i] = alp
+			}
 		}
 
 		// status
