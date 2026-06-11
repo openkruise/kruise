@@ -29,6 +29,8 @@ type Interface interface {
 	BroadcastJobs() BroadcastJobInformer
 	// CloneSets returns a CloneSetInformer.
 	CloneSets() CloneSetInformer
+	// ContainerRecreateRequests returns a ContainerRecreateRequestInformer.
+	ContainerRecreateRequests() ContainerRecreateRequestInformer
 	// DaemonSets returns a DaemonSetInformer.
 	DaemonSets() DaemonSetInformer
 	// ImageListPullJobs returns a ImageListPullJobInformer.
@@ -37,10 +39,18 @@ type Interface interface {
 	ImagePullJobs() ImagePullJobInformer
 	// NodeImages returns a NodeImageInformer.
 	NodeImages() NodeImageInformer
+	// PersistentPodStates returns a PersistentPodStateInformer.
+	PersistentPodStates() PersistentPodStateInformer
+	// ResourceDistributions returns a ResourceDistributionInformer.
+	ResourceDistributions() ResourceDistributionInformer
 	// SidecarSets returns a SidecarSetInformer.
 	SidecarSets() SidecarSetInformer
 	// StatefulSets returns a StatefulSetInformer.
 	StatefulSets() StatefulSetInformer
+	// UnitedDeployments returns a UnitedDeploymentInformer.
+	UnitedDeployments() UnitedDeploymentInformer
+	// WorkloadSpreads returns a WorkloadSpreadInformer.
+	WorkloadSpreads() WorkloadSpreadInformer
 }
 
 type version struct {
@@ -69,6 +79,11 @@ func (v *version) CloneSets() CloneSetInformer {
 	return &cloneSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
+// ContainerRecreateRequests returns a ContainerRecreateRequestInformer.
+func (v *version) ContainerRecreateRequests() ContainerRecreateRequestInformer {
+	return &containerRecreateRequestInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
 // DaemonSets returns a DaemonSetInformer.
 func (v *version) DaemonSets() DaemonSetInformer {
 	return &daemonSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
@@ -89,6 +104,16 @@ func (v *version) NodeImages() NodeImageInformer {
 	return &nodeImageInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
+// PersistentPodStates returns a PersistentPodStateInformer.
+func (v *version) PersistentPodStates() PersistentPodStateInformer {
+	return &persistentPodStateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ResourceDistributions returns a ResourceDistributionInformer.
+func (v *version) ResourceDistributions() ResourceDistributionInformer {
+	return &resourceDistributionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
 // SidecarSets returns a SidecarSetInformer.
 func (v *version) SidecarSets() SidecarSetInformer {
 	return &sidecarSetInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
@@ -97,4 +122,14 @@ func (v *version) SidecarSets() SidecarSetInformer {
 // StatefulSets returns a StatefulSetInformer.
 func (v *version) StatefulSets() StatefulSetInformer {
 	return &statefulSetInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// UnitedDeployments returns a UnitedDeploymentInformer.
+func (v *version) UnitedDeployments() UnitedDeploymentInformer {
+	return &unitedDeploymentInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// WorkloadSpreads returns a WorkloadSpreadInformer.
+func (v *version) WorkloadSpreads() WorkloadSpreadInformer {
+	return &workloadSpreadInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

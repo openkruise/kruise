@@ -59,7 +59,7 @@ func TestNamespaceEventHandler(t *testing.T) {
 	namespaceDemo2.ObjectMeta.Labels["group"] = "seven"
 	distributor2 := buildResourceDistributionWithSecret()
 	distributor2.SetName("test-resource-distribution-2")
-	distributor2.Spec.Targets.NamespaceLabelSelector.MatchLabels["group"] = "seven"
+	distributor2.Spec.Targets.NamespaceSelector.MatchLabels["group"] = "seven"
 	if err := handlerClient.Create(context.TODO(), distributor2, &client.CreateOptions{}); err != nil {
 		t.Fatalf("add distributor2 to fake client, err %v", err)
 	}

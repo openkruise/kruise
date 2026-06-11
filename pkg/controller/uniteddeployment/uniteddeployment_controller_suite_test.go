@@ -17,7 +17,11 @@ limitations under the License.
 package uniteddeployment
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"errors"
+	"io"
 	stdlog "log"
 	"os"
 	"path/filepath"
@@ -25,25 +29,35 @@ import (
 	"testing"
 
 	"github.com/onsi/gomega"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/yaml"
 
 	"github.com/openkruise/kruise/apis"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 var cfg *rest.Config
 
 func TestMain(m *testing.M) {
+	crdDirectory := filepath.Join("..", "..", "..", "config", "crd", "bases")
+	crds, err := loadCRDsFromDirectory(crdDirectory)
+	utilruntime.Must(err)
+	disableUnitedDeploymentConversionWebhook(crds)
+
 	t := &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
+		CRDs:   crds,
+		Scheme: runtime.NewScheme(),
 	}
 	utilruntime.Must(apis.AddToScheme(scheme.Scheme))
 
-	var err error
 	if cfg, err = t.Start(); err != nil {
 		stdlog.Fatal(err)
 	}
@@ -51,6 +65,80 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	t.Stop()
 	os.Exit(code)
+}
+
+func disableUnitedDeploymentConversionWebhook(crds []*apiextensionsv1.CustomResourceDefinition) {
+	for _, crd := range crds {
+		if crd.Spec.Group != "apps.kruise.io" || crd.Spec.Names.Kind != "UnitedDeployment" {
+			continue
+		}
+		crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
+			Strategy: apiextensionsv1.NoneConverter,
+		}
+	}
+}
+
+func loadCRDsFromDirectory(path string) ([]*apiextensionsv1.CustomResourceDefinition, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var crds []*apiextensionsv1.CustomResourceDefinition
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		switch filepath.Ext(entry.Name()) {
+		case ".json", ".yaml", ".yml":
+		default:
+			continue
+		}
+
+		filePath := filepath.Join(path, entry.Name())
+		documents, err := readDocuments(filePath)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, document := range documents {
+			crd := &apiextensionsv1.CustomResourceDefinition{}
+			if err := yaml.Unmarshal(document, crd); err != nil {
+				return nil, err
+			}
+			if crd.Kind != "CustomResourceDefinition" || crd.Spec.Names.Kind == "" || crd.Spec.Group == "" {
+				continue
+			}
+			crds = append(crds, crd)
+		}
+	}
+
+	return crds, nil
+}
+
+func readDocuments(path string) ([][]byte, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var documents [][]byte
+	reader := k8syaml.NewYAMLReader(bufio.NewReader(bytes.NewReader(content)))
+	for {
+		document, err := reader.Read()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, err
+		}
+		if len(bytes.TrimSpace(document)) == 0 {
+			continue
+		}
+		documents = append(documents, document)
+	}
+	return documents, nil
 }
 
 // SetupTestReconcile returns a reconcile.Reconcile implementation that delegates to inner and
@@ -77,4 +165,15 @@ func StartTestManager(ctx context.Context, mgr manager.Manager, g *gomega.Gomega
 		g.Expect(mgr.Start(ctx)).NotTo(gomega.HaveOccurred())
 	}()
 	return wg
+}
+
+func subsetPartitionsFromStatus(statuses []appsv1beta1.UnitedDeploymentSubsetStatus) map[string]int32 {
+	partitions := make(map[string]int32, len(statuses))
+	for _, status := range statuses {
+		if status.Name == "" {
+			continue
+		}
+		partitions[status.Name] = status.Partition
+	}
+	return partitions
 }

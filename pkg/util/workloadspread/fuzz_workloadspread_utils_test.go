@@ -22,7 +22,7 @@ import (
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	fuzzutils "github.com/openkruise/kruise/test/fuzz"
 )
 
@@ -65,7 +65,7 @@ func FuzzInjectWorkloadSpreadIntoPod(f *testing.F) {
 			return
 		}
 
-		ws := &appsv1alpha1.WorkloadSpread{}
+		ws := &appsv1beta1.WorkloadSpread{}
 		if err := cf.GenerateStruct(ws); err != nil {
 			return
 		}

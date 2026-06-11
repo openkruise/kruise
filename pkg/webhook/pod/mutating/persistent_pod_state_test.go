@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
@@ -43,31 +42,31 @@ var (
 	// kruise
 	KruiseKindSts = appsv1beta1.SchemeGroupVersion.WithKind("StatefulSet")
 
-	ppsDemo = appsv1alpha1.PersistentPodState{
+	ppsDemo = appsv1beta1.PersistentPodState{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-kruise-sts",
 			Namespace: "ns-test",
 		},
-		Spec: appsv1alpha1.PersistentPodStateSpec{
-			TargetReference: appsv1alpha1.TargetReference{
+		Spec: appsv1beta1.PersistentPodStateSpec{
+			TargetReference: appsv1beta1.TargetReference{
 				APIVersion: KruiseKindSts.GroupVersion().String(),
 				Kind:       KruiseKindSts.Kind,
 				Name:       "test-kruise-sts",
 			},
-			RequiredPersistentTopology: &appsv1alpha1.NodeTopologyTerm{
-				NodeTopologyKeys: []string{RequiredPodStateNodeAffinityAZLabels},
+			RequiredPersistentTopology: &appsv1beta1.NodeTopologyTerm{
+				Keys: []string{RequiredPodStateNodeAffinityAZLabels},
 			},
-			PreferredPersistentTopology: []appsv1alpha1.PreferredTopologyTerm{
+			PreferredPersistentTopology: []appsv1beta1.PreferredTopologyTerm{
 				{
 					Weight: 10,
-					Preference: appsv1alpha1.NodeTopologyTerm{
-						NodeTopologyKeys: []string{PreferredPodStateNodeAffinityAZLabels},
+					Preference: appsv1beta1.NodeTopologyTerm{
+						Keys: []string{PreferredPodStateNodeAffinityAZLabels},
 					},
 				},
 			},
 		},
-		Status: appsv1alpha1.PersistentPodStateStatus{
-			PodStates: map[string]appsv1alpha1.PodState{
+		Status: appsv1beta1.PersistentPodStateStatus{
+			PodStates: map[string]appsv1beta1.PodState{
 				"test-pod": {
 					NodeTopologyLabels: map[string]string{
 						RequiredPodStateNodeAffinityAZLabels:  "cn-beijing-a",
@@ -137,7 +136,7 @@ func TestPersistentPodStateMutatingPod(t *testing.T) {
 	cases := []struct {
 		name        string
 		getPod      func() *corev1.Pod
-		getPodState func() *appsv1alpha1.PersistentPodState
+		getPodState func() *appsv1beta1.PersistentPodState
 		exceptPod   func() *corev1.Pod
 	}{
 		{
@@ -146,7 +145,7 @@ func TestPersistentPodStateMutatingPod(t *testing.T) {
 				demo := podDemo.DeepCopy()
 				return demo
 			},
-			getPodState: func() *appsv1alpha1.PersistentPodState {
+			getPodState: func() *appsv1beta1.PersistentPodState {
 				return ppsDemo.DeepCopy()
 			},
 			exceptPod: func() *corev1.Pod {
@@ -207,7 +206,7 @@ func TestPersistentPodStateMutatingPod(t *testing.T) {
 				demo.OwnerReferences[0].Name = "no-found"
 				return demo
 			},
-			getPodState: func() *appsv1alpha1.PersistentPodState {
+			getPodState: func() *appsv1beta1.PersistentPodState {
 				return ppsDemo.DeepCopy()
 			},
 			exceptPod: func() *corev1.Pod {

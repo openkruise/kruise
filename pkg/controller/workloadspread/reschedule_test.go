@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 	wsutil "github.com/openkruise/kruise/pkg/util/workloadspread"
@@ -54,13 +55,13 @@ func TestRescheduleSubset(t *testing.T) {
 	currentTime = time.Now()
 
 	wsDemo := workloadSpreadDemo.DeepCopy()
-	wsDemo.Spec.ScheduleStrategy = appsv1alpha1.WorkloadSpreadScheduleStrategy{
-		Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
-		Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
+	wsDemo.Spec.ScheduleStrategy = appsv1beta1.WorkloadSpreadScheduleStrategy{
+		Type: appsv1beta1.AdaptiveWorkloadSpreadScheduleStrategyType,
+		Adaptive: &appsv1beta1.AdaptiveWorkloadSpreadStrategy{
 			RescheduleCriticalSeconds: pointer.Int32Ptr(5),
 		},
 	}
-	wsDemo.Spec.Subsets = []appsv1alpha1.WorkloadSpreadSubset{
+	wsDemo.Spec.Subsets = []appsv1beta1.WorkloadSpreadSubset{
 		{
 			Name:        "subset-a",
 			MaxReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 5},
@@ -69,14 +70,14 @@ func TestRescheduleSubset(t *testing.T) {
 			Name: "subset-b",
 		},
 	}
-	wsDemo.Status.SubsetStatuses = []appsv1alpha1.WorkloadSpreadSubsetStatus{
+	wsDemo.Status.SubsetStatuses = []appsv1beta1.WorkloadSpreadSubsetStatus{
 		{
 			Name:            "subset-a",
 			MissingReplicas: 5,
 			CreatingPods:    map[string]metav1.Time{},
 			DeletingPods:    map[string]metav1.Time{},
-			Conditions: []appsv1alpha1.WorkloadSpreadSubsetCondition{
-				*NewWorkloadSpreadSubsetCondition(appsv1alpha1.SubsetSchedulable, corev1.ConditionTrue, "", ""),
+			Conditions: []metav1.Condition{
+				*NewWorkloadSpreadSubsetCondition("Schedulable", metav1.ConditionTrue, "", ""),
 			},
 		},
 		{
@@ -84,27 +85,27 @@ func TestRescheduleSubset(t *testing.T) {
 			MissingReplicas: -1,
 			CreatingPods:    map[string]metav1.Time{},
 			DeletingPods:    map[string]metav1.Time{},
-			Conditions: []appsv1alpha1.WorkloadSpreadSubsetCondition{
-				*NewWorkloadSpreadSubsetCondition(appsv1alpha1.SubsetSchedulable, corev1.ConditionTrue, "", ""),
+			Conditions: []metav1.Condition{
+				*NewWorkloadSpreadSubsetCondition("Schedulable", metav1.ConditionTrue, "", ""),
 			},
 		},
 	}
 	cases := []struct {
 		name                 string
 		getPods              func() []*corev1.Pod
-		getWorkloadSpread    func() *appsv1alpha1.WorkloadSpread
+		getWorkloadSpread    func() *appsv1beta1.WorkloadSpread
 		getCloneSet          func() *appsv1alpha1.CloneSet
 		expectPods           func() []*corev1.Pod
-		expectWorkloadSpread func() *appsv1alpha1.WorkloadSpread
+		expectWorkloadSpread func() *appsv1beta1.WorkloadSpread
 	}{
 		{
 			name: "close reschedule strategy, condition is null",
 			getPods: func() []*corev1.Pod {
 				return []*corev1.Pod{}
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				ws := wsDemo.DeepCopy()
-				ws.Spec.ScheduleStrategy.Type = appsv1alpha1.FixedWorkloadSpreadScheduleStrategyType
+				ws.Spec.ScheduleStrategy.Type = appsv1beta1.FixedWorkloadSpreadScheduleStrategyType
 				ws.Status.SubsetStatuses[0].Conditions = nil
 				ws.Status.SubsetStatuses[1].Conditions = nil
 				return ws
@@ -115,7 +116,7 @@ func TestRescheduleSubset(t *testing.T) {
 			expectPods: func() []*corev1.Pod {
 				return []*corev1.Pod{}
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				ws := wsDemo.DeepCopy()
 				ws.Status.SubsetStatuses[0].Conditions = nil
 				ws.Status.SubsetStatuses[1].Conditions = nil
@@ -127,7 +128,7 @@ func TestRescheduleSubset(t *testing.T) {
 			getPods: func() []*corev1.Pod {
 				return []*corev1.Pod{}
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				ws := wsDemo.DeepCopy()
 				ws.Status.SubsetStatuses[0].Conditions = nil
 				ws.Status.SubsetStatuses[1].Conditions = nil
@@ -139,13 +140,13 @@ func TestRescheduleSubset(t *testing.T) {
 			expectPods: func() []*corev1.Pod {
 				return []*corev1.Pod{}
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				ws := wsDemo.DeepCopy()
-				ws.Status.SubsetStatuses[0].Conditions = []appsv1alpha1.WorkloadSpreadSubsetCondition{
-					*NewWorkloadSpreadSubsetCondition(appsv1alpha1.SubsetSchedulable, corev1.ConditionTrue, "", ""),
+				ws.Status.SubsetStatuses[0].Conditions = []metav1.Condition{
+					*NewWorkloadSpreadSubsetCondition("Schedulable", metav1.ConditionTrue, "", ""),
 				}
-				ws.Status.SubsetStatuses[1].Conditions = []appsv1alpha1.WorkloadSpreadSubsetCondition{
-					*NewWorkloadSpreadSubsetCondition(appsv1alpha1.SubsetSchedulable, corev1.ConditionTrue, "", ""),
+				ws.Status.SubsetStatuses[1].Conditions = []metav1.Condition{
+					*NewWorkloadSpreadSubsetCondition("Schedulable", metav1.ConditionTrue, "", ""),
 				}
 				return ws
 			},
@@ -163,7 +164,7 @@ func TestRescheduleSubset(t *testing.T) {
 				}
 				return pods
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				ws := wsDemo.DeepCopy()
 				return ws
 			},
@@ -173,13 +174,13 @@ func TestRescheduleSubset(t *testing.T) {
 			expectPods: func() []*corev1.Pod {
 				return []*corev1.Pod{}
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				ws := wsDemo.DeepCopy()
-				ws.Status.SubsetStatuses[0].Conditions = []appsv1alpha1.WorkloadSpreadSubsetCondition{
-					*NewWorkloadSpreadSubsetCondition(appsv1alpha1.SubsetSchedulable, corev1.ConditionFalse, "", ""),
+				ws.Status.SubsetStatuses[0].Conditions = []metav1.Condition{
+					*NewWorkloadSpreadSubsetCondition("Schedulable", metav1.ConditionFalse, "", ""),
 				}
-				ws.Status.SubsetStatuses[1].Conditions = []appsv1alpha1.WorkloadSpreadSubsetCondition{
-					*NewWorkloadSpreadSubsetCondition(appsv1alpha1.SubsetSchedulable, corev1.ConditionTrue, "", ""),
+				ws.Status.SubsetStatuses[1].Conditions = []metav1.Condition{
+					*NewWorkloadSpreadSubsetCondition("Schedulable", metav1.ConditionTrue, "", ""),
 				}
 				return ws
 			},
@@ -190,12 +191,12 @@ func TestRescheduleSubset(t *testing.T) {
 				pods := make([]*corev1.Pod, 0)
 				return pods
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				ws := wsDemo.DeepCopy()
-				ws.Status.SubsetStatuses[0].Conditions = []appsv1alpha1.WorkloadSpreadSubsetCondition{
+				ws.Status.SubsetStatuses[0].Conditions = []metav1.Condition{
 					{
-						Type:               appsv1alpha1.SubsetSchedulable,
-						Status:             corev1.ConditionFalse,
+						Type:               "Schedulable",
+						Status:             metav1.ConditionFalse,
 						LastTransitionTime: metav1.Time{Time: currentTime.Add(4 * m)},
 					},
 				}
@@ -207,12 +208,12 @@ func TestRescheduleSubset(t *testing.T) {
 			expectPods: func() []*corev1.Pod {
 				return []*corev1.Pod{}
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				ws := wsDemo.DeepCopy()
-				ws.Status.SubsetStatuses[0].Conditions = []appsv1alpha1.WorkloadSpreadSubsetCondition{
+				ws.Status.SubsetStatuses[0].Conditions = []metav1.Condition{
 					{
-						Type:               appsv1alpha1.SubsetSchedulable,
-						Status:             corev1.ConditionFalse,
+						Type:               "Schedulable",
+						Status:             metav1.ConditionFalse,
 						LastTransitionTime: metav1.Time{Time: currentTime.Add(4 * m)},
 					},
 				}
@@ -225,12 +226,12 @@ func TestRescheduleSubset(t *testing.T) {
 				pods := make([]*corev1.Pod, 0)
 				return pods
 			},
-			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				ws := wsDemo.DeepCopy()
-				ws.Status.SubsetStatuses[0].Conditions = []appsv1alpha1.WorkloadSpreadSubsetCondition{
+				ws.Status.SubsetStatuses[0].Conditions = []metav1.Condition{
 					{
-						Type:               appsv1alpha1.SubsetSchedulable,
-						Status:             corev1.ConditionFalse,
+						Type:               "Schedulable",
+						Status:             metav1.ConditionFalse,
 						LastTransitionTime: metav1.Time{Time: currentTime.Add(10 * m)},
 					},
 				}
@@ -242,12 +243,12 @@ func TestRescheduleSubset(t *testing.T) {
 			expectPods: func() []*corev1.Pod {
 				return []*corev1.Pod{}
 			},
-			expectWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+			expectWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
 				ws := wsDemo.DeepCopy()
-				ws.Status.SubsetStatuses[0].Conditions = []appsv1alpha1.WorkloadSpreadSubsetCondition{
+				ws.Status.SubsetStatuses[0].Conditions = []metav1.Condition{
 					{
-						Type:               appsv1alpha1.SubsetSchedulable,
-						Status:             corev1.ConditionTrue,
+						Type:               "Schedulable",
+						Status:             metav1.ConditionTrue,
 						LastTransitionTime: metav1.Now(),
 					},
 				}
@@ -267,7 +268,7 @@ func TestRescheduleSubset(t *testing.T) {
 						owners = append(owners, string(ref.UID))
 					}
 					return owners
-				}).WithStatusSubresource(&appsv1alpha1.WorkloadSpread{}).Build()
+				}).WithStatusSubresource(&appsv1beta1.WorkloadSpread{}).Build()
 			for _, pod := range cs.getPods() {
 				podIn := pod.DeepCopy()
 				err := fakeClient.Create(context.TODO(), podIn)
@@ -311,8 +312,8 @@ func TestRescheduleSubset(t *testing.T) {
 			fmt.Println(string(by))
 
 			for i := 0; i < len(latestWorkloadSpread.Spec.Subsets); i++ {
-				lc := GetWorkloadSpreadSubsetCondition(&latestStatus.SubsetStatuses[i], appsv1alpha1.SubsetSchedulable)
-				ec := GetWorkloadSpreadSubsetCondition(&exceptStatus.SubsetStatuses[i], appsv1alpha1.SubsetSchedulable)
+				lc := GetWorkloadSpreadSubsetCondition(&latestStatus.SubsetStatuses[i], "Schedulable")
+				ec := GetWorkloadSpreadSubsetCondition(&exceptStatus.SubsetStatuses[i], "Schedulable")
 
 				if lc == nil && ec != nil {
 					t.Fatalf("reschedule failed")

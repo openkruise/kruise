@@ -28,11 +28,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func init() {
 	scheme = runtime.NewScheme()
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 }
 
@@ -42,29 +44,29 @@ var (
 	podStateZoneTopologyLabel = "topology.kubernetes.io/zone"
 	podStateNodeTopologyLabel = "kubernetes.io/hostname"
 
-	ppsDemo = appsv1alpha1.PersistentPodState{
+	ppsDemo = appsv1beta1.PersistentPodState{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: appsv1alpha1.GroupVersion.String(),
+			APIVersion: appsv1beta1.GroupVersion.String(),
 			Kind:       "PersistentPodState",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "per-test",
 		},
-		Spec: appsv1alpha1.PersistentPodStateSpec{
-			TargetReference: appsv1alpha1.TargetReference{
+		Spec: appsv1beta1.PersistentPodStateSpec{
+			TargetReference: appsv1beta1.TargetReference{
 				APIVersion: "apps/v1",
 				Kind:       "StatefulSet",
 				Name:       "statefulset-test",
 			},
-			RequiredPersistentTopology: &appsv1alpha1.NodeTopologyTerm{
-				NodeTopologyKeys: []string{podStateZoneTopologyLabel},
+			RequiredPersistentTopology: &appsv1beta1.NodeTopologyTerm{
+				Keys: []string{podStateZoneTopologyLabel},
 			},
-			PreferredPersistentTopology: []appsv1alpha1.PreferredTopologyTerm{
+			PreferredPersistentTopology: []appsv1beta1.PreferredTopologyTerm{
 				{
 					Weight: 100,
-					Preference: appsv1alpha1.NodeTopologyTerm{
-						NodeTopologyKeys: []string{podStateNodeTopologyLabel},
+					Preference: appsv1beta1.NodeTopologyTerm{
+						Keys: []string{podStateNodeTopologyLabel},
 					},
 				},
 			},
@@ -75,12 +77,12 @@ var (
 func TestValidatingPer(t *testing.T) {
 	cases := []struct {
 		name          string
-		per           func() *appsv1alpha1.PersistentPodState
+		per           func() *appsv1beta1.PersistentPodState
 		expectErrList int
 	}{
 		{
 			name: "valid per, TargetReference",
-			per: func() *appsv1alpha1.PersistentPodState {
+			per: func() *appsv1beta1.PersistentPodState {
 				pps := ppsDemo.DeepCopy()
 				return pps
 			},
@@ -88,18 +90,18 @@ func TestValidatingPer(t *testing.T) {
 		},
 		{
 			name: "invalid per, TargetReference are nil",
-			per: func() *appsv1alpha1.PersistentPodState {
+			per: func() *appsv1beta1.PersistentPodState {
 				pps := ppsDemo.DeepCopy()
-				pps.Spec.TargetReference = appsv1alpha1.TargetReference{}
+				pps.Spec.TargetReference = appsv1beta1.TargetReference{}
 				return pps
 			},
 			expectErrList: 2,
 		},
 		{
 			name: "invalid per, targetRef Deployment",
-			per: func() *appsv1alpha1.PersistentPodState {
+			per: func() *appsv1beta1.PersistentPodState {
 				pps := ppsDemo.DeepCopy()
-				pps.Spec.TargetReference = appsv1alpha1.TargetReference{
+				pps.Spec.TargetReference = appsv1beta1.TargetReference{
 					APIVersion: "apps/v1",
 					Kind:       "Deployment",
 					Name:       "test",
@@ -110,7 +112,7 @@ func TestValidatingPer(t *testing.T) {
 		},
 		{
 			name: "invalid per, TopologyConstraint and TopologyPreference are nil",
-			per: func() *appsv1alpha1.PersistentPodState {
+			per: func() *appsv1beta1.PersistentPodState {
 				pps := ppsDemo.DeepCopy()
 				pps.Spec.RequiredPersistentTopology = nil
 				pps.Spec.PreferredPersistentTopology = nil
@@ -139,71 +141,71 @@ func TestValidatingPer(t *testing.T) {
 func TestPerConflictWithOthers(t *testing.T) {
 	cases := []struct {
 		name          string
-		per           func() *appsv1alpha1.PersistentPodState
-		otherPers     func() []*appsv1alpha1.PersistentPodState
+		per           func() *appsv1beta1.PersistentPodState
+		otherPers     func() []*appsv1beta1.PersistentPodState
 		expectErrList int
 	}{
 		{
 			name: "no conflict with other pers, and TargetReference",
-			per: func() *appsv1alpha1.PersistentPodState {
+			per: func() *appsv1beta1.PersistentPodState {
 				pps := ppsDemo.DeepCopy()
 				return pps
 			},
-			otherPers: func() []*appsv1alpha1.PersistentPodState {
+			otherPers: func() []*appsv1beta1.PersistentPodState {
 				pps1 := ppsDemo.DeepCopy()
 				pps1.Name = "pps1"
-				pps1.Spec.TargetReference = appsv1alpha1.TargetReference{
+				pps1.Spec.TargetReference = appsv1beta1.TargetReference{
 					APIVersion: "apps/v1",
 					Kind:       "StatefulSet",
 					Name:       "statefulset-test1",
 				}
 				pps2 := ppsDemo.DeepCopy()
 				pps2.Name = "pps2"
-				pps2.Spec.TargetReference = appsv1alpha1.TargetReference{
+				pps2.Spec.TargetReference = appsv1beta1.TargetReference{
 					APIVersion: "apps/v1",
 					Kind:       "StatefulSet",
 					Name:       "statefulset-test2",
 				}
-				return []*appsv1alpha1.PersistentPodState{pps1, pps2}
+				return []*appsv1beta1.PersistentPodState{pps1, pps2}
 			},
 			expectErrList: 0,
 		},
 		{
 			name: "invalid conflict with other pers, and TargetReference",
-			per: func() *appsv1alpha1.PersistentPodState {
+			per: func() *appsv1beta1.PersistentPodState {
 				pps := ppsDemo.DeepCopy()
 				return pps
 			},
-			otherPers: func() []*appsv1alpha1.PersistentPodState {
+			otherPers: func() []*appsv1beta1.PersistentPodState {
 				pps1 := ppsDemo.DeepCopy()
 				pps1.Name = "pps1"
-				pps1.Spec.TargetReference = appsv1alpha1.TargetReference{
+				pps1.Spec.TargetReference = appsv1beta1.TargetReference{
 					APIVersion: "apps/v1",
 					Kind:       "StatefulSet",
 					Name:       "statefulset-test",
 				}
 				pps2 := ppsDemo.DeepCopy()
 				pps2.Name = "pps2"
-				pps2.Spec.TargetReference = appsv1alpha1.TargetReference{
+				pps2.Spec.TargetReference = appsv1beta1.TargetReference{
 					APIVersion: "apps/v1",
 					Kind:       "StatefulSet",
 					Name:       "statefulset-test2",
 				}
-				return []*appsv1alpha1.PersistentPodState{pps1, pps2}
+				return []*appsv1beta1.PersistentPodState{pps1, pps2}
 			},
 			expectErrList: 1,
 		},
 		{
 			name: "no conflict with other pers, and Selector, other namespace",
-			per: func() *appsv1alpha1.PersistentPodState {
+			per: func() *appsv1beta1.PersistentPodState {
 				pps := ppsDemo.DeepCopy()
 				return pps
 			},
-			otherPers: func() []*appsv1alpha1.PersistentPodState {
+			otherPers: func() []*appsv1beta1.PersistentPodState {
 				pps1 := ppsDemo.DeepCopy()
 				pps1.Name = "pps1"
 				pps1.Namespace = "pps1"
-				return []*appsv1alpha1.PersistentPodState{pps1}
+				return []*appsv1beta1.PersistentPodState{pps1}
 			},
 			expectErrList: 0,
 		},
@@ -231,17 +233,17 @@ func TestPerConflictWithOthers(t *testing.T) {
 func TestValidatingUpdatePer(t *testing.T) {
 	cases := []struct {
 		name          string
-		old           func() *appsv1alpha1.PersistentPodState
-		obj           func() *appsv1alpha1.PersistentPodState
+		old           func() *appsv1beta1.PersistentPodState
+		obj           func() *appsv1beta1.PersistentPodState
 		expectErrList int
 	}{
 		{
 			name: "valid per, targetRef not changed",
-			old: func() *appsv1alpha1.PersistentPodState {
+			old: func() *appsv1beta1.PersistentPodState {
 				pps := ppsDemo.DeepCopy()
 				return pps
 			},
-			obj: func() *appsv1alpha1.PersistentPodState {
+			obj: func() *appsv1beta1.PersistentPodState {
 				pps := ppsDemo.DeepCopy()
 				return pps
 			},
@@ -249,13 +251,13 @@ func TestValidatingUpdatePer(t *testing.T) {
 		},
 		{
 			name: "invalid per, targetRef changed",
-			old: func() *appsv1alpha1.PersistentPodState {
+			old: func() *appsv1beta1.PersistentPodState {
 				pps := ppsDemo.DeepCopy()
 				return pps
 			},
-			obj: func() *appsv1alpha1.PersistentPodState {
+			obj: func() *appsv1beta1.PersistentPodState {
 				pps := ppsDemo.DeepCopy()
-				pps.Spec.TargetReference = appsv1alpha1.TargetReference{
+				pps.Spec.TargetReference = appsv1beta1.TargetReference{
 					APIVersion: "apps/v1",
 					Kind:       "StatefulSet",
 					Name:       "statefulset-changed",

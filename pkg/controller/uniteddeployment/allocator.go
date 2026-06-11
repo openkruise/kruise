@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 type nameToReplicas struct {
@@ -59,7 +59,7 @@ type ReplicaAllocator interface {
 	Alloc(existingSubsets map[string]*Subset) (map[string]int32, error)
 }
 
-func NewReplicaAllocator(ud *appsv1alpha1.UnitedDeployment) ReplicaAllocator {
+func NewReplicaAllocator(ud *appsv1beta1.UnitedDeployment) ReplicaAllocator {
 	if ud.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
 		return &reservationAllocator{ud}
 	}
@@ -96,7 +96,7 @@ func isSubSetUnschedulable(name string, existingSubsets map[string]*Subset) (uns
 }
 
 type specificAllocator struct {
-	*appsv1alpha1.UnitedDeployment
+	*appsv1beta1.UnitedDeployment
 	subsets *subsetInfos
 }
 
@@ -150,7 +150,7 @@ func (s *specificAllocator) validateReplicas(replicas int32, subsetReplicasLimit
 	return nil
 }
 
-func getSpecifiedSubsetReplicas(replicas int32, ud *appsv1alpha1.UnitedDeployment) map[string]int32 {
+func getSpecifiedSubsetReplicas(replicas int32, ud *appsv1beta1.UnitedDeployment) map[string]int32 {
 	replicaLimits := map[string]int32{}
 	if ud.Spec.Topology.Subsets == nil {
 		return replicaLimits
@@ -172,7 +172,7 @@ func getSpecifiedSubsetReplicas(replicas int32, ud *appsv1alpha1.UnitedDeploymen
 	return replicaLimits
 }
 
-func getSubsetInfos(existingSubsets map[string]*Subset, ud *appsv1alpha1.UnitedDeployment) *subsetInfos {
+func getSubsetInfos(existingSubsets map[string]*Subset, ud *appsv1beta1.UnitedDeployment) *subsetInfos {
 	infos := make(subsetInfos, len(ud.Spec.Topology.Subsets))
 	for idx, subsetDef := range ud.Spec.Topology.Subsets {
 		var replicas int32
@@ -260,7 +260,7 @@ func (s *specificAllocator) String() string {
 }
 
 type minMaxAllocator struct {
-	*appsv1alpha1.UnitedDeployment
+	*appsv1beta1.UnitedDeployment
 }
 
 // Alloc returns a mapping from subset to next replicas.
@@ -316,7 +316,7 @@ func (ac *minMaxAllocator) validateAndCalculateMinMaxMap(replicas int32) (map[st
 
 // adaptiveAllocator is the allocator for default adaptive strategy
 type adaptiveAllocator struct {
-	*appsv1alpha1.UnitedDeployment
+	*appsv1beta1.UnitedDeployment
 }
 
 func (ac *adaptiveAllocator) Alloc(existingSubsets map[string]*Subset) (map[string]int32, error) {
@@ -355,7 +355,7 @@ func (ac *adaptiveAllocator) Alloc(existingSubsets map[string]*Subset) (map[stri
 	return nextReplicas, nil
 }
 
-func allocateByMinMaxMap(replicas int32, minReplicasMap, maxReplicasMap map[string]int32, subsets []appsv1alpha1.Subset) map[string]int32 {
+func allocateByMinMaxMap(replicas int32, minReplicasMap, maxReplicasMap map[string]int32, subsets []appsv1beta1.Subset) map[string]int32 {
 	allocated := int32(0)
 	// Step 1: satisfy the minimum replicas of each subset firstly.
 	subsetReplicas := make(map[string]int32, len(subsets))
@@ -385,7 +385,7 @@ func allocateByMinMaxMap(replicas int32, minReplicasMap, maxReplicasMap map[stri
 
 // reservationAllocator is an allocator for reservation adaptive strategy
 type reservationAllocator struct {
-	*appsv1alpha1.UnitedDeployment
+	*appsv1beta1.UnitedDeployment
 }
 
 func (ac *reservationAllocator) Alloc(existingSubsets map[string]*Subset) (map[string]int32, error) {
@@ -514,7 +514,7 @@ func allocateByMinMaxMapAndReservation(replicas int32, minReplicasMap, maxReplic
 	return exportReservationRecords(records)
 }
 
-func calculateRawMinMaxMap(replicas int32, subsets []appsv1alpha1.Subset) (map[string]int32, map[string]int32, error) {
+func calculateRawMinMaxMap(replicas int32, subsets []appsv1beta1.Subset) (map[string]int32, map[string]int32, error) {
 	numSubset := len(subsets)
 	minReplicasMap := make(map[string]int32, numSubset)
 	maxReplicasMap := make(map[string]int32, numSubset)
@@ -529,7 +529,7 @@ func calculateRawMinMaxMap(replicas int32, subsets []appsv1alpha1.Subset) (map[s
 	return minReplicasMap, maxReplicasMap, nil
 }
 
-func parseMinMaxReplicas(replicas int32, subset appsv1alpha1.Subset) (int32, int32) {
+func parseMinMaxReplicas(replicas int32, subset appsv1beta1.Subset) (int32, int32) {
 	minReplicas := int32(0)
 	maxReplicas := int32(math.MaxInt32)
 	if subset.MinReplicas != nil {

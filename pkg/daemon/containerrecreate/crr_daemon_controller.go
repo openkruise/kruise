@@ -35,15 +35,16 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/client"
 	kruiseclient "github.com/openkruise/kruise/pkg/client/clientset/versioned"
-	listersalpha1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1alpha1"
+	listersv1beta1 "github.com/openkruise/kruise/pkg/client/listers/apps/v1beta1"
 	daemonruntime "github.com/openkruise/kruise/pkg/daemon/criruntime"
 	"github.com/openkruise/kruise/pkg/daemon/kuberuntime"
 	daemonoptions "github.com/openkruise/kruise/pkg/daemon/options"
@@ -66,7 +67,7 @@ type Controller struct {
 	queue          workqueue.RateLimitingInterface
 	runtimeClient  runtimeclient.Client
 	crrInformer    cache.SharedIndexInformer
-	crrLister      listersalpha1.ContainerRecreateRequestLister
+	crrLister      listersv1beta1.ContainerRecreateRequestLister
 	eventRecorder  record.EventRecorder
 	runtimeFactory daemonruntime.Factory
 }
@@ -88,19 +89,19 @@ func NewController(opts daemonoptions.Options) (*Controller, error) {
 
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			crr, ok := obj.(*appsv1alpha1.ContainerRecreateRequest)
+			crr, ok := obj.(*appsv1beta1.ContainerRecreateRequest)
 			if ok {
 				enqueue(queue, crr)
 			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			crr, ok := newObj.(*appsv1alpha1.ContainerRecreateRequest)
+			crr, ok := newObj.(*appsv1beta1.ContainerRecreateRequest)
 			if ok {
 				enqueue(queue, crr)
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			crr, ok := obj.(*appsv1alpha1.ContainerRecreateRequest)
+			crr, ok := obj.(*appsv1beta1.ContainerRecreateRequest)
 			if ok {
 				resourceVersionExpectation.Delete(crr)
 			}
@@ -118,17 +119,17 @@ func NewController(opts daemonoptions.Options) (*Controller, error) {
 		queue:          queue,
 		runtimeClient:  opts.RuntimeClient,
 		crrInformer:    informer,
-		crrLister:      listersalpha1.NewContainerRecreateRequestLister(informer.GetIndexer()),
+		crrLister:      listersv1beta1.NewContainerRecreateRequestLister(informer.GetIndexer()),
 		eventRecorder:  recorder,
 		runtimeFactory: opts.RuntimeFactory,
 	}, nil
 }
 
-func newCRRInformer(client kruiseclient.Interface, nodeName string) cache.SharedIndexInformer {
+func newCRRInformer(kruiseClient kruiseclient.Interface, nodeName string) cache.SharedIndexInformer {
 	tweakListOptionsFunc := func(opt *metav1.ListOptions) {
 		opt.LabelSelector = fmt.Sprintf("%s=%s,%s=%s",
-			appsv1alpha1.ContainerRecreateRequestNodeNameKey, nodeName,
-			appsv1alpha1.ContainerRecreateRequestActiveKey, "true",
+			appsv1beta1.ContainerRecreateRequestNodeNameKey, nodeName,
+			appsv1beta1.ContainerRecreateRequestActiveKey, "true",
 		)
 	}
 
@@ -136,28 +137,28 @@ func newCRRInformer(client kruiseclient.Interface, nodeName string) cache.Shared
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				tweakListOptionsFunc(&options)
-				return client.AppsV1alpha1().ContainerRecreateRequests(v1.NamespaceAll).List(context.TODO(), options)
+				return kruiseClient.AppsV1beta1().ContainerRecreateRequests(v1.NamespaceAll).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				tweakListOptionsFunc(&options)
-				return client.AppsV1alpha1().ContainerRecreateRequests(v1.NamespaceAll).Watch(context.TODO(), options)
+				return kruiseClient.AppsV1beta1().ContainerRecreateRequests(v1.NamespaceAll).Watch(context.TODO(), options)
 			},
 		},
-		&appsv1alpha1.ContainerRecreateRequest{},
+		&appsv1beta1.ContainerRecreateRequest{},
 		0, // do not resync
 		cache.Indexers{CRRPodNameIndex: SpecPodNameIndexFunc, cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 	return im
 }
 
-func enqueue(queue workqueue.Interface, obj *appsv1alpha1.ContainerRecreateRequest) {
+func enqueue(queue workqueue.Interface, obj *appsv1beta1.ContainerRecreateRequest) {
 	if obj.DeletionTimestamp != nil || obj.Status.CompletionTime != nil {
 		return
 	}
 	queue.Add(objectKey(obj))
 }
 
-func objectKey(obj *appsv1alpha1.ContainerRecreateRequest) string {
+func objectKey(obj *appsv1beta1.ContainerRecreateRequest) string {
 	return obj.Namespace + "/" + obj.Spec.PodName
 }
 
@@ -186,8 +187,6 @@ func (c *Controller) Run(stop <-chan struct{}) {
 // processNextWorkItem will read a single work item off the workqueue and
 // attempt to process it, by calling the syncHandler.
 func (c *Controller) processNextWorkItem() bool {
-	// pull the next work item from queue.  It should be a key we use to lookup
-	// something in a cache
 	key, quit := c.queue.Get()
 	if quit {
 		return false
@@ -197,10 +196,8 @@ func (c *Controller) processNextWorkItem() bool {
 	err := c.sync(key.(string))
 
 	if err == nil {
-		// No error, tell the queue to stop tracking history
 		c.queue.Forget(key)
 	} else {
-		// requeue the item to work on later
 		c.queue.AddRateLimited(key)
 	}
 
@@ -219,9 +216,9 @@ func (c *Controller) sync(key string) (retErr error) {
 		return err
 	}
 
-	crrList := make([]*appsv1alpha1.ContainerRecreateRequest, 0, len(objectList))
+	crrList := make([]*appsv1beta1.ContainerRecreateRequest, 0, len(objectList))
 	for _, obj := range objectList {
-		crr, ok := obj.(*appsv1alpha1.ContainerRecreateRequest)
+		crr, ok := obj.(*appsv1beta1.ContainerRecreateRequest)
 		if ok && crr != nil && crr.Namespace == namespace {
 			crrList = append(crrList, crr)
 		}
@@ -244,22 +241,15 @@ func (c *Controller) sync(key string) (retErr error) {
 		}
 	}()
 
-	// once first update its phase to recreating
-	if crr.Status.Phase != appsv1alpha1.ContainerRecreateRequestRecreating {
-		return c.updateCRRPhase(crr, appsv1alpha1.ContainerRecreateRequestRecreating)
+	if crr.Status.Phase != appsv1beta1.ContainerRecreateRequestRecreating {
+		return c.updateCRRPhase(crr, appsv1beta1.ContainerRecreateRequestRecreating)
 	}
 
-	if crr.Spec.Strategy.UnreadyGracePeriodSeconds != nil {
-		unreadyTimeStr := crr.Annotations[appsv1alpha1.ContainerRecreateRequestUnreadyAcquiredKey]
-		if unreadyTimeStr == "" {
+	if crr.Spec.Strategy != nil && crr.Spec.Strategy.UnreadyGracePeriodSeconds != nil {
+		unreadyTime, found := getPreRecreateGraceTime(crr)
+		if !found {
 			klog.InfoS("CRR is waiting for unready acquirement", "namespace", crr.Namespace, "name", crr.Name)
 			return nil
-		}
-
-		unreadyTime, err := time.Parse(time.RFC3339, unreadyTimeStr)
-		if err != nil {
-			klog.ErrorS(err, "CRR failed to parse unready time", "namespace", crr.Namespace, "name", crr.Name, "unreadyTimeStr", unreadyTimeStr)
-			return c.completeCRRStatus(crr, fmt.Sprintf("failed to parse unready time %s: %v", unreadyTimeStr, err))
 		}
 
 		leftTime := time.Duration(*crr.Spec.Strategy.UnreadyGracePeriodSeconds)*time.Second - time.Since(unreadyTime)
@@ -273,9 +263,19 @@ func (c *Controller) sync(key string) (retErr error) {
 	return c.manage(crr)
 }
 
-func (c *Controller) pickRecreateRequest(crrList []*appsv1alpha1.ContainerRecreateRequest) (*appsv1alpha1.ContainerRecreateRequest, error) {
+// getPreRecreateGraceTime returns the LastTransitionTime of the PreRecreateGrace condition.
+func getPreRecreateGraceTime(crr *appsv1beta1.ContainerRecreateRequest) (time.Time, bool) {
+	for _, c := range crr.Status.Conditions {
+		if c.Type == appsv1beta1.ContainerRecreateRequestPreRecreateGraceType && c.Status == metav1.ConditionTrue {
+			return c.LastTransitionTime.Time, true
+		}
+	}
+	return time.Time{}, false
+}
+
+func (c *Controller) pickRecreateRequest(crrList []*appsv1beta1.ContainerRecreateRequest) (*appsv1beta1.ContainerRecreateRequest, error) {
 	sort.Sort(crrListByPhaseAndCreated(crrList))
-	var picked *appsv1alpha1.ContainerRecreateRequest
+	var picked *appsv1beta1.ContainerRecreateRequest
 	for _, crr := range crrList {
 		if crr.DeletionTimestamp != nil || crr.Status.CompletionTime != nil {
 			resourceVersionExpectation.Delete(crr)
@@ -295,7 +295,7 @@ func (c *Controller) pickRecreateRequest(crrList []*appsv1alpha1.ContainerRecrea
 		if picked == nil {
 			picked = crr
 		} else if crr.Status.Phase == "" {
-			if err := c.updateCRRPhase(crr, appsv1alpha1.ContainerRecreateRequestPending); err != nil {
+			if err := c.updateCRRPhase(crr, appsv1beta1.ContainerRecreateRequestPending); err != nil {
 				klog.ErrorS(err, "Failed to update CRR status to Pending", "namespace", crr.Namespace, "name", crr.Name)
 				return nil, err
 			}
@@ -304,7 +304,7 @@ func (c *Controller) pickRecreateRequest(crrList []*appsv1alpha1.ContainerRecrea
 	return picked, nil
 }
 
-func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
+func (c *Controller) manage(crr *appsv1beta1.ContainerRecreateRequest) error {
 	runtimeManager, err := c.newRuntimeManager(c.runtimeFactory, crr)
 	if err != nil {
 		klog.ErrorS(err, "Failed to find runtime service", "namespace", crr.Namespace, "name", crr.Name)
@@ -328,21 +328,21 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 	for i := range newCRRContainerRecreateStates {
 		state := &newCRRContainerRecreateStates[i]
 		switch state.Phase {
-		case appsv1alpha1.ContainerRecreateRequestSucceeded:
+		case appsv1beta1.ContainerRecreateRequestSucceeded:
 			completedCount++
 			continue
-		case appsv1alpha1.ContainerRecreateRequestFailed:
+		case appsv1beta1.ContainerRecreateRequestFailed:
 			completedCount++
-			if crr.Spec.Strategy.FailurePolicy == appsv1alpha1.ContainerRecreateRequestFailurePolicyIgnore {
+			if crr.Spec.Strategy != nil && crr.Spec.Strategy.FailurePolicy == appsv1beta1.ContainerRecreateRequestFailurePolicyIgnore {
 				continue
 			}
 			return c.completeCRRStatus(crr, "")
-		case appsv1alpha1.ContainerRecreateRequestPending, appsv1alpha1.ContainerRecreateRequestRecreating:
+		case appsv1beta1.ContainerRecreateRequestPending, appsv1beta1.ContainerRecreateRequestRecreating:
 		}
 
-		if state.Phase == appsv1alpha1.ContainerRecreateRequestRecreating {
+		if state.Phase == appsv1beta1.ContainerRecreateRequestRecreating {
 			state.IsKilled = true
-			if crr.Spec.Strategy.OrderedRecreate {
+			if crr.Spec.Strategy != nil && crr.Spec.Strategy.OrderedRecreate {
 				break
 			}
 			continue
@@ -357,15 +357,15 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 		err := runtimeManager.KillContainer(pod, kubeContainerStatus.ID, state.Name, msg, nil)
 		if err != nil {
 			klog.ErrorS(err, "Failed to kill container in Pod for CRR", "containerName", state.Name, "podNamespace", pod.Namespace, "podName", pod.Name, "crrNamespace", crr.Namespace, "crrName", crr.Name)
-			state.Phase = appsv1alpha1.ContainerRecreateRequestFailed
+			state.Phase = appsv1beta1.ContainerRecreateRequestFailed
 			state.Message = fmt.Sprintf("kill container error: %v", err)
-			if crr.Spec.Strategy.FailurePolicy == appsv1alpha1.ContainerRecreateRequestFailurePolicyIgnore {
+			if crr.Spec.Strategy != nil && crr.Spec.Strategy.FailurePolicy == appsv1beta1.ContainerRecreateRequestFailurePolicyIgnore {
 				continue
 			}
 			return c.patchCRRContainerRecreateStates(crr, newCRRContainerRecreateStates)
 		}
 		state.IsKilled = true
-		state.Phase = appsv1alpha1.ContainerRecreateRequestRecreating
+		state.Phase = appsv1beta1.ContainerRecreateRequestRecreating
 		break
 	}
 
@@ -373,7 +373,6 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 		return c.patchCRRContainerRecreateStates(crr, newCRRContainerRecreateStates)
 	}
 
-	// check if all containers have completed
 	if completedCount == len(newCRRContainerRecreateStates) {
 		return c.completeCRRStatus(crr, "")
 	}
@@ -384,7 +383,7 @@ func (c *Controller) manage(crr *appsv1alpha1.ContainerRecreateRequest) error {
 	return nil
 }
 
-func (c *Controller) patchCRRContainerRecreateStates(crr *appsv1alpha1.ContainerRecreateRequest, newCRRContainerRecreateStates []appsv1alpha1.ContainerRecreateRequestContainerRecreateState) error {
+func (c *Controller) patchCRRContainerRecreateStates(crr *appsv1beta1.ContainerRecreateRequest, newCRRContainerRecreateStates []appsv1beta1.ContainerRecreateRequestContainerRecreateState) error {
 	klog.V(3).InfoS("CRR patch containerRecreateStates", "namespace", crr.Namespace, "name", crr.Name, "states", util.DumpJSON(newCRRContainerRecreateStates))
 	crr = crr.DeepCopy()
 	body := fmt.Sprintf(`{"status":{"containerRecreateStates":%s}}`, util.DumpJSON(newCRRContainerRecreateStates))
@@ -397,44 +396,50 @@ func (c *Controller) patchCRRContainerRecreateStates(crr *appsv1alpha1.Container
 	return c.runtimeClient.Status().Patch(context.TODO(), crr, runtimeclient.RawPatch(types.MergePatchType, []byte(body)))
 }
 
-func (c *Controller) updateCRRPhase(crr *appsv1alpha1.ContainerRecreateRequest, phase appsv1alpha1.ContainerRecreateRequestPhase) error {
-	crr = crr.DeepCopy()
-	crr.Status.Phase = phase
-	oldRev := crr.ResourceVersion
-	defer func() {
-		if crr.ResourceVersion != oldRev {
-			resourceVersionExpectation.Expect(crr)
+func (c *Controller) updateCRRPhase(crr *appsv1beta1.ContainerRecreateRequest, phase appsv1beta1.ContainerRecreateRequestPhase) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		fresh := &appsv1beta1.ContainerRecreateRequest{}
+		if err := c.runtimeClient.Get(context.TODO(), types.NamespacedName{Namespace: crr.Namespace, Name: crr.Name}, fresh); err != nil {
+			return err
 		}
-	}()
-	return c.runtimeClient.Status().Update(context.TODO(), crr)
+		fresh.Status.Phase = phase
+		if err := c.runtimeClient.Status().Update(context.TODO(), fresh); err != nil {
+			return err
+		}
+		resourceVersionExpectation.Expect(fresh)
+		return nil
+	})
 }
 
-func (c *Controller) completeCRRStatus(crr *appsv1alpha1.ContainerRecreateRequest, msg string) error {
-	crr = crr.DeepCopy()
+func (c *Controller) completeCRRStatus(crr *appsv1beta1.ContainerRecreateRequest, msg string) error {
 	now := metav1.Now()
-	crr.Status.Phase = appsv1alpha1.ContainerRecreateRequestCompleted
-	crr.Status.CompletionTime = &now
-	crr.Status.Message = msg
-	oldRev := crr.ResourceVersion
-	defer func() {
-		if crr.ResourceVersion != oldRev {
-			resourceVersionExpectation.Expect(crr)
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		fresh := &appsv1beta1.ContainerRecreateRequest{}
+		if err := c.runtimeClient.Get(context.TODO(), types.NamespacedName{Namespace: crr.Namespace, Name: crr.Name}, fresh); err != nil {
+			return err
 		}
-	}()
-	return c.runtimeClient.Status().Update(context.TODO(), crr)
+		fresh.Status.Phase = appsv1beta1.ContainerRecreateRequestCompleted
+		fresh.Status.CompletionTime = &now
+		fresh.Status.Message = msg
+		if err := c.runtimeClient.Status().Update(context.TODO(), fresh); err != nil {
+			return err
+		}
+		resourceVersionExpectation.Expect(fresh)
+		return nil
+	})
 }
 
-func (c *Controller) newRuntimeManager(runtimeFactory daemonruntime.Factory, crr *appsv1alpha1.ContainerRecreateRequest) (kuberuntime.Runtime, error) {
+func (c *Controller) newRuntimeManager(runtimeFactory daemonruntime.Factory, crr *appsv1beta1.ContainerRecreateRequest) (kuberuntime.Runtime, error) {
 	var runtimeName string
 	for i := range crr.Spec.Containers {
-		c := &crr.Spec.Containers[i]
-		if c.StatusContext == nil || c.StatusContext.ContainerID == "" {
-			return nil, fmt.Errorf("no statusContext or empty containerID in %s container", c.Name)
+		ctr := &crr.Spec.Containers[i]
+		if ctr.StatusContext == nil || ctr.StatusContext.ContainerID == "" {
+			return nil, fmt.Errorf("no statusContext or empty containerID in %s container", ctr.Name)
 		}
 
 		containerID := kubeletcontainer.ContainerID{}
-		if err := containerID.ParseString(c.StatusContext.ContainerID); err != nil {
-			return nil, fmt.Errorf("failed to parse containerID %s in %s container: %v", c.StatusContext.ContainerID, c.Name, err)
+		if err := containerID.ParseString(ctr.StatusContext.ContainerID); err != nil {
+			return nil, fmt.Errorf("failed to parse containerID %s in %s container: %v", ctr.StatusContext.ContainerID, ctr.Name, err)
 		}
 		if runtimeName == "" {
 			runtimeName = containerID.Type

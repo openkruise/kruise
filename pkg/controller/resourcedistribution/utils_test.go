@@ -20,6 +20,11 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func TestMatchFunctions(t *testing.T) {
@@ -71,4 +76,57 @@ func TestGetNamespaceForDistributor(t *testing.T) {
 	if len(unmatched) != 1 {
 		t.Fatalf("the number of expected unmatched namespace is %d, but got %d", 1, len(unmatched))
 	}
+}
+
+func TestIsControlledByDistributorAcceptsAlphaOwnerRef(t *testing.T) {
+	distributor := buildResourceDistributionWithSecret()
+	distributor.SetUID("rd-uid")
+
+	resource := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-secret-1",
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: appsv1alpha1.GroupVersion.String(),
+				Kind:       "ResourceDistribution",
+				Name:       distributor.Name,
+				UID:        distributor.UID,
+				Controller: ptrTo(true),
+			}},
+		},
+	}
+
+	if !isControlledByDistributor(resource, distributor) {
+		t.Fatalf("expected beta distributor to recognize alpha owner reference")
+	}
+}
+
+func TestMakeResourceObjectRewritesOwnerRefToBeta(t *testing.T) {
+	distributor := buildResourceDistributionWithSecret()
+	distributor.SetUID("rd-uid")
+	resource := &unstructured.Unstructured{}
+	resource.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+	resource.SetName("test-secret-1")
+
+	oldResource := &unstructured.Unstructured{}
+	oldResource.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+	oldResource.SetOwnerReferences([]metav1.OwnerReference{{
+		APIVersion: appsv1alpha1.GroupVersion.String(),
+		Kind:       "ResourceDistribution",
+		Name:       distributor.Name,
+		UID:        distributor.UID,
+		Controller: ptrTo(true),
+	}})
+
+	newResource := makeResourceObject(distributor, "ns-1", resource, "hash", oldResource).(*unstructured.Unstructured)
+	controllerRef := metav1.GetControllerOf(newResource)
+	if controllerRef == nil {
+		t.Fatalf("expected controller ref to be set")
+	}
+	if controllerRef.APIVersion != appsv1beta1.GroupVersion.String() {
+		t.Fatalf("expected beta ownerRef apiVersion, got %s", controllerRef.APIVersion)
+	}
+}
+
+func ptrTo[T any](value T) *T {
+	return &value
 }

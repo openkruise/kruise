@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/configuration"
 	fuzzutils "github.com/openkruise/kruise/test/fuzz"
@@ -49,7 +50,7 @@ func FuzzValidateWorkloadSpreadSpec(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cf := fuzz.NewConsumer(data)
 
-		ws := &appsv1alpha1.WorkloadSpread{}
+		ws := &appsv1beta1.WorkloadSpread{}
 		if err := cf.GenerateStruct(ws); err != nil {
 			return
 		}
@@ -96,15 +97,15 @@ func FuzzValidateWorkloadSpreadConflict(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cf := fuzz.NewConsumer(data)
 
-		ws := &appsv1alpha1.WorkloadSpread{}
+		ws := &appsv1beta1.WorkloadSpread{}
 		if err := cf.GenerateStruct(ws); err != nil {
 			return
 		}
 
-		others := make([]appsv1alpha1.WorkloadSpread, 0)
+		others := make([]appsv1beta1.WorkloadSpread, 0)
 		if numOthers, err := cf.GetInt(); err == nil {
 			for i := 0; i < numOthers%5; i++ {
-				other := appsv1alpha1.WorkloadSpread{}
+				other := appsv1beta1.WorkloadSpread{}
 				if err := cf.GenerateStruct(&other); err != nil {
 					continue
 				}
@@ -115,7 +116,7 @@ func FuzzValidateWorkloadSpreadConflict(f *testing.F) {
 
 				if ws.Spec.TargetReference != nil {
 					if conflict, err := cf.GetBool(); conflict && err == nil {
-						other.Spec.TargetReference = &appsv1alpha1.TargetReference{
+						other.Spec.TargetReference = &appsv1beta1.TargetReference{
 							APIVersion: ws.Spec.TargetReference.APIVersion,
 							Kind:       ws.Spec.TargetReference.Kind,
 							Name:       ws.Spec.TargetReference.Name,
@@ -134,12 +135,12 @@ func FuzzValidateWorkloadSpreadTargetRefUpdate(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		cf := fuzz.NewConsumer(data)
 
-		targetRef := &appsv1alpha1.TargetReference{}
+		targetRef := &appsv1beta1.TargetReference{}
 		if err := cf.GenerateStruct(targetRef); err != nil {
 			return
 		}
 
-		oldTargetRef := &appsv1alpha1.TargetReference{}
+		oldTargetRef := &appsv1beta1.TargetReference{}
 		if err := cf.GenerateStruct(oldTargetRef); err != nil {
 			return
 		}

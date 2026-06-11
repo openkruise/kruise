@@ -197,6 +197,10 @@ func SetDefaultsConfigMapSet(obj *v1alpha1.ConfigMapSet) {
 
 // SetDefaults_UnitedDeployment set default values for UnitedDeployment.
 func SetDefaultsUnitedDeployment(obj *v1alpha1.UnitedDeployment, injectTemplateDefaults bool) {
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = ptr.To(int32(1))
+	}
+
 	if obj.Spec.RevisionHistoryLimit == nil {
 		obj.Spec.RevisionHistoryLimit = ptr.To(int32(10))
 	}

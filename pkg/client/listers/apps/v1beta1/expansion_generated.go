@@ -41,6 +41,14 @@ type CloneSetListerExpansion interface{}
 // CloneSetNamespaceLister.
 type CloneSetNamespaceListerExpansion interface{}
 
+// ContainerRecreateRequestListerExpansion allows custom methods to be added to
+// ContainerRecreateRequestLister.
+type ContainerRecreateRequestListerExpansion interface{}
+
+// ContainerRecreateRequestNamespaceListerExpansion allows custom methods to be added to
+// ContainerRecreateRequestNamespaceLister.
+type ContainerRecreateRequestNamespaceListerExpansion interface{}
+
 // DaemonSetListerExpansion allows custom methods to be added to
 // DaemonSetLister.
 type DaemonSetListerExpansion interface{}
@@ -69,6 +77,18 @@ type ImagePullJobNamespaceListerExpansion interface{}
 // NodeImageLister.
 type NodeImageListerExpansion interface{}
 
+// PersistentPodStateListerExpansion allows custom methods to be added to
+// PersistentPodStateLister.
+type PersistentPodStateListerExpansion interface{}
+
+// PersistentPodStateNamespaceListerExpansion allows custom methods to be added to
+// PersistentPodStateNamespaceLister.
+type PersistentPodStateNamespaceListerExpansion interface{}
+
+// ResourceDistributionListerExpansion allows custom methods to be added to
+// ResourceDistributionLister.
+type ResourceDistributionListerExpansion interface{}
+
 // SidecarSetListerExpansion allows custom methods to be added to
 // SidecarSetLister.
 type SidecarSetListerExpansion interface{}
@@ -80,3 +100,19 @@ type StatefulSetListerExpansion interface{}
 // StatefulSetNamespaceListerExpansion allows custom methods to be added to
 // StatefulSetNamespaceLister.
 type StatefulSetNamespaceListerExpansion interface{}
+
+// UnitedDeploymentListerExpansion allows custom methods to be added to
+// UnitedDeploymentLister.
+type UnitedDeploymentListerExpansion interface{}
+
+// UnitedDeploymentNamespaceListerExpansion allows custom methods to be added to
+// UnitedDeploymentNamespaceLister.
+type UnitedDeploymentNamespaceListerExpansion interface{}
+
+// WorkloadSpreadListerExpansion allows custom methods to be added to
+// WorkloadSpreadLister.
+type WorkloadSpreadListerExpansion interface{}
+
+// WorkloadSpreadNamespaceListerExpansion allows custom methods to be added to
+// WorkloadSpreadNamespaceLister.
+type WorkloadSpreadNamespaceListerExpansion interface{}

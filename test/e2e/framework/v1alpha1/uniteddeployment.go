@@ -341,12 +341,31 @@ func (m *UnitedDeploymentManager) CheckUnschedulableStatus(expect map[string]boo
 
 func (m *UnitedDeploymentManager) SetNodeLabel(key string, value string) {
 	gomega.Eventually(func(g gomega.Gomega) {
-		node, err := m.c.CoreV1().Nodes().Get(context.TODO(), "ci-testing-worker", metav1.GetOptions{})
+		nodeName, err := m.getWorkerNodeName()
+		g.Expect(err).NotTo(gomega.HaveOccurred())
+		node, err := m.c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 		node.Labels[key] = value
 		_, err = m.c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
 		g.Expect(err).NotTo(gomega.HaveOccurred())
 	}, time.Minute, 5*time.Second).Should(gomega.Succeed())
+}
+
+func (m *UnitedDeploymentManager) getWorkerNodeName() (string, error) {
+	nodes, err := m.c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return "", err
+	}
+	for _, node := range nodes.Items {
+		if _, ok := node.Labels["node-role.kubernetes.io/control-plane"]; ok {
+			continue
+		}
+		if _, ok := node.Labels["node-role.kubernetes.io/master"]; ok {
+			continue
+		}
+		return node.Name, nil
+	}
+	return "", fmt.Errorf("no worker node found")
 }
 
 func (m *UnitedDeploymentManager) SetImage(image string) {

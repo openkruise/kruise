@@ -23,6 +23,8 @@ type BroadcastJobExpansion interface{}
 
 type CloneSetExpansion interface{}
 
+type ContainerRecreateRequestExpansion interface{}
+
 type DaemonSetExpansion interface{}
 
 type ImageListPullJobExpansion interface{}
@@ -31,6 +33,14 @@ type ImagePullJobExpansion interface{}
 
 type NodeImageExpansion interface{}
 
+type PersistentPodStateExpansion interface{}
+
+type ResourceDistributionExpansion interface{}
+
 type SidecarSetExpansion interface{}
 
 type StatefulSetExpansion interface{}
+
+type UnitedDeploymentExpansion interface{}
+
+type WorkloadSpreadExpansion interface{}

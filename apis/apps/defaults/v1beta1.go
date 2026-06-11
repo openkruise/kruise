@@ -97,6 +97,57 @@ func SetDefaultsStatefulSet(obj *v1beta1.StatefulSet, injectTemplateDefaults boo
 	}
 }
 
+// SetDefaultsUnitedDeploymentV1beta1 sets default values for v1beta1 UnitedDeployment.
+func SetDefaultsUnitedDeploymentV1beta1(obj *v1beta1.UnitedDeployment, injectTemplateDefaults bool) {
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = ptr.To(int32(1))
+	}
+
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = ptr.To(int32(10))
+	}
+
+	if len(obj.Spec.UpdateStrategy.Type) == 0 {
+		obj.Spec.UpdateStrategy.Type = v1beta1.ManualUpdateStrategyType
+	}
+
+	if obj.Spec.UpdateStrategy.Type == v1beta1.ManualUpdateStrategyType && obj.Spec.UpdateStrategy.ManualUpdate == nil {
+		obj.Spec.UpdateStrategy.ManualUpdate = &v1beta1.ManualUpdate{}
+	}
+
+	if obj.Spec.Template.StatefulSetTemplate != nil {
+		if injectTemplateDefaults {
+			SetDefaultPodSpec(&obj.Spec.Template.StatefulSetTemplate.Spec.Template.Spec)
+			for i := range obj.Spec.Template.StatefulSetTemplate.Spec.VolumeClaimTemplates {
+				a := &obj.Spec.Template.StatefulSetTemplate.Spec.VolumeClaimTemplates[i]
+				v1.SetDefaults_PersistentVolumeClaim(a)
+				v1.SetDefaults_ResourceList(&a.Spec.Resources.Limits)
+				v1.SetDefaults_ResourceList(&a.Spec.Resources.Requests)
+				v1.SetDefaults_ResourceList(&a.Status.Capacity)
+			}
+		}
+	}
+
+	hasReplicasSettings := false
+	hasCapacitySettings := false
+	for _, subset := range obj.Spec.Topology.Subsets {
+		if subset.Replicas != nil {
+			hasReplicasSettings = true
+		}
+		if subset.MinReplicas != nil || subset.MaxReplicas != nil {
+			hasCapacitySettings = true
+		}
+	}
+	if hasCapacitySettings && !hasReplicasSettings {
+		for i := range obj.Spec.Topology.Subsets {
+			subset := &obj.Spec.Topology.Subsets[i]
+			if subset.MinReplicas == nil {
+				subset.MinReplicas = &intstr.IntOrString{Type: intstr.Int, IntVal: 0}
+			}
+		}
+	}
+}
+
 // SetDefaultsBroadcastJob set default values for BroadcastJob.
 func SetDefaultsBroadcastJob(obj *v1beta1.BroadcastJob, injectTemplateDefaults bool) {
 	if injectTemplateDefaults {

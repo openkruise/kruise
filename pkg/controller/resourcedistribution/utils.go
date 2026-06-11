@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	utils "github.com/openkruise/kruise/pkg/webhook/resourcedistribution/validating"
 )
@@ -52,6 +52,12 @@ const (
 	OperationSucceeded     = "Succeeded"
 )
 
+// defaultSystemNamespaces returns system namespaces that are always excluded
+// from distribution, regardless of AllNamespaces, IncludedNamespaces, or NamespaceSelector.
+func defaultSystemNamespaces() sets.String {
+	return sets.NewString("kube-system", "kube-public")
+}
+
 // UnexpectedError is designed to store the information about .status.conditions when error occurs
 type UnexpectedError struct {
 	err         error
@@ -60,7 +66,7 @@ type UnexpectedError struct {
 }
 
 // isInList return true if namespaceName is in namespaceList, else return false
-func isInList(namespaceName string, namespaceList []appsv1alpha1.ResourceDistributionNamespace) bool {
+func isInList(namespaceName string, namespaceList []appsv1beta1.ResourceDistributionNamespace) bool {
 	for _, namespace := range namespaceList {
 		if namespaceName == namespace.Name {
 			return true
@@ -70,16 +76,16 @@ func isInList(namespaceName string, namespaceList []appsv1alpha1.ResourceDistrib
 }
 
 // matchViaIncludedNamespaces return true if namespace is in targets.IncludedNamespaces
-func matchViaIncludedNamespaces(namespace *corev1.Namespace, distributor *appsv1alpha1.ResourceDistribution) (bool, error) {
+func matchViaIncludedNamespaces(namespace *corev1.Namespace, distributor *appsv1beta1.ResourceDistribution) (bool, error) {
 	if isInList(namespace.Name, distributor.Spec.Targets.IncludedNamespaces.List) {
 		return true, nil
 	}
 	return false, nil
 }
 
-// matchViaLabelSelector return true if namespace matches with target.NamespacesLabelSelectors
-func matchViaLabelSelector(namespace *corev1.Namespace, distributor *appsv1alpha1.ResourceDistribution) (bool, error) {
-	selector, err := util.ValidatedLabelSelectorAsSelector(&distributor.Spec.Targets.NamespaceLabelSelector)
+// matchViaLabelSelector return true if namespace matches with target.NamespaceSelector
+func matchViaLabelSelector(namespace *corev1.Namespace, distributor *appsv1beta1.ResourceDistribution) (bool, error) {
+	selector, err := util.ValidatedLabelSelectorAsSelector(&distributor.Spec.Targets.NamespaceSelector)
 	if err != nil {
 		return false, err
 	}
@@ -90,8 +96,12 @@ func matchViaLabelSelector(namespace *corev1.Namespace, distributor *appsv1alpha
 }
 
 // matchViaTargets check whether Namespace matches ResourceDistribution via spec.targets
-func matchViaTargets(namespace *corev1.Namespace, distributor *appsv1alpha1.ResourceDistribution) (bool, error) {
+func matchViaTargets(namespace *corev1.Namespace, distributor *appsv1beta1.ResourceDistribution) (bool, error) {
 	targets := &distributor.Spec.Targets
+	// system namespaces are always excluded, even if listed in IncludedNamespaces
+	if defaultSystemNamespaces().Has(namespace.Name) {
+		return false, nil
+	}
 	if isInList(namespace.Name, targets.ExcludedNamespaces.List) {
 		return false, nil
 	}
@@ -105,7 +115,7 @@ func matchViaTargets(namespace *corev1.Namespace, distributor *appsv1alpha1.Reso
 }
 
 // addMatchedResourceDistributionToWorkQueue adds rds into q
-func addMatchedResourceDistributionToWorkQueue(q workqueue.TypedRateLimitingInterface[reconcile.Request], rds []*appsv1alpha1.ResourceDistribution) {
+func addMatchedResourceDistributionToWorkQueue(q workqueue.TypedRateLimitingInterface[reconcile.Request], rds []*appsv1beta1.ResourceDistribution) {
 	for _, rd := range rds {
 		q.Add(reconcile.Request{
 			NamespacedName: types.NamespacedName{
@@ -122,7 +132,7 @@ func hashResource(resourceYaml runtime.RawExtension) string {
 }
 
 // setCondition set condition[].Type, .Reason, and .FailedNamespaces
-func setCondition(condition *appsv1alpha1.ResourceDistributionCondition, err error, namespaces ...string) {
+func setCondition(condition *appsv1beta1.ResourceDistributionCondition, err error, namespaces ...string) {
 	if condition == nil || err == nil {
 		return
 	}
@@ -131,21 +141,21 @@ func setCondition(condition *appsv1alpha1.ResourceDistributionCondition, err err
 }
 
 // initConditionType set conditionTypes for .status.conditions
-func initConditionType(conditions []appsv1alpha1.ResourceDistributionCondition) {
+func initConditionType(conditions []appsv1beta1.ResourceDistributionCondition) {
 	if len(conditions) < NumberOfConditionTypes {
 		return
 	}
-	conditions[GetConditionID].Type = appsv1alpha1.ResourceDistributionGetResourceFailed
-	conditions[CreateConditionID].Type = appsv1alpha1.ResourceDistributionCreateResourceFailed
-	conditions[UpdateConditionID].Type = appsv1alpha1.ResourceDistributionUpdateResourceFailed
-	conditions[DeleteConditionID].Type = appsv1alpha1.ResourceDistributionDeleteResourceFailed
-	conditions[ConflictConditionID].Type = appsv1alpha1.ResourceDistributionConflictOccurred
-	conditions[NotExistConditionID].Type = appsv1alpha1.ResourceDistributionNamespaceNotExists
+	conditions[GetConditionID].Type = appsv1beta1.ResourceDistributionGetResourceFailed
+	conditions[CreateConditionID].Type = appsv1beta1.ResourceDistributionCreateResourceFailed
+	conditions[UpdateConditionID].Type = appsv1beta1.ResourceDistributionUpdateResourceFailed
+	conditions[DeleteConditionID].Type = appsv1beta1.ResourceDistributionDeleteResourceFailed
+	conditions[ConflictConditionID].Type = appsv1beta1.ResourceDistributionConflictOccurred
+	conditions[NotExistConditionID].Type = appsv1beta1.ResourceDistributionNamespaceNotExists
 }
 
 // calculateNewStatus returns a complete new status to update distributor.status
-func calculateNewStatus(distributor *appsv1alpha1.ResourceDistribution, newConditions []appsv1alpha1.ResourceDistributionCondition, desired, succeeded int32) *appsv1alpha1.ResourceDistributionStatus {
-	status := &appsv1alpha1.ResourceDistributionStatus{}
+func calculateNewStatus(distributor *appsv1beta1.ResourceDistribution, newConditions []appsv1beta1.ResourceDistributionCondition, desired, succeeded int32) *appsv1beta1.ResourceDistributionStatus {
+	status := &appsv1beta1.ResourceDistributionStatus{}
 	if distributor == nil || len(newConditions) < NumberOfConditionTypes {
 		return status
 	}
@@ -162,9 +172,9 @@ func calculateNewStatus(distributor *appsv1alpha1.ResourceDistribution, newCondi
 		if len(newConditions[i].FailedNamespaces) == 0 {
 			// if no error occurred
 			newConditions[i].Reason = OperationSucceeded
-			newConditions[i].Status = appsv1alpha1.ResourceDistributionConditionFalse
+			newConditions[i].Status = appsv1beta1.ResourceDistributionConditionFalse
 		} else {
-			newConditions[i].Status = appsv1alpha1.ResourceDistributionConditionTrue
+			newConditions[i].Status = appsv1beta1.ResourceDistributionConditionTrue
 		}
 		if len(oldConditions) == 0 || oldConditions[i].Status != newConditions[i].Status {
 			// if .conditions.status changed
@@ -208,7 +218,7 @@ func mergeMetadata(newResource, oldResource *unstructured.Unstructured) {
 }
 
 // makeResourceObject set some necessary information for resource before updating and creating
-func makeResourceObject(distributor *appsv1alpha1.ResourceDistribution, namespace string, resource runtime.Object, hashCode string, oldResource *unstructured.Unstructured) runtime.Object {
+func makeResourceObject(distributor *appsv1beta1.ResourceDistribution, namespace string, resource runtime.Object, hashCode string, oldResource *unstructured.Unstructured) runtime.Object {
 	// convert to unstructured
 	newResource := utils.ConvertToUnstructured(resource.DeepCopyObject())
 	if oldResource != nil {
@@ -219,17 +229,20 @@ func makeResourceObject(distributor *appsv1alpha1.ResourceDistribution, namespac
 	newResource.SetNamespace(namespace)
 
 	// 2. set ownerReference for cascading deletion
+	controllerRef := *metav1.NewControllerRef(distributor, distributor.GroupVersionKind())
 	found := false
 	owners := newResource.GetOwnerReferences()
 	for i := range owners {
 		if owners[i].UID == distributor.UID {
+			owners[i] = controllerRef
 			found = true
 			break
 		}
 	}
 	if !found {
-		newResource.SetOwnerReferences(append(owners, *metav1.NewControllerRef(distributor, distributor.GroupVersionKind())))
+		owners = append(owners, controllerRef)
 	}
+	newResource.SetOwnerReferences(owners)
 
 	// 3. set resource annotations
 	annotations := newResource.GetAnnotations()
@@ -273,9 +286,10 @@ func syncItSlowly(namespaces []string, initialBatchSize int, fn func(namespace s
 }
 
 // listNamespacesForDistributor returns two slices: one contains all matched namespaces, another contains all unmatched.
-// Firstly, Spec.Targets will parse .AllNamespaces, .IncludedNamespaces, and .NamespaceLabelSelector; Then calculate their
+// Firstly, Spec.Targets will parse .AllNamespaces, .IncludedNamespaces, and .NamespaceSelector; Then calculate their
 // union; At last ExcludedNamespaces will act on the union to remove the designated namespaces from it.
-func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1alpha1.ResourceDistributionTargets) ([]string, []string, error) {
+// Note: kube-system and kube-public are always excluded from the matched set regardless of the above settings.
+func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1beta1.ResourceDistributionTargets) ([]string, []string, error) {
 	matchedSet := sets.NewString()
 	unmatchedSet := sets.NewString()
 
@@ -289,20 +303,23 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1al
 	}
 
 	if targets.AllNamespaces {
-		// 1. select all namespaces via targets.AllNamespace
 		for _, namespace := range namespacesList.Items {
-			matchedSet.Insert(namespace.Name)
+			if !defaultSystemNamespaces().Has(namespace.Name) {
+				matchedSet.Insert(namespace.Name)
+			}
 		}
 	} else {
 		// 2. select the namespaces via targets.IncludedNamespaces
 		for _, namespace := range targets.IncludedNamespaces.List {
-			matchedSet.Insert(namespace.Name)
+			if !defaultSystemNamespaces().Has(namespace.Name) {
+				matchedSet.Insert(namespace.Name)
+			}
 		}
 	}
 
-	if !targets.AllNamespaces && (len(targets.NamespaceLabelSelector.MatchLabels) != 0 || len(targets.NamespaceLabelSelector.MatchExpressions) != 0) {
-		// 3. select the namespaces via targets.NamespaceLabelSelector
-		selectors, err := util.ValidatedLabelSelectorAsSelector(&targets.NamespaceLabelSelector)
+	if !targets.AllNamespaces && (len(targets.NamespaceSelector.MatchLabels) != 0 || len(targets.NamespaceSelector.MatchExpressions) != 0) {
+		// 3. select the namespaces via targets.NamespaceSelector
+		selectors, err := util.ValidatedLabelSelectorAsSelector(&targets.NamespaceSelector)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -311,7 +328,9 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1al
 			return nil, nil, err
 		}
 		for _, namespace := range namespaces.Items {
-			matchedSet.Insert(namespace.Name)
+			if !defaultSystemNamespaces().Has(namespace.Name) {
+				matchedSet.Insert(namespace.Name)
+			}
 		}
 	}
 
@@ -336,13 +355,13 @@ func needToUpdate(old, new *unstructured.Unstructured) bool {
 	return !reflect.DeepEqual(oldObject, newObject)
 }
 
-func isControlledByDistributor(resource metav1.Object, distributor *appsv1alpha1.ResourceDistribution) bool {
+func isControlledByDistributor(resource metav1.Object, distributor *appsv1beta1.ResourceDistribution) bool {
 	controller := metav1.GetControllerOf(resource)
-	if controller != nil && distributor != nil &&
-		distributor.APIVersion == controller.APIVersion &&
-		distributor.Kind == controller.Kind &&
-		distributor.Name == controller.Name {
-		return true
+	if controller == nil || distributor == nil {
+		return false
 	}
-	return false
+	if controller.UID != "" && distributor.UID != "" {
+		return controller.UID == distributor.UID
+	}
+	return distributor.Kind == controller.Kind && distributor.Name == controller.Name
 }

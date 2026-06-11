@@ -10,6 +10,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func TestNestedField(t *testing.T) {
@@ -173,7 +174,7 @@ func TestNestedField(t *testing.T) {
 }
 
 func TestIsPodSelected(t *testing.T) {
-	commonFilter := &appsv1alpha1.TargetFilter{
+	commonFilter := &appsv1beta1.TargetFilter{
 		Selector: &metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				"app": "selected",
@@ -182,7 +183,7 @@ func TestIsPodSelected(t *testing.T) {
 	}
 	cases := []struct {
 		name     string
-		filter   *appsv1alpha1.TargetFilter
+		filter   *appsv1beta1.TargetFilter
 		labels   map[string]string
 		selected bool
 		wantErr  bool
@@ -213,7 +214,7 @@ func TestIsPodSelected(t *testing.T) {
 		},
 		{
 			name: "selector is invalid",
-			filter: &appsv1alpha1.TargetFilter{
+			filter: &appsv1beta1.TargetFilter{
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"app": "selected",

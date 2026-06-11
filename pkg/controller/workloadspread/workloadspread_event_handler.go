@@ -215,8 +215,8 @@ func (w *workloadEventHandler) handleWorkload(q workqueue.TypedRateLimitingInter
 
 func (w *workloadEventHandler) getWorkloadSpreadForWorkload(
 	workloadNamespaceName types.NamespacedName,
-	gvk schema.GroupVersionKind, ownerRef *metav1.OwnerReference) (*appsv1alpha1.WorkloadSpread, error) {
-	wsList := &appsv1alpha1.WorkloadSpreadList{}
+	gvk schema.GroupVersionKind, ownerRef *metav1.OwnerReference) (*appsv1beta1.WorkloadSpread, error) {
+	wsList := &appsv1beta1.WorkloadSpreadList{}
 	listOptions := &client.ListOptions{Namespace: workloadNamespaceName.Namespace}
 	if err := w.List(context.TODO(), wsList, listOptions); err != nil {
 		klog.ErrorS(err, "Failed to list WorkloadSpread", "namespace", workloadNamespaceName.Namespace)

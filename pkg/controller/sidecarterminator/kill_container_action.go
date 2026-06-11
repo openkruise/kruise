@@ -27,7 +27,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 func (r *ReconcileSidecarTerminator) executeKillContainerAction(pod *corev1.Pod, sidecars sets.Set[string]) error {
@@ -37,7 +37,7 @@ func (r *ReconcileSidecarTerminator) executeKillContainerAction(pod *corev1.Pod,
 	}
 
 	// if the CRR has been created, this func will do nothing
-	existingCRR := &appsv1alpha1.ContainerRecreateRequest{}
+	existingCRR := &appsv1beta1.ContainerRecreateRequest{}
 	err := r.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: getCRRName(pod)}, existingCRR)
 	if err == nil {
 		klog.V(3).InfoS("SidecarTerminator -- CRR exists, waiting for this CRR to complete", "containerRecreateRequest", klog.KObj(existingCRR))
@@ -47,14 +47,14 @@ func (r *ReconcileSidecarTerminator) executeKillContainerAction(pod *corev1.Pod,
 		return err
 	}
 
-	var sidecarContainers []appsv1alpha1.ContainerRecreateRequestContainer
+	var sidecarContainers []appsv1beta1.ContainerRecreateRequestContainer
 	for _, name := range uncompletedSidecars.UnsortedList() {
-		sidecarContainers = append(sidecarContainers, appsv1alpha1.ContainerRecreateRequestContainer{
+		sidecarContainers = append(sidecarContainers, appsv1beta1.ContainerRecreateRequestContainer{
 			Name: name,
 		})
 	}
 
-	crr := &appsv1alpha1.ContainerRecreateRequest{
+	crr := &appsv1beta1.ContainerRecreateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: pod.Namespace,
 			Name:      getCRRName(pod),
@@ -62,12 +62,12 @@ func (r *ReconcileSidecarTerminator) executeKillContainerAction(pod *corev1.Pod,
 				*metav1.NewControllerRef(pod, pod.GroupVersionKind()),
 			},
 		},
-		Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+		Spec: appsv1beta1.ContainerRecreateRequestSpec{
 			PodName:    pod.Name,
 			Containers: sidecarContainers,
-			Strategy: &appsv1alpha1.ContainerRecreateRequestStrategy{
+			Strategy: &appsv1beta1.ContainerRecreateRequestStrategy{
 				ForceRecreate: true,
-				FailurePolicy: appsv1alpha1.ContainerRecreateRequestFailurePolicyIgnore,
+				FailurePolicy: appsv1beta1.ContainerRecreateRequestFailurePolicyIgnore,
 			},
 		},
 	}

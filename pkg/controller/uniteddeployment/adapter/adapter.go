@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 type Adapter interface {
@@ -47,7 +47,7 @@ type Adapter interface {
 	// GetSubsetFailure returns failure information of the subset.
 	GetSubsetFailure() *string
 	// ApplySubsetTemplate updates the subset to the latest revision.
-	ApplySubsetTemplate(ud *alpha1.UnitedDeployment, subsetName, revision string, replicas, partition int32, subset runtime.Object) error
+	ApplySubsetTemplate(ud *beta1.UnitedDeployment, subsetName, revision string, replicas, partition int32, subset runtime.Object) error
 	// PostUpdate does some works after subset updated
-	PostUpdate(ud *alpha1.UnitedDeployment, subset runtime.Object, revision string, partition int32) error
+	PostUpdate(ud *beta1.UnitedDeployment, subset runtime.Object, revision string, partition int32) error
 }

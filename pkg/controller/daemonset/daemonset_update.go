@@ -35,7 +35,9 @@ import (
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clonesetutils "github.com/openkruise/kruise/pkg/controller/cloneset/utils"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
 
@@ -47,12 +49,29 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1beta
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
+
+	// Handle pods on nodes that no longer match the DaemonSet's nodeSelector/nodeAffinity/taints.
+	// When the selector is narrowed, some nodes become ineligible and their existing pods should be removed.
+	// - DaemonSetPruneIneligibleNodes enabled: pods on newly-ineligible nodes are deleted immediately during
+	//   the rolling update, keeping nodeToDaemonPods consistent with the current selector.
+	// - DaemonSetPruneIneligibleNodes disabled (default): ineligible nodes are left in nodeToDaemonPods as-is,
+	//   so the rolling update budget still counts their pods. This prevents the update from consuming
+	//   extra unavailability slots just because the selector changed — the manage loop will handle
+	//   deleting those pods separately via its normal reconcile path.
+	//   WARNING: this can block the rollout in two situations:
+	//   1. The number of NotReady pods across all nodes already reaches or exceeds maxUnavailable,
+	//      leaving no budget for the rolling update to proceed.
+	//   2. The selector is narrowed and the excluded pods (which cannot be deleted by the rolling
+	//      update itself) occupy all maxUnavailable slots, so no eligible node can be updated.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DaemonSetPruneIneligibleNodes) {
+		nodeToDaemonPods = dsc.pruneNodesAndOrphanedPods(ds, nodeToDaemonPods, nodeList)
+	}
+
 	maxSurge, maxUnavailable, err := dsc.updatedDesiredNodeCounts(ds, nodeList, nodeToDaemonPods)
 	if err != nil {
 		return fmt.Errorf("couldn't get unavailable numbers: %v", err)
 	}
 
-	// Advanced: filter the pods updated, updating and can update, according to partition and selector
 	nodeToDaemonPods, err = dsc.filterDaemonPodsToUpdate(ds, nodeList, hash, nodeToDaemonPods)
 	if err != nil {
 		return fmt.Errorf("failed to filterDaemonPodsToUpdate: %v", err)

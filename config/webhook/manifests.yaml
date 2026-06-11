@@ -118,7 +118,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-containerrecreaterequest
+      path: /mutate-apps-kruise-io-containerrecreaterequest
   failurePolicy: Fail
   name: mcontainerrecreaterequest.kb.io
   rules:
@@ -126,6 +126,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -271,7 +272,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kruise-io-v1alpha1-uniteddeployment
+      path: /mutate-apps-kruise-io-uniteddeployment
   failurePolicy: Fail
   name: muniteddeployment.kb.io
   rules:
@@ -279,6 +280,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -298,7 +300,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-apps-kruise-io-v1alpha1-resourcedistribution
+      path: /validate-apps-kruise-io-resourcedistribution
   failurePolicy: Fail
   name: vresourcedistribution.kb.io
   rules:
@@ -306,6 +308,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -319,7 +322,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-apps-kruise-io-v1alpha1-workloadspread
+      path: /validate-apps-kruise-io-workloadspread
   failurePolicy: Fail
   name: vworkloadspread.kb.io
   rules:
@@ -327,6 +330,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -667,6 +671,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -750,6 +755,7 @@ webhooks:
     - policy.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE
@@ -828,7 +834,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-apps-kruise-io-v1alpha1-uniteddeployment
+      path: /validate-apps-kruise-io-uniteddeployment
   failurePolicy: Fail
   name: vuniteddeployment.kb.io
   rules:
@@ -836,6 +842,7 @@ webhooks:
     - apps.kruise.io
     apiVersions:
     - v1alpha1
+    - v1beta1
     operations:
     - CREATE
     - UPDATE

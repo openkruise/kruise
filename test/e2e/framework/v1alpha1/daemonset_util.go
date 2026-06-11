@@ -206,6 +206,7 @@ func (t *DaemonSetTester) SetDaemonSetNodeLabels(nodeName string, labels map[str
 		daemonSetLabels, otherLabels := t.SeparateDaemonSetNodeLabels(node.Labels)
 		if reflect.DeepEqual(daemonSetLabels, labels) {
 			newNode = node
+			newLabels = daemonSetLabels
 			return true, nil
 		}
 		node.Labels = otherLabels

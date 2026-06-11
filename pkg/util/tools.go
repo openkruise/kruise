@@ -34,6 +34,7 @@ import (
 	"k8s.io/utils/integer"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 // SlowStartBatch tries to call the provided function a total of 'count' times,
@@ -185,7 +186,20 @@ func CalculatePartitionReplicas(partition *intstrutil.IntOrString, replicasPoint
 	return pValue, nil
 }
 
-// IsReferenceEqual checks APIVersion, Kind, Name
+// IsReferenceEqualV1beta1 checks API group (not full APIVersion), Kind, and Name for v1beta1 TargetReference.
+func IsReferenceEqualV1beta1(ref1, ref2 appsv1beta1.TargetReference) bool {
+	return IsReferenceEqual(appsv1alpha1.TargetReference{
+		APIVersion: ref1.APIVersion,
+		Kind:       ref1.Kind,
+		Name:       ref1.Name,
+	}, appsv1alpha1.TargetReference{
+		APIVersion: ref2.APIVersion,
+		Kind:       ref2.Kind,
+		Name:       ref2.Name,
+	})
+}
+
+// IsReferenceEqual checks API group (not full APIVersion), Kind, and Name.
 func IsReferenceEqual(ref1, ref2 appsv1alpha1.TargetReference) bool {
 	gv1, err := schema.ParseGroupVersion(ref1.APIVersion)
 	if err != nil {

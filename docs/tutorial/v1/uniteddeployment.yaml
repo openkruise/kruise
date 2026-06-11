@@ -1,4 +1,4 @@
-apiVersion: apps.kruise.io/v1alpha1
+apiVersion: apps.kruise.io/v1beta1
 kind: UnitedDeployment
 metadata:
   labels:

@@ -30,6 +30,7 @@ import (
 
 // UpdateStrategyType is a string enumeration type that enumerates
 // all possible update strategies for the UnitedDeployment controller.
+// +kubebuilder:validation:Enum=Manual;""
 type UpdateStrategyType string
 
 const (

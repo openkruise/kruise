@@ -39,6 +39,10 @@ func (c *FakeAppsV1beta1) CloneSets(namespace string) v1beta1.CloneSetInterface 
 	return newFakeCloneSets(c, namespace)
 }
 
+func (c *FakeAppsV1beta1) ContainerRecreateRequests(namespace string) v1beta1.ContainerRecreateRequestInterface {
+	return newFakeContainerRecreateRequests(c, namespace)
+}
+
 func (c *FakeAppsV1beta1) DaemonSets(namespace string) v1beta1.DaemonSetInterface {
 	return newFakeDaemonSets(c, namespace)
 }
@@ -55,12 +59,28 @@ func (c *FakeAppsV1beta1) NodeImages() v1beta1.NodeImageInterface {
 	return newFakeNodeImages(c)
 }
 
+func (c *FakeAppsV1beta1) PersistentPodStates(namespace string) v1beta1.PersistentPodStateInterface {
+	return newFakePersistentPodStates(c, namespace)
+}
+
+func (c *FakeAppsV1beta1) ResourceDistributions() v1beta1.ResourceDistributionInterface {
+	return newFakeResourceDistributions(c)
+}
+
 func (c *FakeAppsV1beta1) SidecarSets() v1beta1.SidecarSetInterface {
 	return newFakeSidecarSets(c)
 }
 
 func (c *FakeAppsV1beta1) StatefulSets(namespace string) v1beta1.StatefulSetInterface {
 	return newFakeStatefulSets(c, namespace)
+}
+
+func (c *FakeAppsV1beta1) UnitedDeployments(namespace string) v1beta1.UnitedDeploymentInterface {
+	return newFakeUnitedDeployments(c, namespace)
+}
+
+func (c *FakeAppsV1beta1) WorkloadSpreads(namespace string) v1beta1.WorkloadSpreadInterface {
+	return newFakeWorkloadSpreads(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

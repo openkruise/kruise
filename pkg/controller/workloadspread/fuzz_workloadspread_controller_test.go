@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	fuzzutils "github.com/openkruise/kruise/test/fuzz"
 )
 
@@ -53,7 +54,7 @@ func FuzzPatchFavoriteSubsetMetadataToPod(f *testing.F) {
 			pod.SetDeletionTimestamp(nil)
 		}
 
-		ws := &appsv1alpha1.WorkloadSpread{}
+		ws := &appsv1beta1.WorkloadSpread{}
 		if err := cf.GenerateStruct(ws); err != nil {
 			return
 		}
@@ -67,7 +68,7 @@ func FuzzPatchFavoriteSubsetMetadataToPod(f *testing.F) {
 		}
 		ws.GetAnnotations()[IgnorePatchExistingPodsAnnotation] = strconv.FormatBool(ignore)
 
-		subset := &appsv1alpha1.WorkloadSpreadSubset{}
+		subset := &appsv1beta1.WorkloadSpreadSubset{}
 		if err := cf.GenerateStruct(subset); err != nil {
 			return
 		}
@@ -96,7 +97,7 @@ func FuzzPodPreferredScore(f *testing.F) {
 			return
 		}
 
-		subset := &appsv1alpha1.WorkloadSpreadSubset{}
+		subset := &appsv1beta1.WorkloadSpreadSubset{}
 		if err := cf.GenerateStruct(subset); err != nil {
 			return
 		}

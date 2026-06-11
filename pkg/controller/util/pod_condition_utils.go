@@ -6,7 +6,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
 // using pod condition message to get key-value pairs
@@ -57,7 +57,7 @@ func GetTimeBeforePendingTimeout(pod *v1.Pod, timeout time.Duration, currentTime
 }
 
 // GetTimeBeforeUpdateTimeout is used during updating. when the updating lasts longer than timeout, all pods will be considered as timeout.
-func GetTimeBeforeUpdateTimeout(pod *v1.Pod, updatedCondition *appsv1alpha1.UnitedDeploymentCondition, timeout time.Duration, currentTime time.Time) (timeouted bool, nextCheckAfter time.Duration) {
+func GetTimeBeforeUpdateTimeout(pod *v1.Pod, updatedCondition *appsv1beta1.UnitedDeploymentCondition, timeout time.Duration, currentTime time.Time) (timeouted bool, nextCheckAfter time.Duration) {
 	if pod.DeletionTimestamp != nil {
 		return false, -1
 	}
