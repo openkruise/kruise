@@ -214,12 +214,6 @@ spec:
                     description: Config provides the detailed configuration parameters
                       for the chosen sidecar type.
                     properties:
-                      command:
-                        description: Command specifies the container execution command
-                          when using the "k8s" type.
-                        items:
-                          type: string
-                        type: array
                       configMapRef:
                         description: ConfigMapRef references a ConfigMap containing
                           the container configuration when using the "custom" type.
@@ -238,18 +232,6 @@ spec:
                               in the default controller RBAC manifests.
                             type: string
                         type: object
-                      image:
-                        description: Image specifies the container image when using
-                          the "k8s" type.
-                        type: string
-                      name:
-                        description: Name specifies the container name when using
-                          the "k8s" type.
-                        type: string
-                      restartPolicy:
-                        description: RestartPolicy specifies the container restart
-                          policy when using the "k8s" type.
-                        type: string
                       sidecarSetRef:
                         description: SidecarSetRef references an OpenKruise SidecarSet
                           when using the "sidecarset" type.
@@ -264,9 +246,9 @@ spec:
                         type: object
                     type: object
                   type:
-                    description: Type of the reload sidecar config. Can be "k8s" (native
-                      pod template), "sidecarset" (injected via Kruise SidecarSet),
-                      or "custom" (referenced via ConfigMap).
+                    description: Type of the reload sidecar config. Can be "sidecarset"
+                      (injected via Kruise SidecarSet), or "custom" (referenced via
+                      ConfigMap).
                     type: string
                 type: object
               revisionHistoryLimit:

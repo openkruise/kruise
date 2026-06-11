@@ -76,8 +76,13 @@ type ConfigMapSetContainer struct {
 }
 
 // ReloadSidecarConfig specifies the configuration for the reload-sidecar.
+// If ReloadSidecarConfig is not specified, or if its Type is not declared,
+// or if Type is "custom" but ConfigMapRef is not provided, the system will
+// automatically load the default ConfigMap configuration
+// (Namespace: kruise-system, Name: default-reload-sidecar-config).
+// This default configuration can be freely customized in the helm manifests.
 type ReloadSidecarConfig struct {
-	// Type of the reload sidecar config. Can be "k8s" (native pod template), "sidecarset" (injected via Kruise SidecarSet), or "custom" (referenced via ConfigMap).
+	// Type of the reload sidecar config. Can be "sidecarset" (injected via Kruise SidecarSet), or "custom" (referenced via ConfigMap).
 	Type ReloadSidecarType `json:"type,omitempty"`
 	// Config provides the detailed configuration parameters for the chosen sidecar type.
 	Config *ReloadSidecarConfigData `json:"config,omitempty"`
@@ -87,22 +92,12 @@ type ReloadSidecarConfig struct {
 type ReloadSidecarType string
 
 const (
-	ReloadSidecarTypeK8s        ReloadSidecarType = "k8s"
 	ReloadSidecarTypeSidecarSet ReloadSidecarType = "sidecarset"
 	ReloadSidecarTypeCustom     ReloadSidecarType = "custom"
 )
 
 // ReloadSidecarConfigData contains the specific configuration details for the chosen ReloadSidecarType.
 type ReloadSidecarConfigData struct {
-	// Name specifies the container name when using the "k8s" type.
-	Name string `json:"name,omitempty"`
-	// Image specifies the container image when using the "k8s" type.
-	Image string `json:"image,omitempty"`
-	// RestartPolicy specifies the container restart policy when using the "k8s" type.
-	RestartPolicy corev1.ContainerRestartPolicy `json:"restartPolicy,omitempty"`
-	// Command specifies the container execution command when using the "k8s" type.
-	Command []string `json:"command,omitempty"`
-
 	// SidecarSetRef references an OpenKruise SidecarSet when using the "sidecarset" type.
 	SidecarSetRef *SidecarSetRef `json:"sidecarSetRef,omitempty"`
 

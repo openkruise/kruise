@@ -57,12 +57,6 @@ spec:
     mountPath: /data/conf3
   # Container used to update configuration files, injected when the Pod is created
   reloadSidecarConfig:
-    # Direct injection by Kubernetes
-    type: k8s
-    config:
-      name: reload-sidecar
-      image: openkruise/reload-sidecar:v1.0.0
-      restartPolicy: Always
     # Injection by referencing OpenKruise SidecarSet
     type: sidecarset
     config:
@@ -190,25 +184,7 @@ spec:
 ## Reload Sidecar Container Injection
 
 The Reload sidecar container is injected into the Pod and is used to update configuration files automatically.
-
-### Explicitly declare reload container injection
-
-```yaml
-apiVersion: xxx/v1alpha1
-kind: ConfigMapSet
-# ...
-spec:
-  # ...
-  reloadSidecarConfig:
-    # Direct injection by Kubernetes
-    type: k8s
-    config:
-      name: reload-sidecar
-      image: openkruise/reload-sidecar:v1.0.0
-      restartPolicy: Always
-```
-
-In this mode, the container is injected directly into the Pod at creation time through a webhook. It also automatically generates the `emptyDir` volume and `InitContainer` volumeMounts, while the business containers are injected with the corresponding `volumeMounts` as well. During injection, the annotation `apps.kruise.io/container-launch-priority: Ordered` is enabled to ensure it starts before the business containers.
+If `reloadSidecarConfig` is not specified, or if its `type` is omitted, or if `type` is "custom" but `configMapRef` is not provided, the system will automatically load the default ConfigMap configuration (`namespace: kruise-system`, `name: default-reload-sidecar-config`). This default configuration can be freely customized in the helm manifests.
 
 ### Declare injection by referencing SidecarSet
 
