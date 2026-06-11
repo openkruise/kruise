@@ -198,6 +198,13 @@ spec:
                           name:
                             type: string
                           namespace:
+                            description: |-
+                              Namespace allows referencing a ConfigMap from a different namespace.
+                              This is by design to allow configuration generalization, where a single ConfigMap
+                              can be shared and referenced by ConfigMapSets across multiple namespaces without duplication.
+                              Security Implications & RBAC: The kruise-manager requires cluster-level 'get' permission
+                              for ConfigMaps to resolve cross-namespace references. This permission is already included
+                              in the default controller RBAC manifests.
                             type: string
                         type: object
                       image:
@@ -293,6 +300,8 @@ spec:
                     - type: string
                     x-kubernetes-int-or-string: true
                 type: object
+            required:
+            - selector
             type: object
           status:
             description: ConfigMapSetStatus defines the observed state of ConfigMapSet

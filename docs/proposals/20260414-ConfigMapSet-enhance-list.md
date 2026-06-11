@@ -76,7 +76,7 @@ In essence, configuration effect is driven by restart.
 
 The new proposal introduces `effectPolicy`, supporting three configuration effect modes:
 
-1. `ReStart`
+1. `Restart`
    - restart `reload-sidecar` first
    - then restart business containers
    - suitable for the safest strong-consistency scenarios

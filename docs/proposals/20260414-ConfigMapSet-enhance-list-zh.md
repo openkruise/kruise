@@ -76,7 +76,7 @@
 
 新提案引入 `effectPolicy`，支持三种配置生效模式：
 
-1. `ReStart`
+1. `Restart`
    - 先重启 reload-sidecar
    - 再重启业务容器
    - 适用于最稳妥的强一致场景

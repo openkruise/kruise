@@ -79,7 +79,7 @@ spec:
         namespace: default
   effectPolicy:
     # Both reload-sidecar and business containers are restarted; reload-sidecar restarts first
-    type: ReStart
+    type: Restart
     # Only reload-sidecar is restarted; after restart completes, HTTP/TCP is used to trigger business container reload
     type: PostHook
     postHook:
@@ -300,7 +300,7 @@ After `ConfigMapSet.data` is updated, the controller workflow is as follows:
 2. Update the Pod annotation: set `apps.kruise.io/configmapset.updateRevision` to the current value
 3. Make the configuration take effect according to `effectPolicy`
 
-   1. `ReStart` (default):
+   1. `Restart` (default):
       1. Restart `reload-sidecar` first
       2. Wait for `reload-sidecar` to become ready
       3. Check whether the latest configuration has been loaded

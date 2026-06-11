@@ -82,7 +82,7 @@ spec:
         namespace: default
   effectPolicy:
     # reload-sidecar和业务容器都会重启，reload-sidecar先于业务容器重启
-    type: ReStart
+    type: Restart
     # 仅reload-sidecar容器重启，重启完成后，执行HTTP/TCP触发业务容器更新配置
     type: PostHook
     postHook:
@@ -301,7 +301,7 @@ spec:
     
 3.  根据effectPolicy策略，进行配置生效
     
-    1.  ReStart（默认）：
+    1.  Restart（默认）：
         
         1.  先重启reload-sidecar容器
             

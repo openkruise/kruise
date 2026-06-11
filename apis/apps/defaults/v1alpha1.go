@@ -21,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	utilpointer "k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -191,7 +190,7 @@ func SetDefaultsConfigMapSet(obj *v1alpha1.ConfigMapSet) {
 		obj.Spec.UpdateStrategy.MaxUnavailable = &maxUnavailableValue
 	}
 	if obj.Spec.RevisionHistoryLimit == nil {
-		obj.Spec.RevisionHistoryLimit = utilpointer.Int32(5)
+		obj.Spec.RevisionHistoryLimit = ptr.To[int32](5)
 	}
 }
 

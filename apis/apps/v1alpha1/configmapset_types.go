@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kruise Authors.
+Copyright 2026 The Kruise Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,8 +29,7 @@ type ConfigMapSetSpec struct {
 	CustomVersion string `json:"customVersion,omitempty"`
 
 	// Selector is a label query over pods that should be updated
-	// +optional
-	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+	Selector *metav1.LabelSelector `json:"selector"`
 
 	// Data contains the configuration data to be updated
 	// +optional
@@ -101,7 +100,14 @@ type SidecarSetRef struct {
 }
 
 type ConfigMapRef struct {
-	Name      string `json:"name,omitempty"`
+	Name string `json:"name,omitempty"`
+	// Namespace allows referencing a ConfigMap from a different namespace.
+	// This is by design to allow configuration generalization, where a single ConfigMap
+	// can be shared and referenced by ConfigMapSets across multiple namespaces without duplication.
+	// Security Implications & RBAC: The kruise-manager requires cluster-level 'get' permission
+	// for ConfigMaps to resolve cross-namespace references. This permission is already included
+	// in the default controller RBAC manifests.
+	// +optional
 	Namespace string `json:"namespace,omitempty"`
 }
 
@@ -113,7 +119,7 @@ type EffectPolicy struct {
 type EffectPolicyType string
 
 const (
-	EffectPolicyTypeReStart   EffectPolicyType = "ReStart"
+	EffectPolicyTypeRestart   EffectPolicyType = "Restart"
 	EffectPolicyTypePostHook  EffectPolicyType = "PostHook"
 	EffectPolicyTypeHotUpdate EffectPolicyType = "HotUpdate"
 )
