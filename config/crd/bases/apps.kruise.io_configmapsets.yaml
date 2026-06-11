@@ -55,18 +55,27 @@ spec:
           metadata:
             type: object
           spec:
-            description: ConfigMapSetSpec defines the desired state of ConfigMapSet
+            description: Spec represents the desired behavior of the ConfigMapSet.
             properties:
               containers:
-                description: Containers defines the business containers that need
-                  to be updated
+                description: |-
+                  Containers defines the list of business containers within the matched Pods
+                  that need to mount the configuration data.
                 items:
+                  description: ConfigMapSetContainer specifies a target container
+                    and where the configuration should be mounted.
                   properties:
                     mountPath:
+                      description: MountPath is the directory path inside the container
+                        where the configuration files will be mounted.
                       type: string
                     name:
+                      description: Name of the target container to mount the configuration.
                       type: string
                     nameFrom:
+                      description: |-
+                        NameFrom provides a dynamic way to determine the container name (e.g., via Downward API)
+                        to support dynamically injected containers like SidecarSets.
                       properties:
                         fieldRef:
                           description: 'Selects a field of the pod: supports metadata.name,
@@ -88,20 +97,30 @@ spec:
                   type: object
                 type: array
               customVersion:
-                description: CustomVersion alias for the current update revision
+                description: |-
+                  CustomVersion is an optional string to provide a user-defined version or alias
+                  for the current configuration data. It can be used for version tracking.
                 type: string
               data:
                 additionalProperties:
                   type: string
-                description: Data contains the configuration data to be updated
+                description: |-
+                  Data contains the actual configuration files (key-value pairs) to be distributed
+                  to the matched Pods. Keys are file names, and values are the file contents.
                 type: object
               effectPolicy:
-                description: EffectPolicy defines how the configuration update takes
-                  effect
+                description: |-
+                  EffectPolicy defines the strategy for how configuration updates should be applied
+                  to the Pods (e.g., restarting containers, hot updating, or triggering webhooks).
                 properties:
                   postHook:
+                    description: |-
+                      PostHook defines the callback actions to trigger business containers to reload configurations
+                      when Type is "PostHook".
                     properties:
                       httpGet:
+                        description: HTTPGet defines an HTTP GET request to perform
+                          as a post-hook action.
                         items:
                           description: HTTPGetAction describes an action based on
                             HTTP Get requests.
@@ -154,6 +173,8 @@ spec:
                           type: object
                         type: array
                       tcpSocket:
+                        description: TCPSocket defines a TCP socket connection to
+                          perform as a post-hook action.
                         items:
                           description: TCPSocketAction describes an action based on
                             opening a socket
@@ -177,25 +198,35 @@ spec:
                         type: array
                     type: object
                   type:
+                    description: |-
+                      Type indicates the method of applying updates.
+                      "Restart": Restarts the reload-sidecar first, then restarts business containers.
+                      "PostHook": Restarts the reload-sidecar, then triggers HTTP/TCP callbacks to business containers.
+                      "HotUpdate": Neither container restarts; reload-sidecar updates shared files and business containers hot-reload.
                     type: string
                 type: object
               reloadSidecarConfig:
-                description: ReloadSidecarConfig defines the container injected during
-                  Pod creation to update configuration files
+                description: |-
+                  ReloadSidecarConfig configures the sidecar container responsible for dynamically
+                  receiving configuration updates and sharing them with the business containers.
                 properties:
                   config:
-                    description: Config provides the configuration for the chosen
-                      type
+                    description: Config provides the detailed configuration parameters
+                      for the chosen sidecar type.
                     properties:
                       command:
-                        description: Command for k8s type
+                        description: Command specifies the container execution command
+                          when using the "k8s" type.
                         items:
                           type: string
                         type: array
                       configMapRef:
-                        description: ConfigMapRef for custom type
+                        description: ConfigMapRef references a ConfigMap containing
+                          the container configuration when using the "custom" type.
                         properties:
                           name:
+                            description: Name specifies the name of the referenced
+                              ConfigMap.
                             type: string
                           namespace:
                             description: |-
@@ -208,35 +239,46 @@ spec:
                             type: string
                         type: object
                       image:
-                        description: Image for k8s type
+                        description: Image specifies the container image when using
+                          the "k8s" type.
                         type: string
                       name:
-                        description: Name for k8s type
+                        description: Name specifies the container name when using
+                          the "k8s" type.
                         type: string
                       restartPolicy:
-                        description: RestartPolicy for k8s type
+                        description: RestartPolicy specifies the container restart
+                          policy when using the "k8s" type.
                         type: string
                       sidecarSetRef:
-                        description: SidecarSetRef for sidecarset type
+                        description: SidecarSetRef references an OpenKruise SidecarSet
+                          when using the "sidecarset" type.
                         properties:
                           containerName:
+                            description: ContainerName is the name of the container
+                              within the SidecarSet to be used.
                             type: string
                           name:
+                            description: Name is the name of the SidecarSet.
                             type: string
                         type: object
                     type: object
                   type:
-                    description: Type of the reload sidecar config (k8s, sidecarset,
-                      custom)
+                    description: Type of the reload sidecar config. Can be "k8s" (native
+                      pod template), "sidecarset" (injected via Kruise SidecarSet),
+                      or "custom" (referenced via ConfigMap).
                     type: string
                 type: object
               revisionHistoryLimit:
-                description: RevisionHistoryLimit indicates the maximum quantity of
-                  stored revisions about the ConfigMapSet
+                description: |-
+                  RevisionHistoryLimit indicates the maximum number of old configuration revisions
+                  to retain for rollback purposes.
                 format: int32
                 type: integer
               selector:
-                description: Selector is a label query over pods that should be updated
+                description: |-
+                  Selector is a label query over Pods that should be managed by this ConfigMapSet.
+                  Only Pods matching this selector will have their configurations updated.
                 properties:
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
@@ -282,10 +324,14 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               updateStrategy:
-                description: UpdateStrategy indicates the strategy that the ConfigMapSet
-                  controller will use to perform updates
+                description: |-
+                  UpdateStrategy defines the rules for rolling out configuration updates to
+                  the matched Pods, such as partition, maxUnavailable, and grouping.
                 properties:
                   matchLabelKeys:
+                    description: |-
+                      MatchLabelKeys allows grouping matched Pods by label keys. The rollout strategy
+                      (Partition/MaxUnavailable) will be applied independently within each group.
                     items:
                       type: string
                     type: array
@@ -293,43 +339,68 @@ spec:
                     anyOf:
                     - type: integer
                     - type: string
+                    description: MaxUnavailable is the maximum number of Pods that
+                      can be unavailable during the update.
                     x-kubernetes-int-or-string: true
                   partition:
                     anyOf:
                     - type: integer
                     - type: string
+                    description: |-
+                      Partition indicates the desired number or percentage of Pods in old revisions.
+                      Pods beyond this partition will be updated to the new revision.
                     x-kubernetes-int-or-string: true
                 type: object
             required:
             - selector
             type: object
           status:
-            description: ConfigMapSetStatus defines the observed state of ConfigMapSet
+            description: Status represents the current observed state of the ConfigMapSet.
             properties:
               currentCustomVersion:
+                description: CurrentCustomVersion tracks the user-defined version
+                  alias of the currently applied configuration.
                 type: string
               currentRevision:
+                description: CurrentRevision is the system-generated hash revision
+                  of the currently applied configuration.
                 type: string
               expectedUpdatedReplicas:
+                description: ExpectedUpdatedReplicas is the total number of matched
+                  Pods that are expected to be updated.
                 format: int32
                 type: integer
               observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  by the ConfigMapSet controller.
                 format: int64
                 type: integer
               readyReplicas:
+                description: ReadyReplicas is the number of matched Pods that have
+                  a Ready Condition.
                 format: int32
                 type: integer
               replicas:
+                description: Replicas is the total number of Pods that match the ConfigMapSet
+                  selector.
                 format: int32
                 type: integer
               updateCustomVersion:
+                description: UpdateCustomVersion tracks the user-defined version alias
+                  of the configuration being rolled out.
                 type: string
               updateRevision:
+                description: UpdateRevision is the system-generated hash revision
+                  of the configuration being rolled out.
                 type: string
               updatedReadyReplicas:
+                description: UpdatedReadyReplicas is the number of matched Pods that
+                  have been updated to the latest revision and are Ready.
                 format: int32
                 type: integer
               updatedReplicas:
+                description: UpdatedReplicas is the total number of matched Pods that
+                  have been updated to the latest revision.
                 format: int32
                 type: integer
             type: object
