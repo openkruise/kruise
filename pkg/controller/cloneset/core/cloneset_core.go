@@ -195,6 +195,10 @@ func (c *commonControl) IgnorePodUpdateEvent(oldPod, curPod *v1.Pod) bool {
 		return false
 	}
 
+	if kubecontroller.IsPodActive(oldPod) != kubecontroller.IsPodActive(curPod) {
+		return false
+	}
+
 	containsReadinessGate := func(pod *v1.Pod) bool {
 		for _, r := range pod.Spec.ReadinessGates {
 			if r.ConditionType == appspub.InPlaceUpdateReady {
