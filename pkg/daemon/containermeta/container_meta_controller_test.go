@@ -58,3 +58,53 @@ func TestGetRuntimeForPodUsesRuntimeName(t *testing.T) {
 		t.Fatalf("expected runtime name containerd, got %s", factory.runtimeName)
 	}
 }
+
+func TestGetRuntimeForPodInvalidContainerID(t *testing.T) {
+	fakeRuntime := critesting.NewFakeRuntimeService()
+
+	c := &Controller{
+		runtimeFactory: &fakeRuntimeFactory{
+			runtime: fakeRuntime,
+		},
+	}
+
+	pod := &v1.Pod{
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					ContainerID: "invalid-container-id",
+				},
+			},
+		},
+	}
+
+	_, _, err := c.getRuntimeForPod(pod)
+	if err == nil {
+		t.Fatal("expected error for invalid container ID")
+	}
+}
+
+func TestGetRuntimeForPodMissingRuntimeName(t *testing.T) {
+	fakeRuntime := critesting.NewFakeRuntimeService()
+
+	c := &Controller{
+		runtimeFactory: &fakeRuntimeFactory{
+			runtime: fakeRuntime,
+		},
+	}
+
+	pod := &v1.Pod{
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					ContainerID: "://abcdef",
+				},
+			},
+		},
+	}
+
+	_, _, err := c.getRuntimeForPod(pod)
+	if err == nil {
+		t.Fatal("expected error when runtime name is missing")
+	}
+}
