@@ -20,9 +20,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -60,6 +62,15 @@ func (h *ImagePullJobCreateUpdateHandler) Handle(ctx context.Context, req admiss
 		if err := h.Decoder.Decode(req, obj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
+		if req.AdmissionRequest.Operation == admissionv1.Update {
+			oldObj := &appsv1beta1.ImagePullJob{}
+			if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+			if !reflect.DeepEqual(obj.Spec.PullSecrets, oldObj.Spec.PullSecrets) {
+				return admission.Denied("spec.pullSecrets is immutable")
+			}
+		}
 		if err := validateV1beta1(obj); err != nil {
 			klog.ErrorS(err, "Error validate ImagePullJob", "namespace", obj.Namespace, "name", obj.Name)
 			return admission.Errored(http.StatusBadRequest, err)
@@ -69,6 +80,15 @@ func (h *ImagePullJobCreateUpdateHandler) Handle(ctx context.Context, req admiss
 		obj := &appsv1alpha1.ImagePullJob{}
 		if err := h.Decoder.Decode(req, obj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
+		}
+		if req.AdmissionRequest.Operation == admissionv1.Update {
+			oldObj := &appsv1alpha1.ImagePullJob{}
+			if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+			if !reflect.DeepEqual(obj.Spec.PullSecrets, oldObj.Spec.PullSecrets) {
+				return admission.Denied("spec.pullSecrets is immutable")
+			}
 		}
 		if err := validate(obj); err != nil {
 			klog.ErrorS(err, "Error validate ImagePullJob", "namespace", obj.Namespace, "name", obj.Name)
