@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	k8stesting "k8s.io/utils/clock/testing"
@@ -2279,6 +2280,385 @@ func TestSyncJobPullSecrets_NoPullSecrets(t *testing.T) {
 	result, err := r.syncJobPullSecrets(job)
 	assert.NoError(t, err)
 	assert.Nil(t, result)
+}
+
+func TestSyncJobPullSecrets_EarlyReturn(t *testing.T) {
+	kruiseDaemonConfigNs := util.GetKruiseDaemonConfigNamespace()
+	now := metav1.Now()
+
+	syncedSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "synced-secret-abc",
+			Namespace: kruiseDaemonConfigNs,
+			Annotations: map[string]string{
+				SecretAnnotationReferenceJobs:   "default/test-job",
+				SecretAnnotationSourceSecretKey: "default/my-secret",
+			},
+		},
+		Data: map[string][]byte{"key": []byte("val")},
+	}
+	daemonConfigNs := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: kruiseDaemonConfigNs},
+	}
+
+	tests := []struct {
+		name             string
+		job              *appsv1beta1.ImagePullJob
+		objects          []client.Object
+		expectEarlyNil   bool
+		expectSecretGCed bool
+	}{
+		{
+			name: "no pullSecrets + active job: early return nil",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: "default"},
+				Spec:       appsv1beta1.ImagePullJobSpec{},
+			},
+			expectEarlyNil: true,
+		},
+		{
+			name: "no pullSecrets + DeletionTimestamp set: should NOT early return, proceeds to cleanup",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test-job",
+					Namespace:         "default",
+					DeletionTimestamp: &now,
+					Finalizers:        []string{"test"},
+				},
+				Spec: appsv1beta1.ImagePullJobSpec{},
+			},
+			objects:          []client.Object{daemonConfigNs, syncedSecret},
+			expectEarlyNil:   false,
+			expectSecretGCed: true,
+		},
+		{
+			name: "no pullSecrets + CompletionTime set: should NOT early return, proceeds to cleanup",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: "default"},
+				Spec:       appsv1beta1.ImagePullJobSpec{},
+				Status:     appsv1beta1.ImagePullJobStatus{CompletionTime: &now},
+			},
+			objects:          []client.Object{daemonConfigNs, syncedSecret},
+			expectEarlyNil:   false,
+			expectSecretGCed: true,
+		},
+		{
+			name: "has pullSecrets + active job: should NOT early return",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: "default"},
+				Spec: appsv1beta1.ImagePullJobSpec{
+					ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+						PullSecrets: []string{"my-secret"},
+					},
+				},
+			},
+			objects:        []client.Object{daemonConfigNs, &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "my-secret", Namespace: "default"}, Data: map[string][]byte{"key": []byte("val")}}},
+			expectEarlyNil: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			builder := fake.NewClientBuilder().WithScheme(scheme)
+			if len(tt.objects) > 0 {
+				builder = builder.WithObjects(tt.objects...)
+			}
+			fakeClient := builder.Build()
+			r := &ReconcileImagePullJob{
+				Client:                   fakeClient,
+				scheme:                   scheme,
+				generateRandomStringFunc: defaultGenerateRandomString,
+			}
+
+			result, err := r.syncJobPullSecrets(tt.job)
+			assert.NoError(t, err)
+
+			if tt.expectEarlyNil {
+				assert.Nil(t, result)
+				return
+			}
+
+			if tt.expectSecretGCed {
+				secret := &v1.Secret{}
+				getErr := fakeClient.Get(context.TODO(), types.NamespacedName{
+					Namespace: kruiseDaemonConfigNs,
+					Name:      "synced-secret-abc",
+				}, secret)
+				assert.True(t, getErr != nil, "synced secret should have been deleted during cleanup")
+			}
+		})
+	}
+}
+
+func TestSyncNodeImages(t *testing.T) {
+	fakeClock := k8stesting.NewFakeClock(time.Now())
+	jobUID := types.UID("job-uid-1")
+	ownerRef := v1.ObjectReference{
+		APIVersion: controllerKind.GroupVersion().String(),
+		Kind:       controllerKind.Kind,
+		Name:       "test-job",
+		Namespace:  "default",
+		UID:        jobUID,
+	}
+	otherOwnerRef := v1.ObjectReference{
+		APIVersion: controllerKind.GroupVersion().String(),
+		Kind:       controllerKind.Kind,
+		Name:       "other-job",
+		Namespace:  "default",
+		UID:        types.UID("other-uid"),
+	}
+	secretA := appsv1beta1.ReferenceObject{Namespace: "kruise-daemon-config", Name: "secret-a"}
+	secretB := appsv1beta1.ReferenceObject{Namespace: "kruise-daemon-config", Name: "secret-b"}
+
+	tests := []struct {
+		name                string
+		job                 *appsv1beta1.ImagePullJob
+		secrets             []appsv1beta1.ReferenceObject
+		existingNodeImage   *appsv1beta1.NodeImage
+		expectUpdate        bool
+		expectPullSecrets   []appsv1beta1.ReferenceObject
+		expectTagCount      int
+		expectTagVersion    int64
+		expectOwnerRefCount int
+	}{
+		{
+			name: "new tag: creates tag and persists pullSecrets",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: "default", UID: jobUID},
+				Spec: appsv1beta1.ImagePullJobSpec{
+					Image:                "nginx:1.20",
+					ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{Parallelism: &intstr.IntOrString{Type: intstr.Int, IntVal: 1}},
+				},
+			},
+			secrets: []appsv1beta1.ReferenceObject{secretA},
+			existingNodeImage: &appsv1beta1.NodeImage{
+				ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+				Spec:       appsv1beta1.NodeImageSpec{Images: map[string]appsv1beta1.ImageSpec{}},
+			},
+			expectUpdate:        true,
+			expectPullSecrets:   []appsv1beta1.ReferenceObject{secretA},
+			expectTagCount:      1,
+			expectTagVersion:    0,
+			expectOwnerRefCount: 1,
+		},
+		{
+			name: "tag+ownerRef exist, pullSecrets already synced: skip update",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: "default", UID: jobUID},
+				Spec: appsv1beta1.ImagePullJobSpec{
+					Image:                "nginx:1.20",
+					ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{Parallelism: &intstr.IntOrString{Type: intstr.Int, IntVal: 1}},
+				},
+			},
+			secrets: []appsv1beta1.ReferenceObject{secretA},
+			existingNodeImage: &appsv1beta1.NodeImage{
+				ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+				Spec: appsv1beta1.NodeImageSpec{
+					Images: map[string]appsv1beta1.ImageSpec{
+						"nginx": {
+							PullSecrets: []appsv1beta1.ReferenceObject{secretA},
+							Tags: []appsv1beta1.ImageTagSpec{
+								{Tag: "1.20", Version: 1, OwnerReferences: []v1.ObjectReference{ownerRef}},
+							},
+						},
+					},
+				},
+			},
+			expectUpdate: false,
+		},
+		{
+			name: "tag+ownerRef exist, pullSecrets missing: persist pullSecrets (Fix 2 core case)",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: "default", UID: jobUID},
+				Spec: appsv1beta1.ImagePullJobSpec{
+					Image:                "nginx:1.20",
+					ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{Parallelism: &intstr.IntOrString{Type: intstr.Int, IntVal: 1}},
+				},
+			},
+			secrets: []appsv1beta1.ReferenceObject{secretA},
+			existingNodeImage: &appsv1beta1.NodeImage{
+				ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+				Spec: appsv1beta1.NodeImageSpec{
+					Images: map[string]appsv1beta1.ImageSpec{
+						"nginx": {
+							Tags: []appsv1beta1.ImageTagSpec{
+								{Tag: "1.20", Version: 1, OwnerReferences: []v1.ObjectReference{ownerRef}},
+							},
+						},
+					},
+				},
+			},
+			expectUpdate:        true,
+			expectPullSecrets:   []appsv1beta1.ReferenceObject{secretA},
+			expectTagCount:      1,
+			expectTagVersion:    1,
+			expectOwnerRefCount: 1,
+		},
+		{
+			name: "tag+ownerRef exist, partial pullSecrets missing: append missing secret",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: "default", UID: jobUID},
+				Spec: appsv1beta1.ImagePullJobSpec{
+					Image:                "nginx:1.20",
+					ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{Parallelism: &intstr.IntOrString{Type: intstr.Int, IntVal: 1}},
+				},
+			},
+			secrets: []appsv1beta1.ReferenceObject{secretA, secretB},
+			existingNodeImage: &appsv1beta1.NodeImage{
+				ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+				Spec: appsv1beta1.NodeImageSpec{
+					Images: map[string]appsv1beta1.ImageSpec{
+						"nginx": {
+							PullSecrets: []appsv1beta1.ReferenceObject{secretA},
+							Tags: []appsv1beta1.ImageTagSpec{
+								{Tag: "1.20", Version: 1, OwnerReferences: []v1.ObjectReference{ownerRef}},
+							},
+						},
+					},
+				},
+			},
+			expectUpdate:        true,
+			expectPullSecrets:   []appsv1beta1.ReferenceObject{secretA, secretB},
+			expectTagCount:      1,
+			expectTagVersion:    1,
+			expectOwnerRefCount: 1,
+		},
+		{
+			name: "tag exists but ownerRef mismatch: bump version and append pullSecrets",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: "default", UID: jobUID},
+				Spec: appsv1beta1.ImagePullJobSpec{
+					Image:                "nginx:1.20",
+					ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{Parallelism: &intstr.IntOrString{Type: intstr.Int, IntVal: 1}},
+				},
+			},
+			secrets: []appsv1beta1.ReferenceObject{secretB},
+			existingNodeImage: &appsv1beta1.NodeImage{
+				ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+				Spec: appsv1beta1.NodeImageSpec{
+					Images: map[string]appsv1beta1.ImageSpec{
+						"nginx": {
+							PullSecrets: []appsv1beta1.ReferenceObject{secretA},
+							Tags: []appsv1beta1.ImageTagSpec{
+								{Tag: "1.20", Version: 3, OwnerReferences: []v1.ObjectReference{otherOwnerRef}},
+							},
+						},
+					},
+				},
+			},
+			expectUpdate:        true,
+			expectPullSecrets:   []appsv1beta1.ReferenceObject{secretA, secretB},
+			expectTagCount:      1,
+			expectTagVersion:    4,
+			expectOwnerRefCount: 2,
+		},
+		{
+			name: "tag+ownerRef exist, no secrets: skip update",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: "default", UID: jobUID},
+				Spec: appsv1beta1.ImagePullJobSpec{
+					Image:                "nginx:1.20",
+					ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{Parallelism: &intstr.IntOrString{Type: intstr.Int, IntVal: 1}},
+				},
+			},
+			secrets: nil,
+			existingNodeImage: &appsv1beta1.NodeImage{
+				ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+				Spec: appsv1beta1.NodeImageSpec{
+					Images: map[string]appsv1beta1.ImageSpec{
+						"nginx": {
+							Tags: []appsv1beta1.ImageTagSpec{
+								{Tag: "1.20", Version: 1, OwnerReferences: []v1.ObjectReference{ownerRef}},
+							},
+						},
+					},
+				},
+			},
+			expectUpdate: false,
+		},
+		{
+			name: "new tag with existing status version: version = foundVersion + 1",
+			job: &appsv1beta1.ImagePullJob{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-job", Namespace: "default", UID: jobUID},
+				Spec: appsv1beta1.ImagePullJobSpec{
+					Image:                "nginx:1.20",
+					ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{Parallelism: &intstr.IntOrString{Type: intstr.Int, IntVal: 1}},
+				},
+			},
+			secrets: nil,
+			existingNodeImage: &appsv1beta1.NodeImage{
+				ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+				Spec:       appsv1beta1.NodeImageSpec{Images: map[string]appsv1beta1.ImageSpec{}},
+				Status: appsv1beta1.NodeImageStatus{
+					ImageStatuses: map[string]appsv1beta1.ImageStatus{
+						"nginx": {
+							Tags: []appsv1beta1.ImageTagStatus{
+								{Tag: "1.20", Version: 5},
+							},
+						},
+					},
+				},
+			},
+			expectUpdate:        true,
+			expectPullSecrets:   nil,
+			expectTagCount:      1,
+			expectTagVersion:    6,
+			expectOwnerRefCount: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			_ = appsv1beta1.AddToScheme(scheme)
+			_ = clientgoscheme.AddToScheme(scheme)
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithRuntimeObjects(tt.existingNodeImage).
+				Build()
+
+			r := &ReconcileImagePullJob{
+				Client: fakeClient,
+				scheme: scheme,
+				clock:  fakeClock,
+			}
+
+			oldRV := tt.existingNodeImage.ResourceVersion
+			newStatus := &appsv1beta1.ImagePullJobStatus{Active: 0}
+			err := r.syncNodeImages(tt.job, newStatus, []string{tt.existingNodeImage.Name}, tt.secrets)
+			assert.NoError(t, err)
+
+			var nodeImage appsv1beta1.NodeImage
+			err = fakeClient.Get(context.TODO(), types.NamespacedName{Name: tt.existingNodeImage.Name}, &nodeImage)
+			assert.NoError(t, err)
+
+			updated := nodeImage.ResourceVersion != oldRV
+			assert.Equal(t, tt.expectUpdate, updated, "update expectation mismatch")
+
+			if !tt.expectUpdate {
+				return
+			}
+
+			imageName := "nginx"
+			imageSpec, ok := nodeImage.Spec.Images[imageName]
+			assert.True(t, ok, "image %s should exist in NodeImage spec", imageName)
+			assert.Equal(t, tt.expectTagCount, len(imageSpec.Tags))
+
+			if tt.expectPullSecrets == nil {
+				assert.Empty(t, imageSpec.PullSecrets)
+			} else {
+				assert.Equal(t, tt.expectPullSecrets, imageSpec.PullSecrets)
+			}
+
+			if tt.expectTagCount > 0 {
+				tag := imageSpec.Tags[0]
+				assert.Equal(t, "1.20", tag.Tag)
+				assert.Equal(t, tt.expectTagVersion, tag.Version)
+				assert.Equal(t, tt.expectOwnerRefCount, len(tag.OwnerReferences))
+			}
+		})
+	}
 }
 
 func TestClassifyPullSecretsForJob_ListError(t *testing.T) {

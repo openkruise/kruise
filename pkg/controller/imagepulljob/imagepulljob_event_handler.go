@@ -80,29 +80,60 @@ func (e *nodeImageEventHandler) handle(nodeImage *appsv1beta1.NodeImage, q workq
 }
 
 func (e *nodeImageEventHandler) handleUpdate(nodeImage, oldNodeImage *appsv1beta1.NodeImage, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-	changedImages := sets.NewString()
+	// changedTags tracks which tags changed per image name.
+	// nil value = image-level field change (PullSecrets/SandboxConfig/deleted), enqueue all jobs for that image
+	// non-nil value = only specific tags changed, only enqueue jobs owning those tags
+	changedTags := make(map[string]sets.String)
 	tmpOldNodeImage := oldNodeImage.DeepCopy()
+
 	for name, imageSpec := range nodeImage.Spec.Images {
 		oldImageSpec := tmpOldNodeImage.Spec.Images[name]
 		delete(tmpOldNodeImage.Spec.Images, name)
-		if !reflect.DeepEqual(imageSpec, oldImageSpec) {
-			changedImages.Insert(name)
+		if reflect.DeepEqual(imageSpec, oldImageSpec) {
+			continue
+		}
+		if !reflect.DeepEqual(imageSpec.PullSecrets, oldImageSpec.PullSecrets) ||
+			!reflect.DeepEqual(imageSpec.SandboxConfig, oldImageSpec.SandboxConfig) {
+			changedTags[name] = nil
+		} else {
+			tags := getChangedSpecTags(imageSpec.Tags, oldImageSpec.Tags)
+			if prev, ok := changedTags[name]; ok && prev != nil {
+				changedTags[name] = prev.Union(tags)
+			} else if !ok {
+				changedTags[name] = tags
+			}
 		}
 	}
 	for name := range tmpOldNodeImage.Spec.Images {
-		changedImages.Insert(name)
+		changedTags[name] = nil
 	}
+
 	for name, imageStatus := range nodeImage.Status.ImageStatuses {
 		oldImageStatus := tmpOldNodeImage.Status.ImageStatuses[name]
 		delete(tmpOldNodeImage.Status.ImageStatuses, name)
-		if !reflect.DeepEqual(imageStatus, oldImageStatus) {
-			changedImages.Insert(name)
+		if reflect.DeepEqual(imageStatus, oldImageStatus) {
+			continue
+		}
+		tags := getChangedStatusTags(imageStatus.Tags, oldImageStatus.Tags)
+		if prev, ok := changedTags[name]; ok && prev != nil {
+			changedTags[name] = prev.Union(tags)
+		} else if !ok {
+			changedTags[name] = tags
 		}
 	}
 	for name := range tmpOldNodeImage.Status.ImageStatuses {
-		changedImages.Insert(name)
+		if _, ok := changedTags[name]; !ok {
+			changedTags[name] = nil
+		}
 	}
-	klog.V(5).InfoS("Found NodeImage updated and only affect images", "nodeImageName", nodeImage.Name, "changedImages", changedImages.List())
+
+	if klog.V(5).Enabled() {
+		changedImages := make([]string, 0, len(changedTags))
+		for name := range changedTags {
+			changedImages = append(changedImages, name)
+		}
+		klog.InfoS("Found NodeImage updated", "nodeImageName", nodeImage.Name, "changedImages", changedImages)
+	}
 
 	// Get jobs related to this NodeImage
 	newJobs, oldJobs, err := utilimagejob.GetActiveJobsForNodeImage(e.Reader, nodeImage, oldNodeImage)
@@ -111,18 +142,59 @@ func (e *nodeImageEventHandler) handleUpdate(nodeImage, oldNodeImage *appsv1beta
 	}
 	diffSet := diffJobs(newJobs, oldJobs)
 	for _, j := range newJobs {
-		imageName, _, err := daemonutil.NormalizeImageRefToNameTag(j.Spec.Image)
+		imageName, imageTag, err := daemonutil.NormalizeImageRefToNameTag(j.Spec.Image)
 		if err != nil {
 			klog.InfoS("Invalid image in job", "image", j.Spec.Image, "imagePullJob", klog.KObj(j))
 			continue
 		}
-		if changedImages.Has(imageName) {
+		tags, ok := changedTags[imageName]
+		if !ok {
+			continue
+		}
+		// nil means image-level change, enqueue all jobs for this image
+		if tags == nil || tags.Has(imageTag) {
 			diffSet[types.NamespacedName{Namespace: j.Namespace, Name: j.Name}] = struct{}{}
 		}
 	}
 	for name := range diffSet {
 		q.Add(reconcile.Request{NamespacedName: name})
 	}
+}
+
+func getChangedSpecTags(newTags, oldTags []appsv1beta1.ImageTagSpec) sets.String {
+	changed := sets.NewString()
+	oldMap := make(map[string]appsv1beta1.ImageTagSpec, len(oldTags))
+	for _, t := range oldTags {
+		oldMap[t.Tag] = t
+	}
+	for _, t := range newTags {
+		if old, ok := oldMap[t.Tag]; !ok || !reflect.DeepEqual(t, old) {
+			changed.Insert(t.Tag)
+		}
+		delete(oldMap, t.Tag)
+	}
+	for tag := range oldMap {
+		changed.Insert(tag)
+	}
+	return changed
+}
+
+func getChangedStatusTags(newTags, oldTags []appsv1beta1.ImageTagStatus) sets.String {
+	changed := sets.NewString()
+	oldMap := make(map[string]appsv1beta1.ImageTagStatus, len(oldTags))
+	for _, t := range oldTags {
+		oldMap[t.Tag] = t
+	}
+	for _, t := range newTags {
+		if old, ok := oldMap[t.Tag]; !ok || !reflect.DeepEqual(t, old) {
+			changed.Insert(t.Tag)
+		}
+		delete(oldMap, t.Tag)
+	}
+	for tag := range oldMap {
+		changed.Insert(tag)
+	}
+	return changed
 }
 
 type podEventHandler struct {

@@ -20,8 +20,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"reflect"
+	"strconv"
+	"strings"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -57,6 +62,15 @@ func (h *ImagePullJobCreateUpdateHandler) Handle(ctx context.Context, req admiss
 		if err := h.Decoder.Decode(req, obj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
+		if req.AdmissionRequest.Operation == admissionv1.Update {
+			oldObj := &appsv1beta1.ImagePullJob{}
+			if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+			if !reflect.DeepEqual(obj.Spec.PullSecrets, oldObj.Spec.PullSecrets) {
+				return admission.Denied("spec.pullSecrets is immutable")
+			}
+		}
 		if err := validateV1beta1(obj); err != nil {
 			klog.ErrorS(err, "Error validate ImagePullJob", "namespace", obj.Namespace, "name", obj.Name)
 			return admission.Errored(http.StatusBadRequest, err)
@@ -66,6 +80,15 @@ func (h *ImagePullJobCreateUpdateHandler) Handle(ctx context.Context, req admiss
 		obj := &appsv1alpha1.ImagePullJob{}
 		if err := h.Decoder.Decode(req, obj); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
+		}
+		if req.AdmissionRequest.Operation == admissionv1.Update {
+			oldObj := &appsv1alpha1.ImagePullJob{}
+			if err := h.Decoder.DecodeRaw(req.OldObject, oldObj); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+			if !reflect.DeepEqual(obj.Spec.PullSecrets, oldObj.Spec.PullSecrets) {
+				return admission.Denied("spec.pullSecrets is immutable")
+			}
 		}
 		if err := validate(obj); err != nil {
 			klog.ErrorS(err, "Error validate ImagePullJob", "namespace", obj.Namespace, "name", obj.Name)
@@ -109,6 +132,27 @@ func validate(obj *appsv1alpha1.ImagePullJob) error {
 	if _, err := daemonutil.NormalizeImageRef(obj.Spec.Image); err != nil {
 		return fmt.Errorf("invalid image %s: %v", obj.Spec.Image, err)
 	}
+
+	// Validate Parallelism (only supports integer, not percentage)
+	if obj.Spec.Parallelism != nil {
+		parallelism := obj.Spec.Parallelism
+		if parallelism.Type == intstr.String {
+			if strings.HasSuffix(parallelism.StrVal, "%") {
+				return fmt.Errorf("parallelism does not support percentage value")
+			}
+			// Try to parse as integer
+			val, err := strconv.ParseInt(parallelism.StrVal, 10, 32)
+			if err != nil {
+				return fmt.Errorf("parallelism must be a valid integer: %v", err)
+			}
+			if val < 0 {
+				return fmt.Errorf("parallelism must be non-negative")
+			}
+		} else if parallelism.IntVal < 0 {
+			return fmt.Errorf("parallelism must be non-negative")
+		}
+	}
+
 	if obj.Spec.PullPolicy == nil {
 		obj.Spec.PullPolicy = &appsv1alpha1.PullPolicy{}
 	}
@@ -164,6 +208,27 @@ func validateV1beta1(obj *appsv1beta1.ImagePullJob) error {
 	if _, err := daemonutil.NormalizeImageRef(obj.Spec.Image); err != nil {
 		return fmt.Errorf("invalid image %s: %v", obj.Spec.Image, err)
 	}
+
+	// Validate Parallelism (only supports integer, not percentage)
+	if obj.Spec.Parallelism != nil {
+		parallelism := obj.Spec.Parallelism
+		if parallelism.Type == intstr.String {
+			if strings.HasSuffix(parallelism.StrVal, "%") {
+				return fmt.Errorf("parallelism does not support percentage value")
+			}
+			// Try to parse as integer
+			val, err := strconv.ParseInt(parallelism.StrVal, 10, 32)
+			if err != nil {
+				return fmt.Errorf("parallelism must be a valid integer: %v", err)
+			}
+			if val < 0 {
+				return fmt.Errorf("parallelism must be non-negative")
+			}
+		} else if parallelism.IntVal < 0 {
+			return fmt.Errorf("parallelism must be non-negative")
+		}
+	}
+
 	if obj.Spec.PullPolicy == nil {
 		obj.Spec.PullPolicy = &appsv1beta1.PullPolicy{}
 	}

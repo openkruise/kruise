@@ -296,6 +296,10 @@ func (r *ReconcileImagePullJob) Reconcile(_ context.Context, request reconcile.R
 // so it is necessary to synchronize the pullsecrets of imagepulljob to the kruise-daemon-config namespace
 // to facilitate kruise-daemon to fetch them.
 func (r *ReconcileImagePullJob) syncJobPullSecrets(job *appsv1beta1.ImagePullJob) ([]appsv1beta1.ReferenceObject, error) {
+	if len(job.Spec.PullSecrets) == 0 && job.DeletionTimestamp.IsZero() && job.Status.CompletionTime == nil {
+		return nil, nil
+	}
+
 	var secretRefs []appsv1beta1.ReferenceObject
 	// If it's in kruise-daemon-config namespace, no need to go through the sync logic, return directly
 	if job.Namespace == util.GetKruiseDaemonConfigNamespace() {
@@ -355,21 +359,28 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1beta1.ImagePullJob, ne
 			imageSpec := nodeImage.Spec.Images[imageName]
 			imageSpec.SandboxConfig = job.Spec.SandboxConfig
 
-			for _, secret := range secrets {
-				if !containsObject(imageSpec.PullSecrets, secret) {
-					imageSpec.PullSecrets = append(imageSpec.PullSecrets, secret)
-				}
-			}
-
 			var found bool
+			var secretsSynced bool
 			for i := range imageSpec.Tags {
 				tagSpec := &imageSpec.Tags[i]
 				if tagSpec.Tag != imageTag {
 					continue
 				}
 				if util.ContainsObjectRef(tagSpec.OwnerReferences, *ownerRef) {
-					skip = true
-					return nil
+					needUpdate := false
+					for _, secret := range secrets {
+						if !containsObject(imageSpec.PullSecrets, secret) {
+							imageSpec.PullSecrets = append(imageSpec.PullSecrets, secret)
+							needUpdate = true
+						}
+					}
+					if !needUpdate {
+						skip = true
+						return nil
+					}
+					secretsSynced = true
+					found = true
+					break
 				}
 				// increase version to start a new round of image downloads
 				tagSpec.Version++
@@ -380,6 +391,15 @@ func (r *ReconcileImagePullJob) syncNodeImages(job *appsv1beta1.ImagePullJob, ne
 				found = true
 				break
 			}
+
+			if !secretsSynced {
+				for _, secret := range secrets {
+					if !containsObject(imageSpec.PullSecrets, secret) {
+						imageSpec.PullSecrets = append(imageSpec.PullSecrets, secret)
+					}
+				}
+			}
+
 			if !found {
 				var foundVersion int64 = -1
 				if imageStatus, ok := nodeImage.Status.ImageStatuses[imageName]; ok {
