@@ -161,8 +161,8 @@ var _ = ginkgo.Describe("ResourceDistribution", ginkgo.Serial, ginkgo.Label("Res
 				if err != nil {
 					return err
 				}
-				if len(secret.StringData) != 0 {
-					return fmt.Errorf("secret not yet reverted")
+				if len(secret.Data) != 1 {
+					return fmt.Errorf("secret not yet reverted, data keys: %d", len(secret.Data))
 				}
 				return nil
 			}, 3*time.Minute, time.Second).Should(gomega.BeNil())
