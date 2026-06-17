@@ -489,7 +489,6 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				return condition
 			}, 120*time.Second, 3*time.Second).Should(gomega.Equal(tester.NewCloneSetAvailableCondition()))
-			condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
 
 			oldPods, err := tester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -515,18 +514,19 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 				return cs.Status.Replicas
 			}, 5*time.Second, time.Second).Should(gomega.Equal(int32(3)))
 
-			ginkgo.By("Check cloneSet progressing condition with origin available reason")
-			waitPreDeleteProgressingCondition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			condition = &appsv1alpha1.CloneSetCondition{
+			ginkgo.By("Check cloneSet progressing condition with updated reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 30*time.Second, 3*time.Second).Should(gomega.Equal(&appsv1alpha1.CloneSetCondition{
 				Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
 				Status:             v1.ConditionTrue,
 				LastUpdateTime:     metav1.Time{},
 				LastTransitionTime: metav1.Time{},
 				Reason:             string(appsv1alpha1.CloneSetProgressUpdated),
 				Message:            "CloneSet is progressing",
-			}
-			gomega.Expect(waitPreDeleteProgressingCondition).To(gomega.Equal(condition))
+			}))
 
 			newPods, err := tester.ListPodsForCloneSet(cs.Name)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -561,18 +561,19 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 			keepOldPods := util.GetPodNames(newPods).Intersection(util.GetPodNames(oldPods)).List()
 			gomega.Expect(keepOldPods).To(gomega.HaveLen(2))
 
-			ginkgo.By("Check cloneSet progressing condition with origin available reason")
-			finalProgressingCondition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			condition = &appsv1alpha1.CloneSetCondition{
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 30*time.Second, 3*time.Second).Should(gomega.Equal(&appsv1alpha1.CloneSetCondition{
 				Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
 				Status:             v1.ConditionTrue,
 				LastUpdateTime:     metav1.Time{},
 				LastTransitionTime: metav1.Time{},
 				Reason:             string(appsv1alpha1.CloneSetAvailable),
 				Message:            "CloneSet is available",
-			}
-			gomega.Expect(finalProgressingCondition).To(gomega.Equal(condition))
+			}))
 		})
 
 		ginkgo.It("specific scale down with lifecycle and then scale up, when scalingExcludePreparingDelete is enabled", func() {
@@ -693,18 +694,19 @@ var _ = ginkgo.Describe("CloneSet", ginkgo.Label("CloneSet", "workload"), func()
 			keepOldPods := util.GetPodNames(newPods).Intersection(util.GetPodNames(oldPods)).List()
 			gomega.Expect(keepOldPods).To(gomega.HaveLen(2))
 
-			ginkgo.By("Check cloneSet progressing condition with origin available reason")
-			finalProgressingCondition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			condition = &appsv1alpha1.CloneSetCondition{
+			ginkgo.By("Check cloneSet progressing condition with available reason")
+			gomega.Eventually(func() *appsv1alpha1.CloneSetCondition {
+				condition, err := tester.GetCloneSetProgressingConditionWithoutTime(cs.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return condition
+			}, 30*time.Second, 3*time.Second).Should(gomega.Equal(&appsv1alpha1.CloneSetCondition{
 				Type:               appsv1alpha1.CloneSetConditionTypeProgressing,
 				Status:             v1.ConditionTrue,
 				LastUpdateTime:     metav1.Time{},
 				LastTransitionTime: metav1.Time{},
 				Reason:             string(appsv1alpha1.CloneSetAvailable),
 				Message:            "CloneSet is available",
-			}
-			gomega.Expect(finalProgressingCondition).To(gomega.Equal(condition))
+			}))
 		})
 	})
 
