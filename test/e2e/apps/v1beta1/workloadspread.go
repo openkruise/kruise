@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -199,10 +200,12 @@ var _ = ginkgo.Describe("WorkloadSpread v1beta1", ginkgo.Label("WorkloadSpread",
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(pods).To(gomega.HaveLen(4))
 
-			workloadSpread, err = kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-			gomega.Expect(workloadSpread.Status.SubsetStatuses[0].Replicas).To(gomega.Equal(int32(2)))
-			gomega.Expect(workloadSpread.Status.SubsetStatuses[1].Replicas).To(gomega.Equal(int32(2)))
+			gomega.Eventually(func(g gomega.Gomega) {
+				ws, getErr := kc.AppsV1beta1().WorkloadSpreads(workloadSpread.Namespace).Get(context.TODO(), workloadSpread.Name, metav1.GetOptions{})
+				g.Expect(getErr).NotTo(gomega.HaveOccurred())
+				g.Expect(ws.Status.SubsetStatuses[0].Replicas).To(gomega.Equal(int32(2)))
+				g.Expect(ws.Status.SubsetStatuses[1].Replicas).To(gomega.Equal(int32(2)))
+			}, time.Minute, time.Second).Should(gomega.Succeed())
 
 			ginkgo.By("v1beta1: deploy in two zones done")
 		})
