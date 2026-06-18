@@ -374,8 +374,9 @@ func (r *ReconcileResourceDistribution) SetupWithManager(mgr ctrl.Manager) error
 }
 
 func supportedResourceWatchObjects() []client.Object {
-	return []client.Object{
-		&corev1.Secret{},
-		&corev1.ConfigMap{},
-	}
+	secret := &unstructured.Unstructured{}
+	secret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+	configMap := &unstructured.Unstructured{}
+	configMap.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+	return []client.Object{secret, configMap}
 }
