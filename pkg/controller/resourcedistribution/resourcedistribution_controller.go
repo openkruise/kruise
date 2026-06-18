@@ -111,38 +111,20 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// Watch for changes to Secrets
-	secret := unstructured.Unstructured{}
-	secret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
-	err = c.Watch(source.Kind(mgr.GetCache(), client.Object(&secret), handler.EnqueueRequestForOwner(
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.ResourceDistribution{}, handler.OnlyControllerOwner()),
-		predicate.Funcs{
-			CreateFunc: func(createEvent event.CreateEvent) bool {
-				return false
-			},
-			GenericFunc: func(genericEvent event.GenericEvent) bool {
-				return false
-			},
-		}))
-	if err != nil {
-		return err
-	}
-
-	// Watch for changes to ConfigMap
-	configMap := unstructured.Unstructured{}
-	configMap.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
-	err = c.Watch(source.Kind(mgr.GetCache(), client.Object(&configMap), handler.EnqueueRequestForOwner(
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.ResourceDistribution{}, handler.OnlyControllerOwner()),
-		predicate.Funcs{
-			CreateFunc: func(createEvent event.CreateEvent) bool {
-				return false
-			},
-			GenericFunc: func(genericEvent event.GenericEvent) bool {
-				return false
-			},
-		}))
-	if err != nil {
-		return err
+	for _, watchedObject := range supportedResourceWatchObjects() {
+		err = c.Watch(source.Kind(mgr.GetCache(), watchedObject, handler.EnqueueRequestForOwner(
+			mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1alpha1.ResourceDistribution{}, handler.OnlyControllerOwner()),
+			predicate.Funcs{
+				CreateFunc: func(createEvent event.CreateEvent) bool {
+					return false
+				},
+				GenericFunc: func(genericEvent event.GenericEvent) bool {
+					return false
+				},
+			}))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -389,4 +371,12 @@ func (r *ReconcileResourceDistribution) SetupWithManager(mgr ctrl.Manager) error
 		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
 		// For().
 		Complete(r)
+}
+
+func supportedResourceWatchObjects() []client.Object {
+	secret := &unstructured.Unstructured{}
+	secret.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+	configMap := &unstructured.Unstructured{}
+	configMap.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+	return []client.Object{secret, configMap}
 }
