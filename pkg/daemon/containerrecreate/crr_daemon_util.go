@@ -109,8 +109,6 @@ func getCurrentCRRContainersRecreateStates(
 				Name:  c.Name,
 				Phase: appsv1alpha1.ContainerRecreateRequestPending,
 			}
-		} else if kubeContainerStatus.ID.String() != c.StatusContext.ContainerID ||
-			kubeContainerStatus.RestartCount > int(c.StatusContext.RestartCount) {
 		} else if c.StatusContext != nil && (kubeContainerStatus.ID.String() != c.StatusContext.ContainerID ||
 			kubeContainerStatus.RestartCount > int(c.StatusContext.RestartCount)) {
 			// already recreated or restarted
