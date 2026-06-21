@@ -1,0 +1,77 @@
+# options for analysis running
+run:
+  # default concurrency is a available CPU number
+  concurrency: 4
+
+# exit code when at least one issue was found, default is 1
+  issues-exit-code: 1
+
+  # include test files or not, default is true
+  tests: true
+
+  # list of build tags, all linters use it. Default is empty list.
+  #build-tags:
+  #  - mytag
+
+# output configuration options
+output:
+  formats:
+    text:
+      path: stdout
+      color: true
+
+  # print lines of code with issue, default is true
+  print-issued-lines: true
+
+  # print linter name in the end of issue text, default is true
+  print-linter-name: true
+
+
+linters:
+  fast: false
+  disable-all: true
+  exclusions:
+    paths:
+    - apis
+    - pkg/client
+    - vendor
+    - test
+  enable:
+    # TODO Enforce the below linters later
+    - govet
+    - ineffassign
+    - misspell
+    - vet
+    - unconvert
+    - unused
+    - depguard
+  settings:
+    misspell:
+      # Correct spellings using locale preferences for US or UK.
+      # Default is to use a neutral variety of English.
+      # Setting locale to US will correct the British spelling of 'colour' to 'color'.
+      locale: US
+    depguard:
+      rules:
+        forbid-pkg-errors:
+          deny:
+          - pkg: "github.com/pkg/errors"
+            dsc: Should be replaced with standard lib errors or fmt.Errorf
+
+
+formatters:
+  enable:
+  - gofmt
+  - goimports
+  settings:
+    gofmt:
+      simplify: true
+  goimports:
+    # put imports beginning with prefix after 3rd-party packages;
+    # it's a comma-separated list of prefixes
+    local-prefixes: github.com/openkruise/kruise
+
+issues:
+  exclude:
+    # staticcheck
+    - 'SA1019: package github.com/golang/protobuf/proto is deprecated: Use the "google.golang.org/protobuf/proto" package instead'

@@ -494,6 +494,9 @@ func (r *ReconcileCloneSet) getActiveRevisions(cs *appsv1alpha1.CloneSet, revisi
 		lastEqualRevision := equalRevisions[equalCount-1]
 		if !VCTHashEqual(lastEqualRevision, updateRevision) {
 			klog.InfoS("Revision vct hash will be updated", "revisionName", lastEqualRevision.Name, "lastRevisionVCTHash", lastEqualRevision.Annotations[volumeclaimtemplate.HashAnnotation], "updateRevisionVCTHash", updateRevision.Annotations[volumeclaimtemplate.HashAnnotation])
+			if lastEqualRevision.Annotations == nil {
+				lastEqualRevision.Annotations = make(map[string]string)
+			}
 			lastEqualRevision.Annotations[volumeclaimtemplate.HashAnnotation] = updateRevision.Annotations[volumeclaimtemplate.HashAnnotation]
 		}
 		// if the equivalent revision is not immediately prior we will roll back by incrementing the
