@@ -36,18 +36,32 @@ func TestEnqueueAfterDelete(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
-		obj  interface{}
+		name    string
+		obj     interface{}
+		wantKey string
 	}{
 		{
-			name: "delete event",
-			obj:  crr,
+			name:    "delete event",
+			obj:     crr,
+			wantKey: "default/pod-1",
 		},
 		{
 			name: "delete tombstone",
 			obj: cache.DeletedFinalStateUnknown{
 				Key: "default/crr-1",
 				Obj: crr,
+			},
+			wantKey: "default/pod-1",
+		},
+		{
+			name: "unexpected delete object",
+			obj:  struct{}{},
+		},
+		{
+			name: "tombstone containing unexpected object",
+			obj: cache.DeletedFinalStateUnknown{
+				Key: "default/not-a-crr",
+				Obj: struct{}{},
 			},
 		},
 	}
@@ -59,6 +73,12 @@ func TestEnqueueAfterDelete(t *testing.T) {
 
 			enqueueAfterDelete(queue, tt.obj)
 
+			if tt.wantKey == "" {
+				if queue.Len() != 0 {
+					t.Fatalf("expected no queued key, got %d", queue.Len())
+				}
+				return
+			}
 			if queue.Len() != 1 {
 				t.Fatalf("expected one queued key, got %d", queue.Len())
 			}
@@ -67,8 +87,8 @@ func TestEnqueueAfterDelete(t *testing.T) {
 				t.Fatal("queue unexpectedly shut down")
 			}
 			defer queue.Done(key)
-			if key != "default/pod-1" {
-				t.Fatalf("expected key default/pod-1, got %v", key)
+			if key != tt.wantKey {
+				t.Fatalf("expected key %s, got %v", tt.wantKey, key)
 			}
 		})
 	}
