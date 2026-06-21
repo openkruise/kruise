@@ -163,12 +163,19 @@ When adding a new API type or controller:
 5. make generate && make manifests
 ```
 
-## Common Pitfalls
+## Behavioral Rules
 
-- Forgetting `make generate && make manifests` after modifying API types
-- Using `github.com/pkg/errors` instead of `fmt.Errorf` with `%w`
-- Manually editing generated code under `pkg/client/`, `zz_generated.deepcopy.go`, or `config/crd/bases/`
-- Missing license boilerplate on new `.go` files
-- Import order not matching goimports local prefix convention
-- Performing blocking or locking operations in controller event handlers instead of the reconcile loop
-- Accessing cluster-scoped resources from daemon code
+- Import order need matching goimports local prefix convention
+- Don't perform blocking or locking operations in controller event handlers instead of the reconcile loop
+- Don't Access cluster-scoped resources from daemon code
+- Read related files before modifying code
+- Don't edit `client/`, `proto/`, `config/crd/` — run `make generate` or `make manifests` instead
+- After modifying `api/`, run `make generate manifests`
+- Don't delete comments unless outdated
+- New `.go` files need Apache 2.0 license header from `hack/boilerplate.go.txt`
+- Use `Expectations` (`pkg/utils/expectations/`) for slow informer cache issues
+- New APIs/architectural changes need proposal in `docs/proposals/`
+- Ask user when unsure about business logic
+- Always edit the files on your own, never use automation tools or scripts
+- All comments must be in English
+- Always commit with sign-off (e.g. `git commit -s`)

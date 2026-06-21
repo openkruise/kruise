@@ -1331,3 +1331,298 @@ func randomString(n int) string {
 	}
 	return string(b)
 }
+
+func TestGetActiveRevisions(t *testing.T) {
+	// Helper to create a CloneSet with VolumeClaimTemplates
+	newCloneSetWithVCT := func() *appsv1beta1.CloneSet {
+		cs := &appsv1beta1.CloneSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-cs",
+				Namespace: "default",
+				UID:       types.UID("test-uid"),
+			},
+			Spec: appsv1beta1.CloneSetSpec{
+				Replicas: getInt32(1),
+				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
+				Template: v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "test"}},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{Name: "nginx", Image: "nginx:1.9.1"}},
+					},
+				},
+				VolumeClaimTemplates: []v1.PersistentVolumeClaim{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "data-vol"},
+						Spec: v1.PersistentVolumeClaimSpec{
+							AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+							Resources: v1.VolumeResourceRequirements{
+								Requests: v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Gi")},
+							},
+						},
+					},
+				},
+			},
+		}
+		defaults.SetDefaultsCloneSetV1beta1(cs, true)
+		return cs
+	}
+
+	// Pre-compute the Data.Raw that NewRevision produces for the CloneSet with VCT.
+	// This allows us to construct "equal" history revisions whose Data.Raw matches
+	// the updateRevision that getActiveRevisions will create internally.
+	rc := revisioncontrol.NewRevisionControl()
+	var cc int32
+	refRev, err := rc.NewRevision(newCloneSetWithVCT(), 1, &cc)
+	if err != nil {
+		t.Fatalf("failed to create reference revision: %v", err)
+	}
+	equalDataRaw := refRev.Data.Raw
+	expectedVCTHash := refRev.Annotations[volumeclaimtemplate.HashAnnotation]
+
+	// A different Data.Raw that will not match any equal revision.
+	differentDataRaw := []byte(`{"spec":{"template":{"$patch":"replace","metadata":{"creationTimestamp":null,"labels":{"foo":"bar"}},"spec":{"containers":[{"image":"different:1.0","name":"nginx"}]}}}}`)
+
+	cases := []struct {
+		name         string
+		getCloneSet  func() *appsv1beta1.CloneSet
+		getRevisions func() []*appsv1.ControllerRevision
+		expectErr    bool
+		validate     func(t *testing.T, currentRev, updateRev *appsv1.ControllerRevision, collisionCount int32)
+	}{
+		{
+			// This is the main bug case: an equal revision with nil Annotations.
+			// Before the fix, writing to lastEqualRevision.Annotations[...] panics
+			// because the map is nil.
+			name:        "equal revision with nil annotations should not panic",
+			getCloneSet: newCloneSetWithVCT,
+			getRevisions: func() []*appsv1.ControllerRevision {
+				return []*appsv1.ControllerRevision{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:        "test-cs-equal-1",
+							Namespace:   "default",
+							Annotations: nil,
+						},
+						Revision: 1,
+						Data:     runtime.RawExtension{Raw: equalDataRaw},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-cs-diff-2",
+							Namespace: "default",
+						},
+						Revision: 2,
+						Data:     runtime.RawExtension{Raw: differentDataRaw},
+					},
+				}
+			},
+			expectErr: false,
+			validate: func(t *testing.T, currentRev, updateRev *appsv1.ControllerRevision, collisionCount int32) {
+				if updateRev == nil {
+					t.Fatal("expected non-nil updateRevision")
+				}
+				// The updateRevision should have been rolled back to the equal revision
+				// with the VCT hash annotation set.
+				if updateRev.Annotations == nil {
+					t.Fatal("expected non-nil annotations on updateRevision")
+				}
+				if got := updateRev.Annotations[volumeclaimtemplate.HashAnnotation]; got != expectedVCTHash {
+					t.Errorf("expected VCT hash %q, got %q", expectedVCTHash, got)
+				}
+				// The updateRevision should have the new revision number (3 = 2 + 1).
+				if updateRev.Revision != 3 {
+					t.Errorf("expected revision 3, got %d", updateRev.Revision)
+				}
+			},
+		},
+		{
+			name:        "equal revision is the last (immediately prior)",
+			getCloneSet: newCloneSetWithVCT,
+			getRevisions: func() []*appsv1.ControllerRevision {
+				return []*appsv1.ControllerRevision{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-cs-diff-1",
+							Namespace: "default",
+						},
+						Revision: 1,
+						Data:     runtime.RawExtension{Raw: differentDataRaw},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:        "test-cs-equal-2",
+							Namespace:   "default",
+							Annotations: map[string]string{volumeclaimtemplate.HashAnnotation: expectedVCTHash},
+						},
+						Revision: 2,
+						Data:     runtime.RawExtension{Raw: equalDataRaw},
+					},
+				}
+			},
+			expectErr: false,
+			validate: func(t *testing.T, currentRev, updateRev *appsv1.ControllerRevision, collisionCount int32) {
+				if updateRev == nil {
+					t.Fatal("expected non-nil updateRevision")
+				}
+				// When the equal revision is immediately prior, updateRevision is reused.
+				if updateRev.Name != "test-cs-equal-2" {
+					t.Errorf("expected updateRevision name test-cs-equal-2, got %s", updateRev.Name)
+				}
+			},
+		},
+		{
+			name:        "no equal revisions, create new one",
+			getCloneSet: newCloneSetWithVCT,
+			getRevisions: func() []*appsv1.ControllerRevision {
+				return []*appsv1.ControllerRevision{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-cs-diff-1",
+							Namespace: "default",
+						},
+						Revision: 1,
+						Data:     runtime.RawExtension{Raw: differentDataRaw},
+					},
+				}
+			},
+			expectErr: false,
+			validate: func(t *testing.T, currentRev, updateRev *appsv1.ControllerRevision, collisionCount int32) {
+				if updateRev == nil {
+					t.Fatal("expected non-nil updateRevision")
+				}
+				// A new revision should be created with revision number 2.
+				if updateRev.Revision != 2 {
+					t.Errorf("expected revision 2, got %d", updateRev.Revision)
+				}
+			},
+		},
+		{
+			name:        "equal revision with matching VCT hash, no annotation update needed",
+			getCloneSet: newCloneSetWithVCT,
+			getRevisions: func() []*appsv1.ControllerRevision {
+				return []*appsv1.ControllerRevision{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:        "test-cs-equal-1",
+							Namespace:   "default",
+							Annotations: map[string]string{volumeclaimtemplate.HashAnnotation: expectedVCTHash},
+						},
+						Revision: 1,
+						Data:     runtime.RawExtension{Raw: equalDataRaw},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-cs-diff-2",
+							Namespace: "default",
+						},
+						Revision: 2,
+						Data:     runtime.RawExtension{Raw: differentDataRaw},
+					},
+				}
+			},
+			expectErr: false,
+			validate: func(t *testing.T, currentRev, updateRev *appsv1.ControllerRevision, collisionCount int32) {
+				if updateRev == nil {
+					t.Fatal("expected non-nil updateRevision")
+				}
+				// VCT hash should remain unchanged.
+				if got := updateRev.Annotations[volumeclaimtemplate.HashAnnotation]; got != expectedVCTHash {
+					t.Errorf("expected VCT hash %q, got %q", expectedVCTHash, got)
+				}
+				// The updateRevision should have the new revision number (3 = 2 + 1).
+				if updateRev.Revision != 3 {
+					t.Errorf("expected revision 3, got %d", updateRev.Revision)
+				}
+			},
+		},
+		{
+			name:        "equal revision with non-nil but different VCT hash",
+			getCloneSet: newCloneSetWithVCT,
+			getRevisions: func() []*appsv1.ControllerRevision {
+				return []*appsv1.ControllerRevision{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:        "test-cs-equal-1",
+							Namespace:   "default",
+							Annotations: map[string]string{volumeclaimtemplate.HashAnnotation: "wrong-hash"},
+						},
+						Revision: 1,
+						Data:     runtime.RawExtension{Raw: equalDataRaw},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "test-cs-diff-2",
+							Namespace: "default",
+						},
+						Revision: 2,
+						Data:     runtime.RawExtension{Raw: differentDataRaw},
+					},
+				}
+			},
+			expectErr: false,
+			validate: func(t *testing.T, currentRev, updateRev *appsv1.ControllerRevision, collisionCount int32) {
+				if updateRev == nil {
+					t.Fatal("expected non-nil updateRevision")
+				}
+				// VCT hash should be updated to the correct value.
+				if got := updateRev.Annotations[volumeclaimtemplate.HashAnnotation]; got != expectedVCTHash {
+					t.Errorf("expected VCT hash %q, got %q", expectedVCTHash, got)
+				}
+				// The updateRevision should have the new revision number (3 = 2 + 1).
+				if updateRev.Revision != 3 {
+					t.Errorf("expected revision 3, got %d", updateRev.Revision)
+				}
+			},
+		},
+		{
+			name:        "empty revisions list, create new one",
+			getCloneSet: newCloneSetWithVCT,
+			getRevisions: func() []*appsv1.ControllerRevision {
+				return []*appsv1.ControllerRevision{}
+			},
+			expectErr: false,
+			validate: func(t *testing.T, currentRev, updateRev *appsv1.ControllerRevision, collisionCount int32) {
+				if updateRev == nil {
+					t.Fatal("expected non-nil updateRevision")
+				}
+				// A new revision should be created with revision number 1.
+				if updateRev.Revision != 1 {
+					t.Errorf("expected revision 1, got %d", updateRev.Revision)
+				}
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			reconciler := newMockCloneSetReconciler()
+			cs := tc.getCloneSet()
+			// Create CloneSet in client (needed by CreateControllerRevision).
+			if err := reconciler.Client.Create(context.TODO(), cs); err != nil {
+				t.Fatalf("failed to create cloneset: %v", err)
+			}
+
+			revisions := tc.getRevisions()
+			for i := range revisions {
+				if err := reconciler.Client.Create(context.TODO(), revisions[i]); err != nil {
+					t.Fatalf("failed to create revision %s: %v", revisions[i].Name, err)
+				}
+			}
+
+			currentRev, updateRev, collisionCount, err := reconciler.getActiveRevisions(cs, revisions)
+			if tc.expectErr {
+				if err == nil {
+					t.Fatal("expected error but got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tc.validate != nil {
+				tc.validate(t, currentRev, updateRev, collisionCount)
+			}
+		})
+	}
+}
