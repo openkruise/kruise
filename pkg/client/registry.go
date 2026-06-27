@@ -2,11 +2,16 @@ package client
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/coreos/go-semver/semver"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/rest"
 )
+
+// nonDigitSuffix matches any trailing non-numeric characters in a version component,
+// e.g. "28+" or "19+" produced by some private Kubernetes distributions.
+var nonDigitSuffix = regexp.MustCompile(`[^0-9].*$`)
 
 var (
 	cfg *rest.Config
@@ -55,5 +60,12 @@ func GetCurrentServerVersion() *version.Info {
 // ShouldUpdateResourceByResize returns whether should update resource by resize
 // The resize sub-resource was introduced in version 1.32, https://github.com/kubernetes/kubernetes/pull/128266
 func ShouldUpdateResourceByResize() bool {
-	return semver.New(fmt.Sprintf("%s.%s.0", curVersion.Major, curVersion.Minor)).Compare(*semver.New("1.32.0")) >= 0
+	// Some private/custom Kubernetes distributions report Minor versions with a
+	// non-numeric suffix (e.g. "28+" or "19+"). Strip it before semver parsing
+	// to avoid a panic in semver.New.
+	minor := nonDigitSuffix.ReplaceAllString(curVersion.Minor, "")
+	if minor == "" {
+		minor = "0"
+	}
+	return semver.New(fmt.Sprintf("%s.%s.0", curVersion.Major, minor)).Compare(*semver.New("1.32.0")) >= 0
 }
