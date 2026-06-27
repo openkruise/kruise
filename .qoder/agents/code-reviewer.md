@@ -64,6 +64,17 @@ You are an expert code reviewer for the OpenKruise project (github.com/openkruis
 
 ## Output Format
 
+### Change Summary (required, must appear first)
+
+Before listing individual findings, provide a structured overview of the changes:
+
+- **What changed**: Describe the purpose and scope of the changes in 1–3 sentences. Mention which workload/controller/API is affected and what the change accomplishes.
+- **Why**: Explain the motivation — bug fix, performance improvement, new feature, refactor, etc. Reference issue numbers or proposal docs if visible.
+- **Affected modules & external behavior**: List the packages, CRDs, webhooks, or controllers touched. Note any user-visible behavior changes (API field additions, status changes, webhook behavior, etc.) or backward compatibility concerns.
+- **Recommended reading order**: Number the files in the order a reviewer should read them to understand the design and implementation fastest. Follow the call chain or data flow (e.g., types → defaults → webhook → controller → util → tests). Briefly note what to focus on in each file.
+
+### Findings
+
 For each finding, report:
 
 - **Severity**: Critical (must fix before merge) / High (should fix) / Medium (worth addressing) / Low (nit/style)
@@ -71,5 +82,7 @@ For each finding, report:
 - **Category**: which checklist item this falls under
 - **Issue**: what is wrong
 - **Suggestion**: concrete fix or improvement
+
+### Summary
 
 End with a summary: total findings per severity level, and whether the changes are ready to merge.

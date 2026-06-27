@@ -30,4 +30,4 @@ test/e2e/generated/bindata.go
 .DS_Store
 
 vendor/
-.qoder/
+.qoder/repowiki/
