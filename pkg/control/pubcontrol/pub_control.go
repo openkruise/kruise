@@ -40,6 +40,7 @@ import (
 	"github.com/openkruise/kruise/pkg/control/sidecarcontrol"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
+	utilcontainermeta "github.com/openkruise/kruise/pkg/util/containermeta"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 )
@@ -121,8 +122,49 @@ func (c *commonControl) CanResizeInplace(oldPod, newPod *corev1.Pod) bool {
 		return false
 	}
 
-	// TODO: Check annotations、labels bind with env using downwardAPI and considering `InPlaceUpdateEnvFromMetadata` featureGate in kruise-daemon
+	if isChangedMetadataReferencedByEnv(oldPod, newPod) {
+		klog.V(3).InfoS("Pod metadata referenced by env changed, and maybe cause unavailability", "pod", klog.KObj(newPod))
+		return false
+	}
 	return true
+}
+
+func isChangedMetadataReferencedByEnv(oldPod, newPod *corev1.Pod) bool {
+	for key, value := range newPod.Labels {
+		if isMapValueChanged(oldPod.Labels, key, value) && isAnyContainerReferenceToMeta(newPod.Spec.Containers, "metadata.labels", key) {
+			return true
+		}
+	}
+	for key, value := range oldPod.Labels {
+		if isMapValueChanged(newPod.Labels, key, value) && isAnyContainerReferenceToMeta(newPod.Spec.Containers, "metadata.labels", key) {
+			return true
+		}
+	}
+	for key, value := range newPod.Annotations {
+		if isMapValueChanged(oldPod.Annotations, key, value) && isAnyContainerReferenceToMeta(newPod.Spec.Containers, "metadata.annotations", key) {
+			return true
+		}
+	}
+	for key, value := range oldPod.Annotations {
+		if isMapValueChanged(newPod.Annotations, key, value) && isAnyContainerReferenceToMeta(newPod.Spec.Containers, "metadata.annotations", key) {
+			return true
+		}
+	}
+	return false
+}
+
+func isMapValueChanged(values map[string]string, key, oldValue string) bool {
+	value, exist := values[key]
+	return !exist || value != oldValue
+}
+
+func isAnyContainerReferenceToMeta(containers []corev1.Container, fieldPath, key string) bool {
+	for i := range containers {
+		if utilcontainermeta.IsContainerReferenceToMeta(&containers[i], fieldPath, key) {
+			return true
+		}
+	}
+	return false
 }
 
 // only allowedResizeResourceKey with NotRequired or "" restartPolicy can do inplace update
