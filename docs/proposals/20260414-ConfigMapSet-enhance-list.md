@@ -40,16 +40,14 @@ This approach is feasible, but lacks flexibility.
 
 ### New proposal improvement
 
-The new proposal adds `reloadSidecarConfig`, explicitly supporting three injection modes:
+The new proposal adds `reloadSidecarConfig`, explicitly supporting the following injection modes:
 
-1. `type: k8s`
-   Inject the container directly by `ConfigMapSet` when the Pod is created.
-
-2. `type: sidecarset`
+1. `type: sidecarset`
    Inject by referencing a container defined in OpenKruise `SidecarSet`.
 
-3. `type: custom`
+2. `type: custom` (Default)
    Reference a `ConfigMap` to customize reload-sidecar configuration and enable cross-namespace reuse.
+   If `reloadSidecarConfig` or its `type` is not specified, or if it is `custom` but `configMapRef` is missing, the system will automatically load the default ConfigMap configuration (`namespace: kruise-system`, `name: default-reload-sidecar-config`), which can be customized in the helm manifests.
 
 ### Value of the improvement
 
@@ -76,7 +74,7 @@ In essence, configuration effect is driven by restart.
 
 The new proposal introduces `effectPolicy`, supporting three configuration effect modes:
 
-1. `ReStart`
+1. `Restart`
    - restart `reload-sidecar` first
    - then restart business containers
    - suitable for the safest strong-consistency scenarios
