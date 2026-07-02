@@ -566,6 +566,17 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 				gomega.Expect(sidecarContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 
 				ginkgo.By("Check Pod sidecar container recreated not waiting for app container ready")
+				// LastTerminationState.Terminated may not yet be populated by the
+				// kubelet right after a force-recreate, so poll until both
+				// containers have a previous termination recorded.
+				gomega.Eventually(func() bool {
+					pod, err = tester.GetPod(pod.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					appContainerStatus = util.GetContainerStatus("app", pod)
+					sidecarContainerStatus = util.GetContainerStatus("sidecar", pod)
+					return appContainerStatus.LastTerminationState.Terminated != nil &&
+						sidecarContainerStatus.LastTerminationState.Terminated != nil
+				}, 30*time.Second, time.Second).Should(gomega.Equal(true))
 				interval := sidecarContainerStatus.LastTerminationState.Terminated.FinishedAt.Sub(appContainerStatus.LastTerminationState.Terminated.FinishedAt.Time)
 				gomega.Expect(interval < 3*time.Second).Should(gomega.Equal(true))
 			}
@@ -621,6 +632,17 @@ var _ = ginkgo.Describe("ContainerRecreateRequest", ginkgo.Label("ContainerRecre
 				gomega.Expect(sidecarContainerStatus.RestartCount).Should(gomega.Equal(int32(1)))
 
 				ginkgo.By("Check Pod sidecar container recreated after app container ready")
+				// LastTerminationState.Terminated may not yet be populated by the
+				// kubelet right after a force-recreate, so poll until both
+				// containers have a previous termination recorded.
+				gomega.Eventually(func() bool {
+					pod, err = tester.GetPod(pod.Name)
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					appContainerStatus = util.GetContainerStatus("app", pod)
+					sidecarContainerStatus = util.GetContainerStatus("sidecar", pod)
+					return appContainerStatus.LastTerminationState.Terminated != nil &&
+						sidecarContainerStatus.LastTerminationState.Terminated != nil
+				}, 30*time.Second, time.Second).Should(gomega.Equal(true))
 				interval := sidecarContainerStatus.LastTerminationState.Terminated.FinishedAt.Sub(appContainerStatus.LastTerminationState.Terminated.FinishedAt.Time)
 				gomega.Expect(interval >= 5*time.Second).Should(gomega.Equal(true))
 			}
