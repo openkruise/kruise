@@ -2,7 +2,6 @@ package validating
 
 import (
 	"reflect"
-	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -137,9 +136,6 @@ func validateContainerCommon(ctr *core.Container, path *field.Path, opts validat
 // This is called by validateContainersOnlyForPod and validateEphemeralContainers directly.
 func validateContainerOnlyForPod(ctr *core.Container, path *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(ctr.Image) != len(strings.TrimSpace(ctr.Image)) {
-		allErrs = append(allErrs, field.Invalid(path.Child("image"), ctr.Image, "must not have leading or trailing whitespace"))
-	}
 	return allErrs
 }
 
