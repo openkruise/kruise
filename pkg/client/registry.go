@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/coreos/go-semver/semver"
 	"k8s.io/apimachinery/pkg/version"
@@ -54,6 +55,42 @@ func GetCurrentServerVersion() *version.Info {
 
 // ShouldUpdateResourceByResize returns whether should update resource by resize
 // The resize sub-resource was introduced in version 1.32, https://github.com/kubernetes/kubernetes/pull/128266
-func ShouldUpdateResourceByResize() bool {
-	return semver.New(fmt.Sprintf("%s.%s.0", curVersion.Major, curVersion.Minor)).Compare(*semver.New("1.32.0")) >= 0
+func ShouldUpdateResourceByResize() (result bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			// semver.New panics on strings that are not in dotted-tri format
+			// (e.g. unexpected non-numeric content from custom build metadata).
+			// Treat that as "not >= 1.32" so the caller falls back to the
+			// pre-1.32 update path.
+			_ = r
+			result = false
+		}
+	}()
+	// coreos/go-semver does not strip the leading 'v' that k8s prefixes on
+	// GitVersion (e.g. "v1.32.0"). Remove it before parsing.
+	v := strings.TrimPrefix(curVersion.GitVersion, "v")
+	// digitsOnly cleans each dotted component so cloud-provider build metadata
+	// (e.g. "1.32+gke.1" → "1.32.1") does not cause a parse panic. SplitN
+	// keeps at most three parts (major/minor/patch); any extra segments are
+	// folded into the last part and then trimmed by digitsOnly. Any
+	// remaining format exception is caught by the deferred recover above.
+	parts := strings.SplitN(v, ".", 3)
+	for i, p := range parts {
+		parts[i] = digitsOnly(p)
+	}
+	cur := semver.New(strings.Join(parts, "."))
+	return cur.Compare(*semver.New("1.32.0")) >= 0
+}
+
+// digitsOnly returns the leading numeric prefix of a version component.
+// This handles GKE/EKS-style build metadata embedded in a component
+// (e.g. "32+gke" → "32"). If the input has no leading digit, an empty
+// string is returned.
+func digitsOnly(s string) string {
+	for i, r := range s {
+		if r < '0' || r > '9' {
+			return s[:i]
+		}
+	}
+	return s
 }
