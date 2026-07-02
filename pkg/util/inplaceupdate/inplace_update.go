@@ -319,7 +319,13 @@ func (c *realControl) Update(pod *v1.Pod, oldRevision, newRevision *apps.Control
 		return UpdateResult{}
 	}
 
-	// TODO(FillZpp): maybe we should check if the previous in-place update has completed
+	latestPod, err := c.podAdapter.GetPod(pod.Namespace, pod.Name)
+	if err != nil {
+		return UpdateResult{InPlaceUpdate: true, UpdateErr: err}
+	}
+	if err = opts.CheckPodUpdateCompleted(latestPod); err != nil {
+		return UpdateResult{InPlaceUpdate: true, UpdateErr: fmt.Errorf("previous in-place update has not completed: %w", err)}
+	}
 
 	// 2. update condition for pod with readiness-gate
 	// When only workload resources are updated, they are marked as not needing to remove traffic
