@@ -238,6 +238,66 @@ func GetNodesNeedingPods(newPodsNum, desire, partition int, progressive bool, no
 	return nodesNeedingPods
 }
 
+// applyNodePatches applies matching NodePatches from the DaemonSet spec to the given pod template,
+// based on the labels of the target node. Patches are applied in the order they appear in the list;
+// later patches override earlier ones on conflicting fields.
+func applyNodePatches(template *corev1.PodTemplateSpec, node *corev1.Node, patches []appsv1beta1.DaemonSetNodePatch) {
+	nodeLabels := labels.Set(node.Labels)
+	for _, patch := range patches {
+		if patch.Selector == nil {
+			continue
+		}
+		selector, err := metav1.LabelSelectorAsSelector(patch.Selector)
+		if err != nil || !selector.Matches(nodeLabels) {
+			continue
+		}
+		// Apply metadata overrides (labels and annotations)
+		if patch.Patch.Metadata != nil {
+			for k, v := range patch.Patch.Metadata.Labels {
+				if template.Labels == nil {
+					template.Labels = make(map[string]string)
+				}
+				template.Labels[k] = v
+			}
+			for k, v := range patch.Patch.Metadata.Annotations {
+				if template.Annotations == nil {
+					template.Annotations = make(map[string]string)
+				}
+				template.Annotations[k] = v
+			}
+		}
+		// Apply container-level overrides
+		if patch.Patch.Spec != nil {
+			for _, containerPatch := range patch.Patch.Spec.Containers {
+				for i := range template.Spec.Containers {
+					if template.Spec.Containers[i].Name != containerPatch.Name {
+						continue
+					}
+					// Merge env vars: override existing by name, append new ones
+					for _, patchEnv := range containerPatch.Env {
+						found := false
+						for j := range template.Spec.Containers[i].Env {
+							if template.Spec.Containers[i].Env[j].Name == patchEnv.Name {
+								template.Spec.Containers[i].Env[j] = patchEnv
+								found = true
+								break
+							}
+						}
+						if !found {
+							template.Spec.Containers[i].Env = append(template.Spec.Containers[i].Env, patchEnv)
+						}
+					}
+					// Override resources wholesale if specified
+					if containerPatch.Resources != nil {
+						template.Spec.Containers[i].Resources = *containerPatch.Resources
+					}
+					break
+				}
+			}
+		}
+	}
+}
+
 func keyFunc(ds *appsv1beta1.DaemonSet) string {
 	return fmt.Sprintf("%s/%s", ds.Namespace, ds.Name)
 }

@@ -25,6 +25,52 @@ import (
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 )
 
+// DaemonSetNodePatch defines a per-node-label pod template patch.
+type DaemonSetNodePatch struct {
+	// Selector is a label query over nodes. Pods on matching nodes will have this patch applied.
+	// Required; at least one match expression or label must be specified.
+	Selector *metav1.LabelSelector `json:"selector"`
+	// Patch is the pod template delta to apply to pods on matching nodes.
+	Patch DaemonSetNodeTemplatePatch `json:"patch"`
+}
+
+// DaemonSetNodeTemplatePatch describes partial overrides merged into the pod template.
+type DaemonSetNodeTemplatePatch struct {
+	// Metadata overrides (labels and annotations) for pods on matched nodes.
+	// +optional
+	Metadata *DaemonSetNodePatchObjectMeta `json:"metadata,omitempty"`
+	// Spec overrides for pods on matched nodes.
+	// +optional
+	Spec *DaemonSetNodePatchPodSpec `json:"spec,omitempty"`
+}
+
+// DaemonSetNodePatchObjectMeta contains label and annotation overrides.
+type DaemonSetNodePatchObjectMeta struct {
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// DaemonSetNodePatchPodSpec contains container-level overrides.
+type DaemonSetNodePatchPodSpec struct {
+	// Containers holds per-container overrides matched by name.
+	// +optional
+	Containers []DaemonSetNodePatchContainer `json:"containers,omitempty"`
+}
+
+// DaemonSetNodePatchContainer defines env and resource overrides for a named container.
+type DaemonSetNodePatchContainer struct {
+	// Name must match a container name in the pod template.
+	Name string `json:"name"`
+	// Env is a list of environment variables to add or override (matched by Name).
+	// +optional
+	Env []corev1.EnvVar `json:"env,omitempty"`
+	// Resources defines resource requests/limits override.
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
 // DaemonSetUpdateStrategy is a struct used to control the update strategy for a DaemonSet.
 type DaemonSetUpdateStrategy struct {
 	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete". Default is RollingUpdate.
@@ -164,6 +210,12 @@ type DaemonSetSpec struct {
 	// employed to create Pods in the DaemonSet.
 	// +optional
 	ScaleStrategy *DaemonSetScaleStrategy `json:"scaleStrategy,omitempty"`
+
+	// NodePatches allows per-node-label overrides to the pod template.
+	// Before creating a pod, the controller checks each patch's selector against the target node's labels.
+	// Patches are applied in order; later patches override earlier ones when fields conflict.
+	// +optional
+	NodePatches []DaemonSetNodePatch `json:"nodePatches,omitempty"`
 }
 
 // DaemonSetScaleStrategy defines strategies for DaemonSet scaling.

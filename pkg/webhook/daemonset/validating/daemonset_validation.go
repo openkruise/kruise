@@ -77,6 +77,7 @@ func validateDaemonSetSpec(spec *appsv1alpha1.DaemonSetSpec, fldPath *field.Path
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("lifecycle", "inPlaceUpdate"), "inPlaceUpdate hook has not supported yet"))
 		}
 	}
+	allErrs = append(allErrs, validateNodePatches(spec.NodePatches, fldPath.Child("nodePatches"))...)
 	return allErrs
 }
 
@@ -139,6 +140,46 @@ func validateRollingUpdateDaemonSet(rollingUpdate *appsv1alpha1.RollingUpdateDae
 		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*rollingUpdate.Partition, fldPath.Child("rollingUpdate").Child("partition"))...)
 	}
 
+	return allErrs
+}
+
+// validateNodePatches validates the NodePatches field on a DaemonSetSpec.
+// It is called for both v1alpha1 and v1beta1 (after converting the patches to the v1alpha1 type).
+func validateNodePatches(patches []appsv1alpha1.DaemonSetNodePatch, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, patch := range patches {
+		idxPath := fldPath.Index(i)
+		if patch.Selector == nil {
+			allErrs = append(allErrs, field.Required(idxPath.Child("selector"), "selector is required for each node patch"))
+		} else {
+			allErrs = append(allErrs, metavalidation.ValidateLabelSelector(
+				patch.Selector,
+				metavalidation.LabelSelectorValidationOptions{},
+				idxPath.Child("selector"))...)
+		}
+		if patch.Patch.Spec != nil {
+			for j, c := range patch.Patch.Spec.Containers {
+				containerPath := idxPath.Child("patch", "spec", "containers").Index(j)
+				if c.Name == "" {
+					allErrs = append(allErrs, field.Required(
+						containerPath.Child("name"),
+						"container name is required"))
+				}
+				// Validate env var names so that invalid names are caught at admission
+				// rather than surfacing as opaque Pod creation failures.
+				for k, env := range c.Env {
+					envPath := containerPath.Child("env").Index(k).Child("name")
+					if env.Name == "" {
+						allErrs = append(allErrs, field.Required(envPath, "env var name is required"))
+					} else if msgs := validation.IsEnvVarName(env.Name); len(msgs) > 0 {
+						for _, msg := range msgs {
+							allErrs = append(allErrs, field.Invalid(envPath, env.Name, msg))
+						}
+					}
+				}
+			}
+		}
+	}
 	return allErrs
 }
 
@@ -228,6 +269,30 @@ func validateDaemonSetSpecV1beta1(spec *appsv1beta1.DaemonSetSpec, fldPath *fiel
 		if spec.Lifecycle.InPlaceUpdate != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("lifecycle", "inPlaceUpdate"), "inPlaceUpdate hook has not supported yet"))
 		}
+	}
+	// Convert v1beta1 NodePatches to v1alpha1 shape and reuse the shared validator.
+	if len(spec.NodePatches) > 0 {
+		convertedPatches := make([]appsv1alpha1.DaemonSetNodePatch, len(spec.NodePatches))
+		for i, p := range spec.NodePatches {
+			cp := appsv1alpha1.DaemonSetNodePatch{Selector: p.Selector}
+			if p.Patch.Metadata != nil {
+				cp.Patch.Metadata = &appsv1alpha1.DaemonSetNodePatchObjectMeta{
+					Labels:      p.Patch.Metadata.Labels,
+					Annotations: p.Patch.Metadata.Annotations,
+				}
+			}
+			if p.Patch.Spec != nil {
+				cp.Patch.Spec = &appsv1alpha1.DaemonSetNodePatchPodSpec{}
+				for _, c := range p.Patch.Spec.Containers {
+					cp.Patch.Spec.Containers = append(cp.Patch.Spec.Containers, appsv1alpha1.DaemonSetNodePatchContainer{
+						Name: c.Name,
+						Env:  c.Env,
+					})
+				}
+			}
+			convertedPatches[i] = cp
+		}
+		allErrs = append(allErrs, validateNodePatches(convertedPatches, fldPath.Child("nodePatches"))...)
 	}
 	return allErrs
 }
