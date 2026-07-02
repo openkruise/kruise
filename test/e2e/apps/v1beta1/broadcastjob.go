@@ -130,7 +130,128 @@ var _ = ginkgo.Describe("BroadcastJob v1beta1", ginkgo.Label("BroadcastJob", "jo
 						break
 					}
 				}
-				if fakePod != nil && fakePod.Status.Phase != v1.PodSucceeded {
+
+				if fakePod == nil {
+					return -1
+				}
+
+				if fakePod.Status.Phase != v1.PodSucceeded {
+					ginkgo.By("Try to update Pod " + fakePod.Name + " to Succeeded")
+					err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+						fakePod, err := c.CoreV1().Pods(job.Namespace).Get(context.TODO(), fakePod.Name, metav1.GetOptions{})
+						if err != nil {
+							return err
+						}
+						fakePod.Status.Phase = v1.PodSucceeded
+						_, err = c.CoreV1().Pods(ns).UpdateStatus(context.TODO(), fakePod, metav1.UpdateOptions{})
+						return err
+					})
+					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				}
+
+				return len(pods)
+			}, 180*time.Second, 3*time.Second).Should(gomega.Equal(len(nodes)))
+
+			gomega.Eventually(func() int32 {
+				job, err = tester.GetBroadcastJob(job.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return job.Status.Succeeded
+			}, 60*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
+		})
+
+		ginkgo.It("succeeds for node that has erased its taint", func() {
+			ginkgo.By("Create Fake Node " + randStr)
+			fakeNode, err := nodeTester.CreateFakeNode(randStr)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			job := &appsv1beta1.BroadcastJob{
+				ObjectMeta: metav1.ObjectMeta{Namespace: ns, Name: "job-" + randStr},
+				Spec: appsv1beta1.BroadcastJobSpec{
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Tolerations: []v1.Toleration{{Key: v1beta1.E2eFakeKey, Operator: v1.TolerationOpEqual, Value: randStr, Effect: v1.TaintEffectNoSchedule}},
+							Containers: []v1.Container{{
+								Name:    "box",
+								Image:   common.BusyboxImage,
+								Command: []string{"/bin/sh", "-c", "sleep 5"},
+							}},
+							RestartPolicy: v1.RestartPolicyNever,
+						},
+					},
+					CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
+				},
+			}
+
+			nodes, err := nodeTester.ListRealNodesWithFake(job.Spec.Template.Spec.Tolerations)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			testTaintKey := "test-taint-" + randStr
+
+			ginkgo.By("Add an extra taint to Fake Node")
+			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				node, err := c.CoreV1().Nodes().Get(context.TODO(), fakeNode.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				node.Spec.Taints = append(node.Spec.Taints, v1.Taint{Key: testTaintKey, Value: "true", Effect: v1.TaintEffectNoSchedule})
+				_, err = c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+				return err
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Create BroadcastJob v1beta1 job-" + randStr)
+			job, err = tester.CreateBroadcastJob(job)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Check the status of job, desired should be less than total nodes")
+			gomega.Eventually(func() int32 {
+				job, err = tester.GetBroadcastJob(job.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return job.Status.Desired
+			}, 10*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes) - 1)))
+
+			ginkgo.By("Erase the extra taint from Fake Node")
+			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				node, err := c.CoreV1().Nodes().Get(context.TODO(), fakeNode.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				var newTaints []v1.Taint
+				for _, t := range node.Spec.Taints {
+					if t.Key != testTaintKey {
+						newTaints = append(newTaints, t)
+					}
+				}
+				node.Spec.Taints = newTaints
+				_, err = c.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+				return err
+			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("Check the status of job, desired should be equal to total nodes")
+			gomega.Eventually(func() int32 {
+				job, err = tester.GetBroadcastJob(job.Name)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				return job.Status.Desired
+			}, 10*time.Second, time.Second).Should(gomega.Equal(int32(len(nodes))))
+
+			gomega.Eventually(func() int {
+				pods, err := tester.GetPodsOfJob(job)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				var fakePod *v1.Pod
+				for _, p := range pods {
+					if p.Spec.NodeName == fakeNode.Name {
+						fakePod = p
+						break
+					}
+				}
+
+				if fakePod == nil {
+					return -1
+				}
+
+				if fakePod.Status.Phase != v1.PodSucceeded {
 					ginkgo.By("Try to update Pod " + fakePod.Name + " to Succeeded")
 					err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 						fakePod, err := c.CoreV1().Pods(job.Namespace).Get(context.TODO(), fakePod.Name, metav1.GetOptions{})
