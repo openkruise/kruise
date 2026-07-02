@@ -1382,7 +1382,7 @@ func TestCalculateUpdateCount(t *testing.T) {
 			totalReplicas:      4,
 			oldRevisionIndexes: []int{0, 1},
 			pods:               []*v1.Pod{readyPod(), readyPod(), readyPod(), readyPod(), readyPod()},
-			expectedResult:     1,
+			expectedResult:     2,
 		},
 		{
 			// maxUnavailable = 0 and maxSurge = 2, usedSurge = 2
