@@ -1,10 +1,10 @@
 module github.com/openkruise/kruise/hack/calculator-helper/validator
 
-go 1.23.0
+go 1.25.0
 
 require (
 	github.com/openkruise/kruise v0.0.0
-	golang.org/x/image v0.18.0
+	golang.org/x/image v0.38.0
 	k8s.io/apimachinery v0.32.10
 )
 
