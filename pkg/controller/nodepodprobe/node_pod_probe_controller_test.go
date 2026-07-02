@@ -797,6 +797,54 @@ func TestSyncPodFromNodePodProbe(t *testing.T) {
 	}
 }
 
+func TestUpdatePodProbeStatusDoesNotPanicWithNilLabels(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-1",
+			Namespace: "default",
+		},
+	}
+	ppm := &appsv1alpha1.PodProbeMarker{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ppm-1",
+			Namespace: "default",
+		},
+		Spec: appsv1alpha1.PodProbeMarkerSpec{
+			Probes: []appsv1alpha1.PodContainerProbe{
+				{
+					Name: "healthy",
+					MarkerPolicy: []appsv1alpha1.ProbeMarkerPolicy{
+						{
+							State: appsv1alpha1.ProbeSucceeded,
+							Labels: map[string]string{
+								"server-healthy": "true",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	status := appsv1alpha1.PodProbeStatus{
+		ProbeStates: []appsv1alpha1.ContainerProbeState{
+			{
+				Name:  "ppm-1#healthy",
+				State: appsv1alpha1.ProbeSucceeded,
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(pod, ppm).
+		Build()
+	recon := ReconcileNodePodProbe{Client: fakeClient}
+
+	if err := recon.updatePodProbeStatus(pod, status); err != nil {
+		t.Fatalf("updatePodProbeStatus failed: %s", err.Error())
+	}
+}
+
 func checkNodePodProbeEqual(c client.WithWatch, t *testing.T, expect []*appsv1alpha1.NodePodProbe) bool {
 	for i := range expect {
 		obj := expect[i]
