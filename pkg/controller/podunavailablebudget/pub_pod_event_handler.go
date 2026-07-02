@@ -272,6 +272,15 @@ func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueu
 		}
 	}
 
+	// If no PUB matched this workload, there is nothing to reconcile.
+	// Without this guard the reconciler would be invoked with an empty
+	// NamespacedName on every scale event, causing spurious API-server GETs.
+	if matched.Name == "" {
+		klog.V(5).InfoS("No PodUnavailableBudget matched the workload, skipping reconcile",
+			"workload", klog.KRef(namespace, targetRef.Name))
+		return
+	}
+
 	q.Add(reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Name:      matched.Name,
@@ -279,5 +288,5 @@ func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueu
 		},
 	})
 	klog.V(3).InfoS("Workload changed, and reconcile PodUnavailableBudget",
-		"wordload", klog.KRef(namespace, targetRef.Name), "podUnavailableBudget", klog.KRef(matched.Namespace, matched.Name))
+		"workload", klog.KRef(namespace, targetRef.Name), "podUnavailableBudget", klog.KRef(matched.Namespace, matched.Name))
 }
