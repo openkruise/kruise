@@ -123,8 +123,8 @@ func prepareToWrite(dir string) error {
 	switch {
 	case os.IsNotExist(err):
 		klog.Info("cert directory doesn't exist, creating", "directory", dir)
-		// TODO: figure out if we can reduce the permission. (Now it's 0777)
-		err = os.MkdirAll(dir, 0777)
+		// Reduced directory permissions from 0777 to 0750 for better security.
+		err = os.MkdirAll(dir, 0750)
 		if err != nil {
 			return fmt.Errorf("can't create dir: %v", dir)
 		}
@@ -198,31 +198,31 @@ func ensureExist(dir string) error {
 }
 
 func certToProjectionMap(cert *generator.Artifacts) map[string]atomic.FileProjection {
-	// TODO: figure out if we can reduce the permission. (Now it's 0666)
+	// Reduced file permissions from 0666 for better security.
 	return map[string]atomic.FileProjection{
 		CAKeyName: {
 			Data: cert.CAKey,
-			Mode: 0666,
+			Mode: 0600,
 		},
 		CACertName: {
 			Data: cert.CACert,
-			Mode: 0666,
+			Mode: 0640,
 		},
 		ServerCertName: {
 			Data: cert.Cert,
-			Mode: 0666,
+			Mode: 0640,
 		},
 		ServerCertName2: {
 			Data: cert.Cert,
-			Mode: 0666,
+			Mode: 0640,
 		},
 		ServerKeyName: {
 			Data: cert.Key,
-			Mode: 0666,
+			Mode: 0600,
 		},
 		ServerKeyName2: {
 			Data: cert.Key,
-			Mode: 0666,
+			Mode: 0600,
 		},
 	}
 }
