@@ -34,5 +34,7 @@ type Options struct {
 	RuntimeFactory daemonruntime.Factory
 	Healthz        *daemonutil.Healthz
 
-	MaxWorkersForPullImages int
+	MaxWorkersForPullImages           int
+	MaxWorkersForContainerMeta        int
+	MaxWorkersForContainerMetaRestart int
 }
