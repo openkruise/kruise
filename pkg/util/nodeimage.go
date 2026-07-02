@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -27,7 +26,7 @@ var defaultTtlsecondsForAlwaysNodeimage int32
 
 func SetDefaultTtlForAlwaysNodeimage(t int) error {
 	if t > maxDefaultTtlsecondsForAlwaysNodeimage || t < 0 {
-		return errors.New(fmt.Sprintf("default-ttlseconds-for-always-nodeimage must be positive and less than %d, current value is %d", maxDefaultTtlsecondsForAlwaysNodeimage, t))
+		return fmt.Errorf("default-ttlseconds-for-always-nodeimage must be positive and less than %d, current value is %d", maxDefaultTtlsecondsForAlwaysNodeimage, t)
 	}
 
 	defaultTtlsecondsForAlwaysNodeimage = int32(t)
