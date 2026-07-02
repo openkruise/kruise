@@ -33,6 +33,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
+	grpcprobe "k8s.io/kubernetes/pkg/probe/grpc"
 	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 	tcpprobe "k8s.io/kubernetes/pkg/probe/tcp"
 	"k8s.io/utils/exec"
@@ -47,6 +48,7 @@ type prober struct {
 	exec           execprobe.Prober
 	http           httpprobe.Prober
 	tcp            tcpprobe.Prober
+	grpc           grpcprobe.Prober
 	runtimeService criapi.RuntimeService
 }
 
@@ -58,6 +60,7 @@ func newProber(runtimeService criapi.RuntimeService) *prober {
 		exec:           execprobe.New(),
 		http:           httpprobe.New(followNonLocalRedirects),
 		tcp:            tcpprobe.New(),
+		grpc:           grpcprobe.New(),
 		runtimeService: runtimeService,
 	}
 }
@@ -106,6 +109,18 @@ func (pb *prober) runProbe(p *appsv1alpha1.ContainerProbeSpec, probeKey probeKey
 		}
 		klog.InfoS("TCP-Probe Host", "host", host, "port", port, "timeout", timeout)
 		return pb.tcp.Probe(host, port, timeout)
+
+	case p.GRPC != nil:
+		host := probeKey.podIP
+		port := int(p.GRPC.Port)
+		service := ""
+		if p.GRPC.Service != nil {
+			service = *p.GRPC.Service
+		}
+		klog.V(4).InfoS("GRPC-Probe", "host", host, "service", service, "port", port, "timeout", timeout)
+		// Reuse upstream kubelet gRPC prober (k8s.io/kubernetes/pkg/probe/grpc) to ensure identical semantics.
+		// Timeouts are fully respected, maintaining consistency with HTTP/TCP probes.
+		return pb.grpc.Probe(host, service, port, timeout)
 	}
 
 	klog.InfoS("Failed to find probe builder for container", "containerName", containerRuntimeStatus.Metadata.Name)
