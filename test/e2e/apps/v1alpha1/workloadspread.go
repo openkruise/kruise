@@ -751,8 +751,8 @@ var _ = ginkgo.Describe("WorkloadSpread", ginkgo.Label("WorkloadSpread", "operat
 			gomega.Expect(workloadSpread.Status.SubsetStatuses[1].Replicas).To(gomega.Equal(int32(3)))
 			gomega.Expect(len(workloadSpread.Status.SubsetStatuses[1].Conditions)).To(gomega.Equal(0))
 
-			// wait for subset schedulabe
-			ginkgo.By(fmt.Sprintf("wait workloadSpread(%s/%s) subset-a reschedulabe", workloadSpread.Namespace, workloadSpread.Name))
+			// wait for subset schedulable
+			ginkgo.By(fmt.Sprintf("wait workloadSpread(%s/%s) subset-a reschedulable", workloadSpread.Namespace, workloadSpread.Name))
 			workloadSpread.Spec.ScheduleStrategy = appsv1alpha1.WorkloadSpreadScheduleStrategy{
 				Type: appsv1alpha1.AdaptiveWorkloadSpreadScheduleStrategyType,
 				Adaptive: &appsv1alpha1.AdaptiveWorkloadSpreadStrategy{
