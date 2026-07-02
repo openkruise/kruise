@@ -272,6 +272,11 @@ func (e *SetEnqueueRequestForPUB) addSetRequest(object client.Object, q workqueu
 		}
 	}
 
+	// If no PUB matched the workload, skip enqueuing to avoid spurious reconcile
+	// requests for non-existent PodUnavailableBudget objects.
+	if matched.Name == "" {
+		return
+	}
 	q.Add(reconcile.Request{
 		NamespacedName: types.NamespacedName{
 			Name:      matched.Name,
