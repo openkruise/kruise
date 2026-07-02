@@ -256,7 +256,7 @@ func NewDaemonSetController(
 		crControl: controller.RealControllerRevisionControl{
 			KubeClient: kubeClient,
 		},
-		lifecycleControl:            lifecycle.NewForInformer(podInformer),
+		lifecycleControl:            lifecycle.NewForTypedClient(kubeClient),
 		expectations:                controller.NewControllerExpectations(),
 		resourceVersionExpectations: kruiseExpectations.NewResourceVersionExpectation(),
 		dsLister:                    dsInformer.Lister(),
