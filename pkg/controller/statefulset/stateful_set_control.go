@@ -1220,7 +1220,37 @@ func (ssc *defaultStatefulSetControl) processReplica(
 		}
 	}
 
-	if identityMatches(set, replicas[i]) && storageMatches(set, replicas[i]) && retentionMatch {
+	// Storage mismatch means spec.volumes changed (e.g. new VolumeClaimTemplate added).
+	// spec.volumes is immutable on running pods — Kubernetes forbids in-place updates.
+	// Delete the pod so it gets recreated; the standard creation path will handle
+	// creating any missing PVCs before the new pod is scheduled.
+	if !storageMatches(set, replicas[i]) {
+		if !isTerminating(replicas[i]) {
+			// Respect the scaleMaxUnavailable budget to avoid excess disruption in parallel mode.
+			if decreaseAndCheckMaxUnavailable(scaleMaxUnavailable) {
+				logger.V(4).Info(
+					"StatefulSet pod has storage mismatch but max unavailable reached, breaking scale",
+					"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[i]))
+				return false, true, nil
+			}
+			logger.V(2).Info("StatefulSet deleting Pod due to storage mismatch",
+				"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[i]))
+			// Route through ssc.deletePod to handle lifecycle PreDelete hooks and FailedDelete events.
+			if _, _, err := ssc.deletePod(set, replicas[i]); err != nil {
+				msg := fmt.Sprintf("StatefulPodControl failed to delete Pod for storage update error: %s", err)
+				condition := NewStatefulsetCondition(appsv1beta1.FailedUpdatePod, v1.ConditionTrue, "", msg)
+				SetStatefulsetCondition(status, condition)
+				return true, false, err
+			}
+		}
+		// Return true to indicate the statefulset mutated (pod deleted or already terminating).
+		// If the lifecycle hook set the pod to PreparingDelete (!modified), we also requeue
+		// so the next reconcile can complete the deletion once hooks are satisfied.
+		return true, false, nil
+	}
+
+	// Identity/retention mismatches are safe to fix in-place (labels, annotations, ownerRefs).
+	if identityMatches(set, replicas[i]) && retentionMatch {
 		return false, false, nil
 	}
 
