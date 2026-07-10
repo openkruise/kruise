@@ -20,13 +20,16 @@ package kuberuntime
 import (
 	"context"
 	"fmt"
+	"net"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
@@ -236,7 +239,21 @@ func (m *genericRuntimeManager) executePreStopHook(pod *v1.Pod, containerID kube
 	go func() {
 		defer close(done)
 		defer utilruntime.HandleCrash()
-		if msg, err := m.runner.Run(context.TODO(), containerID, pod, containerSpec, containerSpec.Lifecycle.PreStop); err != nil {
+
+		handler := containerSpec.Lifecycle.PreStop
+		// The upstream HandlerRunner handles Exec, HTTPGet, and Sleep but does not
+		// implement TCPSocket for lifecycle hooks. We handle TCPSocket ourselves here
+		// so that containers relying on a TCP-based shutdown signal are properly notified.
+		if handler.TCPSocket != nil {
+			if err := executeTCPSocketHook(handler.TCPSocket, pod, containerSpec, gracePeriod); err != nil {
+				klog.ErrorS(err, "preStop TCPSocket hook for container failed", "name", containerSpec.Name)
+				m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeWarning, events.FailedPreStopHook,
+					fmt.Sprintf("TCPSocket preStop hook failed: %v", err))
+			}
+			return
+		}
+
+		if msg, err := m.runner.Run(context.TODO(), containerID, pod, containerSpec, handler); err != nil {
 			klog.ErrorS(err, "preStop hook for container failed", "name", containerSpec.Name)
 			m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeWarning, events.FailedPreStopHook, msg)
 		}
@@ -250,4 +267,71 @@ func (m *genericRuntimeManager) executePreStopHook(pod *v1.Pod, containerID kube
 	}
 
 	return int64(metav1.Now().Sub(start.Time).Seconds())
+}
+
+// executeTCPSocketHook dials a TCP connection to the address specified by the
+// TCPSocket action. Kubernetes defines a successful TCP lifecycle hook as a
+// connection that is established (and then immediately closed); no data needs to
+// be exchanged. A connect timeout equal to the remaining grace period is applied
+// so the hook never blocks beyond the container's termination window.
+//
+// Port resolution follows the same rules as the Kubernetes probing infrastructure:
+//   - An integer port is used directly.
+//   - A named port is resolved against the container's declared port list.
+func executeTCPSocketHook(action *v1.TCPSocketAction, pod *v1.Pod, containerSpec *v1.Container, gracePeriodSeconds int64) error {
+	port, err := resolveTCPSocketPort(action.Port, containerSpec)
+	if err != nil {
+		return fmt.Errorf("failed to resolve TCPSocket port: %w", err)
+	}
+
+	host := action.Host
+	if host == "" {
+		// Fall back to the pod IP when no explicit host is provided. This mirrors
+		// how the HTTPGet probe handler resolves the target address.
+		if pod.Status.PodIP != "" {
+			host = pod.Status.PodIP
+		} else {
+			host = "localhost"
+		}
+	}
+
+	address := net.JoinHostPort(host, strconv.Itoa(port))
+
+	// Use the full remaining grace period as the dial timeout so we never block
+	// longer than the container's termination window allows.
+	timeout := time.Duration(gracePeriodSeconds) * time.Second
+	if timeout <= 0 {
+		timeout = time.Second
+	}
+
+	klog.V(4).InfoS("Dialing TCPSocket preStop hook", "address", address, "timeout", timeout)
+
+	conn, err := net.DialTimeout("tcp", address, timeout)
+	if err != nil {
+		return fmt.Errorf("TCPSocket dial to %s failed: %w", address, err)
+	}
+	_ = conn.Close()
+	return nil
+}
+
+// resolveTCPSocketPort converts the IntOrString port in a TCPSocketAction to an
+// integer. Named ports are looked up in the container's Ports declaration.
+func resolveTCPSocketPort(port intstr.IntOrString, containerSpec *v1.Container) (int, error) {
+	switch port.Type {
+	case intstr.Int:
+		p := int(port.IntVal)
+		if p < 1 || p > 65535 {
+			return 0, fmt.Errorf("invalid port number %d", p)
+		}
+		return p, nil
+	case intstr.String:
+		for _, cp := range containerSpec.Ports {
+			if cp.Name == port.StrVal {
+				return int(cp.ContainerPort), nil
+			}
+		}
+		return 0, fmt.Errorf("named port %q not found in container %q", port.StrVal, containerSpec.Name)
+	default:
+		return 0, fmt.Errorf("unknown port type %v", port.Type)
+	}
 }

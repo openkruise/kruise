@@ -303,7 +303,7 @@ func injectPodIntoContainerRecreateRequestV1alpha1(obj *appsv1alpha1.ContainerRe
 			}
 		}
 
-		if c.PreStop != nil && c.PreStop.HTTPGet != nil {
+		if c.PreStop != nil && (c.PreStop.HTTPGet != nil || c.PreStop.TCPSocket != nil) {
 			c.Ports = podContainer.Ports
 		}
 
@@ -359,7 +359,7 @@ func injectPodIntoContainerRecreateRequestV1beta1(obj *appsv1beta1.ContainerRecr
 			}
 		}
 
-		if c.PreStop != nil && c.PreStop.HTTPGet != nil {
+		if c.PreStop != nil && (c.PreStop.HTTPGet != nil || c.PreStop.TCPSocket != nil) {
 			c.Ports = podContainer.Ports
 		}
 

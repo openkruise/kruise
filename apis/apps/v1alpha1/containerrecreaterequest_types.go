@@ -75,7 +75,6 @@ type ContainerRecreateRequestContainer struct {
 }
 
 // ProbeHandler defines a specific action that should be taken
-// TODO(FillZpp): improve the definition when openkruise/kruise updates to k8s 1.23
 type ProbeHandler struct {
 	// One and only one of the following should be specified.
 	// Exec specifies the action to take.
@@ -84,9 +83,10 @@ type ProbeHandler struct {
 	// HTTPGet specifies the http request to perform.
 	// +optional
 	HTTPGet *v1.HTTPGetAction `json:"httpGet,omitempty" protobuf:"bytes,2,opt,name=httpGet"`
-	// TCPSocket specifies an action involving a TCP port.
-	// TCP hooks not yet supported
-	// TODO: implement a realistic TCP lifecycle hook
+	// TCPSocket specifies a TCP port to dial as a pre-stop hook.
+	// The kruise daemon dials the port; a successful connection (which is then
+	// immediately closed) counts as success. This mirrors how Kubernetes handles
+	// TCPSocket liveness/readiness probes.
 	// +optional
 	TCPSocket *v1.TCPSocketAction `json:"tcpSocket,omitempty" protobuf:"bytes,3,opt,name=tcpSocket"`
 }
