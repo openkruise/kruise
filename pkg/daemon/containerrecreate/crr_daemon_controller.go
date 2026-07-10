@@ -311,7 +311,16 @@ func (c *Controller) manage(crr *appsv1beta1.ContainerRecreateRequest) error {
 		return c.completeCRRStatus(crr, fmt.Sprintf("failed to find runtime service: %v", err))
 	}
 
-	pod := convertCRRToPod(crr)
+	// Fetch the real Pod to obtain its IP for TCPSocket preStop hook resolution.
+	// convertCRRToPod builds a minimal fake Pod; without Status.PodIP the TCP
+	// dialer would fall back to localhost, which is incorrect when the hook
+	// should reach the container's own IP.
+	realPod := &v1.Pod{}
+	if err := c.runtimeClient.Get(context.TODO(), types.NamespacedName{Namespace: crr.Namespace, Name: crr.Spec.PodName}, realPod); err != nil {
+		return fmt.Errorf("failed to get Pod %s/%s: %v", crr.Namespace, crr.Spec.PodName, err)
+	}
+
+	pod := convertCRRToPod(crr, realPod.Status.PodIP)
 
 	podStatus, err := runtimeManager.GetPodStatus(context.TODO(), pod.UID, pod.Name, pod.Namespace)
 	if err != nil {

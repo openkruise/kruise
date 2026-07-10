@@ -165,7 +165,11 @@ func getCRRSyncContainerStatuses(crr *appsv1beta1.ContainerRecreateRequest) map[
 	return statuses
 }
 
-func convertCRRToPod(crr *appsv1beta1.ContainerRecreateRequest) *v1.Pod {
+// convertCRRToPod builds a minimal fake v1.Pod from the CRR spec that is
+// sufficient for the runtime manager to execute preStop hooks and kill containers.
+// podIP should be the real pod's Status.PodIP so that TCPSocket preStop hooks
+// can dial the correct address when no explicit Host is configured.
+func convertCRRToPod(crr *appsv1beta1.ContainerRecreateRequest, podIP string) *v1.Pod {
 	podName := crr.Spec.PodName
 	podUID := types.UID(crr.Labels[appsv1beta1.ContainerRecreateRequestPodUIDKey])
 
@@ -175,7 +179,8 @@ func convertCRRToPod(crr *appsv1beta1.ContainerRecreateRequest) *v1.Pod {
 			Name:      podName,
 			UID:       podUID,
 		},
-		Spec: v1.PodSpec{},
+		Spec:   v1.PodSpec{},
+		Status: v1.PodStatus{PodIP: podIP},
 	}
 
 	if crr.Spec.Strategy != nil {
