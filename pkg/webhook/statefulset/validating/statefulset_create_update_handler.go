@@ -75,7 +75,7 @@ func (h *StatefulSetCreateUpdateHandler) Handle(ctx context.Context, req admissi
 			return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoResizePVCGate) {
-			vctUpdateErr := ValidateVolumeClaimTemplateUpdate(h.Client, obj, oldObj)
+			vctUpdateErr := ValidateVolumeClaimTemplateUpdate(ctx, h.Client, obj, oldObj)
 			if len(vctUpdateErr) > 0 {
 				return admission.Errored(http.StatusUnprocessableEntity, vctUpdateErr.ToAggregate())
 			}

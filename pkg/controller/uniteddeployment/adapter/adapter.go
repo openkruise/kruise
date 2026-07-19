@@ -17,6 +17,8 @@ limitations under the License.
 package adapter
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,7 +35,7 @@ type Adapter interface {
 	// GetStatusObservedGeneration returns the observed generation of the subset.
 	GetStatusObservedGeneration(subset metav1.Object) int64
 	// GetSubsetPods returns all pods of the subset workload.
-	GetSubsetPods(obj metav1.Object) ([]*corev1.Pod, error)
+	GetSubsetPods(ctx context.Context, obj metav1.Object) ([]*corev1.Pod, error)
 	// GetSpecReplicas returns the replicas information of the subset workload.
 	GetSpecReplicas(obj metav1.Object) *int32
 	// SetMaxUnavailable sets the maxUnavailable of the subset workload.
@@ -49,5 +51,5 @@ type Adapter interface {
 	// ApplySubsetTemplate updates the subset to the latest revision.
 	ApplySubsetTemplate(ud *beta1.UnitedDeployment, subsetName, revision string, replicas, partition int32, subset runtime.Object) error
 	// PostUpdate does some works after subset updated
-	PostUpdate(ud *beta1.UnitedDeployment, subset runtime.Object, revision string, partition int32) error
+	PostUpdate(ctx context.Context, ud *beta1.UnitedDeployment, subset runtime.Object, revision string, partition int32) error
 }

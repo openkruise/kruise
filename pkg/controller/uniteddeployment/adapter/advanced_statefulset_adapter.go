@@ -61,7 +61,7 @@ func (a *AdvancedStatefulSetAdapter) GetStatusObservedGeneration(obj metav1.Obje
 	return obj.(*appsv1beta1.StatefulSet).Status.ObservedGeneration
 }
 
-func (a *AdvancedStatefulSetAdapter) GetSubsetPods(obj metav1.Object) ([]*corev1.Pod, error) {
+func (a *AdvancedStatefulSetAdapter) GetSubsetPods(ctx context.Context, obj metav1.Object) ([]*corev1.Pod, error) {
 	return a.getStatefulSetPods(obj.(*appsv1beta1.StatefulSet))
 }
 
@@ -205,7 +205,7 @@ func (a *AdvancedStatefulSetAdapter) ApplySubsetTemplate(ud *appsv1beta1.UnitedD
 }
 
 // PostUpdate does some works after subset updated.
-func (a *AdvancedStatefulSetAdapter) PostUpdate(_ *appsv1beta1.UnitedDeployment, _ runtime.Object, _ string, _ int32) error {
+func (a *AdvancedStatefulSetAdapter) PostUpdate(ctx context.Context, _ *appsv1beta1.UnitedDeployment, _ runtime.Object, _ string, _ int32) error {
 	return nil
 }
 

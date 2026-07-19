@@ -1698,7 +1698,7 @@ func TestValidateSidecarSetCanaryAnnotations(t *testing.T) {
 				tt.setupClient()
 			}
 
-			result := validateSidecarSetCanaryAnnotations(fakeClient, tt.obj, tt.older)
+			result := validateSidecarSetCanaryAnnotations(context.TODO(), fakeClient, tt.obj, tt.older)
 
 			if len(result) != len(tt.expectedErrors) {
 				t.Errorf("Expected %d errors, got %d", len(tt.expectedErrors), len(result))

@@ -1,6 +1,7 @@
 package uniteddeployment
 
 import (
+	"context"
 	"encoding/hex"
 	"math/rand"
 	"reflect"
@@ -221,7 +222,7 @@ func TestSubsetControl_convertToSubset(t *testing.T) {
 				adapter: tt.fields.adapter,
 			}
 			tt.want.Status.UpdatedRevision = tt.args.updatedRevision
-			got, err := m.convertToSubset(tt.args.set, tt.args.updatedRevision)
+			got, err := m.convertToSubset(context.TODO(), tt.args.set, tt.args.updatedRevision)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("convertToSubset() error = %v, wantErr %v", err, tt.wantErr)
 				return

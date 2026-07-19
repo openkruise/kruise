@@ -17,6 +17,7 @@ limitations under the License.
 package uniteddeployment
 
 import (
+	"context"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -103,13 +104,13 @@ type ResourceRef struct {
 // ControlInterface defines the interface that UnitedDeployment uses to list, create, update, and delete Subsets.
 type ControlInterface interface {
 	// GetAllSubsets returns the subsets which are managed by the UnitedDeployment.
-	GetAllSubsets(ud *appsv1beta1.UnitedDeployment, updatedRevision string) ([]*Subset, error)
+	GetAllSubsets(ctx context.Context, ud *appsv1beta1.UnitedDeployment, updatedRevision string) ([]*Subset, error)
 	// CreateSubset creates the subset depending on the inputs.
-	CreateSubset(ud *appsv1beta1.UnitedDeployment, unit string, revision string, replicas, partition int32) error
+	CreateSubset(ctx context.Context, ud *appsv1beta1.UnitedDeployment, unit string, revision string, replicas, partition int32) error
 	// UpdateSubset updates the target subset with the input information.
-	UpdateSubset(subSet *Subset, ud *appsv1beta1.UnitedDeployment, revision string, replicas, partition int32) error
+	UpdateSubset(ctx context.Context, subSet *Subset, ud *appsv1beta1.UnitedDeployment, revision string, replicas, partition int32) error
 	// DeleteSubset is used to delete the input subset.
-	DeleteSubset(*Subset) error
+	DeleteSubset(ctx context.Context, subset *Subset) error
 	// GetSubsetFailure extracts the subset failure message to expose on UnitedDeployment status.
 	GetSubsetFailure(*Subset) *string
 }

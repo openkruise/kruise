@@ -58,8 +58,8 @@ func (a *StatefulSetAdapter) GetStatusObservedGeneration(obj metav1.Object) int6
 	return obj.(*appsv1.StatefulSet).Status.ObservedGeneration
 }
 
-func (a *StatefulSetAdapter) GetSubsetPods(obj metav1.Object) ([]*corev1.Pod, error) {
-	return a.getStatefulSetPods(obj.(*appsv1.StatefulSet))
+func (a *StatefulSetAdapter) GetSubsetPods(ctx context.Context, obj metav1.Object) ([]*corev1.Pod, error) {
+	return a.getStatefulSetPods(ctx, obj.(*appsv1.StatefulSet))
 }
 
 func (a *StatefulSetAdapter) GetSpecReplicas(obj metav1.Object) *int32 {
@@ -192,23 +192,23 @@ func (a *StatefulSetAdapter) ApplySubsetTemplate(ud *beta1.UnitedDeployment, sub
 }
 
 // PostUpdate does some works after subset updated. StatefulSet will implement this method to clean stuck pods.
-func (a *StatefulSetAdapter) PostUpdate(_ *beta1.UnitedDeployment, obj runtime.Object, revision string, partition int32) error {
+func (a *StatefulSetAdapter) PostUpdate(ctx context.Context, _ *beta1.UnitedDeployment, obj runtime.Object, revision string, partition int32) error {
 	set := obj.(*appsv1.StatefulSet)
 	if set.Spec.UpdateStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType {
 		return nil
 	}
 
 	// If RollingUpdate, work around for issue https://github.com/kubernetes/kubernetes/issues/67250
-	return a.deleteStuckPods(set, revision, partition)
+	return a.deleteStuckPods(ctx, set, revision, partition)
 }
 
-func (a *StatefulSetAdapter) getStatefulSetPods(set *appsv1.StatefulSet) ([]*corev1.Pod, error) {
+func (a *StatefulSetAdapter) getStatefulSetPods(ctx context.Context, set *appsv1.StatefulSet) ([]*corev1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
 	podList := &corev1.PodList{}
-	err = a.Client.List(context.TODO(), podList, &client.ListOptions{LabelSelector: selector})
+	err = a.Client.List(ctx, podList, &client.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return nil, err
 	}
@@ -234,8 +234,8 @@ func (a *StatefulSetAdapter) getStatefulSetPods(set *appsv1.StatefulSet) ([]*cor
 }
 
 // deleteStuckPods tries to work around the blocking issue https://github.com/kubernetes/kubernetes/issues/67250
-func (a *StatefulSetAdapter) deleteStuckPods(set *appsv1.StatefulSet, revision string, partition int32) error {
-	pods, err := a.getStatefulSetPods(set)
+func (a *StatefulSetAdapter) deleteStuckPods(ctx context.Context, set *appsv1.StatefulSet, revision string, partition int32) error {
+	pods, err := a.getStatefulSetPods(ctx, set)
 	if err != nil {
 		return err
 	}
@@ -245,7 +245,7 @@ func (a *StatefulSetAdapter) deleteStuckPods(set *appsv1.StatefulSet, revision s
 		// If the pod is considered as stuck, delete it.
 		if isPodStuckForRollingUpdate(pod, revision, partition) {
 			klog.V(2).InfoS("Deleted pod at stuck state", "pod", klog.KObj(pod))
-			err = a.Delete(context.TODO(), pod, client.PropagationPolicy(metav1.DeletePropagationBackground))
+			err = a.Delete(ctx, pod, client.PropagationPolicy(metav1.DeletePropagationBackground))
 			if err != nil {
 				return err
 			}

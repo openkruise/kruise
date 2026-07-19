@@ -17,6 +17,7 @@ limitations under the License.
 package uniteddeployment
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -31,11 +32,11 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 )
 
-func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1beta1.UnitedDeployment, existingSubsets map[string]*Subset,
+func (r *ReconcileUnitedDeployment) manageSubsets(ctx context.Context, ud *appsv1beta1.UnitedDeployment, existingSubsets map[string]*Subset,
 	nextUpdate map[string]SubsetUpdate, currentRevision, updatedRevision *appsv1.ControllerRevision,
 	subsetType subSetType) (newStatus *appsv1beta1.UnitedDeploymentStatus, allErrors error) {
 	newStatus = ud.Status.DeepCopy()
-	exists, provisioned, err := r.manageSubsetProvision(ud, existingSubsets, nextUpdate, currentRevision, updatedRevision, subsetType)
+	exists, provisioned, err := r.manageSubsetProvision(ctx, ud, existingSubsets, nextUpdate, currentRevision, updatedRevision, subsetType)
 	if err != nil {
 		SetUnitedDeploymentCondition(newStatus, NewUnitedDeploymentCondition(appsv1beta1.SubsetProvisioned, corev1.ConditionFalse, "Error", err.Error()))
 		return newStatus, fmt.Errorf("fail to manage Subset provision: %s", err)
@@ -90,7 +91,7 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1beta1.UnitedDeployme
 			klog.InfoS("UnitedDeployment needed to update Subset with revision, replicas and partition",
 				"unitedDeployment", klog.KObj(ud), "subsetType", subsetType, "subset", klog.KObj(subset),
 				"expectedRevisionName", expectedRevision.Name, "replicas", replicas, "partition", partition)
-			updateSubsetErr := r.subSetControls[subsetType].UpdateSubset(subset, ud, expectedRevision.Name, replicas, partition)
+			updateSubsetErr := r.subSetControls[subsetType].UpdateSubset(ctx, subset, ud, expectedRevision.Name, replicas, partition)
 			if updateSubsetErr != nil {
 				r.recorder.Event(ud.DeepCopy(), corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), fmt.Sprintf("Error updating PodSet (%s) %s when updating: %s", subsetType, subset.Name, updateSubsetErr))
 			}
@@ -118,7 +119,7 @@ func (r *ReconcileUnitedDeployment) manageSubsets(ud *appsv1beta1.UnitedDeployme
 	return
 }
 
-func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1beta1.UnitedDeployment, existingSubsets map[string]*Subset, nextUpdate map[string]SubsetUpdate, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (sets.String, bool, error) {
+func (r *ReconcileUnitedDeployment) manageSubsetProvision(ctx context.Context, ud *appsv1beta1.UnitedDeployment, existingSubsets map[string]*Subset, nextUpdate map[string]SubsetUpdate, currentRevision, updatedRevision *appsv1.ControllerRevision, subsetType subSetType) (sets.String, bool, error) {
 	expectedSubsets := sets.String{}
 	gotSubsets := sets.String{}
 
@@ -156,7 +157,7 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1beta1.United
 
 			replicas := nextUpdate[subsetName].Replicas
 			partition := nextUpdate[subsetName].Partition
-			err := r.subSetControls[subsetType].CreateSubset(ud, subsetName, revision, replicas, partition)
+			err := r.subSetControls[subsetType].CreateSubset(ctx, ud, subsetName, revision, replicas, partition)
 			if err != nil {
 				if !apierrors.IsTimeout(err) {
 					return fmt.Errorf("fail to create Subset (%s) %s: %s", subsetType, subsetName, err.Error())
@@ -183,7 +184,7 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1beta1.United
 		var deleteErrs []error
 		for _, subsetName := range deletes {
 			subset := existingSubsets[subsetName]
-			if err := r.subSetControls[subsetType].DeleteSubset(subset); err != nil {
+			if err := r.subSetControls[subsetType].DeleteSubset(ctx, subset); err != nil {
 				deleteErrs = append(deleteErrs, fmt.Errorf("fail to delete Subset (%s) %s/%s for %s: %s", subsetType, subset.Namespace, subset.Name, subsetName, err))
 			}
 		}
@@ -202,7 +203,7 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1beta1.United
 			continue
 		}
 
-		subsets, err := control.GetAllSubsets(ud, revision)
+		subsets, err := control.GetAllSubsets(ctx, ud, revision)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("fail to list Subset of other type %s for UnitedDeployment %s/%s: %s", t, ud.Namespace, ud.Name, err))
 			continue
@@ -210,7 +211,7 @@ func (r *ReconcileUnitedDeployment) manageSubsetProvision(ud *appsv1beta1.United
 
 		for _, subset := range subsets {
 			cleaned = true
-			if err := control.DeleteSubset(subset); err != nil {
+			if err := control.DeleteSubset(ctx, subset); err != nil {
 				errs = append(errs, fmt.Errorf("fail to delete Subset %s of other type %s for UnitedDeployment %s/%s: %s", subset.Name, t, ud.Namespace, ud.Name, err))
 				continue
 			}

@@ -28,17 +28,17 @@ import (
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 )
 
-func (h *CloneSetCreateUpdateHandler) validateCloneSet(cloneSet, oldCloneSet *appsv1alpha1.CloneSet) field.ErrorList {
+func (h *CloneSetCreateUpdateHandler) validateCloneSet(ctx context.Context, cloneSet, oldCloneSet *appsv1alpha1.CloneSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&cloneSet.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	var oldCloneSetSpec *appsv1alpha1.CloneSetSpec
 	if oldCloneSet != nil {
 		oldCloneSetSpec = &oldCloneSet.Spec
 	}
-	allErrs = append(allErrs, h.validateCloneSetSpec(&cloneSet.Spec, oldCloneSetSpec, &cloneSet.ObjectMeta, field.NewPath("spec"))...)
+	allErrs = append(allErrs, h.validateCloneSetSpec(ctx, &cloneSet.Spec, oldCloneSetSpec, &cloneSet.ObjectMeta, field.NewPath("spec"))...)
 	return allErrs
 }
 
-func (h *CloneSetCreateUpdateHandler) validateCloneSetSpec(spec, oldSpec *appsv1alpha1.CloneSetSpec, metadata *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
+func (h *CloneSetCreateUpdateHandler) validateCloneSetSpec(ctx context.Context, spec, oldSpec *appsv1alpha1.CloneSetSpec, metadata *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*spec.Replicas), fldPath.Child("replicas"))...)
@@ -94,7 +94,7 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetSpec(spec, oldSpec *appsv1
 		oldScaleStrategy = &oldSpec.ScaleStrategy
 	}
 
-	allErrs = append(allErrs, h.validateScaleStrategy(&spec.ScaleStrategy, oldScaleStrategy, metadata, fldPath.Child("scaleStrategy"))...)
+	allErrs = append(allErrs, h.validateScaleStrategy(ctx, &spec.ScaleStrategy, oldScaleStrategy, metadata, fldPath.Child("scaleStrategy"))...)
 	allErrs = append(allErrs, h.validateUpdateStrategy(&spec.UpdateStrategy, int(*spec.Replicas), fldPath.Child("updateStrategy"))...)
 
 	if spec.ProgressDeadlineSeconds != nil {
@@ -107,7 +107,7 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetSpec(spec, oldSpec *appsv1
 	return allErrs
 }
 
-func (h *CloneSetCreateUpdateHandler) validateScaleStrategy(strategy, oldStrategy *appsv1alpha1.CloneSetScaleStrategy, metadata *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
+func (h *CloneSetCreateUpdateHandler) validateScaleStrategy(ctx context.Context, strategy, oldStrategy *appsv1alpha1.CloneSetScaleStrategy, metadata *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if list := util.CheckDuplicate(strategy.PodsToDelete); len(list) > 0 {
@@ -123,7 +123,7 @@ func (h *CloneSetCreateUpdateHandler) validateScaleStrategy(strategy, oldStrateg
 
 	for _, podName := range podsToDeleteSet.List() {
 		pod := &v1.Pod{}
-		if err := h.Client.Get(context.TODO(), types.NamespacedName{Namespace: metadata.Namespace, Name: podName}, pod); err != nil {
+		if err := h.Client.Get(ctx, types.NamespacedName{Namespace: metadata.Namespace, Name: podName}, pod); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("podsToDelete"), podName, fmt.Sprintf("find pod %s failed: %v", podName, err)))
 		} else if pod.DeletionTimestamp != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("podsToDelete"), podName, fmt.Sprintf("find pod %s already terminating", podName)))
@@ -195,7 +195,7 @@ func (h *CloneSetCreateUpdateHandler) validateUpdateStrategy(strategy *appsv1alp
 	return allErrs
 }
 
-func (h *CloneSetCreateUpdateHandler) validateCloneSetUpdate(cloneSet, oldCloneSet *appsv1alpha1.CloneSet) field.ErrorList {
+func (h *CloneSetCreateUpdateHandler) validateCloneSetUpdate(ctx context.Context, cloneSet, oldCloneSet *appsv1alpha1.CloneSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&cloneSet.ObjectMeta, &oldCloneSet.ObjectMeta, field.NewPath("metadata"))
 
 	clone := cloneSet.DeepCopy()
@@ -229,7 +229,7 @@ func (h *CloneSetCreateUpdateHandler) validateCloneSetUpdate(cloneSet, oldCloneS
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), err.Error()))
 	}
 
-	allErrs = append(allErrs, h.validateCloneSet(cloneSet, oldCloneSet)...)
+	allErrs = append(allErrs, h.validateCloneSet(ctx, cloneSet, oldCloneSet)...)
 	return allErrs
 }
 

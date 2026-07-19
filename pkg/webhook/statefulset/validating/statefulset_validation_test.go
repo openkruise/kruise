@@ -17,6 +17,8 @@ limitations under the License.
 package validating
 
 import (
+	"context"
+	"encoding/json"
 	"strconv"
 	"testing"
 	"time"
@@ -1133,7 +1135,7 @@ func TestValidateVolumeClaimTemplateUpdate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			errs := ValidateVolumeClaimTemplateUpdate(fakeClient, tt.sts, tt.oldSts)
+			errs := ValidateVolumeClaimTemplateUpdate(context.TODO(), fakeClient, tt.sts, tt.oldSts)
 			hasErrors := len(errs) > 0
 			if hasErrors {
 				t.Log(errs.ToAggregate())
@@ -1203,7 +1205,7 @@ func TestGetDefaultStorageClass(t *testing.T) {
 		client := builder.Build()
 
 		// Test the GetDefaultStorageClass function.
-		defaultSC, err := GetDefaultStorageClass(client)
+		defaultSC, err := GetDefaultStorageClass(context.TODO(), client)
 		assert.NoError(t, err)
 		if tt.expectNil {
 			assert.Nil(t, defaultSC)

@@ -40,14 +40,14 @@ type SubsetControl struct {
 }
 
 // GetAllSubsets returns all subsets owned by the UnitedDeployment.
-func (m *SubsetControl) GetAllSubsets(ud *beta1.UnitedDeployment, updatedRevision string) (subSets []*Subset, err error) {
+func (m *SubsetControl) GetAllSubsets(ctx context.Context, ud *beta1.UnitedDeployment, updatedRevision string) (subSets []*Subset, err error) {
 	selector, err := metav1.LabelSelectorAsSelector(ud.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
 
 	setList := m.adapter.NewResourceListObject()
-	err = m.Client.List(context.TODO(), setList, &client.ListOptions{LabelSelector: selector})
+	err = m.Client.List(ctx, setList, &client.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (m *SubsetControl) GetAllSubsets(ud *beta1.UnitedDeployment, updatedRevisio
 	}
 
 	for _, claimedSet := range claimedSets {
-		subSet, err := m.convertToSubset(claimedSet, updatedRevision)
+		subSet, err := m.convertToSubset(ctx, claimedSet, updatedRevision)
 		if err != nil {
 			return nil, err
 		}
@@ -78,22 +78,22 @@ func (m *SubsetControl) GetAllSubsets(ud *beta1.UnitedDeployment, updatedRevisio
 }
 
 // CreateSubset creates the Subset depending on the inputs.
-func (m *SubsetControl) CreateSubset(ud *beta1.UnitedDeployment, subsetName string, revision string, replicas, partition int32) error {
+func (m *SubsetControl) CreateSubset(ctx context.Context, ud *beta1.UnitedDeployment, subsetName string, revision string, replicas, partition int32) error {
 	set := m.adapter.NewResourceObject()
 	if err := m.adapter.ApplySubsetTemplate(ud, subsetName, revision, replicas, partition, set); err != nil {
 		return err
 	}
 
 	klog.V(4).InfoS("Replicas when creating Subset for UnitedDeployment", "replicas", replicas, "unitedDeployment", klog.KObj(ud))
-	return m.Create(context.TODO(), set)
+	return m.Create(ctx, set)
 }
 
 // UpdateSubset is used to update the subset. The target Subset workload can be found with the input subset.
-func (m *SubsetControl) UpdateSubset(subset *Subset, ud *beta1.UnitedDeployment, revision string, replicas, partition int32) error {
+func (m *SubsetControl) UpdateSubset(ctx context.Context, subset *Subset, ud *beta1.UnitedDeployment, revision string, replicas, partition int32) error {
 	workload := m.adapter.NewResourceObject()
 	var updateError error
 	for i := 0; i < updateRetries; i++ {
-		getError := m.Client.Get(context.TODO(), m.objectKey(&subset.ObjectMeta), workload)
+		getError := m.Client.Get(ctx, m.objectKey(&subset.ObjectMeta), workload)
 		if getError != nil {
 			return getError
 		}
@@ -109,7 +109,7 @@ func (m *SubsetControl) UpdateSubset(subset *Subset, ud *beta1.UnitedDeployment,
 			m.adapter.SetMaxUnavailable(workload, maxUnavailable)
 		}
 
-		updateError = m.Client.Update(context.TODO(), workload)
+		updateError = m.Client.Update(ctx, workload)
 		if updateError == nil {
 			break
 		}
@@ -119,13 +119,13 @@ func (m *SubsetControl) UpdateSubset(subset *Subset, ud *beta1.UnitedDeployment,
 		return updateError
 	}
 
-	return m.adapter.PostUpdate(ud, workload, revision, partition)
+	return m.adapter.PostUpdate(ctx, ud, workload, revision, partition)
 }
 
-// DeleteSubset is called to delete the subset. The target Subset workload can be found with the input subset.
-func (m *SubsetControl) DeleteSubset(subSet *Subset) error {
+// DeleteSubset is used to delete the subset.
+func (m *SubsetControl) DeleteSubset(ctx context.Context, subSet *Subset) error {
 	set := subSet.Spec.SubsetRef.Resources[0].(client.Object)
-	return m.Delete(context.Background(), set, client.PropagationPolicy(metav1.DeletePropagationBackground))
+	return m.Client.Delete(ctx, set, client.PropagationPolicy(metav1.DeletePropagationBackground))
 }
 
 // GetSubsetFailure return the error message extracted form Subset workload status conditions.
@@ -133,7 +133,7 @@ func (m *SubsetControl) GetSubsetFailure(*Subset) *string {
 	return m.adapter.GetSubsetFailure()
 }
 
-func (m *SubsetControl) convertToSubset(set metav1.Object, updatedRevision string) (*Subset, error) {
+func (m *SubsetControl) convertToSubset(ctx context.Context, set metav1.Object, updatedRevision string) (*Subset, error) {
 	subset := &Subset{}
 	subset.ObjectMeta = metav1.ObjectMeta{
 		Name:                       set.GetName(),
@@ -152,7 +152,7 @@ func (m *SubsetControl) convertToSubset(set metav1.Object, updatedRevision strin
 		Finalizers:                 set.GetFinalizers(),
 	}
 
-	pods, err := m.adapter.GetSubsetPods(set)
+	pods, err := m.adapter.GetSubsetPods(ctx, set)
 	if err != nil {
 		return nil, err
 	}

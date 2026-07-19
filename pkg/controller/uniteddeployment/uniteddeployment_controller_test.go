@@ -599,7 +599,7 @@ func TestPatchStagingChangedPods(t *testing.T) {
 			r := ReconcileUnitedDeployment{
 				Client: cli,
 			}
-			_ = r.patchReservedStatusChangedPods([]podToPatchReservedLabel{
+			_ = r.patchReservedStatusChangedPods(context.TODO(), []podToPatchReservedLabel{
 				{pod, tt.reserved},
 			})
 			_ = cli.Get(context.Background(), client.ObjectKeyFromObject(pod), pod)

@@ -57,7 +57,7 @@ func (h *PersistentPodStateCreateUpdateHandler) Handle(ctx context.Context, req 
 		}
 	}
 
-	allErrs := h.validatingPersistentPodStateFn(obj, old)
+	allErrs := h.validatingPersistentPodStateFn(ctx, obj, old)
 	if len(allErrs) != 0 {
 		return admission.Errored(http.StatusBadRequest, allErrs.ToAggregate())
 	}
@@ -110,7 +110,7 @@ func (h *PersistentPodStateCreateUpdateHandler) decodeOldObject(req admission.Re
 	}
 }
 
-func (h *PersistentPodStateCreateUpdateHandler) validatingPersistentPodStateFn(obj, old *appsv1beta1.PersistentPodState) field.ErrorList {
+func (h *PersistentPodStateCreateUpdateHandler) validatingPersistentPodStateFn(ctx context.Context, obj, old *appsv1beta1.PersistentPodState) field.ErrorList {
 	allErrs := field.ErrorList{}
 	whiteList, err := configuration.GetPPSWatchCustomWorkloadWhiteList(h.Client)
 	if err != nil {
@@ -122,7 +122,7 @@ func (h *PersistentPodStateCreateUpdateHandler) validatingPersistentPodStateFn(o
 		allErrs = append(allErrs, validateUpdateObjImmutable(obj, old, field.NewPath("spec"))...)
 	}
 	ppsList := &appsv1beta1.PersistentPodStateList{}
-	if err := h.Client.List(context.TODO(), ppsList, &client.ListOptions{Namespace: obj.Namespace}); err != nil {
+	if err := h.Client.List(ctx, ppsList, &client.ListOptions{Namespace: obj.Namespace}); err != nil {
 		allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("query other PersistentPodState failed, err: %v", err)))
 	} else {
 		allErrs = append(allErrs, validatePerConflict(obj, ppsList.Items, field.NewPath("spec"))...)

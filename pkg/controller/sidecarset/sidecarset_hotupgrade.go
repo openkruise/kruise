@@ -31,9 +31,9 @@ import (
 	"github.com/openkruise/kruise/pkg/util"
 )
 
-func (p *Processor) flipHotUpgradingContainers(control sidecarcontrol.SidecarControl, pods []*corev1.Pod) error {
+func (p *Processor) flipHotUpgradingContainers(ctx context.Context, control sidecarcontrol.SidecarControl, pods []*corev1.Pod) error {
 	for _, pod := range pods {
-		if err := p.flipPodSidecarContainer(control, pod); err != nil {
+		if err := p.flipPodSidecarContainer(ctx, control, pod); err != nil {
 			p.recorder.Eventf(pod, corev1.EventTypeWarning, "ResetContainerFailed", fmt.Sprintf("reset sidecar container image empty failed: %s", err.Error()))
 			return err
 		}
@@ -42,13 +42,13 @@ func (p *Processor) flipHotUpgradingContainers(control sidecarcontrol.SidecarCon
 	return nil
 }
 
-func (p *Processor) flipPodSidecarContainer(control sidecarcontrol.SidecarControl, pod *corev1.Pod) error {
+func (p *Processor) flipPodSidecarContainer(ctx context.Context, control sidecarcontrol.SidecarControl, pod *corev1.Pod) error {
 	podClone := pod.DeepCopy()
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// sidecar container hot upgrade already complete, and flip container
 		flipPodSidecarContainerDo(control, podClone)
 		// update pod in store
-		updateErr := p.Client.Update(context.TODO(), podClone)
+		updateErr := p.Client.Update(ctx, podClone)
 		if updateErr == nil {
 			sidecarcontrol.ResourceVersionExpectations.Expect(podClone)
 			return nil
@@ -58,7 +58,7 @@ func (p *Processor) flipPodSidecarContainer(control sidecarcontrol.SidecarContro
 			Namespace: podClone.Namespace,
 			Name:      podClone.Name,
 		}
-		if err := p.Client.Get(context.TODO(), key, podClone); err != nil {
+		if err := p.Client.Get(ctx, key, podClone); err != nil {
 			klog.ErrorS(err, "Failed to get updated pod from client", "pod", klog.KObj(podClone))
 		}
 		return updateErr

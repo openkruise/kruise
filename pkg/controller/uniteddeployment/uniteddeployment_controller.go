@@ -172,12 +172,12 @@ type ReconcileUnitedDeployment struct {
 
 // Reconcile reads that state of the cluster for a UnitedDeployment object and makes changes based on the state read
 // and what is in the UnitedDeployment.Spec
-func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileUnitedDeployment) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	klog.V(4).InfoS("Reconcile UnitedDeployment", "unitedDeployment", request)
 	// Fetch the UnitedDeployment instance
 	instance := &appsv1beta1.UnitedDeployment{}
 	now := time.Now()
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.Get(ctx, request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
@@ -197,7 +197,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 
 	oldStatus := instance.Status.DeepCopy()
 	initStatus(instance)
-	currentRevision, updatedRevision, _, _, err := r.constructUnitedDeploymentRevisions(instance)
+	currentRevision, updatedRevision, _, _, err := r.constructUnitedDeploymentRevisions(ctx, instance)
 	if err != nil {
 		klog.ErrorS(err, "Failed to construct controller revision of UnitedDeployment", "unitedDeployment", klog.KObj(instance))
 		r.recorder.Event(instance, corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeRevisionProvision), err.Error())
@@ -213,7 +213,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 	}
 	setUpdatedCondition(&instance.Status, currentRevision.Name, expectedRevision, now)
 
-	existingSubsets, err := r.getExistingSubsets(instance, control, expectedRevision)
+	existingSubsets, err := r.getExistingSubsets(ctx, instance, control, expectedRevision)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get Subsets of UnitedDeployment", "unitedDeployment", klog.KObj(instance))
 		r.recorder.Event(instance, corev1.EventTypeWarning, fmt.Sprintf("Failed %s",
@@ -227,7 +227,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 		for name, subset := range existingSubsets {
 			if instance.Spec.Topology.ScheduleStrategy.ShouldReserveUnschedulablePods() {
 				podsToPatch = append(podsToPatch, calculateSubsetsStatusForReservedAdaptiveStrategy(name, subset, instance, now)...)
-				if err = r.patchReservedStatusChangedPods(podsToPatch); err != nil {
+				if err = r.patchReservedStatusChangedPods(ctx, podsToPatch); err != nil {
 					klog.ErrorS(err, "Failed to patch reserved changed pods", "unitedDeployment", klog.KObj(instance))
 					return reconcile.Result{}, err
 				}
@@ -256,7 +256,7 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 	nextUpdate := getNextUpdate(instance, nextReplicas, nextPartitions)
 	klog.V(4).InfoS("Got UnitedDeployment next update", "unitedDeployment", klog.KObj(instance), "nextUpdate", nextUpdate)
 
-	newStatus, err := r.manageSubsets(instance, existingSubsets, nextUpdate, currentRevision, updatedRevision, subsetType)
+	newStatus, err := r.manageSubsets(ctx, instance, existingSubsets, nextUpdate, currentRevision, updatedRevision, subsetType)
 	if err != nil {
 		klog.ErrorS(err, "Failed to update UnitedDeployment", "unitedDeployment", klog.KObj(instance))
 		r.recorder.Event(instance, corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeSubsetsUpdate), err.Error())
@@ -279,13 +279,13 @@ func (r *ReconcileUnitedDeployment) Reconcile(_ context.Context, request reconci
 		klog.InfoS("Requeue needed", "afterSeconds", requeueAfter.Seconds())
 	}
 	newStatus = r.calculateStatus(newStatus, existingSubsets, nextReplicas, nextPartitions, currentRevision, updatedRevision, control)
-	return reconcile.Result{RequeueAfter: requeueAfter}, r.updateStatus(instance, newStatus, oldStatus)
+	return reconcile.Result{RequeueAfter: requeueAfter}, r.updateStatus(ctx, instance, newStatus, oldStatus)
 }
 
 // getExistingSubsets fetches all subset workloads in cluster managed by this UnitedDeployment
 // if adaptive scheduling strategy is used, existing subset unschedulable status will be set true here (newly created subsets are default false)
-func (r *ReconcileUnitedDeployment) getExistingSubsets(instance *appsv1beta1.UnitedDeployment, control ControlInterface, expectedRevision string) (existingSubsets map[string]*Subset, err error) {
-	subSets, err := control.GetAllSubsets(instance, expectedRevision)
+func (r *ReconcileUnitedDeployment) getExistingSubsets(ctx context.Context, instance *appsv1beta1.UnitedDeployment, control ControlInterface, expectedRevision string) (existingSubsets map[string]*Subset, err error) {
+	subSets, err := control.GetAllSubsets(ctx, instance, expectedRevision)
 	if err != nil {
 		r.recorder.Event(instance, corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeFindSubsets), err.Error())
 		return nil, fmt.Errorf("fail to get all Subsets for UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
@@ -294,7 +294,7 @@ func (r *ReconcileUnitedDeployment) getExistingSubsets(instance *appsv1beta1.Uni
 	klog.V(4).InfoS("Classify UnitedDeployment by subSet name", "unitedDeployment", klog.KObj(instance))
 	allSubsets := r.classifySubsetBySubsetName(subSets)
 
-	existingSubsets, err = r.deleteDupSubset(allSubsets, control)
+	existingSubsets, err = r.deleteDupSubset(ctx, allSubsets, control)
 	if err != nil {
 		r.recorder.Event(instance, corev1.EventTypeWarning, fmt.Sprintf("Failed%s", eventTypeDupSubsetsDelete), err.Error())
 		return nil, fmt.Errorf("fail to manage duplicate Subset of UnitedDeployment %s/%s: %s", instance.Namespace, instance.Name, err)
@@ -461,13 +461,13 @@ type podToPatchReservedLabel struct {
 	reserved bool
 }
 
-func (r *ReconcileUnitedDeployment) patchReservedStatusChangedPods(podsToPatch []podToPatchReservedLabel) error {
+func (r *ReconcileUnitedDeployment) patchReservedStatusChangedPods(ctx context.Context, podsToPatch []podToPatchReservedLabel) error {
 	for _, podToPatch := range podsToPatch {
 		var err error
 		if podToPatch.reserved {
-			err = r.patchPodReservedLabel(podToPatch.pod, "true")
+			err = r.patchPodReservedLabel(ctx, podToPatch.pod, "true")
 		} else {
-			err = r.patchPodReservedLabel(podToPatch.pod, "false")
+			err = r.patchPodReservedLabel(ctx, podToPatch.pod, "false")
 		}
 		if err != nil {
 			return err
@@ -476,11 +476,11 @@ func (r *ReconcileUnitedDeployment) patchReservedStatusChangedPods(podsToPatch [
 	return nil
 }
 
-func (r *ReconcileUnitedDeployment) patchPodReservedLabel(pod *corev1.Pod, value string) error {
+func (r *ReconcileUnitedDeployment) patchPodReservedLabel(ctx context.Context, pod *corev1.Pod, value string) error {
 	patchStr := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`,
 		appsv1beta1.ReservedPodLabelKey, value)
 	patch := utilcontroller.GetEmptyObjectWithKey(pod)
-	return r.Patch(context.TODO(), patch, client.RawPatch(types.StrategicMergePatchType, []byte(patchStr)))
+	return r.Patch(ctx, patch, client.RawPatch(types.StrategicMergePatchType, []byte(patchStr)))
 }
 
 func calcNextPartitions(ud *appsv1beta1.UnitedDeployment, nextReplicas map[string]int32) map[string]int32 {
@@ -516,13 +516,13 @@ func getNextUpdate(ud *appsv1beta1.UnitedDeployment, nextReplicas map[string]int
 	return next
 }
 
-func (r *ReconcileUnitedDeployment) deleteDupSubset(allSubsets map[string][]*Subset, control ControlInterface) (map[string]*Subset, error) {
+func (r *ReconcileUnitedDeployment) deleteDupSubset(ctx context.Context, allSubsets map[string][]*Subset, control ControlInterface) (map[string]*Subset, error) {
 	existingSubsets := map[string]*Subset{}
 	for name, subsets := range allSubsets {
 		if len(subsets) > 1 {
 			for _, subset := range subsets[1:] {
 				klog.InfoS("Deleted duplicated Subset for subset name", "subset", klog.KObj(subset), "subsetName", name)
-				if err := control.DeleteSubset(subset); err != nil {
+				if err := control.DeleteSubset(ctx, subset); err != nil {
 					if errors.IsNotFound(err) {
 						continue
 					}
@@ -576,8 +576,8 @@ func (r *ReconcileUnitedDeployment) classifySubsetBySubsetName(subsets []*Subset
 	return mapping
 }
 
-func (r *ReconcileUnitedDeployment) updateStatus(instance *appsv1beta1.UnitedDeployment, newStatus, oldStatus *appsv1beta1.UnitedDeploymentStatus) error {
-	newObj, err := r.updateUnitedDeployment(instance, oldStatus, newStatus)
+func (r *ReconcileUnitedDeployment) updateStatus(ctx context.Context, instance *appsv1beta1.UnitedDeployment, newStatus, oldStatus *appsv1beta1.UnitedDeploymentStatus) error {
+	newObj, err := r.updateUnitedDeployment(ctx, instance, oldStatus, newStatus)
 	if err == nil && newObj != nil {
 		ResourceVersionExpectation.Expect(newObj)
 		klog.InfoS("new resource version expected", "UnitedDeployment", klog.KObj(newObj), "ResourceVersion", newObj.GetResourceVersion())
@@ -652,7 +652,7 @@ func replicasStatus(subset *Subset) (replicas, readyReplicas, updatedReplicas, u
 	return
 }
 
-func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1beta1.UnitedDeployment, oldStatus, newStatus *appsv1beta1.UnitedDeploymentStatus) (*appsv1beta1.UnitedDeployment, error) {
+func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ctx context.Context, ud *appsv1beta1.UnitedDeployment, oldStatus, newStatus *appsv1beta1.UnitedDeploymentStatus) (*appsv1beta1.UnitedDeployment, error) {
 	if oldStatus.Replicas == newStatus.Replicas &&
 		oldStatus.ReadyReplicas == newStatus.ReadyReplicas &&
 		oldStatus.UpdatedReplicas == newStatus.UpdatedReplicas &&
@@ -683,7 +683,7 @@ func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1beta1.Unite
 
 		obj.Status = *newStatus
 
-		updateErr = r.Client.Status().Update(context.TODO(), obj)
+		updateErr = r.Client.Status().Update(ctx, obj)
 		if updateErr == nil {
 			return obj, nil
 		}
@@ -691,7 +691,7 @@ func (r *ReconcileUnitedDeployment) updateUnitedDeployment(ud *appsv1beta1.Unite
 			break
 		}
 		tmpObj := &appsv1beta1.UnitedDeployment{}
-		if getErr = r.Client.Get(context.TODO(), client.ObjectKey{Namespace: obj.Namespace, Name: obj.Name}, tmpObj); getErr != nil {
+		if getErr = r.Client.Get(ctx, client.ObjectKey{Namespace: obj.Namespace, Name: obj.Name}, tmpObj); getErr != nil {
 			return nil, getErr
 		}
 		obj = tmpObj

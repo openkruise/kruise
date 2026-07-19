@@ -37,9 +37,11 @@ import (
 // should be recovered schedulable status to try scheduling Pods again.
 // TODO optimize the unschedulable duration of subset.
 // return one parameters - unschedulable Pods belongs to this subset.
-func (r *ReconcileWorkloadSpread) rescheduleSubset(ws *appsv1beta1.WorkloadSpread,
+func (r *ReconcileWorkloadSpread) rescheduleSubset(ctx context.Context, ws *appsv1beta1.WorkloadSpread,
 	pods []*corev1.Pod,
-	subsetStatus, oldSubsetStatus *appsv1beta1.WorkloadSpreadSubsetStatus) []*corev1.Pod {
+	subsetStatus *appsv1beta1.WorkloadSpreadSubsetStatus,
+	oldSubsetStatus *appsv1beta1.WorkloadSpreadSubsetStatus,
+) []*corev1.Pod {
 	scheduleFailedPods := make([]*corev1.Pod, 0)
 	for i := range pods {
 		if PodUnscheduledTimeout(ws, pods[i]) {
@@ -86,21 +88,20 @@ func (r *ReconcileWorkloadSpread) rescheduleSubset(ws *appsv1beta1.WorkloadSprea
 
 	return scheduleFailedPods
 }
-
-func (r *ReconcileWorkloadSpread) cleanupUnscheduledPods(ws *appsv1beta1.WorkloadSpread,
+func (r *ReconcileWorkloadSpread) cleanupUnscheduledPods(ctx context.Context, ws *appsv1beta1.WorkloadSpread,
 	scheduleFailedPodsMap map[string][]*corev1.Pod) error {
 	for subsetName, pods := range scheduleFailedPodsMap {
-		if err := r.deletePodsForSubset(ws, pods, subsetName); err != nil {
+		if err := r.deletePodsForSubset(ctx, ws, pods, subsetName); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *ReconcileWorkloadSpread) deletePodsForSubset(ws *appsv1beta1.WorkloadSpread,
+func (r *ReconcileWorkloadSpread) deletePodsForSubset(ctx context.Context, ws *appsv1beta1.WorkloadSpread,
 	pods []*corev1.Pod, subsetName string) error {
 	for _, pod := range pods {
-		if err := r.Client.Delete(context.TODO(), pod); err != nil {
+		if err := r.Client.Delete(ctx, pod); err != nil {
 			r.recorder.Eventf(ws, corev1.EventTypeWarning,
 				"DeletePodFailed",
 				"Failed to delete unschedulabe Pod %s/%s in Subset %s of WorkloadSpread %s/%s",

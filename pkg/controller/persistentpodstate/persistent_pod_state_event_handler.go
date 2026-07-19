@@ -109,7 +109,7 @@ func (p *enqueueRequestForPod) fetchPersistentPodState(pod *corev1.Pod) *appsv1b
 		return obj
 	}
 
-	return mutating.SelectorPersistentPodState(p.reader, appsv1beta1.TargetReference{
+	return mutating.SelectorPersistentPodState(context.TODO(), p.reader, appsv1beta1.TargetReference{
 		APIVersion: ref.APIVersion,
 		Kind:       ref.Kind,
 		Name:       ref.Name,
@@ -149,7 +149,7 @@ func (p *enqueueRequestForStatefulSet) Create(ctx context.Context, evt event.Typ
 
 func (p *enqueueRequestForStatefulSet) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1.StatefulSet], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	sts := evt.Object
-	if pps := mutating.SelectorPersistentPodState(p.reader, appsv1beta1.TargetReference{
+	if pps := mutating.SelectorPersistentPodState(context.TODO(), p.reader, appsv1beta1.TargetReference{
 		APIVersion: KruiseKindSts.GroupVersion().String(),
 		Kind:       KruiseKindSts.Kind,
 		Name:       sts.Name,
@@ -177,7 +177,7 @@ func (p *enqueueRequestForStatefulSet) Update(ctx context.Context, evt event.Typ
 
 	// delete statefulSet scenario
 	if oSts.DeletionTimestamp.IsZero() && !nSts.DeletionTimestamp.IsZero() {
-		if pps := mutating.SelectorPersistentPodState(p.reader, appsv1beta1.TargetReference{
+		if pps := mutating.SelectorPersistentPodState(context.TODO(), p.reader, appsv1beta1.TargetReference{
 			APIVersion: KindSts.GroupVersion().String(),
 			Kind:       KindSts.Kind,
 			Name:       nSts.Name,
@@ -220,7 +220,7 @@ func (p *enqueueRequestForKruiseStatefulSet) Create(ctx context.Context, evt eve
 
 func (p *enqueueRequestForKruiseStatefulSet) Delete(ctx context.Context, evt event.TypedDeleteEvent[*appsv1beta1.StatefulSet], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	sts := evt.Object
-	if pps := mutating.SelectorPersistentPodState(p.reader, appsv1beta1.TargetReference{
+	if pps := mutating.SelectorPersistentPodState(context.TODO(), p.reader, appsv1beta1.TargetReference{
 		APIVersion: KruiseKindSts.GroupVersion().String(),
 		Kind:       KruiseKindSts.Kind,
 		Name:       sts.Name,
@@ -248,7 +248,7 @@ func (p *enqueueRequestForKruiseStatefulSet) Update(ctx context.Context, evt eve
 
 	// delete statefulSet scenario
 	if oSts.DeletionTimestamp.IsZero() && !nSts.DeletionTimestamp.IsZero() {
-		if pps := mutating.SelectorPersistentPodState(p.reader, appsv1beta1.TargetReference{
+		if pps := mutating.SelectorPersistentPodState(context.TODO(), p.reader, appsv1beta1.TargetReference{
 			APIVersion: KruiseKindSts.GroupVersion().String(),
 			Kind:       KruiseKindSts.Kind,
 			Name:       nSts.Name,
@@ -292,7 +292,7 @@ func (p *enqueueRequestForStatefulSetLike) Update(ctx context.Context, evt event
 
 	// delete statefulSet scenario
 	if oWorkload.GetDeletionTimestamp().IsZero() && !nWorkload.GetDeletionTimestamp().IsZero() {
-		if pps := mutating.SelectorPersistentPodState(p.reader, appsv1beta1.TargetReference{
+		if pps := mutating.SelectorPersistentPodState(context.TODO(), p.reader, appsv1beta1.TargetReference{
 			APIVersion: oWorkload.GetAPIVersion(),
 			Kind:       oWorkload.GetKind(),
 			Name:       nWorkload.GetName(),
@@ -309,7 +309,7 @@ func (p *enqueueRequestForStatefulSetLike) Update(ctx context.Context, evt event
 
 func (p *enqueueRequestForStatefulSetLike) Delete(ctx context.Context, evt event.DeleteEvent, q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	workload := evt.Object.(*unstructured.Unstructured)
-	if pps := mutating.SelectorPersistentPodState(p.reader, appsv1beta1.TargetReference{
+	if pps := mutating.SelectorPersistentPodState(context.TODO(), p.reader, appsv1beta1.TargetReference{
 		APIVersion: workload.GetAPIVersion(),
 		Kind:       workload.GetKind(),
 		Name:       workload.GetName(),

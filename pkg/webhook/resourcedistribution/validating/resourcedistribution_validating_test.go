@@ -14,6 +14,7 @@ limitations under the License.
 package validating
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -47,8 +48,8 @@ func TestResourceDistributionCreateValidation(t *testing.T) {
 
 	makeEnvironment()
 
-	errs := handler.validateResourceDistribution(rdSecret, nil)
-	errs = append(errs, handler.validateResourceDistribution(rdConfigMap, nil)...)
+	errs := handler.validateResourceDistribution(context.TODO(), rdSecret, nil)
+	errs = append(errs, handler.validateResourceDistribution(context.TODO(), rdConfigMap, nil)...)
 	if len(errs) != 0 {
 		t.Fatalf("failed to validate the creating case, err: %v", errs)
 	}
@@ -60,7 +61,7 @@ func TestResourceDistributionCreateValidationWithEmptyResource(t *testing.T) {
 
 	makeEnvironment()
 
-	errs := handler.validateResourceDistribution(rd, nil)
+	errs := handler.validateResourceDistribution(context.TODO(), rd, nil)
 	if len(errs) != 1 {
 		t.Fatalf("failed to validate the empty resource case, err: %v", errs)
 	}
@@ -74,7 +75,7 @@ func TestResourceDistributionCreateValidationWithWrongResource(t *testing.T) {
 
 	makeEnvironment()
 
-	errs := handler.validateResourceDistribution(rd, nil)
+	errs := handler.validateResourceDistribution(context.TODO(), rd, nil)
 	if len(errs) != 1 {
 		t.Fatalf("failed to validate the wrong resource case, err: %v", errs)
 	}
@@ -88,7 +89,7 @@ func TestResourceDistributionUpdateValidation(t *testing.T) {
 
 	makeEnvironment()
 
-	errs := handler.validateResourceDistribution(newRD, oldRD)
+	errs := handler.validateResourceDistribution(context.TODO(), newRD, oldRD)
 	if len(errs) != 0 {
 		t.Fatalf("failed to validate the updating case, err: %v", errs)
 	}
@@ -165,7 +166,7 @@ func TestValidateResourceDistributionSpecSuccessCases(t *testing.T) {
 
 	for name, rd := range successCases {
 		t.Run(name, func(t *testing.T) {
-			errs := handler.validateResourceDistribution(rd, nil)
+			errs := handler.validateResourceDistribution(context.TODO(), rd, nil)
 			if len(errs) != 0 {
 				t.Errorf("expected success, got: %v", errs)
 			}
@@ -219,7 +220,7 @@ func TestValidateResourceDistributionSpecErrorCases(t *testing.T) {
 
 	for name, rd := range errorCases {
 		t.Run(name, func(t *testing.T) {
-			errs := handler.validateResourceDistribution(rd, nil)
+			errs := handler.validateResourceDistribution(context.TODO(), rd, nil)
 			if len(errs) == 0 {
 				t.Errorf("expected failure for %q but got none", name)
 			}
@@ -267,7 +268,7 @@ func TestValidateResourceDistributionUpdateSuccessCases(t *testing.T) {
 
 	for name, tc := range successCases {
 		t.Run(name, func(t *testing.T) {
-			errs := handler.validateResourceDistribution(tc.newRD, tc.oldRD)
+			errs := handler.validateResourceDistribution(context.TODO(), tc.newRD, tc.oldRD)
 			if len(errs) != 0 {
 				t.Errorf("expected success, got: %v", errs)
 			}
@@ -302,7 +303,7 @@ func TestValidateResourceDistributionUpdateErrorCases(t *testing.T) {
 
 	for name, newRD := range errorCases {
 		t.Run(name, func(t *testing.T) {
-			errs := handler.validateResourceDistribution(newRD, oldRD)
+			errs := handler.validateResourceDistribution(context.TODO(), newRD, oldRD)
 			if len(errs) == 0 {
 				t.Errorf("expected failure for %q but got none", name)
 			}
@@ -341,7 +342,7 @@ func TestResourceDistributionV1beta1IgnoresEmbeddedNamespace(t *testing.T) {
 
 	makeEnvironment()
 
-	errs := handler.validateResourceDistribution(rd, nil)
+	errs := handler.validateResourceDistribution(context.TODO(), rd, nil)
 	require.Len(t, errs, 0)
 }
 
@@ -363,7 +364,7 @@ func TestResourceDistributionUpdateConflict(t *testing.T) {
 
 	makeEnvironment(oldRD, conflictingResource)
 
-	errs := handler.validateResourceDistribution(newRD, oldRD)
+	errs := handler.validateResourceDistribution(context.TODO(), newRD, oldRD)
 	if len(errs) != 1 {
 		t.Fatalf("failed to validate the conflict of updating case, err: %v", errs)
 	}

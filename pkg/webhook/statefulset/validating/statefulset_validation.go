@@ -372,7 +372,7 @@ func validateTemplateInPlaceOnly(oldTemp, newTemp *v1.PodTemplateSpec) error {
 }
 
 // ValidateVolumeClaimTemplateUpdate tests if only size expand when sc allow expansion.
-func ValidateVolumeClaimTemplateUpdate(c client.Client, sts, oldSts *appsv1beta1.StatefulSet) field.ErrorList {
+func ValidateVolumeClaimTemplateUpdate(ctx context.Context, c client.Client, sts, oldSts *appsv1beta1.StatefulSet) field.ErrorList {
 	if sts.Spec.VolumeClaimUpdateStrategy.Type == "" ||
 		sts.Spec.VolumeClaimUpdateStrategy.Type == appsv1beta1.OnPVCDeleteVolumeClaimUpdateStrategyType {
 		return nil
@@ -406,7 +406,7 @@ func ValidateVolumeClaimTemplateUpdate(c client.Client, sts, oldSts *appsv1beta1
 		scName := template.Spec.StorageClassName
 		if scName == nil {
 			// nil scName means using default storage class
-			sc, err = GetDefaultStorageClass(c)
+			sc, err = GetDefaultStorageClass(ctx, c)
 			if err != nil {
 				return field.ErrorList{field.Invalid(field.NewPath("spec", templateIdStr, "spec", "storageClassName"), "nil", "can not list storage class")}
 			}
@@ -416,7 +416,7 @@ func ValidateVolumeClaimTemplateUpdate(c client.Client, sts, oldSts *appsv1beta1
 			}
 		} else {
 			sc = &storagev1.StorageClass{}
-			err = c.Get(context.TODO(), client.ObjectKey{Name: *scName}, sc)
+			err = c.Get(ctx, client.ObjectKey{Name: *scName}, sc)
 			if err != nil || sc == nil {
 				return field.ErrorList{field.Invalid(field.NewPath("spec", templateIdStr, "spec", "storageClassName"), *scName, "can not get sc")}
 			}
@@ -431,11 +431,11 @@ func ValidateVolumeClaimTemplateUpdate(c client.Client, sts, oldSts *appsv1beta1
 
 const isDefaultStorageClassAnnotation = "storageclass.kubernetes.io/is-default-class"
 
-func GetDefaultStorageClass(c client.Client) (*storagev1.StorageClass, error) {
+func GetDefaultStorageClass(ctx context.Context, c client.Client) (*storagev1.StorageClass, error) {
 	// refer to https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1
 	// choose the only one or the newest one
 	scs := &storagev1.StorageClassList{}
-	err := c.List(context.TODO(), scs, &client.ListOptions{})
+	err := c.List(ctx, scs, &client.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

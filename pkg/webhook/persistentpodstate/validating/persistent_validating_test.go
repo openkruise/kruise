@@ -18,6 +18,7 @@ package validating
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -130,7 +131,7 @@ func TestValidatingPer(t *testing.T) {
 	}
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			errList := perHandler.validatingPersistentPodStateFn(cs.per(), nil)
+			errList := perHandler.validatingPersistentPodStateFn(context.TODO(),cs.per(), nil)
 			if len(errList) != cs.expectErrList {
 				t.Fatalf("expect errList(%d) but get(%d) error: %s", cs.expectErrList, len(errList), errList.ToAggregate().Error())
 			}
@@ -222,7 +223,7 @@ func TestPerConflictWithOthers(t *testing.T) {
 				Client:  client,
 				Decoder: decoder,
 			}
-			errList := perHandler.validatingPersistentPodStateFn(cs.per(), nil)
+			errList := perHandler.validatingPersistentPodStateFn(context.TODO(),cs.per(), nil)
 			if len(errList) != cs.expectErrList {
 				t.Fatalf("expect errList(%d) but get(%d) error: %s", cs.expectErrList, len(errList), errList.ToAggregate().Error())
 			}
@@ -276,7 +277,7 @@ func TestValidatingUpdatePer(t *testing.T) {
 	}
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			errList := perHandler.validatingPersistentPodStateFn(cs.obj(), cs.old())
+			errList := perHandler.validatingPersistentPodStateFn(context.TODO(),cs.obj(), cs.old())
 			if len(errList) != cs.expectErrList {
 				t.Fatalf("expect errList(%d) but get(%d) error: %s", cs.expectErrList, len(errList), errList.ToAggregate().Error())
 			}

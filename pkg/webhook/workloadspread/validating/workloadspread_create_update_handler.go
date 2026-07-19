@@ -54,7 +54,7 @@ func (h *WorkloadSpreadCreateUpdateHandler) Handle(ctx context.Context, req admi
 
 	switch req.AdmissionRequest.Operation {
 	case admissionv1.Create:
-		if allErrs := h.validatingWorkloadSpreadFn(obj); len(allErrs) > 0 {
+		if allErrs := h.validatingWorkloadSpreadFn(ctx, obj); len(allErrs) > 0 {
 			return admission.Errored(http.StatusBadRequest, allErrs.ToAggregate())
 		}
 	case admissionv1.Update:
@@ -63,7 +63,7 @@ func (h *WorkloadSpreadCreateUpdateHandler) Handle(ctx context.Context, req admi
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
-		validationErrorList := h.validatingWorkloadSpreadFn(obj)
+		validationErrorList := h.validatingWorkloadSpreadFn(ctx, obj)
 		updateErrorList := validateWorkloadSpreadUpdate(obj, oldObj)
 		if allErrs := append(validationErrorList, updateErrorList...); len(allErrs) > 0 {
 			return admission.Errored(http.StatusBadRequest, allErrs.ToAggregate())

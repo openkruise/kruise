@@ -124,9 +124,9 @@ type ReconcileSidecarSet struct {
 
 // Reconcile reads that state of the cluster for a SidecarSet object and makes changes based on the state read
 // and what is in the SidecarSet.Spec
-func (r *ReconcileSidecarSet) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileSidecarSet) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	sidecarSet := &appsv1beta1.SidecarSet{}
-	err := r.Get(context.TODO(), request.NamespacedName, sidecarSet)
+	err := r.Get(ctx, request.NamespacedName, sidecarSet)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -138,5 +138,8 @@ func (r *ReconcileSidecarSet) Reconcile(_ context.Context, request reconcile.Req
 	}
 
 	klog.V(3).InfoS("Began to process sidecarset for reconcile", "sidecarSet", klog.KObj(sidecarSet))
-	return r.processor.UpdateSidecarSet(sidecarSet)
+	if err = r.processor.UpdateSidecarSet(ctx, sidecarSet); err != nil {
+		return reconcile.Result{}, err
+	}
+	return reconcile.Result{}, nil
 }

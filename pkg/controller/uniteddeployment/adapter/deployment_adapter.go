@@ -57,9 +57,9 @@ func (a *DeploymentAdapter) GetStatusObservedGeneration(obj metav1.Object) int64
 	return obj.(*appsv1.Deployment).Status.ObservedGeneration
 }
 
-func (a *DeploymentAdapter) GetSubsetPods(obj metav1.Object) ([]*corev1.Pod, error) {
+func (a *DeploymentAdapter) GetSubsetPods(ctx context.Context, obj metav1.Object) ([]*corev1.Pod, error) {
 	set := obj.(*appsv1.Deployment)
-	return a.getDeploymentPods(set)
+	return a.getDeploymentPods(context.TODO(), set)
 }
 
 func (a *DeploymentAdapter) GetSpecReplicas(obj metav1.Object) *int32 {
@@ -186,12 +186,12 @@ func (a *DeploymentAdapter) ApplySubsetTemplate(ud *beta1.UnitedDeployment, subs
 }
 
 // PostUpdate does some works after subset updated. Deployments typically don't have post update operations.
-func (a *DeploymentAdapter) PostUpdate(_ *beta1.UnitedDeployment, _ runtime.Object, _ string, _ int32) error {
+func (a *DeploymentAdapter) PostUpdate(ctx context.Context, _ *beta1.UnitedDeployment, _ runtime.Object, _ string, _ int32) error {
 	return nil
 }
 
 // getDeploymentPods gets all Pods under a Deployment object
-func (a *DeploymentAdapter) getDeploymentPods(set *appsv1.Deployment) ([]*corev1.Pod, error) {
+func (a *DeploymentAdapter) getDeploymentPods(ctx context.Context, set *appsv1.Deployment) ([]*corev1.Pod, error) {
 	deploymentReplicaSets, err := a.getDeploymentReplicaSets(set)
 	if err != nil {
 		return nil, err

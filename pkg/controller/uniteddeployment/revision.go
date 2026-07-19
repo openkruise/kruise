@@ -39,7 +39,7 @@ import (
 // ControllerRevisionHashLabel is the label used to indicate the hash value of a ControllerRevision's Data.
 const ControllerRevisionHashLabel = "controller.kubernetes.io/hash"
 
-func (r *ReconcileUnitedDeployment) controlledHistories(ud *appsv1beta1.UnitedDeployment) ([]*apps.ControllerRevision, error) {
+func (r *ReconcileUnitedDeployment) controlledHistories(ctx context.Context, ud *appsv1beta1.UnitedDeployment) ([]*apps.ControllerRevision, error) {
 	// List all histories to include those that don't match the selector anymore
 	// but have a ControllerRef pointing to the controller.
 	selector, err := metav1.LabelSelectorAsSelector(ud.Spec.Selector)
@@ -47,7 +47,7 @@ func (r *ReconcileUnitedDeployment) controlledHistories(ud *appsv1beta1.UnitedDe
 		return nil, err
 	}
 	histories := &apps.ControllerRevisionList{}
-	err = r.Client.List(context.TODO(), histories, &client.ListOptions{LabelSelector: selector})
+	err = r.Client.List(ctx, histories, &client.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (r *ReconcileUnitedDeployment) controlledHistories(ud *appsv1beta1.UnitedDe
 	return claimHistories, nil
 }
 
-func (r *ReconcileUnitedDeployment) constructUnitedDeploymentRevisions(ud *appsv1beta1.UnitedDeployment) (*apps.ControllerRevision, *apps.ControllerRevision, *[]*apps.ControllerRevision, int32, error) {
+func (r *ReconcileUnitedDeployment) constructUnitedDeploymentRevisions(ctx context.Context, ud *appsv1beta1.UnitedDeployment) (*apps.ControllerRevision, *apps.ControllerRevision, *[]*apps.ControllerRevision, int32, error) {
 	var currentRevision, updateRevision *apps.ControllerRevision
 	// Use a local copy of ud.Status.CollisionCount to avoid modifying ud.Status directly.
 	var collisionCount int32
@@ -84,13 +84,13 @@ func (r *ReconcileUnitedDeployment) constructUnitedDeploymentRevisions(ud *appsv
 		collisionCount = *ud.Status.CollisionCount
 	}
 
-	revisions, err := r.controlledHistories(ud)
+	revisions, err := r.controlledHistories(ctx, ud)
 	if err != nil {
 		return currentRevision, updateRevision, nil, collisionCount, err
 	}
 
 	history.SortControllerRevisions(revisions)
-	cleanedRevision, err := r.cleanExpiredRevision(ud, &revisions)
+	cleanedRevision, err := r.cleanExpiredRevision(ctx, ud, &revisions)
 	if err != nil {
 		return currentRevision, updateRevision, nil, collisionCount, err
 	}
@@ -114,14 +114,14 @@ func (r *ReconcileUnitedDeployment) constructUnitedDeploymentRevisions(ud *appsv
 		// if the equivalent revision is not immediately prior to we will roll back by incrementing the
 		// Revision of the equivalent revision
 		equalRevisions[equalCount-1].Revision = updateRevision.Revision
-		err := r.Client.Update(context.TODO(), equalRevisions[equalCount-1])
+		err := r.Client.Update(ctx, equalRevisions[equalCount-1])
 		if err != nil {
 			return nil, nil, nil, collisionCount, err
 		}
 		updateRevision = equalRevisions[equalCount-1]
 	} else {
 		//if there is no equivalent revision we create a new one
-		updateRevision, err = r.createControllerRevision(ud, updateRevision, &collisionCount)
+		updateRevision, err = r.createControllerRevision(ctx, ud, updateRevision, &collisionCount)
 		if err != nil {
 			return nil, nil, nil, collisionCount, err
 		}
@@ -143,7 +143,7 @@ func (r *ReconcileUnitedDeployment) constructUnitedDeploymentRevisions(ud *appsv
 	return currentRevision, updateRevision, &revisions, collisionCount, nil
 }
 
-func (r *ReconcileUnitedDeployment) cleanExpiredRevision(ud *appsv1beta1.UnitedDeployment, sortedRevisions *[]*apps.ControllerRevision) (*[]*apps.ControllerRevision, error) {
+func (r *ReconcileUnitedDeployment) cleanExpiredRevision(ctx context.Context, ud *appsv1beta1.UnitedDeployment, sortedRevisions *[]*apps.ControllerRevision) (*[]*apps.ControllerRevision, error) {
 	exceedNum := len(*sortedRevisions) - int(*ud.Spec.RevisionHistoryLimit)
 	if exceedNum <= 0 {
 		return sortedRevisions, nil
@@ -164,7 +164,7 @@ func (r *ReconcileUnitedDeployment) cleanExpiredRevision(ud *appsv1beta1.UnitedD
 			break
 		}
 
-		if err := r.Client.Delete(context.TODO(), revision); err != nil {
+		if err := r.Client.Delete(ctx, revision); err != nil {
 			return sortedRevisions, err
 		}
 	}
@@ -174,7 +174,7 @@ func (r *ReconcileUnitedDeployment) cleanExpiredRevision(ud *appsv1beta1.UnitedD
 }
 
 // createControllerRevision creates the controller revision owned by the parent.
-func (r *ReconcileUnitedDeployment) createControllerRevision(parent metav1.Object, revision *apps.ControllerRevision, collisionCount *int32) (*apps.ControllerRevision, error) {
+func (r *ReconcileUnitedDeployment) createControllerRevision(ctx context.Context, parent metav1.Object, revision *apps.ControllerRevision, collisionCount *int32) (*apps.ControllerRevision, error) {
 	if collisionCount == nil {
 		return nil, fmt.Errorf("collisionCount should not be nil")
 	}
@@ -189,10 +189,10 @@ func (r *ReconcileUnitedDeployment) createControllerRevision(parent metav1.Objec
 		// Update the revisions name
 		clone.Name = history.ControllerRevisionName(parent.GetName(), hash)
 		clone.Labels[history.ControllerRevisionHashLabel] = hash
-		err = r.Client.Create(context.TODO(), clone)
+		err = r.Client.Create(ctx, clone)
 		if errors.IsAlreadyExists(err) {
 			exists := &apps.ControllerRevision{}
-			err := r.Client.Get(context.TODO(), client.ObjectKey{Namespace: parent.GetNamespace(), Name: clone.Name}, exists)
+			err := r.Client.Get(ctx, client.ObjectKey{Namespace: parent.GetNamespace(), Name: clone.Name}, exists)
 			if err != nil {
 				return nil, err
 			}

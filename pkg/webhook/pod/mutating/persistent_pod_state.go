@@ -53,7 +53,7 @@ func (h *PodCreateHandler) persistentPodStateMutatingPod(ctx context.Context, re
 		return true, nil
 	}
 	// selector persistentPodState
-	persistentPodState := SelectorPersistentPodState(h.Client, appsv1beta1.TargetReference{
+	persistentPodState := SelectorPersistentPodState(ctx, h.Client, appsv1beta1.TargetReference{
 		APIVersion: ref.APIVersion,
 		Kind:       ref.Kind,
 		Name:       ref.Name,
@@ -145,9 +145,9 @@ func createNodeAffinity(spec appsv1beta1.PersistentPodStateSpec, podState appsv1
 	return nodeSelector, preferences
 }
 
-func SelectorPersistentPodState(reader client.Reader, ref appsv1beta1.TargetReference, ns string) *appsv1beta1.PersistentPodState {
+func SelectorPersistentPodState(ctx context.Context, reader client.Reader, ref appsv1beta1.TargetReference, ns string) *appsv1beta1.PersistentPodState {
 	ppsList := &appsv1beta1.PersistentPodStateList{}
-	if err := reader.List(context.TODO(), ppsList, &client.ListOptions{Namespace: ns}, utilclient.DisableDeepCopy); err != nil {
+	if err := reader.List(ctx, ppsList, &client.ListOptions{Namespace: ns}, utilclient.DisableDeepCopy); err != nil {
 		klog.ErrorS(err, "List PersistentPodStateList failed")
 		return nil
 	}

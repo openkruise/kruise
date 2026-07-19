@@ -174,7 +174,7 @@ var _ reconcile.Reconciler = &ReconcileCloneSet{}
 type ReconcileCloneSet struct {
 	client.Client
 	scheme        *runtime.Scheme
-	reconcileFunc func(request reconcile.Request) (reconcile.Result, error)
+	reconcileFunc func(ctx context.Context, request reconcile.Request) (reconcile.Result, error)
 
 	recorder          record.EventRecorder
 	controllerHistory history.Interface
@@ -195,11 +195,11 @@ type ReconcileCloneSet struct {
 
 // Reconcile reads that state of the cluster for a CloneSet object and makes changes based on the state read
 // and what is in the CloneSet.Spec
-func (r *ReconcileCloneSet) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
-	return r.reconcileFunc(request)
+func (r *ReconcileCloneSet) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	return r.reconcileFunc(ctx, request)
 }
 
-func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcile.Result, retErr error) {
+func (r *ReconcileCloneSet) doReconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, retErr error) {
 	startTime := time.Now()
 	defer func() {
 		if retErr == nil {
@@ -217,7 +217,7 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 
 	// Fetch the CloneSet instance
 	instance := &appsv1beta1.CloneSet{}
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.Get(ctx, request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
@@ -548,7 +548,7 @@ func (r *ReconcileCloneSet) getOwnedPVCs(cs *appsv1beta1.CloneSet) ([]*v1.Persis
 	}
 
 	pvcList := v1.PersistentVolumeClaimList{}
-	if err := r.List(context.TODO(), &pvcList, opts, utilclient.DisableDeepCopy); err != nil {
+	if err := r.List(ctx, &pvcList, opts, utilclient.DisableDeepCopy); err != nil {
 		return nil, err
 	}
 	var filteredPVCs []*v1.PersistentVolumeClaim

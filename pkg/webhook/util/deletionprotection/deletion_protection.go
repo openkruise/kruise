@@ -73,7 +73,7 @@ func ValidateIngressDeletion(obj metav1.Object) error {
 	return nil
 }
 
-func ValidateNamespaceDeletion(c client.Client, namespace *v1.Namespace) error {
+func ValidateNamespaceDeletion(ctx context.Context, c client.Client, namespace *v1.Namespace) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourcesDeletionProtection) || namespace.DeletionTimestamp != nil {
 		return nil
 	}
@@ -82,7 +82,7 @@ func ValidateNamespaceDeletion(c client.Client, namespace *v1.Namespace) error {
 		return fmt.Errorf("forbidden by ResourcesProtectionDeletion for %s=%s", policyv1alpha1.DeletionProtectionKey, val)
 	case policyv1alpha1.DeletionProtectionTypeCascading:
 		pods := v1.PodList{}
-		if err := c.List(context.TODO(), &pods, client.InNamespace(namespace.Name), utilclient.DisableDeepCopy); err != nil {
+		if err := c.List(ctx, &pods, client.InNamespace(namespace.Name), utilclient.DisableDeepCopy); err != nil {
 			return fmt.Errorf("forbidden by ResourcesProtectionDeletion for list pods error: %v", err)
 		}
 		var activeCount int
@@ -97,7 +97,7 @@ func ValidateNamespaceDeletion(c client.Client, namespace *v1.Namespace) error {
 		}
 
 		pvcs := v1.PersistentVolumeClaimList{}
-		if err := c.List(context.TODO(), &pvcs, client.InNamespace(namespace.Name), utilclient.DisableDeepCopy); err != nil {
+		if err := c.List(ctx, &pvcs, client.InNamespace(namespace.Name), utilclient.DisableDeepCopy); err != nil {
 			return fmt.Errorf("forbidden by ResourcesProtectionDeletion for list pvc error: %v", err)
 		}
 		var boundCount int
@@ -115,7 +115,7 @@ func ValidateNamespaceDeletion(c client.Client, namespace *v1.Namespace) error {
 	return nil
 }
 
-func ValidateCRDDeletion(c client.Client, obj metav1.Object, gvk schema.GroupVersionKind) error {
+func ValidateCRDDeletion(ctx context.Context, c client.Client, obj metav1.Object, gvk schema.GroupVersionKind) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResourcesDeletionProtection) || obj.GetDeletionTimestamp() != nil {
 		return nil
 	}
@@ -129,7 +129,7 @@ func ValidateCRDDeletion(c client.Client, obj metav1.Object, gvk schema.GroupVer
 		objList := &unstructured.UnstructuredList{}
 		objList.SetAPIVersion(gvk.GroupVersion().String())
 		objList.SetKind(gvk.Kind)
-		if err := c.List(context.TODO(), objList, client.InNamespace(v1.NamespaceAll)); err != nil {
+		if err := c.List(ctx, objList, client.InNamespace(v1.NamespaceAll)); err != nil {
 			return fmt.Errorf("failed to list CRs of %v: %v", gvk, err)
 		}
 

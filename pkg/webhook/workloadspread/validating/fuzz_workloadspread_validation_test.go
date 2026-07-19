@@ -17,6 +17,7 @@ limitations under the License.
 package validating
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -89,7 +90,7 @@ func FuzzValidateWorkloadSpreadSpec(f *testing.F) {
 			).Build()
 
 		h := &WorkloadSpreadCreateUpdateHandler{Client: fakeClient}
-		_ = validateWorkloadSpreadSpec(h, ws, field.NewPath("spec"))
+		_ = validateWorkloadSpreadSpec(context.TODO(), h, ws, field.NewPath("spec"))
 	})
 }
 

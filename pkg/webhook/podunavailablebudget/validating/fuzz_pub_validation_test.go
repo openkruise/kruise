@@ -17,6 +17,8 @@ limitations under the License.
 package validating
 
 import (
+	"context"
+	"encoding/json"
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
@@ -55,8 +57,8 @@ func FuzzValidatePodUnavailableBudgetSpec(f *testing.F) {
 		}
 
 		_ = validatePodUnavailableBudgetSpecV1beta1(pub, field.NewPath("spec"))
-		_ = handler.validatingPodUnavailableBudgetFnV1beta1(pub, nil)
-		_ = handler.validatingPodUnavailableBudgetFnV1beta1(pub, old)
+		_ = handler.validatingPodUnavailableBudgetFnV1beta1(context.TODO(), pub, nil)
+		_ = handler.validatingPodUnavailableBudgetFnV1beta1(context.TODO(), pub, old)
 	})
 }
 

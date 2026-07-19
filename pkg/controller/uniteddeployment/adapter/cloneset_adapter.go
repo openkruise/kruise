@@ -41,7 +41,7 @@ func (a *CloneSetAdapter) GetStatusObservedGeneration(obj metav1.Object) int64 {
 	return obj.(*beta1.CloneSet).Status.ObservedGeneration
 }
 
-func (a *CloneSetAdapter) GetSubsetPods(obj metav1.Object) ([]*corev1.Pod, error) {
+func (a *CloneSetAdapter) GetSubsetPods(ctx context.Context, obj metav1.Object) ([]*corev1.Pod, error) {
 	return a.getCloneSetPods(obj.(*beta1.CloneSet))
 }
 
@@ -168,7 +168,7 @@ func (a *CloneSetAdapter) ApplySubsetTemplate(ud *beta1.UnitedDeployment, subset
 	return nil
 }
 
-func (a *CloneSetAdapter) PostUpdate(_ *beta1.UnitedDeployment, _ runtime.Object, _ string, _ int32) error {
+func (a *CloneSetAdapter) PostUpdate(ctx context.Context, _ *beta1.UnitedDeployment, _ runtime.Object, _ string, _ int32) error {
 	return nil
 }
 

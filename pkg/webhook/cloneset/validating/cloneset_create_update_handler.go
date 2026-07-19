@@ -93,7 +93,7 @@ func (h *CloneSetCreateUpdateHandler) Handle(ctx context.Context, req admission.
 			if err := h.Decoder.Decode(req, obj); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}
-			if allErrs := h.validateCloneSet(obj, nil); len(allErrs) > 0 {
+			if allErrs := h.validateCloneSet(ctx, obj, nil); len(allErrs) > 0 {
 				return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 			}
 		case admissionv1.Update:
@@ -104,7 +104,7 @@ func (h *CloneSetCreateUpdateHandler) Handle(ctx context.Context, req admission.
 				return admission.Errored(http.StatusBadRequest, err)
 			}
 
-			if allErrs := h.validateCloneSetUpdate(obj, oldObj); len(allErrs) > 0 {
+			if allErrs := h.validateCloneSetUpdate(ctx, obj, oldObj); len(allErrs) > 0 {
 				return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 			}
 		case admissionv1.Delete:

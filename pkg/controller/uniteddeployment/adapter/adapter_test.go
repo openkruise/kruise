@@ -17,6 +17,7 @@ limitations under the License.
 package adapter
 
 import (
+	"context"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -85,7 +86,7 @@ func TestPostUpdate(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if err := testCase.adapter.PostUpdate(nil, testCase.subsetGetter(), "", 0); err != nil {
+			if err := testCase.adapter.PostUpdate(context.TODO(), nil, testCase.subsetGetter(), "", 0); err != nil {
 				t.Errorf("PostUpdate() error = %v", err)
 			}
 		})

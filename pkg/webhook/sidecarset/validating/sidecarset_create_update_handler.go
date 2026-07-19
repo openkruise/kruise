@@ -76,20 +76,20 @@ type SidecarSetCreateUpdateHandler struct {
 	Decoder admission.Decoder
 }
 
-func (h *SidecarSetCreateUpdateHandler) validatingSidecarSetFn(_ context.Context, obj *appsv1beta1.SidecarSet, older *appsv1beta1.SidecarSet) (bool, string, error) {
-	allErrs := h.validateSidecarSet(obj, older)
+func (h *SidecarSetCreateUpdateHandler) validatingSidecarSetFn(ctx context.Context, obj *appsv1beta1.SidecarSet, older *appsv1beta1.SidecarSet) (bool, string, error) {
+	allErrs := h.validateSidecarSet(ctx, obj, older)
 	if len(allErrs) != 0 {
 		return false, "", allErrs.ToAggregate()
 	}
 	return true, "allowed to be admitted", nil
 }
 
-func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1beta1.SidecarSet, older *appsv1beta1.SidecarSet) field.ErrorList {
+func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(ctx context.Context, obj *appsv1beta1.SidecarSet, older *appsv1beta1.SidecarSet) field.ErrorList {
 	// validating ObjectMeta
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, validateSidecarSetName, field.NewPath("metadata"))
 
 	// validate canary annotations
-	allErrs = append(allErrs, validateSidecarSetCanaryAnnotations(h.Client, obj, older)...)
+	allErrs = append(allErrs, validateSidecarSetCanaryAnnotations(ctx, h.Client, obj, older)...)
 
 	// validating spec
 	allErrs = append(allErrs, h.validateSidecarSetSpec(obj, field.NewPath("spec"))...)
@@ -102,14 +102,14 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1beta1.Side
 	}
 	// iterate across all containers in other sidecarsets to avoid duplication of name
 	sidecarSets := &appsv1beta1.SidecarSetList{}
-	if err := h.Client.List(context.TODO(), sidecarSets, &client.ListOptions{}); err != nil {
+	if err := h.Client.List(ctx, sidecarSets, &client.ListOptions{}); err != nil {
 		allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("query other sidecarsets failed, err: %v", err)))
 	}
 	allErrs = append(allErrs, validateSidecarConflict(h.Client, sidecarSets, obj, field.NewPath("spec"))...)
 	return allErrs
 }
 
-func validateSidecarSetCanaryAnnotations(c client.Client, obj *appsv1beta1.SidecarSet, older *appsv1beta1.SidecarSet) field.ErrorList {
+func validateSidecarSetCanaryAnnotations(ctx context.Context, c client.Client, obj *appsv1beta1.SidecarSet, older *appsv1beta1.SidecarSet) field.ErrorList {
 	allErrs := field.ErrorList{}
 	isCanary, baseSidecarSet := sidecarcontrol.IsCanarySidecarSet(obj)
 	if !isCanary {
@@ -129,7 +129,7 @@ func validateSidecarSetCanaryAnnotations(c client.Client, obj *appsv1beta1.Sidec
 
 	// check if baseSidecarSet exists
 	sidecarSet := &appsv1beta1.SidecarSet{}
-	err := c.Get(context.TODO(), client.ObjectKey{Name: baseSidecarSet}, sidecarSet)
+	err := c.Get(ctx, client.ObjectKey{Name: baseSidecarSet}, sidecarSet)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), obj.Annotations, fmt.Sprintf(
 			"fetch base sidecarSet[%s] failed: %s", baseSidecarSet, err.Error())))
