@@ -390,40 +390,37 @@ func (r *ReconcileEphemeralJob) calculateStatus(job *appsv1alpha1.EphemeralJob, 
 		return err
 	}
 
-	var replicas int32
-	if job.Spec.Replicas == nil {
-		replicas = job.Status.Matches
-	} else {
-		replicas = *job.Spec.Replicas
+	// Conditions are keyed by type, so this must come before the phase
+	// decision below, which may replace it with a terminal JobFailed.
+	if job.Status.Failed > 0 {
+		job.Status.Conditions = addConditions(job.Status.Conditions,
+			appsv1alpha1.EJobFailed, "CreateFailed",
+			fmt.Sprintf("EphemeralJob %s/%s failed to create ephemeral container", job.Namespace, job.Name))
 	}
 
 	if job.Status.Matches == 0 {
 		job.Status.Phase = appsv1alpha1.EphemeralJobWaiting
 		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobMatchedEmpty, "MatchEmpty", "job match no pods")
-	} else if job.Status.Succeeded == replicas && job.Status.Succeeded > 0 {
-		job.Status.CompletionTime = timeNow()
-		job.Status.Phase = appsv1alpha1.EphemeralJobSucceeded
-		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobSucceeded, "JobSucceeded", "job success to run all tasks")
 	} else if job.Status.Running > 0 {
 		job.Status.Phase = appsv1alpha1.EphemeralJobRunning
-	} else if job.Status.Failed == replicas {
-		job.Status.CompletionTime = timeNow()
-		job.Status.Phase = appsv1alpha1.EphemeralJobFailed
-		job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobFailed, "JobFailed", "job failed to run all tasks")
-	} else if job.Status.Waiting == replicas {
+	} else if job.Status.Waiting > 0 {
 		job.Status.Phase = appsv1alpha1.EphemeralJobWaiting
+	} else if job.Status.Succeeded+job.Status.Failed == job.Status.Matches {
+		job.Status.CompletionTime = timeNow()
+		if job.Status.Failed > 0 {
+			job.Status.Phase = appsv1alpha1.EphemeralJobFailed
+			job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobFailed, "JobFailed",
+				fmt.Sprintf("job failed to run all tasks, %d/%d pods failed", job.Status.Failed, job.Status.Matches))
+		} else {
+			job.Status.Phase = appsv1alpha1.EphemeralJobSucceeded
+			job.Status.Conditions = addConditions(job.Status.Conditions, appsv1alpha1.EJobSucceeded, "JobSucceeded", "job success to run all tasks")
+		}
 	} else {
 		job.Status.Phase = appsv1alpha1.EphemeralJobUnknown
 	}
 
 	if job.Spec.Paused {
 		job.Status.Phase = appsv1alpha1.EphemeralJobPause
-	}
-
-	if job.Status.Failed > 0 {
-		job.Status.Conditions = addConditions(job.Status.Conditions,
-			appsv1alpha1.EJobFailed, "CreateFailed",
-			fmt.Sprintf("EphemeralJob %s/%s failed to create ephemeral container", job.Namespace, job.Name))
 	}
 
 	if (job.Status.Phase == appsv1alpha1.EphemeralJobWaiting || job.Status.Phase == appsv1alpha1.EphemeralJobUnknown ||
