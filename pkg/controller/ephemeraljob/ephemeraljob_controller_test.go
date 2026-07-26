@@ -154,26 +154,50 @@ func TestCalculateStatus(t *testing.T) {
 }
 
 func TestCalculateStatusFailedCondition(t *testing.T) {
-	job := newTestEphemeralJob()
-	r := &ReconcileEphemeralJob{}
-
-	if err := r.calculateStatus(job, []*v1.Pod{succeededPod("pod-1"), failedPod("pod-2")}); err != nil {
-		t.Fatalf("calculateStatus returned error: %v", err)
+	cases := []struct {
+		name        string
+		targetPods  []*v1.Pod
+		wantReason  string
+		wantMessage string
+	}{
+		{
+			name:        "terminal failure reports the failed count",
+			targetPods:  []*v1.Pod{succeededPod("pod-1"), failedPod("pod-2")},
+			wantReason:  "JobFailed",
+			wantMessage: "1/2 pods failed",
+		},
+		{
+			name:        "failure while still running is not reported as a create failure",
+			targetPods:  []*v1.Pod{failedPod("pod-1"), runningPod("pod-2")},
+			wantReason:  "ContainerFailed",
+			wantMessage: "1/2 pods have a failed ephemeral container",
+		},
 	}
 
-	var found *appsv1alpha1.EphemeralJobCondition
-	for i := range job.Status.Conditions {
-		if job.Status.Conditions[i].Type == appsv1alpha1.EJobFailed {
-			found = &job.Status.Conditions[i]
-		}
-	}
-	if found == nil {
-		t.Fatalf("no %s condition found in %v", appsv1alpha1.EJobFailed, job.Status.Conditions)
-	}
-	if found.Reason != "JobFailed" {
-		t.Errorf("reason = %s, want JobFailed", found.Reason)
-	}
-	if !strings.Contains(found.Message, "1/2 pods failed") {
-		t.Errorf("message = %q, want it to report 1/2 pods failed", found.Message)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			job := newTestEphemeralJob()
+			r := &ReconcileEphemeralJob{}
+
+			if err := r.calculateStatus(job, tc.targetPods); err != nil {
+				t.Fatalf("calculateStatus returned error: %v", err)
+			}
+
+			var found *appsv1alpha1.EphemeralJobCondition
+			for i := range job.Status.Conditions {
+				if job.Status.Conditions[i].Type == appsv1alpha1.EJobFailed {
+					found = &job.Status.Conditions[i]
+				}
+			}
+			if found == nil {
+				t.Fatalf("no %s condition found in %v", appsv1alpha1.EJobFailed, job.Status.Conditions)
+			}
+			if found.Reason != tc.wantReason {
+				t.Errorf("reason = %s, want %s", found.Reason, tc.wantReason)
+			}
+			if !strings.Contains(found.Message, tc.wantMessage) {
+				t.Errorf("message = %q, want it to contain %q", found.Message, tc.wantMessage)
+			}
+		})
 	}
 }

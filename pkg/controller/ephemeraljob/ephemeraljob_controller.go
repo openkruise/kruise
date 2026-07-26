@@ -394,8 +394,8 @@ func (r *ReconcileEphemeralJob) calculateStatus(job *appsv1alpha1.EphemeralJob, 
 	// decision below, which may replace it with a terminal JobFailed.
 	if job.Status.Failed > 0 {
 		job.Status.Conditions = addConditions(job.Status.Conditions,
-			appsv1alpha1.EJobFailed, "CreateFailed",
-			fmt.Sprintf("EphemeralJob %s/%s failed to create ephemeral container", job.Namespace, job.Name))
+			appsv1alpha1.EJobFailed, "ContainerFailed",
+			fmt.Sprintf("%d/%d pods have a failed ephemeral container", job.Status.Failed, job.Status.Matches))
 	}
 
 	if job.Status.Matches == 0 {

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -115,7 +116,7 @@ func TestReconcileAgainstRealAPIServer(t *testing.T) {
 		}
 	}
 
-	r := &ReconcileEphemeralJob{Client: c, scheme: sch}
+	r := &ReconcileEphemeralJob{Client: c, scheme: sch, recorder: record.NewFakeRecorder(10)}
 	req := reconcile.Request{NamespacedName: types.NamespacedName{Name: job.Name, Namespace: job.Namespace}}
 
 	// Injects the ephemeral containers into both pods.
