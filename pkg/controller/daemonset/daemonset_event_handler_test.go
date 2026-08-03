@@ -41,6 +41,87 @@ func newTestPodEventHandler(reader client.Reader, expectations kubecontroller.Co
 	}
 }
 
+func TestResolveControllerRef(t *testing.T) {
+	ds := &appsv1beta1.DaemonSet{ObjectMeta: metav1.ObjectMeta{
+		Name:      "ds",
+		Namespace: "default",
+		UID:       "ds-uid",
+	}}
+	handler := newTestPodEventHandler(fake.NewClientBuilder().WithObjects(ds).Build(), nil)
+
+	tests := []struct {
+		name        string
+		ownerRef    metav1.OwnerReference
+		wantResolve bool
+	}{
+		{
+			name: "v1beta1 owner reference",
+			ownerRef: metav1.OwnerReference{
+				APIVersion: "apps.kruise.io/v1beta1",
+				Kind:       "DaemonSet",
+				Name:       "ds",
+				UID:        "ds-uid",
+			},
+			wantResolve: true,
+		},
+		{
+			name: "v1alpha1 owner reference",
+			ownerRef: metav1.OwnerReference{
+				APIVersion: "apps.kruise.io/v1alpha1",
+				Kind:       "DaemonSet",
+				Name:       "ds",
+				UID:        "ds-uid",
+			},
+			wantResolve: true,
+		},
+		{
+			name: "different group",
+			ownerRef: metav1.OwnerReference{
+				APIVersion: "apps.example.io/v1beta1",
+				Kind:       "DaemonSet",
+				Name:       "ds",
+				UID:        "ds-uid",
+			},
+		},
+		{
+			name: "different kind",
+			ownerRef: metav1.OwnerReference{
+				APIVersion: "apps.kruise.io/v1alpha1",
+				Kind:       "CloneSet",
+				Name:       "ds",
+				UID:        "ds-uid",
+			},
+		},
+		{
+			name: "different uid",
+			ownerRef: metav1.OwnerReference{
+				APIVersion: "apps.kruise.io/v1alpha1",
+				Kind:       "DaemonSet",
+				Name:       "ds",
+				UID:        "other-uid",
+			},
+		},
+		{
+			name: "malformed api version",
+			ownerRef: metav1.OwnerReference{
+				APIVersion: "apps.kruise.io/v1alpha1/invalid",
+				Kind:       "DaemonSet",
+				Name:       "ds",
+				UID:        "ds-uid",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := handler.resolveControllerRef("default", &tt.ownerRef)
+			if (got != nil) != tt.wantResolve {
+				t.Fatalf("resolveControllerRef() resolved = %v, want %v", got != nil, tt.wantResolve)
+			}
+		})
+	}
+}
+
 func TestEnqueueRequestForPodCreate(t *testing.T) {
 	lTrue := true
 	cases := []struct {
