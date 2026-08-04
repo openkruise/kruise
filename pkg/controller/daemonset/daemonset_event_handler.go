@@ -187,12 +187,16 @@ func (e *podEventHandler) Generic(ctx context.Context, evt event.TypedGenericEve
 }
 
 func (e *podEventHandler) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *appsv1beta1.DaemonSet {
+	if controllerRef.Kind != controllerKind.Kind {
+		return nil
+	}
+
 	refGV, err := schema.ParseGroupVersion(controllerRef.APIVersion)
 	if err != nil {
 		klog.ErrorS(err, "Could not parse APIVersion in OwnerReference", "ownerRef", controllerRef)
 		return nil
 	}
-	if controllerRef.Kind != controllerKind.Kind || refGV.Group != controllerKind.Group {
+	if refGV.Group != controllerKind.Group {
 		return nil
 	}
 
