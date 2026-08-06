@@ -340,6 +340,9 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 		if podClone.Annotations == nil {
 			podClone.Annotations = map[string]string{}
 		}
+		if podClone.Labels == nil {
+			podClone.Labels = map[string]string{}
+		}
 		for k, v := range probeMetadata.Labels {
 			// delete the label
 			if v == nil {
