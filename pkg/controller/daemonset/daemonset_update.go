@@ -64,7 +64,13 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1beta
 	//   2. The selector is narrowed and the excluded pods (which cannot be deleted by the rolling
 	//      update itself) occupy all maxUnavailable slots, so no eligible node can be updated.
 	if utilfeature.DefaultFeatureGate.Enabled(features.DaemonSetPruneIneligibleNodes) {
-		nodeToDaemonPods = dsc.pruneNodesAndOrphanedPods(ds, nodeToDaemonPods, nodeList)
+		var ineligiblePodsToDelete []string
+		nodeToDaemonPods, ineligiblePodsToDelete = dsc.pruneNodesAndOrphanedPods(ds, nodeToDaemonPods, nodeList)
+		if len(ineligiblePodsToDelete) > 0 {
+			if err := dsc.syncNodes(ctx, ds, ineligiblePodsToDelete, nil, hash); err != nil {
+				return err
+			}
+		}
 	}
 
 	maxSurge, maxUnavailable, err := dsc.updatedDesiredNodeCounts(ds, nodeList, nodeToDaemonPods)

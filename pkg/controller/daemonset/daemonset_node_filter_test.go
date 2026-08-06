@@ -1,6 +1,7 @@
 package daemonset
 
 import (
+	"context"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -193,4 +194,85 @@ func TestDaemonSetIgnoreNotReadyNodesWhenUpdating(t *testing.T) {
 
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, 2, 0, 0)
+}
+
+// TestPruneIneligibleNodesActuallyDeletesPods verifies that when DaemonSetPruneIneligibleNodes is enabled
+// and nodeAffinity is updated to exclude nodes, the pods on those nodes are actually deleted via syncNodes.
+func TestPruneIneligibleNodesActuallyDeletesPods(t *testing.T) {
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.DaemonSetPruneIneligibleNodes, true)()
+
+	ds := newDaemonSet("foo")
+	ds.Spec.UpdateStrategy = appsv1beta1.DaemonSetUpdateStrategy{
+		Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+			MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+		},
+	}
+
+	manager, podControl, _, err := newTestController(ds)
+	if err != nil {
+		t.Fatalf("error creating DaemonSets controller: %v", err)
+	}
+
+	addNodes(manager.nodeStore, 0, 5, nil)
+	manager.dsStore.Add(ds)
+	expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
+	markAllPodsReady(podControl.podStore, nil)
+
+	// Modify nodeAffinity to exclude node-0 and node-1
+	excludedNodes := sets.NewString("node-0", "node-1")
+	ds.Spec.Template.Spec.Affinity = &corev1.Affinity{
+		NodeAffinity: &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "kubernetes.io/hostname",
+								Operator: corev1.NodeSelectorOpNotIn,
+								Values:   excludedNodes.List(),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	ds.Generation++
+	manager.dsStore.Update(ds)
+
+	// Fetch current pods mapped to nodes
+	nodeToDaemonPods, err := manager.getNodesToDaemonPods(context.TODO(), ds)
+	if err != nil {
+		t.Fatalf("failed to get node to daemon pods: %v", err)
+	}
+
+	var nodeList []*corev1.Node
+	for _, obj := range manager.nodeStore.List() {
+		nodeList = append(nodeList, obj.(*corev1.Node))
+	}
+
+	// Call the updated prune function
+	_, podsToDelete := manager.pruneNodesAndOrphanedPods(ds, nodeToDaemonPods, nodeList)
+
+	// Assert exactly 2 pods are returned to be deleted
+	if len(podsToDelete) != 2 {
+		t.Fatalf("expected 2 pods to delete, got %d: %v", len(podsToDelete), podsToDelete)
+	}
+
+	// Verify the pods belong to the excluded nodes
+	deletedPodNames := sets.NewString(podsToDelete...)
+	for _, podObj := range podControl.podStore.List() {
+		pod := podObj.(*corev1.Pod)
+		nodeName, _ := util.GetTargetNodeName(pod)
+		if excludedNodes.Has(nodeName) {
+			if !deletedPodNames.Has(pod.Name) {
+				t.Errorf("expected pod %s on excluded node %s to be in podsToDelete list", pod.Name, nodeName)
+			}
+		} else {
+			if deletedPodNames.Has(pod.Name) {
+				t.Errorf("did not expect pod %s on eligible node %s to be in podsToDelete list", pod.Name, nodeName)
+			}
+		}
+	}
 }
