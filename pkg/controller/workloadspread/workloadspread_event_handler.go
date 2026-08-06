@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -126,8 +127,8 @@ func (w workloadEventHandler) Update(ctx context.Context, evt event.UpdateEvent,
 		newReplicas = *evt.ObjectNew.(*appsv1.ReplicaSet).Spec.Replicas
 		gvk = controllerKindRS
 	case *batchv1.Job:
-		oldReplicas = *evt.ObjectOld.(*batchv1.Job).Spec.Parallelism
-		newReplicas = *evt.ObjectNew.(*batchv1.Job).Spec.Parallelism
+		oldReplicas = ptr.Deref(evt.ObjectOld.(*batchv1.Job).Spec.Parallelism, 1)
+		newReplicas = ptr.Deref(evt.ObjectNew.(*batchv1.Job).Spec.Parallelism, 1)
 		gvk = controllerKindJob
 	case *appsv1.StatefulSet:
 		oldReplicas = *evt.ObjectOld.(*appsv1.StatefulSet).Spec.Replicas

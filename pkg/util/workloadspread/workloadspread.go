@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -861,7 +862,7 @@ func (h *Handler) getWorkloadReplicas(ws *appsv1beta1.WorkloadSpread) (int32, er
 	case *appsv1.StatefulSet:
 		return *o.Spec.Replicas, nil
 	case *batchv1.Job:
-		return *o.Spec.Parallelism, nil
+		return ptr.Deref(o.Spec.Parallelism, 1), nil
 	case *appsv1alpha1.CloneSet:
 		return *o.Spec.Replicas, nil
 	case *appsv1beta1.StatefulSet:
