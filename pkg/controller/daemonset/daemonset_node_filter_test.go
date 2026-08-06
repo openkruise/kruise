@@ -194,3 +194,94 @@ func TestDaemonSetIgnoreNotReadyNodesWhenUpdating(t *testing.T) {
 	clearExpectations(t, manager, ds, podControl)
 	expectSyncDaemonSets(t, manager, ds, podControl, 2, 0, 0)
 }
+
+// TestPruneIneligibleNodesActuallyDeletesPods is a regression test for the bug where
+// podsToDelete was built inside pruneNodesAndOrphanedPods but never returned, so pods
+// on ineligible nodes were never actually deleted even when DaemonSetPruneIneligibleNodes
+// was enabled.
+//
+// It verifies two things:
+//  1. pruneNodesAndOrphanedPods returns the correct pod names for ineligible nodes.
+//  2. A full sync with DaemonSetPruneIneligibleNodes=true causes those pods to be deleted
+//     (i.e., syncNodes is actually invoked with the returned names).
+func TestPruneIneligibleNodesActuallyDeletesPods(t *testing.T) {
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.DaemonSetPruneIneligibleNodes, true)()
+
+	ds := newDaemonSet("foo")
+	ds.Spec.UpdateStrategy = appsv1beta1.DaemonSetUpdateStrategy{
+		Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+			MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
+		},
+	}
+
+	manager, podControl, _, err := newTestController(ds)
+	if err != nil {
+		t.Fatalf("error creating DaemonSets controller: %v", err)
+	}
+
+	// 5 nodes, initial sync creates one pod per node.
+	addNodes(manager.nodeStore, 0, 5, nil)
+	manager.dsStore.Add(ds)
+	expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
+	markAllPodsReady(podControl.podStore, nil)
+
+	// Narrow nodeAffinity to exclude node-0 and node-1.
+	// Also bump the image so this is a real rolling update.
+	excludedNodes := sets.NewString("node-0", "node-1")
+	ds.Spec.Template.Spec.Affinity = &corev1.Affinity{
+		NodeAffinity: &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "kubernetes.io/hostname",
+								Operator: corev1.NodeSelectorOpNotIn,
+								Values:   excludedNodes.List(),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	ds.Spec.Template.Spec.Containers[0].Image = "bar2"
+	ds.Generation++
+	manager.dsStore.Update(ds)
+
+	// --- Part 1: validate pruneNodesAndOrphanedPods return value directly ---
+	// Build nodeToDaemonPods the same way the controller does and confirm the
+	// function now returns (not silently drops) the 2 pod names from excluded nodes.
+	nodeToDaemonPods, err2 := manager.getNodesToDaemonPods(t.Context(), ds)
+	if err2 != nil {
+		t.Fatalf("getNodesToDaemonPods: %v", err2)
+	}
+	var nodeList []*corev1.Node
+	for _, obj := range manager.nodeStore.List() {
+		nodeList = append(nodeList, obj.(*corev1.Node))
+	}
+
+	_, ineligiblePods := manager.pruneNodesAndOrphanedPods(ds, nodeToDaemonPods, nodeList)
+	if len(ineligiblePods) != 2 {
+		t.Errorf("pruneNodesAndOrphanedPods: expected 2 ineligible pod names, got %d: %v", len(ineligiblePods), ineligiblePods)
+	}
+
+	// --- Part 2: validate end-to-end that the pods are actually deleted via syncNodes ---
+	// The first sync should:
+	//   - via manage:         delete 2 pods on excluded nodes (node-0, node-1)
+	//   - via rollingUpdate:  delete 1 pod on an eligible node (maxUnavailable=1)
+	// Total expected deletes: 3 (2 ineligible + 1 rolling-update step).
+	clearExpectations(t, manager, ds, podControl)
+	expectSyncDaemonSets(t, manager, ds, podControl, 0, 3, 0)
+
+	// Verify no pods remain on the excluded nodes.
+	for _, obj := range podControl.podStore.List() {
+		pod := obj.(*corev1.Pod)
+		nodeName := pod.Spec.NodeName
+		if excludedNodes.Has(nodeName) {
+			t.Errorf("pod %s still exists on excluded node %s after sync", pod.Name, nodeName)
+		}
+	}
+}
+
