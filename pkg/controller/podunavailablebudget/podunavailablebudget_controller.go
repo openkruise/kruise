@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -138,9 +139,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// deployment
 	if err = c.Watch(source.Kind(mgr.GetCache(), client.Object(&apps.Deployment{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			old := e.ObjectOld.(*apps.Deployment)
-			new := e.ObjectNew.(*apps.Deployment)
-			return *old.Spec.Replicas != *new.Spec.Replicas
+			return workloadReplicasChanged(e.ObjectOld, e.ObjectNew)
 		},
 		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
 			return true
@@ -152,9 +151,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// kruise AdvancedStatefulSet
 	if err = c.Watch(source.Kind(mgr.GetCache(), client.Object(&kruiseappsv1beta1.StatefulSet{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			old := e.ObjectOld.(*kruiseappsv1beta1.StatefulSet)
-			new := e.ObjectNew.(*kruiseappsv1beta1.StatefulSet)
-			return *old.Spec.Replicas != *new.Spec.Replicas
+			return workloadReplicasChanged(e.ObjectOld, e.ObjectNew)
 		},
 		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
 			return true
@@ -166,9 +163,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// CloneSet
 	if err = c.Watch(source.Kind(mgr.GetCache(), client.Object(&kruiseappsv1alpha1.CloneSet{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			old := e.ObjectOld.(*kruiseappsv1alpha1.CloneSet)
-			new := e.ObjectNew.(*kruiseappsv1alpha1.CloneSet)
-			return *old.Spec.Replicas != *new.Spec.Replicas
+			return workloadReplicasChanged(e.ObjectOld, e.ObjectNew)
 		},
 		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
 			return true
@@ -180,9 +175,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// StatefulSet
 	if err = c.Watch(source.Kind(mgr.GetCache(), client.Object(&apps.StatefulSet{}), &SetEnqueueRequestForPUB{mgr}, predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			old := e.ObjectOld.(*apps.StatefulSet)
-			new := e.ObjectNew.(*apps.StatefulSet)
-			return *old.Spec.Replicas != *new.Spec.Replicas
+			return workloadReplicasChanged(e.ObjectOld, e.ObjectNew)
 		},
 		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
 			return true
@@ -505,4 +498,43 @@ func (r *ReconcilePodUnavailableBudget) updatePubStatus(pub *policyv1beta1.PodUn
 	klog.V(3).InfoS("PodUnavailableBudget update status", "podUnavailableBudget", klog.KObj(pub), "disruptedPods", len(disruptedPods), "unavailablePods", len(unavailablePods),
 		"expectedCount", expectedCount, "desiredAvailable", desiredAvailable, "currentAvailable", currentAvailable, "unavailableAllowed", unavailableAllowed)
 	return nil
+}
+
+// workloadReplicasChanged safely compares replica counts for supported workloads.
+// Treats nil replicas as the Kubernetes default of 1.
+func workloadReplicasChanged(oldObj, newObj client.Object) bool {
+	var oldReplicas, newReplicas *int32
+	switch old := oldObj.(type) {
+	case *apps.Deployment:
+		new, ok := newObj.(*apps.Deployment)
+		if !ok {
+			return false
+		}
+		oldReplicas = old.Spec.Replicas
+		newReplicas = new.Spec.Replicas
+	case *kruiseappsv1beta1.StatefulSet:
+		new, ok := newObj.(*kruiseappsv1beta1.StatefulSet)
+		if !ok {
+			return false
+		}
+		oldReplicas = old.Spec.Replicas
+		newReplicas = new.Spec.Replicas
+	case *kruiseappsv1alpha1.CloneSet:
+		new, ok := newObj.(*kruiseappsv1alpha1.CloneSet)
+		if !ok {
+			return false
+		}
+		oldReplicas = old.Spec.Replicas
+		newReplicas = new.Spec.Replicas
+	case *apps.StatefulSet:
+		new, ok := newObj.(*apps.StatefulSet)
+		if !ok {
+			return false
+		}
+		oldReplicas = old.Spec.Replicas
+		newReplicas = new.Spec.Replicas
+	default:
+		return false
+	}
+	return ptr.Deref(oldReplicas, 1) != ptr.Deref(newReplicas, 1)
 }

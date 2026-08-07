@@ -37,6 +37,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	kruiseappsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
+	kruiseappsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	policyv1beta1 "github.com/openkruise/kruise/apis/policy/v1beta1"
 	"github.com/openkruise/kruise/pkg/control/pubcontrol"
 	"github.com/openkruise/kruise/pkg/util"
@@ -1363,4 +1365,95 @@ func isPubStatusEqual(expectStatus, nowStatus policyv1beta1.PodUnavailableBudget
 	}
 
 	return reflect.DeepEqual(expectStatus, nowStatus)
+}
+
+func TestWorkloadReplicasChanged(t *testing.T) {
+	cases := []struct {
+		name     string
+		oldObj   client.Object
+		newObj   client.Object
+		expected bool
+	}{
+		{
+			name:     "Deployment: both nil (default to 1)",
+			oldObj:   &apps.Deployment{Spec: apps.DeploymentSpec{Replicas: nil}},
+			newObj:   &apps.Deployment{Spec: apps.DeploymentSpec{Replicas: nil}},
+			expected: false,
+		},
+		{
+			name:     "Deployment: old nil, new 1",
+			oldObj:   &apps.Deployment{Spec: apps.DeploymentSpec{Replicas: nil}},
+			newObj:   &apps.Deployment{Spec: apps.DeploymentSpec{Replicas: ptr.To[int32](1)}},
+			expected: false,
+		},
+		{
+			name:     "Deployment: old 1, new nil",
+			oldObj:   &apps.Deployment{Spec: apps.DeploymentSpec{Replicas: ptr.To[int32](1)}},
+			newObj:   &apps.Deployment{Spec: apps.DeploymentSpec{Replicas: nil}},
+			expected: false,
+		},
+		{
+			name:     "Deployment: old nil, new 2",
+			oldObj:   &apps.Deployment{Spec: apps.DeploymentSpec{Replicas: nil}},
+			newObj:   &apps.Deployment{Spec: apps.DeploymentSpec{Replicas: ptr.To[int32](2)}},
+			expected: true,
+		},
+		{
+			name:     "Deployment: old 2, new nil",
+			oldObj:   &apps.Deployment{Spec: apps.DeploymentSpec{Replicas: ptr.To[int32](2)}},
+			newObj:   &apps.Deployment{Spec: apps.DeploymentSpec{Replicas: nil}},
+			expected: true,
+		},
+		{
+			name:     "Deployment: old 2, new 2",
+			oldObj:   &apps.Deployment{Spec: apps.DeploymentSpec{Replicas: ptr.To[int32](2)}},
+			newObj:   &apps.Deployment{Spec: apps.DeploymentSpec{Replicas: ptr.To[int32](2)}},
+			expected: false,
+		},
+		{
+			name:     "Deployment: old 2, new 3",
+			oldObj:   &apps.Deployment{Spec: apps.DeploymentSpec{Replicas: ptr.To[int32](2)}},
+			newObj:   &apps.Deployment{Spec: apps.DeploymentSpec{Replicas: ptr.To[int32](3)}},
+			expected: true,
+		},
+		{
+			name:     "Kruise StatefulSet: old nil, new 2",
+			oldObj:   &kruiseappsv1beta1.StatefulSet{Spec: kruiseappsv1beta1.StatefulSetSpec{Replicas: nil}},
+			newObj:   &kruiseappsv1beta1.StatefulSet{Spec: kruiseappsv1beta1.StatefulSetSpec{Replicas: ptr.To[int32](2)}},
+			expected: true,
+		},
+		{
+			name:     "CloneSet: old nil, new 2",
+			oldObj:   &kruiseappsv1alpha1.CloneSet{Spec: kruiseappsv1alpha1.CloneSetSpec{Replicas: nil}},
+			newObj:   &kruiseappsv1alpha1.CloneSet{Spec: kruiseappsv1alpha1.CloneSetSpec{Replicas: ptr.To[int32](2)}},
+			expected: true,
+		},
+		{
+			name:     "Apps StatefulSet: old nil, new 2",
+			oldObj:   &apps.StatefulSet{Spec: apps.StatefulSetSpec{Replicas: nil}},
+			newObj:   &apps.StatefulSet{Spec: apps.StatefulSetSpec{Replicas: ptr.To[int32](2)}},
+			expected: true,
+		},
+		{
+			name:     "Type mismatch",
+			oldObj:   &apps.Deployment{Spec: apps.DeploymentSpec{Replicas: ptr.To[int32](1)}},
+			newObj:   &apps.StatefulSet{Spec: apps.StatefulSetSpec{Replicas: ptr.To[int32](2)}},
+			expected: false,
+		},
+		{
+			name:     "Unknown type",
+			oldObj:   &corev1.Pod{},
+			newObj:   &corev1.Pod{},
+			expected: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := workloadReplicasChanged(tc.oldObj, tc.newObj)
+			if result != tc.expected {
+				t.Errorf("expected %v, got %v", tc.expected, result)
+			}
+		})
+	}
 }
