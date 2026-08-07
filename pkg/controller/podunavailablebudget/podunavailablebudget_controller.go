@@ -227,7 +227,7 @@ func (r *ReconcilePodUnavailableBudget) Reconcile(_ context.Context, req ctrl.Re
 				Namespace: req.Namespace,
 			},
 		}); cacheErr != nil {
-			klog.ErrorS(err, "Deleted cache failed for PodUnavailableBudget", "podUnavailableBudget", req)
+			klog.ErrorS(cacheErr, "Deleted cache failed for PodUnavailableBudget", "podUnavailableBudget", req)
 		}
 		// Object not found, return.  Created objects are automatically garbage collected.
 		// For additional cleanup logic use finalizers.
