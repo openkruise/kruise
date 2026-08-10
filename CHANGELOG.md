@@ -1,5 +1,17 @@
 # Change Log
 
+## v1.8.5
+> Change log since v1.8.4
+
+### Bug fixes
+- Fix that setting `completionPolicy.ttlSecondsAfterFinished` to clean up nodeimage data would also delete the job itself. Now expose the `default-ttlseconds-for-always-nodeimage` cli param for kruise-controller-manager to control the nodeimage data ttl instead ([#2219](https://github.com/openkruise/kruise/pull/2219), [@bitsf](https://github.com/bitsf))
+
+## v1.8.4
+> Change log since v1.8.3
+
+### Other Notable Changes
+- Unify virtual-kubelet label constants and propagate the virtual-kubelet label from Node to ContainerRecreateRequest ([#2468](https://github.com/openkruise/kruise/pull/2468), [@zmberg](https://github.com/zmberg))
+
 ## v1.8.3
 > Change log since v1.8.2
 
