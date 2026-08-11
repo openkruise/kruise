@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"time"
 
+	digest "github.com/opencontainers/go-digest"
 	"google.golang.org/grpc"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -94,10 +95,21 @@ func (c *commonCRIImageService) ListImages(ctx context.Context) ([]ImageInfo, er
 	return c.listImagesV1alpha2(ctx)
 }
 
+// joinImageRef rebuilds the reference that NormalizeImageRefToNameTag split
+// apart. That split returns a digest in the tag position, and a digest joins the
+// name with '@': joining with ':' would yield "repo:sha256:...", which CRI
+// runtimes reject as an invalid reference.
+func joinImageRef(imageName, tagOrDigest string) string {
+	if _, err := digest.Parse(tagOrDigest); err == nil {
+		return imageName + "@" + tagOrDigest
+	}
+	return imageName + ":" + tagOrDigest
+}
+
 // PullImage implements ImageService.PullImage using v1 CRI client.
 func (c *commonCRIImageService) pullImageV1(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, sandboxConfig *appsv1beta1.SandboxConfig) (ImagePullStatusReader, error) {
 	registry := daemonutil.ParseRegistry(imageName)
-	fullImageName := imageName + ":" + tag
+	fullImageName := joinImageRef(imageName, tag)
 	repoToPull, _, _, err := parsers.ParseImageName(fullImageName)
 	if err != nil {
 		return nil, err
@@ -217,7 +229,7 @@ func (c *commonCRIImageService) listImagesV1(ctx context.Context) ([]ImageInfo, 
 // PullImage implements ImageService.PullImage using v1alpha2 CRI client.
 func (c *commonCRIImageService) pullImageV1alpha2(ctx context.Context, imageName, tag string, pullSecrets []v1.Secret, sandboxConfig *appsv1beta1.SandboxConfig) (ImagePullStatusReader, error) {
 	registry := daemonutil.ParseRegistry(imageName)
-	fullImageName := imageName + ":" + tag
+	fullImageName := joinImageRef(imageName, tag)
 	repoToPull, _, _, err := parsers.ParseImageName(fullImageName)
 	if err != nil {
 		return nil, err
