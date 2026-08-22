@@ -152,9 +152,21 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 				if !ok || err != nil {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for StatefulSet."))
 				} else {
-					set := &appsv1.StatefulSet{}
-					if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
-						workloadTemplate = set
+					if spec.TargetReference.APIVersion == controllerKruiseKindBetaSts.GroupVersion().String() {
+						set := &appsv1beta1.StatefulSet{}
+						if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
+							workloadTemplate = set
+						}
+					} else if spec.TargetReference.APIVersion == controllerKruiseKindAlphaSts.GroupVersion().String() {
+						set := &appsv1alpha1.StatefulSet{}
+						if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
+							workloadTemplate = set
+						}
+					} else {
+						set := &appsv1.StatefulSet{}
+						if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
+							workloadTemplate = set
+						}
 					}
 				}
 			default:
@@ -311,6 +323,12 @@ func validateWorkloadSpreadSubsets(ws *appsv1beta1.WorkloadSpread, subsets []app
 					podSpec = workloadTemplate.(*batchv1.Job).Spec.Template
 				case controllerKindSts:
 					sts := workloadTemplate.(*appsv1.StatefulSet)
+					podSpec = withVolumeClaimTemplates(sts.Spec.Template, sts.Spec.VolumeClaimTemplates)
+				case controllerKruiseKindBetaSts:
+					sts := workloadTemplate.(*appsv1beta1.StatefulSet)
+					podSpec = withVolumeClaimTemplates(sts.Spec.Template, sts.Spec.VolumeClaimTemplates)
+				case controllerKruiseKindAlphaSts:
+					sts := workloadTemplate.(*appsv1alpha1.StatefulSet)
 					podSpec = withVolumeClaimTemplates(sts.Spec.Template, sts.Spec.VolumeClaimTemplates)
 				}
 				podBytes, _ := json.Marshal(podSpec)
