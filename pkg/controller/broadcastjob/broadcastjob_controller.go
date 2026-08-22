@@ -410,6 +410,10 @@ func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1beta1.BroadcastJob,
 	}
 	parallelism := int32(parallelismInt)
 
+	if active < 0 {
+		active = 0
+	}
+
 	// The rest pods to run
 	rest := int32(len(restNodesToRunPod))
 	var errCh chan error
@@ -676,7 +680,9 @@ func (r *ReconcileBroadcastJob) deleteJobPods(job *appsv1beta1.BroadcastJob, pod
 			} else {
 				failedLock.Lock()
 				failed++
-				active--
+				if active > 0 {
+					active--
+				}
 				r.recorder.Eventf(job, corev1.EventTypeNormal, kubecontroller.SuccessfulDeletePodReason, "Delete pod: %v", pods[ix].Name)
 				failedLock.Unlock()
 			}

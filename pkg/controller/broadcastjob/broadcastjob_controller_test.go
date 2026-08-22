@@ -676,3 +676,138 @@ func patchPodName(pod *v1.Pod) {
 		pod.Name = pod.GenerateName + string(uuid.NewUUID())
 	}
 }
+
+// TestDeleteJobPodsDecrementsActiveCorrectly verifies that deleteJobPods decrements
+// active for each successfully deleted pod when active > 0. This covers the active--
+// branch inside the "if active > 0" guard added to prevent underflow.
+//
+// Setup:
+//   - 3 nodes; 1 pod is Failed (triggers FailFast policy), 2 pods are Running (truly active).
+//   - FailFast policy causes jobFailed=true, which calls deleteJobPods(job, activePods, ...).
+//   - active starts at 2; each successful delete decrements it to 0.
+func TestDeleteJobPodsDecrementsActiveCorrectly(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
+
+	p := intstr.FromInt(10)
+	job := createJob("job-decrement", p)
+	job.Spec.FailurePolicy.Type = appsv1beta1.FailurePolicyTypeFailFast
+
+	node1 := createNode("node1")
+	node2 := createNode("node2")
+	node3 := createNode("node3")
+
+	// pod3 is Failed — triggers FailFast and sets jobFailed=true.
+	pod1 := createPod(job, "pod1", "node1", v1.PodRunning)
+	pod2 := createPod(job, "pod2", "node2", v1.PodRunning)
+	pod3 := createPod(job, "pod3", "node3", v1.PodFailed)
+
+	reconcileJob := createReconcileJob(scheme, job, pod1, pod2, pod3, node1, node2, node3)
+	request := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "job-decrement",
+			Namespace: "default",
+		},
+	}
+
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
+	assert.NoError(t, err)
+
+	retrievedJob := &appsv1beta1.BroadcastJob{}
+	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
+	assert.NoError(t, err)
+
+	// Job failed due to FailFast; active pods were deleted, so active must be 0.
+	assert.Equal(t, appsv1beta1.PhaseFailed, retrievedJob.Status.Phase)
+	assert.Equal(t, int32(0), retrievedJob.Status.Active)
+}
+
+// TestReconcilePodsClampNegativeActive verifies the defensive guard in reconcilePods
+// that clamps a negative active value to 0, preventing make(chan error, diff) from
+// panicking when called with a negative size.
+//
+// No restNodesToRunPod are passed so rest=0, diff=0, and no pod creation is
+// attempted — the guard fires cleanly without needing a fully-wired job template.
+func TestReconcilePodsClampNegativeActive(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
+
+	p := intstr.FromInt(2)
+	job := createJob("job-clamp", p)
+
+	reconcileJob := createReconcileJob(scheme, job)
+
+	// Call reconcilePods directly with a negative active value and no rest nodes.
+	// rest=0 means diff=0 so no pod creation occurs; the guard clamps active to 0.
+	active, err := reconcileJob.reconcilePods(job, []*v1.Node{}, -5, 1)
+	assert.NoError(t, err)
+	assert.GreaterOrEqual(t, active, int32(0))
+}
+
+// TestDeleteJobPodsDoesNotUnderflowActive verifies that deleteJobPods does not
+// drive active negative when pods that were classified as "failed" by filterPods
+// (and therefore not counted in active) are also present in podsToDelete.
+//
+// Setup:
+//   - 3 nodes; nodes 2 and 3 carry a NoExecute taint so their pods end up in
+//     podsToDelete via checkNodeFitness.
+//   - All 3 pods have RestartPolicy=OnFailure and RestartCount > restartLimit (0),
+//     so filterPods classifies them as failed, meaning active == 0 going into
+//     reconcilePods.
+//   - deleteJobPods would previously decrement active below zero, causing
+//     make(chan error, diff) to panic with a negative size.
+func TestDeleteJobPodsDoesNotUnderflowActive(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
+
+	p := intstr.FromInt(10)
+	job := createJob("job-underflow", p)
+
+	// node1 is clean; nodes 2 and 3 carry a NoExecute taint.
+	node1 := createNode("node1")
+	node2 := createNode("node2")
+	node2.Spec.Taints = []v1.Taint{
+		{Key: "test-taint", Effect: v1.TaintEffectNoExecute},
+	}
+	node3 := createNode("node3")
+	node3.Spec.Taints = []v1.Taint{
+		{Key: "test-taint", Effect: v1.TaintEffectNoExecute},
+	}
+
+	// Create pods on all three nodes. Each pod has RestartPolicy=OnFailure and
+	// RestartCount=1, which exceeds the default restartLimit of 0, so filterPods
+	// classifies them as failed rather than active.
+	makePod := func(name, nodeName string) *v1.Pod {
+		pod := createPod(job, name, nodeName, v1.PodRunning)
+		pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
+		pod.Status.ContainerStatuses = []v1.ContainerStatus{
+			{Name: "c", RestartCount: 1},
+		}
+		return pod
+	}
+	pod1 := makePod("pod1", "node1")
+	pod2 := makePod("pod2", "node2")
+	pod3 := makePod("pod3", "node3")
+
+	reconcileJob := createReconcileJob(scheme, job, pod1, pod2, pod3, node1, node2, node3)
+	request := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "job-underflow",
+			Namespace: "default",
+		},
+	}
+
+	// Must not panic.
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
+	assert.NoError(t, err)
+
+	retrievedJob := &appsv1beta1.BroadcastJob{}
+	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
+	assert.NoError(t, err)
+
+	// active must not be negative.
+	assert.GreaterOrEqual(t, retrievedJob.Status.Active, int32(0))
+}
