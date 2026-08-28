@@ -99,11 +99,14 @@ func (pb *prober) runProbe(p *appsv1alpha1.ContainerProbeSpec, probeKey probeKey
 		}
 		return pb.http.Probe(req, timeout)
 	case p.TCPSocket != nil:
-		port := p.TCPSocket.Port.IntValue()
-		host := p.TCPSocket.Host
-		if host == "" {
-			host = probeKey.podIP
+		// FIX(SSRF): never honor a caller-supplied Host. NodePodProbe has no admission
+		// webhook of its own and the daemon runs with hostNetwork=true, so a Host smuggled
+		// in via a direct NodePodProbe write would dial node-local/metadata endpoints.
+		host, err := resolveProbeHost(p.TCPSocket.Host, probeKey.podIP)
+		if err != nil {
+			return probe.Unknown, "", err
 		}
+		port := p.TCPSocket.Port.IntValue()
 		klog.InfoS("TCP-Probe Host", "host", host, "port", port, "timeout", timeout)
 		return pb.tcp.Probe(host, port, timeout)
 	}
@@ -112,15 +115,33 @@ func (pb *prober) runProbe(p *appsv1alpha1.ContainerProbeSpec, probeKey probeKey
 	return probe.Unknown, "", fmt.Errorf("missing probe handler for %s", containerRuntimeStatus.Metadata.Name)
 }
 
+// resolveProbeHost returns the only address a probe is permitted to dial: the target
+// Pod IP. A non-empty Host that differs from the Pod IP is rejected loudly rather than
+// silently dropped so a direct NodePodProbe injection (e.g. Host=169.254.169.254) is
+// both blocked and observable in the daemon logs. An empty Pod IP is rejected too, which
+// also closes the latent net.JoinHostPort("", port) -> ":port" loopback dial.
+func resolveProbeHost(specHost, podIP string) (string, error) {
+	if specHost != "" && specHost != podIP {
+		return "", fmt.Errorf("probe host %q is not allowed: probes may only target the pod IP", specHost)
+	}
+	if podIP == "" {
+		return "", fmt.Errorf("probe target pod IP is empty")
+	}
+	return podIP, nil
+}
+
 func newRequestForHTTPGetAction(httpGet *v1.HTTPGetAction, podIP string, userAgentFragment string) (*http.Request, error) {
 	scheme := string(httpGet.Scheme)
 	if scheme == "" {
 		scheme = "http"
 	}
 
-	host := httpGet.Host
-	if host == "" {
-		host = podIP
+	// FIX(SSRF): pin the probe to the target Pod IP regardless of httpGet.Host. See
+	// resolveProbeHost - this is the daemon-side backstop for the same invariant the
+	// PodProbeMarker validating webhook claims to enforce.
+	host, err := resolveProbeHost(httpGet.Host, podIP)
+	if err != nil {
+		return nil, err
 	}
 
 	port := httpGet.Port.IntValue()

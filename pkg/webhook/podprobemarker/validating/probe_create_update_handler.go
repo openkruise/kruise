@@ -270,6 +270,11 @@ func validateHTTPGetAction(http *corev1.HTTPGetAction, fldPath *field.Path) fiel
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("scheme"), http.Scheme, sets.List(supportedHTTPSchemes)))
 	}
 	for _, header := range http.HTTPHeaders {
+		// The daemon copies a "Host" header into req.Host (see newProbeRequest), so allowing
+		// it would reintroduce the host override that the Host field above forbids.
+		if strings.EqualFold(header.Name, "Host") {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("httpHeaders"), header.Name, "Host header is not allowed"))
+		}
 		for _, msg := range validationutil.IsHTTPHeaderName(header.Name) {
 			allErrors = append(allErrors, field.Invalid(fldPath.Child("httpHeaders"), header.Name, msg))
 		}
