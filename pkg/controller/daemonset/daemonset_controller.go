@@ -1076,6 +1076,10 @@ func (dsc *ReconcileDaemonSet) refreshUpdateStates(ctx context.Context, ds *apps
 		if res.RefreshErr != nil {
 			klog.ErrorS(res.RefreshErr, "DaemonSet failed to update pod condition for inplace", "daemonSet", klog.KObj(ds), "pod", klog.KObj(pod))
 			return res.RefreshErr
+		} else if opts.CheckPodUpdateCompleted(pod) == nil {
+			//patch restart_cnt to annotation
+			_, _ = dsc.inplaceControl.RefreshRestartCountBaseToPod(pod)
+			inplaceupdate.CalcInplaceUpdateDuration(pod)
 		}
 		if res.DelayDuration != 0 {
 			durationStore.Push(dsKey, res.DelayDuration)
