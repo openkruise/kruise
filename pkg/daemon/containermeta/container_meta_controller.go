@@ -420,22 +420,28 @@ func (c *Controller) getRuntimeForPod(pod *v1.Pod) (criapi.RuntimeService, kuber
 			break
 		}
 	}
+
 	if existingID == "" {
 		return nil, nil, nil
 	}
 
 	containerID := kubeletcontainer.ContainerID{}
-	if err := containerID.ParseString(pod.Status.ContainerStatuses[0].ContainerID); err != nil {
-		return nil, nil, fmt.Errorf("failed to parse containerID %s: %v", pod.Status.ContainerStatuses[0].ContainerID, err)
+	if err := containerID.ParseString(existingID); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse containerID %q: %w", existingID, err)
 	} else if containerID.Type == "" {
-		return nil, nil, fmt.Errorf("no runtime name in containerID %s", pod.Status.ContainerStatuses[0].ContainerID)
+		return nil, nil, fmt.Errorf("no runtime name in containerID %q", existingID)
 	}
 
 	runtimeName := containerID.Type
 	runtimeService := c.runtimeFactory.GetRuntimeServiceByName(runtimeName)
 	if runtimeService == nil {
-		return nil, nil, fmt.Errorf("not found runtime service for %s in daemon", runtimeName)
+		return nil, nil, fmt.Errorf("not found runtime service for %q in daemon", runtimeName)
 	}
 
-	return runtimeService, kuberuntime.NewGenericRuntime(runtimeName, runtimeService, nil, &http.Client{}), nil
+	return runtimeService, kuberuntime.NewGenericRuntime(
+		runtimeName,
+		runtimeService,
+		nil,
+		&http.Client{},
+	), nil
 }
