@@ -97,10 +97,10 @@ func GenerateImageListPullJobV1Beta1(cf *fuzz.ConsumeFuzzer, bj *appsv1beta1.Ima
 
 	// Generate Status
 	bj.Status = appsv1beta1.ImageListPullJobStatus{
-		Active:    int32(r.Intn(1)),
-		Succeeded: int32(r.Intn(1)),
+		Active:    int32(r.Intn(2)),
+		Succeeded: int32(r.Intn(2)),
 		Desired:   int32(r.Intn(3)),
-		Completed: int32(r.Intn(1)),
+		Completed: int32(r.Intn(2)),
 	}
 
 	return nil
