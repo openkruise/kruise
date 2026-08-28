@@ -92,6 +92,9 @@ func TestValidateEphemeralContainers(t *testing.T) {
 				TTY:       true,
 			},
 		}},
+		"Whitespace Padded Image Name": {
+			{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: " image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+		},
 	} {
 		if errs := validateEphemeralContainers(ephemeralContainers, field.NewPath("ephemeralContainers"), validation.PodValidationOptions{}, true); len(errs) != 0 {
 			t.Errorf("expected success for '%s' but got errors: %v", title, errs)
@@ -130,13 +133,6 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 		},
 		field.ErrorList{{Type: field.ErrorTypeRequired, Field: "ephemeralContainers[0].name"}},
-	}, {
-		"whitespace padded image name",
-		line(),
-		[]core.EphemeralContainer{
-			{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: " image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-		},
-		field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "ephemeralContainers[0].image"}},
 	}, {
 		"invalid image pull policy",
 		line(),
