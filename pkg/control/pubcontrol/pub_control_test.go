@@ -322,6 +322,168 @@ func TestCanResizeInplace(t *testing.T) {
 			},
 			expect: false,
 		},
+		{
+			name: "resources changed with referenced label changed",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Labels["version"] = "v1"
+				demo.Spec.Containers[0].Env = []corev1.EnvVar{
+					{
+						Name: "VERSION",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.labels['version']",
+							},
+						},
+					},
+				}
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Labels["version"] = "v2"
+				demo.Spec.Containers[0].Env = []corev1.EnvVar{
+					{
+						Name: "VERSION",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.labels['version']",
+							},
+						},
+					},
+				}
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("3"),
+						corev1.ResourceMemory: resource.MustParse("3Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			expect: false,
+		},
+		{
+			name: "resources changed with unrelated label changed",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Labels["version"] = "v1"
+				demo.Spec.Containers[0].Env = []corev1.EnvVar{
+					{
+						Name: "APP",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.labels['app']",
+							},
+						},
+					},
+				}
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Labels["version"] = "v2"
+				demo.Spec.Containers[0].Env = []corev1.EnvVar{
+					{
+						Name: "APP",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.labels['app']",
+							},
+						},
+					},
+				}
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("3"),
+						corev1.ResourceMemory: resource.MustParse("3Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			expect: true,
+		},
+		{
+			name: "resources changed with referenced annotation changed",
+			getOldPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Annotations["config"] = "v1"
+				demo.Spec.Containers[0].Env = []corev1.EnvVar{
+					{
+						Name: "CONFIG",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.annotations['config']",
+							},
+						},
+					},
+				}
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			getNewPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Annotations["config"] = "v2"
+				demo.Spec.Containers[0].Env = []corev1.EnvVar{
+					{
+						Name: "CONFIG",
+						ValueFrom: &corev1.EnvVarSource{
+							FieldRef: &corev1.ObjectFieldSelector{
+								FieldPath: "metadata.annotations['config']",
+							},
+						},
+					},
+				}
+				demo.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("3"),
+						corev1.ResourceMemory: resource.MustParse("3Gi"),
+					},
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				}
+				return demo
+			},
+			expect: false,
+		},
 	}
 
 	for _, cs := range cases {
