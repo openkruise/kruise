@@ -101,10 +101,7 @@ func NewController(opts daemonoptions.Options) (*Controller, error) {
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			crr, ok := obj.(*appsv1beta1.ContainerRecreateRequest)
-			if ok {
-				resourceVersionExpectation.Delete(crr)
-			}
+			enqueueAfterDelete(queue, obj)
 		},
 	})
 
@@ -156,6 +153,29 @@ func enqueue(queue workqueue.Interface, obj *appsv1beta1.ContainerRecreateReques
 		return
 	}
 	queue.Add(objectKey(obj))
+}
+
+// enqueueAfterDelete requeues the Pod so another CRR targeting it can be processed.
+// The filtered informer sends a delete event both when a CRR is deleted and when
+// its active label is removed after completion. It can also send a tombstone when
+// the original delete notification was missed.
+func enqueueAfterDelete(queue workqueue.Interface, obj interface{}) {
+	crr, ok := obj.(*appsv1beta1.ContainerRecreateRequest)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			return
+		}
+		crr, ok = tombstone.Obj.(*appsv1beta1.ContainerRecreateRequest)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a ContainerRecreateRequest %+v", obj))
+			return
+		}
+	}
+
+	resourceVersionExpectation.Delete(crr)
+	queue.Add(objectKey(crr))
 }
 
 func objectKey(obj *appsv1beta1.ContainerRecreateRequest) string {
