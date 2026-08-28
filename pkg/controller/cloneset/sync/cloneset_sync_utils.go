@@ -131,6 +131,10 @@ func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, cur
 	var newRevisionCount, newRevisionActiveCount, oldRevisionCount, oldRevisionActiveCount int
 	var unavailableNewRevisionCount, unavailableOldRevisionCount int
 	var toDeleteNewRevisionCount, toDeleteOldRevisionCount, preDeletingNewRevisionCount, preDeletingOldRevisionCount int
+	// transitionRevisionActiveCount counts active pods that are classified as new by isPodUpdate (e.g. PreparingUpdate)
+	// but do not actually carry the updateRevision hash. This happens in continuous upgrade scenarios (V1→V2→V3)
+	// where V1 pods in PreparingUpdate state are incorrectly treated as updateRevision pods by revision.IsPodUpdate.
+	var transitionRevisionActiveCount int
 	defer func() {
 		if res.isEmpty() {
 			return
@@ -138,6 +142,7 @@ func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, cur
 		klog.V(1).InfoS("Calculate diffs for CloneSet", "cloneSet", klog.KObj(cs), "replicas", replicas, "partition", partition,
 			"maxSurge", maxSurge, "maxUnavailable", maxUnavailable, "allPodCount", len(pods), "newRevisionCount", newRevisionCount,
 			"newRevisionActiveCount", newRevisionActiveCount, "oldrevisionCount", oldRevisionCount, "oldRevisionActiveCount", oldRevisionActiveCount,
+			"transitionRevisionActiveCount", transitionRevisionActiveCount,
 			"unavailableNewRevisionCount", unavailableNewRevisionCount, "unavailableOldRevisionCount", unavailableOldRevisionCount,
 			"preDeletingNewRevisionCount", preDeletingNewRevisionCount, "preDeletingOldRevisionCount", preDeletingOldRevisionCount,
 			"toDeleteNewRevisionCount", toDeleteNewRevisionCount, "toDeleteOldRevisionCount", toDeleteOldRevisionCount,
@@ -167,6 +172,14 @@ func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, cur
 			default:
 				newRevisionActiveCount++
 
+				// Track pods counted as new by isPodUpdate but not actually at updateRevision.
+				// In continuous upgrade scenarios (e.g. V1→V2→V3), revision.IsPodUpdate treats
+				// PreparingUpdate pods as new regardless of their actual revision hash, causing
+				// updateOldDiff to undercount the true number of pods still needing upgrade.
+				if !clonesetutils.EqualToRevisionHash("", p, updateRevision) {
+					transitionRevisionActiveCount++
+				}
+
 				if isSpecifiedDelete(cs, p) {
 					toDeleteNewRevisionCount++
 				} else if !IsPodAvailable(coreControl, p, cs.Spec.MinReadySeconds) {
@@ -192,8 +205,11 @@ func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, cur
 		}
 	}
 
-	updateOldDiff := oldRevisionActiveCount - partition
-	updateNewDiff := newRevisionActiveCount - (replicas - partition)
+	// Fix: include transitionRevisionActiveCount so that pods from intermediate revisions
+	// (e.g. V1 pods in a V1→V2→V3 continuous upgrade) are correctly counted as needing
+	// update even when revision.IsPodUpdate has classified them as new-revision pods.
+	updateOldDiff := oldRevisionActiveCount + transitionRevisionActiveCount - partition
+	updateNewDiff := newRevisionActiveCount - transitionRevisionActiveCount - (replicas - partition)
 	totalUnavailable := preDeletingNewRevisionCount + preDeletingOldRevisionCount + unavailableNewRevisionCount + unavailableOldRevisionCount
 	// If the currentRevision and updateRevision are consistent, Pods can only update to this revision
 	// If the CloneSetPartitionRollback is not enabled, Pods can only update to the new revision
@@ -214,20 +230,20 @@ func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, cur
 			}
 		}
 
-		// Use surge for old and new revision updating
+		// Use surge for old and new revision updating.
+		// updateSurge is driven by how many old pods still need replacing (updateOldDiff when positive,
+		// meaning update direction) or how many new pods are excess (updateNewDiff when positive, meaning
+		// rollback direction). It must NOT be capped by updateNewDiff in the update direction: surge pods
+		// that are already running cause updateNewDiff to approach 0 before all old pods are replaced,
+		// which previously caused useSurge to drop prematurely (e.g. 10->9->5->3->2->1 instead of a steady 10).
 		var updateSurge, updateOldRevisionSurge int
-		if util.IsIntPlusAndMinus(updateOldDiff, updateNewDiff) {
-			if util.IntAbs(updateOldDiff) <= util.IntAbs(updateNewDiff) {
-				updateSurge = util.IntAbs(updateOldDiff)
-				if updateOldDiff < 0 {
-					updateOldRevisionSurge = updateSurge
-				}
-			} else {
-				updateSurge = util.IntAbs(updateNewDiff)
-				if updateNewDiff > 0 {
-					updateOldRevisionSurge = updateSurge
-				}
-			}
+		if updateOldDiff > 0 {
+			// Normal update: too many old pods, need to replace them with surge.
+			updateSurge = updateOldDiff
+		} else if updateOldDiff < 0 && updateNewDiff > 0 {
+			// Rollback: too many new pods, need to replace them via surge of old-revision pods.
+			updateSurge = updateNewDiff
+			updateOldRevisionSurge = updateSurge
 		}
 
 		// It is because the controller is designed not to do scale and update in once reconcile
@@ -268,12 +284,12 @@ func calculateDiffsWithExpectation(cs *appsv1beta1.CloneSet, pods []*v1.Pod, cur
 		res.deleteReadyLimit = integer.IntMax(maxUnavailable+(len(pods)-replicas)-totalUnavailable, 0)
 	}
 
-	// The consistency between scale and update will be guaranteed by syncCloneSet and expectations
-	if util.IntAbs(updateOldDiff) <= util.IntAbs(updateNewDiff) {
-		res.updateNum = updateOldDiff
-	} else {
-		res.updateNum = 0 - updateNewDiff
-	}
+	// The consistency between scale and update will be guaranteed by syncCloneSet and expectations.
+	// updateNum is positive when pods need to be updated forward, negative for rollback.
+	// Use updateOldDiff directly: it measures how many old pods exceed the partition and is not
+	// affected by surge pods already created (which inflate newRevisionActiveCount and make
+	// updateNewDiff approach 0 before all old pods have been replaced).
+	res.updateNum = updateOldDiff
 	if res.updateNum != 0 {
 		res.updateMaxUnavailable = maxUnavailable + len(pods) - replicas
 	}
