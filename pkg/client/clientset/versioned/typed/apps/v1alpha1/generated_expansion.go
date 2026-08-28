@@ -23,6 +23,8 @@ type BroadcastJobExpansion interface{}
 
 type CloneSetExpansion interface{}
 
+type ConfigMapSetExpansion interface{}
+
 type ContainerRecreateRequestExpansion interface{}
 
 type DaemonSetExpansion interface{}

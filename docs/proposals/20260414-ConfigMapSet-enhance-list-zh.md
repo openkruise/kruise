@@ -40,16 +40,14 @@
 
 ### 新提案改进
 
-新提案新增 `reloadSidecarConfig`，显式支持三类注入模式：
+新提案新增 `reloadSidecarConfig`，显式支持以下注入模式：
 
-1. `type: k8s`
-   直接由 ConfigMapSet 在 Pod 创建时注入容器。
-
-2. `type: sidecarset`
+1. `type: sidecarset`
    通过引用 OpenKruise `SidecarSet` 中的容器完成注入。
 
-3. `type: custom`
+2. `type: custom`（默认模式）
    通过引用 `ConfigMap` 自定义 reload-sidecar 配置，实现跨命名空间复用。
+   当 ConfigMapSet 上不声明 `reloadSidecarConfig` 或其 `type`，或声明为 `custom` 但未配置 `configMapRef` 时，系统会自动加载默认的 ConfigMap 配置（`namespace: kruise-system`, `name: default-reload-sidecar-config`）。该默认配置可以在 helm 清单中自由定义。
 
 ### 改进价值
 
@@ -76,7 +74,7 @@
 
 新提案引入 `effectPolicy`，支持三种配置生效模式：
 
-1. `ReStart`
+1. `Restart`
    - 先重启 reload-sidecar
    - 再重启业务容器
    - 适用于最稳妥的强一致场景
