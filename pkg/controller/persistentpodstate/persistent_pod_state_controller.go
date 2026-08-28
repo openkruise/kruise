@@ -231,7 +231,7 @@ func (r *ReconcilePersistentPodState) Reconcile(_ context.Context, req ctrl.Requ
 				currentKeys.Insert(key)
 			}
 			currentAns := sets.NewString()
-			for _, key := range podState.Annotations {
+			for key := range podState.Annotations {
 				currentAns.Insert(key)
 			}
 
