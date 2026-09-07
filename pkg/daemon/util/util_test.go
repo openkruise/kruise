@@ -143,3 +143,53 @@ func TestNormalizeImageRef(t *testing.T) {
 		})
 	}
 }
+
+func TestJoinImageNameTag(t *testing.T) {
+	digest := "sha256:f2b6de562150a257551639c432c6999337533816574519989a3f244195a63e63"
+	cases := []struct {
+		name     string
+		imgName  string
+		tag      string
+		expected string
+	}{
+		{name: "tag", imgName: "ubuntu", tag: "20.04", expected: "ubuntu:20.04"},
+		{name: "latest tag", imgName: "docker.io/library/ubuntu", tag: "latest", expected: "docker.io/library/ubuntu:latest"},
+		{name: "registry with port and tag", imgName: "myregistry:5000/my/image", tag: "v1", expected: "myregistry:5000/my/image:v1"},
+		{name: "digest", imgName: "ubuntu", tag: digest, expected: "ubuntu@" + digest},
+		{name: "registry with port and digest", imgName: "myregistry:5000/my/image", tag: digest, expected: "myregistry:5000/my/image@" + digest},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, JoinImageNameTag(tc.imgName, tc.tag))
+		})
+	}
+}
+
+// TestNormalizeImageRefToNameTagRoundTrip makes sure that the name and tag
+// returned by NormalizeImageRefToNameTag can be joined back into a reference
+// that is still parseable, which is what kruise-daemon does before pulling.
+func TestNormalizeImageRefToNameTagRoundTrip(t *testing.T) {
+	digest := "sha256:f2b6de562150a257551639c432c6999337533816574519989a3f244195a63e63"
+	refs := []string{
+		"ubuntu",
+		"ubuntu:20.04",
+		"docker.io/library/ubuntu:latest",
+		"myregistry:5000/my/image:v1",
+		fmt.Sprintf("ubuntu@%s", digest),
+		fmt.Sprintf("myregistry:5000/my/image@%s", digest),
+		fmt.Sprintf("ubuntu:20.04@%s", digest),
+		fmt.Sprintf("myregistry:5000/my/image:v1@%s", digest),
+	}
+
+	for _, ref := range refs {
+		t.Run(ref, func(t *testing.T) {
+			name, tag, err := NormalizeImageRefToNameTag(ref)
+			assert.NoError(t, err)
+
+			joined := JoinImageNameTag(name, tag)
+			_, err = NormalizeImageRef(joined)
+			assert.NoError(t, err, "joined reference %q is not parseable", joined)
+		})
+	}
+}
