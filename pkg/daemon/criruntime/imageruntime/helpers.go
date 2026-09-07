@@ -239,13 +239,18 @@ func (r *imagePullStatusReader) mainloop() {
 }
 
 func (c ImageInfo) ContainsImage(name string, tag string) bool {
-	for _, repoTag := range c.RepoTags {
-		// We should remove defaultDomain and officialRepoName in RepoTags by NormalizeImageRefToNameTag method,
-		// Because if the user needs to download the image from hub.docker.com, CRI.PullImage will automatically add these when downloading the image
-		// Ref: https://github.com/openkruise/kruise/issues/1273
-		imageRepo, imageTag, _ := daemonutil.NormalizeImageRefToNameTag(repoTag)
-		if imageRepo == name && imageTag == tag {
-			return true
+	// The tag may be a digest, because NormalizeImageRefToNameTag returns the
+	// digest as the tag for a digested reference. Such a tag never shows up in
+	// RepoTags, so RepoDigests has to be searched as well.
+	for _, refs := range [][]string{c.RepoTags, c.RepoDigests} {
+		for _, ref := range refs {
+			// We should remove defaultDomain and officialRepoName in RepoTags by NormalizeImageRefToNameTag method,
+			// Because if the user needs to download the image from hub.docker.com, CRI.PullImage will automatically add these when downloading the image
+			// Ref: https://github.com/openkruise/kruise/issues/1273
+			imageRepo, imageTag, _ := daemonutil.NormalizeImageRefToNameTag(ref)
+			if imageRepo == name && imageTag == tag {
+				return true
+			}
 		}
 	}
 	return false
