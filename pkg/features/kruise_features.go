@@ -161,6 +161,19 @@ const (
 	// node affinity, then the pods on the nodes that have undergone
 	// this reduction will not be counted in the maxUnavailable.
 	DaemonSetPruneIneligibleNodes featuregate.Feature = "DaemonSetPruneIneligibleNodes"
+
+	// InPlaceUpdateRestartableInitContainer enables CloneSet/Advanced StatefulSet controllers to
+	// in-place update the images of restartable init containers, a.k.a. the native sidecar containers
+	// that have `restartPolicy: Always` in spec.initContainers.
+	//
+	// It requires the SidecarContainers feature of Kubernetes, which is GA since v1.33 and enabled
+	// by default since v1.29. Note that only restartable init containers are supported: kubelet
+	// restarts an init container on image change only when its restartPolicy is Always, so a regular
+	// init container would never report a new imageID and the in-place update would never complete.
+	//
+	// When this feature is disabled, changing any field under spec.initContainers falls back to
+	// recreating the Pod, which is the behavior before this feature was introduced.
+	InPlaceUpdateRestartableInitContainer featuregate.Feature = "InPlaceUpdateRestartableInitContainer"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -204,6 +217,8 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	DefaultHostNetworkHostPortsInPodTemplates: {Default: false, PreRelease: featuregate.Alpha},
 
 	DaemonSetPruneIneligibleNodes: {Default: false, PreRelease: featuregate.Alpha},
+
+	InPlaceUpdateRestartableInitContainer: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

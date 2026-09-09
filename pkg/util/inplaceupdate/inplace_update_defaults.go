@@ -123,6 +123,19 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 	for _, cName := range containersWithHighestPriority {
 		containersToUpdate.Insert(cName)
 	}
+	// Restartable init containers (native sidecar containers) do not participate in the container
+	// launch priority batching, because the priority env is only injected into spec.containers.
+	// They are always updated in the current batch. They are still recorded in containersToUpdate
+	// so that the lower-priority containers wait for them to become ready before being updated.
+	initContainersToUpdate := sets.NewString()
+	for i := range pod.Spec.InitContainers {
+		c := &pod.Spec.InitContainers[i]
+		if _, exists := spec.InitContainerImages[c.Name]; !exists {
+			continue
+		}
+		initContainersToUpdate.Insert(c.Name)
+		containersToUpdate.Insert(c.Name)
+	}
 	addMetadataSharedContainersToUpdate(pod, containersToUpdate, spec.ContainerRefMetadata)
 
 	// DO NOT modify the fields in spec for it may have to retry on conflict in updatePodInPlace
@@ -152,6 +165,32 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 			} else {
 				// now just update imageID
 				cs.ImageID = c.ImageID
+			}
+		}
+	}
+
+	// update images of the restartable init containers and record their current imageIDs.
+	// Note that their statuses live in pod.Status.InitContainerStatuses.
+	if len(spec.InitContainerImages) > 0 {
+		initContainersImageChanged := sets.NewString()
+		for i := range pod.Spec.InitContainers {
+			c := &pod.Spec.InitContainers[i]
+			newImage, exists := spec.InitContainerImages[c.Name]
+			if !exists || !initContainersToUpdate.Has(c.Name) {
+				continue
+			}
+			pod.Spec.InitContainers[i].Image = newImage
+			initContainersImageChanged.Insert(c.Name)
+		}
+		for _, c := range pod.Status.InitContainerStatuses {
+			if !initContainersImageChanged.Has(c.Name) {
+				continue
+			}
+			if state.LastContainerStatuses == nil {
+				state.LastContainerStatuses = map[string]appspub.InPlaceUpdateContainerStatus{}
+			}
+			if _, ok := state.LastContainerStatuses[c.Name]; !ok {
+				state.LastContainerStatuses[c.Name] = appspub.InPlaceUpdateContainerStatus{ImageID: c.ImageID}
 			}
 		}
 	}
@@ -333,6 +372,38 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 			continue
 		}
 
+		if initContainerImagePatchRexp.MatchString(op.Path) {
+			// for example: /spec/initContainers/0/image
+			if !utilfeature.DefaultFeatureGate.Enabled(features.InPlaceUpdateRestartableInitContainer) {
+				return nil
+			}
+			words := strings.Split(op.Path, "/")
+			idx, _ := strconv.Atoi(words[3])
+			if len(oldTemp.Spec.InitContainers) <= idx || len(newTemp.Spec.InitContainers) <= idx {
+				return nil
+			}
+			// Only restartable init containers (native sidecar containers) can be in-place updated.
+			// kubelet restarts an init container whose spec changed only when its restartPolicy is
+			// Always. For a regular init container the imageID in status would never change, so the
+			// in-place update would never be considered completed and the Pod would hang forever.
+			// Require it to be restartable in both the old and the new revision, so that toggling
+			// restartPolicy itself still falls back to recreating the Pod.
+			if !util.IsRestartableInitContainer(&oldTemp.Spec.InitContainers[idx]) ||
+				!util.IsRestartableInitContainer(&newTemp.Spec.InitContainers[idx]) {
+				klog.V(4).InfoS("Can not in-place update the image of a non-restartable init container",
+					"initContainerName", oldTemp.Spec.InitContainers[idx].Name)
+				return nil
+			}
+			// Lazily initialize the map, so that InitContainerImages stays nil when no restartable
+			// init container image changes. This keeps the calculated spec byte-for-byte identical
+			// to the behavior before this feature was introduced.
+			if updateSpec.InitContainerImages == nil {
+				updateSpec.InitContainerImages = make(map[string]string)
+			}
+			updateSpec.InitContainerImages[oldTemp.Spec.InitContainers[idx].Name] = op.Value.(string)
+			continue
+		}
+
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) &&
 			containerResourcesPatchRexp.MatchString(op.Path) {
 			err = verticalUpdateImpl.UpdateInplaceUpdateMetadata(&op, oldTemp, updateSpec)
@@ -411,6 +482,45 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 	return updateSpec
 }
 
+// DiffRestartableInitContainerImages returns the images of the restartable init containers
+// (native sidecar containers) whose image differs between the old and the new pod template.
+// It returns nil when the InPlaceUpdateRestartableInitContainer feature-gate is disabled, so
+// that callers keep their previous behavior by default.
+//
+// It is used by the workload controllers to pre-download images for in-place update.
+func DiffRestartableInitContainerImages(oldTemp, newTemp *v1.PodTemplateSpec) map[string]string {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlaceUpdateRestartableInitContainer) {
+		return nil
+	}
+	if oldTemp == nil || newTemp == nil {
+		return nil
+	}
+
+	oldImages := make(map[string]string, len(oldTemp.Spec.InitContainers))
+	for i := range oldTemp.Spec.InitContainers {
+		c := &oldTemp.Spec.InitContainers[i]
+		if !util.IsRestartableInitContainer(c) {
+			continue
+		}
+		oldImages[c.Name] = c.Image
+	}
+
+	images := make(map[string]string)
+	for i := range newTemp.Spec.InitContainers {
+		c := &newTemp.Spec.InitContainers[i]
+		if !util.IsRestartableInitContainer(c) {
+			continue
+		}
+		if oldImage, ok := oldImages[c.Name]; !ok || oldImage != c.Image {
+			images[c.Name] = c.Image
+		}
+	}
+	if len(images) == 0 {
+		return nil
+	}
+	return images
+}
+
 // DefaultCheckInPlaceUpdateCompleted checks whether imageID in pod status has been changed since in-place update.
 // If the imageID in containerStatuses has not been changed, we assume that kubelet has not updated
 // containers in Pod.
@@ -463,7 +573,7 @@ func defaultCheckContainersInPlaceUpdateCompleted(pod *v1.Pod, inPlaceUpdateStat
 		// in case kruise-daemon has broken for some reason and runtime-container-meta is still in an old version.
 	}
 
-	containerImages := make(map[string]string, len(pod.Spec.Containers))
+	containerImages := make(map[string]string, len(pod.Spec.Containers)+len(pod.Spec.InitContainers))
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
 		containerImages[c.Name] = c.Image
@@ -471,17 +581,35 @@ func defaultCheckContainersInPlaceUpdateCompleted(pod *v1.Pod, inPlaceUpdateStat
 			containerImages[c.Name] = fmt.Sprintf("%s:latest", c.Image)
 		}
 	}
-
-	for _, cs := range pod.Status.ContainerStatuses {
-		if oldStatus, ok := inPlaceUpdateState.LastContainerStatuses[cs.Name]; ok {
-			// TODO: we assume that users should not update workload template with new image which actually has the same imageID as the old image
-			if oldStatus.ImageID == cs.ImageID {
-				if containerImages[cs.Name] != cs.Image {
-					return fmt.Errorf("container %s imageID not changed", cs.Name)
-				}
-			}
-			delete(inPlaceUpdateState.LastContainerStatuses, cs.Name)
+	for i := range pod.Spec.InitContainers {
+		c := &pod.Spec.InitContainers[i]
+		containerImages[c.Name] = c.Image
+		if len(strings.Split(c.Image, ":")) <= 1 {
+			containerImages[c.Name] = fmt.Sprintf("%s:latest", c.Image)
 		}
+	}
+
+	checkStatuses := func(statuses []v1.ContainerStatus) error {
+		for _, cs := range statuses {
+			if oldStatus, ok := inPlaceUpdateState.LastContainerStatuses[cs.Name]; ok {
+				// TODO: we assume that users should not update workload template with new image which actually has the same imageID as the old image
+				if oldStatus.ImageID == cs.ImageID {
+					if containerImages[cs.Name] != cs.Image {
+						return fmt.Errorf("container %s imageID not changed", cs.Name)
+					}
+				}
+				delete(inPlaceUpdateState.LastContainerStatuses, cs.Name)
+			}
+		}
+		return nil
+	}
+
+	if err := checkStatuses(pod.Status.ContainerStatuses); err != nil {
+		return err
+	}
+	// Restartable init containers (native sidecar containers) report their status here.
+	if err := checkStatuses(pod.Status.InitContainerStatuses); err != nil {
+		return err
 	}
 
 	if len(inPlaceUpdateState.LastContainerStatuses) > 0 {
@@ -502,17 +630,25 @@ const (
 // 1. all containers in spec.containers should also be in status.containerStatuses and runtime-container-meta
 // 2. all containers in status.containerStatuses and runtime-container-meta should have the same containerID
 // 3. all containers in spec.containers and runtime-container-meta should have the same hashes
+//
+// The restartable init containers (native sidecar containers) are checked in the same way, for
+// kruise-daemon reports them into runtime-container-meta as well. Regular init containers are
+// skipped, because kubelet never restarts them on spec change.
 func checkAllContainersHashConsistent(pod *v1.Pod, runtimeContainerMetaSet *appspub.RuntimeContainerMetaSet, hashType hashType) bool {
-	for i := range pod.Spec.Containers {
-		containerSpec := &pod.Spec.Containers[i]
-
-		var containerStatus *v1.ContainerStatus
-		for j := range pod.Status.ContainerStatuses {
-			if pod.Status.ContainerStatuses[j].Name == containerSpec.Name {
-				containerStatus = &pod.Status.ContainerStatuses[j]
-				break
-			}
+	containerSpecs := make([]*v1.Container, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
+	for i := range pod.Spec.InitContainers {
+		c := &pod.Spec.InitContainers[i]
+		if !util.IsRestartableInitContainer(c) {
+			continue
 		}
+		containerSpecs = append(containerSpecs, c)
+	}
+	for i := range pod.Spec.Containers {
+		containerSpecs = append(containerSpecs, &pod.Spec.Containers[i])
+	}
+
+	for _, containerSpec := range containerSpecs {
+		containerStatus := util.GetContainerStatusIncludingInit(containerSpec.Name, pod)
 		if containerStatus == nil {
 			klog.InfoS("Find no container in status for Pod", "containerName", containerSpec.Name, "namespace", pod.Namespace, "podName", pod.Name)
 			return false
