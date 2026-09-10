@@ -42,13 +42,22 @@ import (
 )
 
 var (
-	containerImagePatchRexp     = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
+	containerImagePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
+	// containerResourcesPatchRexp intentionally matches the regular containers only. The resources
+	// of a restartable init container are not in-place updatable, so such a patch falls through to
+	// the fallback of defaultCalculateInPlaceUpdateSpec and the Pod gets recreated.
 	containerResourcesPatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/resources/.*$")
 	// initContainerImagePatchRexp matches the image of an init container. Only restartable init
 	// containers (native sidecar containers) can be in-place updated, and it is guarded by the
 	// InPlaceUpdateRestartableInitContainer feature-gate. See defaultCalculateInPlaceUpdateSpec.
 	initContainerImagePatchRexp = regexp.MustCompile("^/spec/initContainers/([0-9]+)/image$")
 	rfc6901Decoder              = strings.NewReplacer("~1", "/", "~0", "~")
+
+	// The two regexps below match the patches calculated between two PodTemplateSpec.Spec, so
+	// they have no leading "/spec". They are used by the InPlaceOnly validation of the workload
+	// webhooks. See ValidateInPlaceOnlyTemplateSpecPatches.
+	inPlaceOnlyContainerImagePatchRexp     = regexp.MustCompile("^/containers/([0-9]+)/image$")
+	inPlaceOnlyInitContainerImagePatchRexp = regexp.MustCompile("^/initContainers/([0-9]+)/image$")
 
 	Clock clock.Clock = clock.RealClock{}
 )

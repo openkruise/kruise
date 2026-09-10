@@ -521,6 +521,56 @@ func DiffRestartableInitContainerImages(oldTemp, newTemp *v1.PodTemplateSpec) ma
 	return images
 }
 
+// ValidateInPlaceOnlyTemplateSpecPatches checks the JSON patches calculated between the pod
+// template spec of the old and the new workload, and returns an error describing the first patch
+// that an in-place update can not carry out.
+//
+// A workload with the InPlaceOnly strategy never recreates its Pods, so its validating webhook has
+// to reject every template change that the in-place update is unable to apply. Besides the images
+// of the regular containers, the images of restartable init containers (native sidecar containers)
+// are accepted as well once the InPlaceUpdateRestartableInitContainer feature-gate is enabled,
+// which keeps this validation consistent with defaultCalculateInPlaceUpdateSpec.
+//
+// The patches are expected to be calculated between PodTemplateSpec.Spec, so their paths have no
+// leading "/spec", e.g. "/containers/0/image".
+func ValidateInPlaceOnlyTemplateSpecPatches(patches []jsonpatch.Operation, oldTemp, newTemp *v1.PodTemplateSpec) error {
+	for _, p := range patches {
+		if p.Operation != "replace" {
+			return fmt.Errorf("%s %s", p.Operation, p.Path)
+		}
+		if inPlaceOnlyContainerImagePatchRexp.MatchString(p.Path) {
+			continue
+		}
+
+		words := inPlaceOnlyInitContainerImagePatchRexp.FindStringSubmatch(p.Path)
+		if words == nil {
+			return fmt.Errorf("%s %s", p.Operation, p.Path)
+		}
+		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlaceUpdateRestartableInitContainer) {
+			return fmt.Errorf("%s %s, for the %s feature-gate is disabled",
+				p.Operation, p.Path, features.InPlaceUpdateRestartableInitContainer)
+		}
+		idx, err := strconv.Atoi(words[1])
+		if err != nil {
+			return fmt.Errorf("%s %s", p.Operation, p.Path)
+		}
+		if oldTemp == nil || newTemp == nil ||
+			len(oldTemp.Spec.InitContainers) <= idx || len(newTemp.Spec.InitContainers) <= idx {
+			return fmt.Errorf("%s %s", p.Operation, p.Path)
+		}
+		// Require the init container to be restartable in both the old and the new template, so
+		// that toggling restartPolicy itself is still rejected. kubelet restarts an init container
+		// whose spec changed only when its restartPolicy is Always, otherwise the in-place update
+		// would never be considered completed and the Pod would hang forever.
+		if !util.IsRestartableInitContainer(&oldTemp.Spec.InitContainers[idx]) ||
+			!util.IsRestartableInitContainer(&newTemp.Spec.InitContainers[idx]) {
+			return fmt.Errorf("%s %s, for the init container %s is not restartable",
+				p.Operation, p.Path, oldTemp.Spec.InitContainers[idx].Name)
+		}
+	}
+	return nil
+}
+
 // DefaultCheckInPlaceUpdateCompleted checks whether imageID in pod status has been changed since in-place update.
 // If the imageID in containerStatuses has not been changed, we assume that kubelet has not updated
 // containers in Pod.

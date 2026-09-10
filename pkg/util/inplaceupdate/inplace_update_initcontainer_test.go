@@ -17,9 +17,11 @@ limitations under the License.
 package inplaceupdate
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
+	"github.com/appscode/jsonpatch"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -341,5 +343,129 @@ func TestDiffRestartableInitContainerImages(t *testing.T) {
 	got := DiffRestartableInitContainerImages(oldTemp, newTemp)
 	if len(got) != 1 || got["sidecar"] != "foo2" {
 		t.Fatalf("expected only the restartable init container to be diffed, got %v", got)
+	}
+}
+
+// TestValidateInPlaceOnlyTemplateSpecPatches covers the InPlaceOnly whitelist used by the
+// CloneSet / Advanced StatefulSet validating webhooks. Without accepting the images of the
+// restartable init containers here, the workload controllers would never get the chance to
+// in-place update them, for the update request is rejected by the admission webhook first.
+func TestValidateInPlaceOnlyTemplateSpecPatches(t *testing.T) {
+	templateOf := func(mainImage, initImage string, restartable bool, extra func(*v1.PodTemplateSpec)) *v1.PodTemplateSpec {
+		temp := &v1.PodTemplateSpec{Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{Name: "setup", Image: "setup1"},
+				{Name: "sidecar", Image: initImage},
+			},
+			Containers: []v1.Container{{Name: "c1", Image: mainImage}},
+		}}
+		if restartable {
+			temp.Spec.InitContainers[1].RestartPolicy = restartAlways()
+		}
+		if extra != nil {
+			extra(temp)
+		}
+		return temp
+	}
+
+	cases := []struct {
+		name        string
+		gateEnabled bool
+		oldTemp     *v1.PodTemplateSpec
+		newTemp     *v1.PodTemplateSpec
+		expectErr   bool
+	}{
+		{
+			name:        "regular container image is always allowed",
+			gateEnabled: false,
+			oldTemp:     templateOf("main1", "foo1", true, nil),
+			newTemp:     templateOf("main2", "foo1", true, nil),
+			expectErr:   false,
+		},
+		{
+			name:        "restartable init container image is allowed when the gate is enabled",
+			gateEnabled: true,
+			oldTemp:     templateOf("main1", "foo1", true, nil),
+			newTemp:     templateOf("main1", "foo2", true, nil),
+			expectErr:   false,
+		},
+		{
+			name:        "restartable init container image is rejected when the gate is disabled",
+			gateEnabled: false,
+			oldTemp:     templateOf("main1", "foo1", true, nil),
+			newTemp:     templateOf("main1", "foo2", true, nil),
+			expectErr:   true,
+		},
+		{
+			name:        "regular init container image is rejected",
+			gateEnabled: true,
+			oldTemp:     templateOf("main1", "foo1", false, nil),
+			newTemp:     templateOf("main1", "foo2", false, nil),
+			expectErr:   true,
+		},
+		{
+			name:        "demoting a restartable init container is rejected",
+			gateEnabled: true,
+			oldTemp:     templateOf("main1", "foo1", true, nil),
+			newTemp:     templateOf("main1", "foo2", false, nil),
+			expectErr:   true,
+		},
+		{
+			name:        "both a regular and a restartable init container image is rejected",
+			gateEnabled: true,
+			oldTemp:     templateOf("main1", "foo1", true, nil),
+			newTemp: templateOf("main1", "foo2", true, func(temp *v1.PodTemplateSpec) {
+				temp.Spec.InitContainers[0].Image = "setup2"
+			}),
+			expectErr: true,
+		},
+		{
+			name:        "non-image field of an init container is rejected",
+			gateEnabled: true,
+			oldTemp:     templateOf("main1", "foo1", true, nil),
+			newTemp: templateOf("main1", "foo1", true, func(temp *v1.PodTemplateSpec) {
+				temp.Spec.InitContainers[1].Env = []v1.EnvVar{{Name: "k", Value: "v"}}
+			}),
+			expectErr: true,
+		},
+		{
+			name:        "adding an init container is rejected",
+			gateEnabled: true,
+			oldTemp:     templateOf("main1", "foo1", true, nil),
+			newTemp: templateOf("main1", "foo1", true, func(temp *v1.PodTemplateSpec) {
+				temp.Spec.InitContainers = append(temp.Spec.InitContainers,
+					v1.Container{Name: "extra", Image: "extra1", RestartPolicy: restartAlways()})
+			}),
+			expectErr: true,
+		},
+		{
+			name:        "no change is allowed",
+			gateEnabled: true,
+			oldTemp:     templateOf("main1", "foo1", true, nil),
+			newTemp:     templateOf("main1", "foo1", true, nil),
+			expectErr:   false,
+		},
+	}
+
+	defer setInitContainerGate(t, false)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			setInitContainerGate(t, tc.gateEnabled)
+
+			oldJSON, _ := json.Marshal(tc.oldTemp.Spec)
+			newJSON, _ := json.Marshal(tc.newTemp.Spec)
+			patches, err := jsonpatch.CreatePatch(oldJSON, newJSON)
+			if err != nil {
+				t.Fatalf("failed to create patches: %v", err)
+			}
+
+			err = ValidateInPlaceOnlyTemplateSpecPatches(patches, tc.oldTemp, tc.newTemp)
+			if tc.expectErr && err == nil {
+				t.Fatalf("expected an error, got nil (patches: %v)", patches)
+			}
+			if !tc.expectErr && err != nil {
+				t.Fatalf("expected no error, got %v (patches: %v)", err, patches)
+			}
+		})
 	}
 }
