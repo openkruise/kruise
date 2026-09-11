@@ -19,7 +19,6 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-	"regexp"
 
 	"github.com/appscode/jsonpatch"
 	v1 "k8s.io/api/core/v1"
@@ -35,10 +34,6 @@ import (
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
-)
-
-var (
-	inPlaceUpdateTemplateSpecPatchRexp = regexp.MustCompile("^/containers/([0-9]+)/image$")
 )
 
 type commonControl struct {
@@ -165,11 +160,9 @@ func (c *commonControl) ValidateCloneSetUpdate(oldCS, newCS *appsv1beta1.CloneSe
 		return fmt.Errorf("failed calculate patches between old/new template spec")
 	}
 
-	for _, p := range patches {
-		if p.Operation != "replace" || !inPlaceUpdateTemplateSpecPatchRexp.MatchString(p.Path) {
-			return fmt.Errorf("only allowed to update images in spec for %s, but found %s %s",
-				appsv1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType, p.Operation, p.Path)
-		}
+	if err := inplaceupdate.ValidateInPlaceOnlyTemplateSpecPatches(patches, &oldCS.Spec.Template, &newCS.Spec.Template); err != nil {
+		return fmt.Errorf("only allowed to update images in spec for %s, but found %v",
+			appsv1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType, err)
 	}
 	return nil
 }

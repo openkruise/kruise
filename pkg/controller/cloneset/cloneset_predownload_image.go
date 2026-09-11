@@ -196,5 +196,10 @@ func diffImagesBetweenRevisions(oldRevision, newRevision *apps.ControllerRevisio
 			containerImages[name] = newImage
 		}
 	}
+	// Also pre-download the images of restartable init containers (native sidecar containers)
+	// when they can be in-place updated.
+	for name, image := range inplaceupdate.DiffRestartableInitContainerImages(oldTemp, newTemp) {
+		containerImages[name] = image
+	}
 	return containerImages
 }

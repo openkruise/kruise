@@ -623,3 +623,152 @@ func TestInjectPodIntoContainerRecreateRequestV1beta1_VirtualKubeletLabel(t *tes
 		})
 	}
 }
+
+// TestInjectPodIntoContainerRecreateRequest_RestartableInitContainer makes sure a CRR can target
+// a restartable init container (native sidecar container). Such a container reports its status in
+// status.initContainerStatuses, so looking up status.containerStatuses only would reject the
+// request and leave no way to recreate a native sidecar.
+//
+// The same cases are run against both API versions on purpose: the injection logic is duplicated
+// in injectPodIntoContainerRecreateRequestV1alpha1 and ...V1beta1, so a fix applied to only one
+// of them would silently leave the other one rejecting native sidecars.
+func TestInjectPodIntoContainerRecreateRequest_RestartableInitContainer(t *testing.T) {
+	restartAlways := v1.ContainerRestartPolicyAlways
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "default",
+			UID:       types.UID("pod-uid-123"),
+		},
+		Spec: v1.PodSpec{
+			NodeName: "test-node",
+			InitContainers: []v1.Container{
+				{Name: "setup"},
+				{Name: "sidecar", RestartPolicy: &restartAlways},
+			},
+			Containers: []v1.Container{{Name: "main"}},
+		},
+		Status: v1.PodStatus{
+			InitContainerStatuses: []v1.ContainerStatus{
+				{Name: "setup", ContainerID: "containerd://setup1", RestartCount: 0},
+				{Name: "sidecar", ContainerID: "containerd://sidecar1", RestartCount: 2},
+			},
+			ContainerStatuses: []v1.ContainerStatus{
+				{Name: "main", ContainerID: "containerd://main1", RestartCount: 0},
+			},
+		},
+	}
+
+	// injectedContext is the version-agnostic view of the injected StatusContext.
+	type injectedContext struct {
+		containerID  string
+		restartCount int32
+	}
+
+	injectors := []struct {
+		version string
+		inject  func(containerName string) (*injectedContext, error)
+	}{
+		{
+			version: "v1alpha1",
+			inject: func(containerName string) (*injectedContext, error) {
+				crr := &appsv1alpha1.ContainerRecreateRequest{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-crr", Namespace: "default", Labels: map[string]string{}},
+					Spec: appsv1alpha1.ContainerRecreateRequestSpec{
+						PodName:    "test-pod",
+						Containers: []appsv1alpha1.ContainerRecreateRequestContainer{{Name: containerName}},
+						Strategy:   &appsv1alpha1.ContainerRecreateRequestStrategy{},
+					},
+				}
+				if err := injectPodIntoContainerRecreateRequestV1alpha1(crr, pod, nil); err != nil {
+					return nil, err
+				}
+				statusContext := crr.Spec.Containers[0].StatusContext
+				if statusContext == nil {
+					return nil, nil
+				}
+				return &injectedContext{statusContext.ContainerID, statusContext.RestartCount}, nil
+			},
+		},
+		{
+			version: "v1beta1",
+			inject: func(containerName string) (*injectedContext, error) {
+				crr := &appsv1beta1.ContainerRecreateRequest{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-crr", Namespace: "default", Labels: map[string]string{}},
+					Spec: appsv1beta1.ContainerRecreateRequestSpec{
+						PodName:    "test-pod",
+						Containers: []appsv1beta1.ContainerRecreateRequestContainer{{Name: containerName}},
+						Strategy:   &appsv1beta1.ContainerRecreateRequestStrategy{},
+					},
+				}
+				if err := injectPodIntoContainerRecreateRequestV1beta1(crr, pod, nil); err != nil {
+					return nil, err
+				}
+				statusContext := crr.Spec.Containers[0].StatusContext
+				if statusContext == nil {
+					return nil, nil
+				}
+				return &injectedContext{statusContext.ContainerID, statusContext.RestartCount}, nil
+			},
+		},
+	}
+
+	cases := []struct {
+		name               string
+		containerName      string
+		expectErr          bool
+		expectContainerID  string
+		expectRestartCount int32
+	}{
+		{
+			name:               "restartable init container is accepted",
+			containerName:      "sidecar",
+			expectContainerID:  "containerd://sidecar1",
+			expectRestartCount: 2,
+		},
+		{
+			name:               "regular init container is accepted as well",
+			containerName:      "setup",
+			expectContainerID:  "containerd://setup1",
+			expectRestartCount: 0,
+		},
+		{
+			name:               "regular container keeps working",
+			containerName:      "main",
+			expectContainerID:  "containerd://main1",
+			expectRestartCount: 0,
+		},
+		{
+			name:          "unknown container is still rejected",
+			containerName: "nonexistent",
+			expectErr:     true,
+		},
+	}
+
+	for _, injector := range injectors {
+		for _, tc := range cases {
+			t.Run(injector.version+"/"+tc.name, func(t *testing.T) {
+				got, err := injector.inject(tc.containerName)
+
+				if tc.expectErr {
+					if err == nil {
+						t.Fatalf("expected an error for container %s, got nil", tc.containerName)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("unexpected error for container %s: %v", tc.containerName, err)
+				}
+				if got == nil {
+					t.Fatalf("expected statusContext to be injected for container %s", tc.containerName)
+				}
+				if got.containerID != tc.expectContainerID {
+					t.Errorf("expected containerID %s, got %s", tc.expectContainerID, got.containerID)
+				}
+				if got.restartCount != tc.expectRestartCount {
+					t.Errorf("expected restartCount %d, got %d", tc.expectRestartCount, got.restartCount)
+				}
+			})
+		}
+	}
+}
