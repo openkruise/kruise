@@ -1288,6 +1288,87 @@ func TestGetWorkloadReplicas(t *testing.T) {
 			},
 			replicas: 3,
 		},
+		{
+			name: "job with nil parallelism",
+			targetReference: &appsv1beta1.TargetReference{
+				APIVersion: "batch/v1",
+				Kind:       "Job",
+				Name:       "test-nil-parallelism",
+			},
+			replicas: 1,
+		},
+		{
+			name: "deployment with nil replicas",
+			targetReference: &appsv1beta1.TargetReference{
+				APIVersion: "apps/v1",
+				Kind:       "Deployment",
+				Name:       "test-nil-replicas",
+			},
+			replicas: 1,
+		},
+		{
+			name: "replicaset",
+			targetReference: &appsv1beta1.TargetReference{
+				APIVersion: "apps/v1",
+				Kind:       "ReplicaSet",
+				Name:       "test",
+			},
+			replicas: 4,
+		},
+		{
+			name: "replicaset with nil replicas",
+			targetReference: &appsv1beta1.TargetReference{
+				APIVersion: "apps/v1",
+				Kind:       "ReplicaSet",
+				Name:       "test-nil-replicas",
+			},
+			replicas: 1,
+		},
+		{
+			name: "k8s statefulset",
+			targetReference: &appsv1beta1.TargetReference{
+				APIVersion: "apps/v1",
+				Kind:       "StatefulSet",
+				Name:       "test-k8s-sts",
+			},
+			replicas: 3,
+		},
+		{
+			name: "k8s statefulset with nil replicas",
+			targetReference: &appsv1beta1.TargetReference{
+				APIVersion: "apps/v1",
+				Kind:       "StatefulSet",
+				Name:       "test-k8s-sts-nil-replicas",
+			},
+			replicas: 1,
+		},
+		{
+			name: "cloneset",
+			targetReference: &appsv1beta1.TargetReference{
+				APIVersion: "apps.kruise.io/v1alpha1",
+				Kind:       "CloneSet",
+				Name:       "test",
+			},
+			replicas: 2,
+		},
+		{
+			name: "cloneset with nil replicas",
+			targetReference: &appsv1beta1.TargetReference{
+				APIVersion: "apps.kruise.io/v1alpha1",
+				Kind:       "CloneSet",
+				Name:       "test-nil-replicas",
+			},
+			replicas: 1,
+		},
+		{
+			name: "Advanced StatefulSet with nil replicas",
+			targetReference: &appsv1beta1.TargetReference{
+				APIVersion: "apps.kruise.io/v1alpha1",
+				Kind:       "StatefulSet",
+				Name:       "test-nil-replicas",
+			},
+			replicas: 1,
+		},
 	}
 	whiteList := &configuration.WSCustomWorkloadWhiteList{
 		Workloads: []configuration.CustomWorkload{
@@ -1308,9 +1389,41 @@ func TestGetWorkloadReplicas(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
 				Spec:       appsv1.DeploymentSpec{Replicas: ptr.To(int32(5))},
 			},
+			&appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-nil-replicas", Namespace: "test"},
+				Spec:       appsv1.DeploymentSpec{Replicas: nil},
+			},
+			&appsv1.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
+				Spec:       appsv1.ReplicaSetSpec{Replicas: ptr.To(int32(4))},
+			},
+			&appsv1.ReplicaSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-nil-replicas", Namespace: "test"},
+				Spec:       appsv1.ReplicaSetSpec{Replicas: nil},
+			},
+			&appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-k8s-sts", Namespace: "test"},
+				Spec:       appsv1.StatefulSetSpec{Replicas: ptr.To(int32(3))},
+			},
+			&appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-k8s-sts-nil-replicas", Namespace: "test"},
+				Spec:       appsv1.StatefulSetSpec{Replicas: nil},
+			},
 			&appsv1beta1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
 				Spec:       appsv1beta1.StatefulSetSpec{Replicas: ptr.To(int32(5))},
+			},
+			&appsv1beta1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-nil-replicas", Namespace: "test"},
+				Spec:       appsv1beta1.StatefulSetSpec{Replicas: nil},
+			},
+			&appsv1alpha1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
+				Spec:       appsv1alpha1.CloneSetSpec{Replicas: ptr.To(int32(2))},
+			},
+			&appsv1alpha1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-nil-replicas", Namespace: "test"},
+				Spec:       appsv1alpha1.CloneSetSpec{Replicas: nil},
 			},
 			&appsv1alpha1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
@@ -1319,6 +1432,10 @@ func TestGetWorkloadReplicas(t *testing.T) {
 			&batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "test"},
 				Spec:       batchv1.JobSpec{Parallelism: ptr.To(int32(3))},
+			},
+			&batchv1.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-nil-parallelism", Namespace: "test"},
+				Spec:       batchv1.JobSpec{Parallelism: nil},
 			},
 			&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{

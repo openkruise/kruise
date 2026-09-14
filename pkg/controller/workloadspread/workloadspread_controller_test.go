@@ -26,6 +26,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -179,6 +180,7 @@ var (
 func init() {
 	scheme = runtime.NewScheme()
 	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(batchv1.AddToScheme(scheme))
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 }
@@ -2505,4 +2507,93 @@ func getLatestPods(c client.Client, workloadSpread *appsv1beta1.WorkloadSpread) 
 		matchedPods[i] = &podList.Items[i]
 	}
 	return matchedPods, err
+}
+
+func TestGetPodJob(t *testing.T) {
+	cases := []struct {
+		name             string
+		job              *batchv1.Job
+		targetRef        *appsv1beta1.TargetReference
+		expectedReplicas int32
+		expectErr        bool
+	}{
+		{
+			name: "Job with explicit parallelism",
+			job: &batchv1.Job{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "batch/v1",
+					Kind:       "Job",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job-parallelism",
+					Namespace: "default",
+					UID:       types.UID("job-uid-1"),
+				},
+				Spec: batchv1.JobSpec{
+					Parallelism: ptr.To(int32(5)),
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "job-1"},
+					},
+				},
+			},
+			targetRef: &appsv1beta1.TargetReference{
+				APIVersion: "batch/v1",
+				Kind:       "Job",
+				Name:       "test-job-parallelism",
+			},
+			expectedReplicas: 5,
+			expectErr:        false,
+		},
+		{
+			name: "Job with nil parallelism defaults to 1",
+			job: &batchv1.Job{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "batch/v1",
+					Kind:       "Job",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-job-nil-parallelism",
+					Namespace: "default",
+					UID:       types.UID("job-uid-2"),
+				},
+				Spec: batchv1.JobSpec{
+					Parallelism: nil,
+					Selector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "job-2"},
+					},
+				},
+			},
+			targetRef: &appsv1beta1.TargetReference{
+				APIVersion: "batch/v1",
+				Kind:       "Job",
+				Name:       "test-job-nil-parallelism",
+			},
+			expectedReplicas: 1,
+			expectErr:        false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tc.job).
+				WithIndex(&corev1.Pod{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
+					var owners []string
+					for _, ref := range obj.GetOwnerReferences() {
+						owners = append(owners, string(ref.UID))
+					}
+					return owners
+				}).Build()
+			r := &ReconcileWorkloadSpread{
+				Client: fakeClient,
+			}
+			pods, replicas, err := r.getPodJob(tc.targetRef, "default")
+			if (err != nil) != tc.expectErr {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if replicas != tc.expectedReplicas {
+				t.Fatalf("expected replicas %d, got %d", tc.expectedReplicas, replicas)
+			}
+			_ = pods
+		})
+	}
 }
