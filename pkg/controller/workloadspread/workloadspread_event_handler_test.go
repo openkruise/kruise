@@ -1308,6 +1308,44 @@ func TestWorkloadEventHandlerForUpdate(t *testing.T) {
 			},
 		},
 		{
+			name: "job parallelism changed to nil ut",
+			getWorkloads: func() (client.Object, client.Object) {
+				oldObj := jobDemo.DeepCopy()
+				oldObj.Spec.Parallelism = pointer.Int32(2)
+				newObj := jobDemo.DeepCopy()
+				newObj.Spec.Parallelism = nil
+				return oldObj, newObj
+			},
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1beta1.TargetReference{
+					APIVersion: jobDemo.APIVersion,
+					Kind:       jobDemo.Kind,
+					Name:       jobDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "job parallelism changed from nil ut",
+			getWorkloads: func() (client.Object, client.Object) {
+				oldObj := jobDemo.DeepCopy()
+				oldObj.Spec.Parallelism = nil
+				newObj := jobDemo.DeepCopy()
+				newObj.Spec.Parallelism = pointer.Int32(2)
+				return oldObj, newObj
+			},
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1beta1.TargetReference{
+					APIVersion: jobDemo.APIVersion,
+					Kind:       jobDemo.Kind,
+					Name:       jobDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
 			name: "cloneset ut",
 			getWorkloads: func() (client.Object, client.Object) {
 				oldObj := cloneSetDemo.DeepCopy()
