@@ -187,11 +187,20 @@ func (r *ControllerFinder) getPodReplicaSet(ref ControllerReference, namespace s
 	if replicaSet == nil {
 		return nil, nil
 	}
-	// The replicaSet may be owned by something other than a builtin Deployment, e.g. an
-	// Argo Rollout. Climb to that owner through the full finder chain (which falls back to
-	// the scale subresource for unrecognized kinds) so targetRef-based PUBs can still match it.
-	// If the owner can't be resolved, fall back to treating the replicaSet itself as the workload.
 	if controllerRef := metav1.GetControllerOf(replicaSet); controllerRef != nil {
+		if controllerRef.Kind == ControllerKindDep.Kind {
+			refSs := ControllerReference{
+				APIVersion: controllerRef.APIVersion,
+				Kind:       controllerRef.Kind,
+				Name:       controllerRef.Name,
+				UID:        controllerRef.UID,
+			}
+			return r.getPodDeployment(refSs, namespace)
+		}
+		// The replicaSet may be owned by something other than a builtin Deployment, e.g. an
+		// Argo Rollout. Climb to that owner through the full finder chain (which falls back to
+		// the scale subresource for unrecognized kinds) so targetRef-based PUBs can still match it.
+		// If the owner can't be resolved, fall back to treating the replicaSet itself as the workload.
 		owner, err := r.GetScaleAndSelectorForRef(controllerRef.APIVersion, controllerRef.Kind, namespace, controllerRef.Name, controllerRef.UID)
 		if err != nil {
 			return nil, err
