@@ -19,8 +19,27 @@ package controllerfinder
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
+
+// getScaleController must not fail the caller when the RESTMapper can't resolve the owner's
+// kind at all (e.g. its CRD isn't installed) -- that's a "can't determine" case, not an error,
+// and should be treated like any other unresolved owner (nil, nil).
+func Test_getScaleController_unresolvableKind(t *testing.T) {
+	finder := &ControllerFinder{mapper: meta.NewDefaultRESTMapper(nil)}
+	scale, err := finder.getScaleController(ControllerReference{
+		APIVersion: "argoproj.io/v1alpha1",
+		Kind:       "Rollout",
+		Name:       "demo",
+	}, "test")
+	if err != nil {
+		t.Fatalf("expected no error for an unresolvable kind, got: %v", err)
+	}
+	if scale != nil {
+		t.Fatalf("expected nil ScaleAndSelector for an unresolvable kind, got: %+v", scale)
+	}
+}
 
 func Test_getSpecReplicas(t *testing.T) {
 	type args struct {

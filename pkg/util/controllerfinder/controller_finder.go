@@ -187,15 +187,17 @@ func (r *ControllerFinder) getPodReplicaSet(ref ControllerReference, namespace s
 	if replicaSet == nil {
 		return nil, nil
 	}
-	controllerRef := metav1.GetControllerOf(replicaSet)
-	if controllerRef != nil && controllerRef.Kind == ControllerKindDep.Kind {
-		refSs := ControllerReference{
-			APIVersion: controllerRef.APIVersion,
-			Kind:       controllerRef.Kind,
-			Name:       controllerRef.Name,
-			UID:        controllerRef.UID,
+	// The replicaSet may be owned by something other than a builtin Deployment, e.g. an
+	// Argo Rollout. Climb to that owner through the full finder chain (which falls back to
+	// the scale subresource for unrecognized kinds) so targetRef-based PUBs can still match it.
+	// If the owner can't be resolved, fall back to treating the replicaSet itself as the workload.
+	if controllerRef := metav1.GetControllerOf(replicaSet); controllerRef != nil {
+		owner, err := r.GetScaleAndSelectorForRef(controllerRef.APIVersion, controllerRef.Kind, namespace, controllerRef.Name, controllerRef.UID)
+		if err != nil {
+			return nil, err
+		} else if owner != nil {
+			return owner, nil
 		}
-		return r.getPodDeployment(refSs, namespace)
 	}
 
 	return &ScaleAndSelector{
@@ -474,6 +476,11 @@ func (r *ControllerFinder) getScaleController(ref ControllerReference, namespace
 	}
 	mapping, err := r.mapper.RESTMapping(gk, gv.Version)
 	if err != nil {
+		// the RESTMapper can't resolve this kind, e.g. its CRD isn't installed; treat it the
+		// same as any other unresolved owner instead of failing the whole caller.
+		if meta.IsNoMatchError(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	gr := mapping.Resource.GroupResource()
