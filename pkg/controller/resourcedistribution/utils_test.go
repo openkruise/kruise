@@ -130,3 +130,166 @@ func TestMakeResourceObjectRewritesOwnerRefToBeta(t *testing.T) {
 func ptrTo[T any](value T) *T {
 	return &value
 }
+
+func TestNeedToUpdate(t *testing.T) {
+	cases := []struct {
+		name         string
+		oldObj       func() *unstructured.Unstructured
+		newObj       func() *unstructured.Unstructured
+		expectUpdate bool
+	}{
+		{
+			name: "unchanged resource without labels/annotations",
+			oldObj: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				u.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+				u.SetName("cm")
+				u.SetNamespace("default")
+				u.Object["data"] = map[string]interface{}{"key": "v1"}
+				return u
+			},
+			newObj: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				u.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+				u.SetName("cm")
+				u.Object["data"] = map[string]interface{}{"key": "v1"}
+				return u
+			},
+			expectUpdate: false,
+		},
+		{
+			name: "data changed",
+			oldObj: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				u.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+				u.SetName("cm")
+				u.SetNamespace("default")
+				u.Object["data"] = map[string]interface{}{"key": "v1"}
+				return u
+			},
+			newObj: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				u.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+				u.SetName("cm")
+				u.Object["data"] = map[string]interface{}{"key": "v2"}
+				return u
+			},
+			expectUpdate: true,
+		},
+		{
+			name: "label added to new resource",
+			oldObj: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				u.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+				u.SetName("cm")
+				u.SetNamespace("default")
+				u.Object["data"] = map[string]interface{}{"key": "v1"}
+				u.SetLabels(map[string]string{"env": "prod"})
+				return u
+			},
+			newObj: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				u.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+				u.SetName("cm")
+				u.Object["data"] = map[string]interface{}{"key": "v1"}
+				u.SetLabels(map[string]string{"env": "prod", "tier": "backend"})
+				return u
+			},
+			expectUpdate: true,
+		},
+		{
+			name: "label modified on new resource",
+			oldObj: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				u.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+				u.SetName("cm")
+				u.SetNamespace("default")
+				u.Object["data"] = map[string]interface{}{"key": "v1"}
+				u.SetLabels(map[string]string{"env": "prod"})
+				return u
+			},
+			newObj: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				u.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+				u.SetName("cm")
+				u.Object["data"] = map[string]interface{}{"key": "v1"}
+				u.SetLabels(map[string]string{"env": "staging"})
+				return u
+			},
+			expectUpdate: true,
+		},
+		{
+			name: "annotation added to new resource",
+			oldObj: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				u.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+				u.SetName("cm")
+				u.SetNamespace("default")
+				u.Object["data"] = map[string]interface{}{"key": "v1"}
+				return u
+			},
+			newObj: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				u.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+				u.SetName("cm")
+				u.Object["data"] = map[string]interface{}{"key": "v1"}
+				u.SetAnnotations(map[string]string{"note": "test"})
+				return u
+			},
+			expectUpdate: true,
+		},
+		{
+			name: "annotation modified on new resource",
+			oldObj: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				u.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+				u.SetName("cm")
+				u.SetNamespace("default")
+				u.Object["data"] = map[string]interface{}{"key": "v1"}
+				u.SetAnnotations(map[string]string{"note": "old"})
+				return u
+			},
+			newObj: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				u.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+				u.SetName("cm")
+				u.Object["data"] = map[string]interface{}{"key": "v1"}
+				u.SetAnnotations(map[string]string{"note": "new"})
+				return u
+			},
+			expectUpdate: true,
+		},
+		{
+			name: "old resource has extra labels and annotations (retained without triggering update)",
+			oldObj: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				u.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+				u.SetName("cm")
+				u.SetNamespace("default")
+				u.Object["data"] = map[string]interface{}{"key": "v1"}
+				u.SetLabels(map[string]string{"env": "prod", "injected-by-namespace": "true"})
+				u.SetAnnotations(map[string]string{"managed": "rd", "istio.io/inject": "false"})
+				return u
+			},
+			newObj: func() *unstructured.Unstructured {
+				u := &unstructured.Unstructured{}
+				u.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+				u.SetName("cm")
+				u.Object["data"] = map[string]interface{}{"key": "v1"}
+				u.SetLabels(map[string]string{"env": "prod"})
+				u.SetAnnotations(map[string]string{"managed": "rd"})
+				return u
+			},
+			expectUpdate: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := needToUpdate(tc.oldObj(), tc.newObj())
+			if got != tc.expectUpdate {
+				t.Fatalf("expected needToUpdate %v, but got %v", tc.expectUpdate, got)
+			}
+		})
+	}
+}

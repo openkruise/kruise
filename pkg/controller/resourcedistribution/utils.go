@@ -352,7 +352,25 @@ func needToUpdate(old, new *unstructured.Unstructured) bool {
 	newObject["metadata"] = nil
 	oldObject["status"] = nil
 	newObject["status"] = nil
-	return !reflect.DeepEqual(oldObject, newObject)
+	if !reflect.DeepEqual(oldObject, newObject) {
+		return true
+	}
+
+	oldLabels := old.GetLabels()
+	for k, v := range new.GetLabels() {
+		if oldLabels == nil || oldLabels[k] != v {
+			return true
+		}
+	}
+
+	oldAnnotations := old.GetAnnotations()
+	for k, v := range new.GetAnnotations() {
+		if oldAnnotations == nil || oldAnnotations[k] != v {
+			return true
+		}
+	}
+
+	return false
 }
 
 func isControlledByDistributor(resource metav1.Object, distributor *appsv1beta1.ResourceDistribution) bool {
