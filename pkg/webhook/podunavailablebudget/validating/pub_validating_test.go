@@ -230,7 +230,7 @@ func TestValidatingPub(t *testing.T) {
 	}
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			errList := pubHandler.validatingPodUnavailableBudgetFnV1beta1(cs.pub(), nil)
+			errList := pubHandler.validatingPodUnavailableBudgetFnV1beta1(context.TODO(), cs.pub(), nil)
 			if len(errList) != cs.expectErrList {
 				t.Fatalf("expect errList(%d) but get(%d) error: %v", cs.expectErrList, len(errList), errList.ToAggregate())
 			}
@@ -362,7 +362,7 @@ func TestPubConflictWithOthers(t *testing.T) {
 				Client:  client,
 				Decoder: decoder,
 			}
-			errList := pubHandler.validatingPodUnavailableBudgetFnV1beta1(cs.pub(), nil)
+			errList := pubHandler.validatingPodUnavailableBudgetFnV1beta1(context.TODO(), cs.pub(), nil)
 			if len(errList) != cs.expectErrList {
 				t.Fatalf("expect errList(%d) but get(%d) error: %v", cs.expectErrList, len(errList), errList.ToAggregate())
 			}
@@ -437,7 +437,7 @@ func TestValidatingUpdatePub(t *testing.T) {
 	}
 	for _, cs := range cases {
 		t.Run(cs.name, func(t *testing.T) {
-			errList := pubHandler.validatingPodUnavailableBudgetFnV1beta1(cs.obj(), cs.old())
+			errList := pubHandler.validatingPodUnavailableBudgetFnV1beta1(context.TODO(), cs.obj(), cs.old())
 			if len(errList) != cs.expectErrList {
 				t.Fatalf("expect errList(%d) but get(%d) error: %v", cs.expectErrList, len(errList), errList.ToAggregate())
 			}

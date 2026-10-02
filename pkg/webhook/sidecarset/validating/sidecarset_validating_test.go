@@ -1698,7 +1698,7 @@ func TestValidateSidecarSetCanaryAnnotations(t *testing.T) {
 				tt.setupClient()
 			}
 
-			result := validateSidecarSetCanaryAnnotations(fakeClient, tt.obj, tt.older)
+			result := validateSidecarSetCanaryAnnotations(context.TODO(), fakeClient, tt.obj, tt.older)
 
 			if len(result) != len(tt.expectedErrors) {
 				t.Errorf("Expected %d errors, got %d", len(tt.expectedErrors), len(result))
@@ -1719,5 +1719,68 @@ func TestValidateSidecarSetCanaryAnnotations(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+type sidecarContextTrackingClient struct {
+	client.Client
+	capturedCtx context.Context
+}
+
+func (c *sidecarContextTrackingClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	c.capturedCtx = ctx
+	return c.Client.List(ctx, list, opts...)
+}
+
+func TestSidecarSetHandler_PropagatesRequestContext(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(apps.AddToScheme(scheme))
+	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	trackingClient := &sidecarContextTrackingClient{Client: fakeClient}
+	h := &SidecarSetCreateUpdateHandler{
+		Client: trackingClient,
+	}
+
+	ss := &appsv1beta1.SidecarSet{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+		Spec: appsv1beta1.SidecarSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "nginx"},
+			},
+			Containers: []appsv1beta1.SidecarContainer{
+				{
+					PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+					ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+						Type: appsv1beta1.ShareVolumePolicyDisabled,
+					},
+					UpgradeStrategy: appsv1beta1.SidecarContainerUpgradeStrategy{
+						UpgradeType: appsv1beta1.SidecarContainerColdUpgrade,
+					},
+					Container: corev1.Container{
+						Name:                     "sidecar-1",
+						Image:                    "busybox",
+						ImagePullPolicy:          corev1.PullIfNotPresent,
+						TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+					},
+				},
+			},
+		},
+	}
+
+	type testCtxKey struct{}
+	testCtx := context.WithValue(context.Background(), testCtxKey{}, "sidecar-req-456")
+	allowed, _, err := h.validatingSidecarSetFn(testCtx, ss, nil)
+	if err != nil || !allowed {
+		t.Fatalf("expected allowed without error, got allowed=%v, err=%v", allowed, err)
+	}
+	if trackingClient.capturedCtx == nil {
+		t.Fatal("expected Client.List to be called with context, but was not called")
+	}
+	val, ok := trackingClient.capturedCtx.Value(testCtxKey{}).(string)
+	if !ok || val != "sidecar-req-456" {
+		t.Fatalf("expected request context with value 'sidecar-req-456', got %v", trackingClient.capturedCtx)
 	}
 }

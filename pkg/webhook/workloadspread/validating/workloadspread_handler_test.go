@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -265,5 +266,41 @@ func TestWSHandler_V1beta1_Create_BadJSON(t *testing.T) {
 	resp := h.Handle(context.Background(), req)
 	if resp.Allowed {
 		t.Fatal("expected rejection for bad JSON body")
+	}
+}
+
+type contextTrackingClient struct {
+	client.Client
+	capturedCtx context.Context
+}
+
+func (c *contextTrackingClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	c.capturedCtx = ctx
+	return c.Client.List(ctx, list, opts...)
+}
+
+func TestWSHandler_PropagatesRequestContext(t *testing.T) {
+	_ = utilfeature.DefaultMutableFeatureGate.Set(string(features.WorkloadSpread) + "=true")
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+	trackingClient := &contextTrackingClient{Client: fakeClient}
+	h := &WorkloadSpreadCreateUpdateHandler{
+		Client:  trackingClient,
+		Decoder: admission.NewDecoder(scheme),
+	}
+
+	type testCtxKey struct{}
+	testCtx := context.WithValue(context.Background(), testCtxKey{}, "request-12345")
+	req := wsAdmissionReq(t, admissionv1.Create, "v1beta1", validV1beta1WS("ws", "default"), nil)
+
+	resp := h.Handle(testCtx, req)
+	if !resp.Allowed {
+		t.Fatalf("expected allowed, got %v", resp.Result)
+	}
+	if trackingClient.capturedCtx == nil {
+		t.Fatal("expected Client.List to be called with context, but was not called")
+	}
+	val, ok := trackingClient.capturedCtx.Value(testCtxKey{}).(string)
+	if !ok || val != "request-12345" {
+		t.Fatalf("expected request context with value 'request-12345', got %v", trackingClient.capturedCtx)
 	}
 }
