@@ -18,6 +18,7 @@ package resourcedistribution
 
 import (
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -129,4 +130,78 @@ func TestMakeResourceObjectRewritesOwnerRefToBeta(t *testing.T) {
 
 func ptrTo[T any](value T) *T {
 	return &value
+}
+
+func TestCalculateNewStatus_PartialAndReorderedConditions(t *testing.T) {
+	pastTime := metav1.Time{Time: time.Now().Add(-10 * time.Minute)}
+
+	// Test 1: Partially populated conditions (e.g. only 1 condition) should not panic and preserve transition time.
+	distributor := &appsv1beta1.ResourceDistribution{
+		Status: appsv1beta1.ResourceDistributionStatus{
+			Conditions: []appsv1beta1.ResourceDistributionCondition{
+				{
+					Type:               appsv1beta1.ResourceDistributionConflictOccurred,
+					Status:             appsv1beta1.ResourceDistributionConditionTrue,
+					LastTransitionTime: pastTime,
+				},
+			},
+		},
+	}
+	newConditions := make([]appsv1beta1.ResourceDistributionCondition, NumberOfConditionTypes)
+	initConditionType(newConditions)
+	newConditions[ConflictConditionID].FailedNamespaces = []string{"ns-conflict"}
+
+	newStatus := calculateNewStatus(distributor, newConditions, 2, 1)
+	if newStatus.Desired != 2 || newStatus.Succeeded != 1 || newStatus.Failed != 1 {
+		t.Fatalf("unexpected status counts: desired=%d, succeeded=%d, failed=%d", newStatus.Desired, newStatus.Succeeded, newStatus.Failed)
+	}
+
+	conflictCond := getDistributionCondition(newStatus.Conditions, appsv1beta1.ResourceDistributionConflictOccurred)
+	if conflictCond == nil || conflictCond.Status != appsv1beta1.ResourceDistributionConditionTrue {
+		t.Fatalf("expected ConflictOccurred to be True, got %v", conflictCond)
+	}
+	if !conflictCond.LastTransitionTime.Equal(&pastTime) {
+		t.Fatalf("expected ConflictOccurred LastTransitionTime to be preserved, got %v vs %v", conflictCond.LastTransitionTime, pastTime)
+	}
+
+	// Test 2: Reordered conditions in Status.Conditions should match by Type, preserving LastTransitionTime.
+	reorderedConditions := []appsv1beta1.ResourceDistributionCondition{
+		{
+			Type:               appsv1beta1.ResourceDistributionNamespaceNotExists,
+			Status:             appsv1beta1.ResourceDistributionConditionFalse,
+			LastTransitionTime: pastTime,
+		},
+		{
+			Type:               appsv1beta1.ResourceDistributionGetResourceFailed,
+			Status:             appsv1beta1.ResourceDistributionConditionFalse,
+			LastTransitionTime: pastTime,
+		},
+	}
+	distributor.Status.Conditions = reorderedConditions
+	newConditions2 := make([]appsv1beta1.ResourceDistributionCondition, NumberOfConditionTypes)
+	initConditionType(newConditions2)
+
+	newStatus2 := calculateNewStatus(distributor, newConditions2, 1, 1)
+	getCond := getDistributionCondition(newStatus2.Conditions, appsv1beta1.ResourceDistributionGetResourceFailed)
+	if getCond == nil || getCond.Status != appsv1beta1.ResourceDistributionConditionFalse {
+		t.Fatalf("expected GetResourceFailed to be False, got %v", getCond)
+	}
+	if !getCond.LastTransitionTime.Equal(&pastTime) {
+		t.Fatalf("expected GetResourceFailed LastTransitionTime to be preserved from reordered old conditions, got %v vs %v", getCond.LastTransitionTime, pastTime)
+	}
+
+	// Test 3: Status transition updates LastTransitionTime
+	newConditions3 := make([]appsv1beta1.ResourceDistributionCondition, NumberOfConditionTypes)
+	initConditionType(newConditions3)
+	// GetResourceFailed now fails
+	newConditions3[GetConditionID].FailedNamespaces = []string{"ns-err"}
+
+	newStatus3 := calculateNewStatus(distributor, newConditions3, 1, 0)
+	getCondUpdated := getDistributionCondition(newStatus3.Conditions, appsv1beta1.ResourceDistributionGetResourceFailed)
+	if getCondUpdated == nil || getCondUpdated.Status != appsv1beta1.ResourceDistributionConditionTrue {
+		t.Fatalf("expected GetResourceFailed to be True, got %v", getCondUpdated)
+	}
+	if getCondUpdated.LastTransitionTime.Equal(&pastTime) {
+		t.Fatalf("expected GetResourceFailed LastTransitionTime to be updated on status change")
+	}
 }
