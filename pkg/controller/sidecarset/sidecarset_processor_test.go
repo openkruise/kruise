@@ -254,6 +254,28 @@ func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetI
 	}
 }
 
+func TestUpdateSidecarSet_PodWithNilAnnotations(t *testing.T) {
+	pod := podDemo.DeepCopy()
+	pod.Annotations = nil
+	sidecarset := sidecarSetDemo.DeepCopy()
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(sidecarset, pod).
+		WithStatusSubresource(&appsv1beta1.SidecarSet{}).Build()
+	processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
+	control := sidecarcontrol.New(sidecarset)
+	if err := processor.updatePodSidecarAndHash(control, pod); err != nil {
+		t.Fatalf("processor update pod sidecar and hash failed: %v", err)
+	}
+
+	podOutput, err := getLatestPod(fakeClient, pod)
+	if err != nil {
+		t.Fatalf("get latest pod failed: %v", err)
+	}
+	if podOutput.Annotations == nil {
+		t.Fatalf("expected pod annotations to be populated")
+	}
+}
+
 func TestScopeNamespacePods(t *testing.T) {
 	sidecarSet := sidecarSetDemo.DeepCopy()
 	// Create namespaces with labels

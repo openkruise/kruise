@@ -89,6 +89,9 @@ func flipPodSidecarContainerDo(control sidecarcontrol.SidecarControl, pod *corev
 			containerNeedFlip.Image = sidecarContainer.UpgradeStrategy.HotUpgradeEmptyImage
 			changedContainer = append(changedContainer, containerNeedFlip.Name)
 			// update pod sidecarSet version annotations
+			if pod.Annotations == nil {
+				pod.Annotations = make(map[string]string)
+			}
 			pod.Annotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation(containerNeedFlip.Name)] = "0"
 			pod.Annotations[sidecarcontrol.GetPodSidecarSetVersionAltAnnotation(workContainer)] = "0"
 		}

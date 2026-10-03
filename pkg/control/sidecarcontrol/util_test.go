@@ -410,6 +410,23 @@ func TestUpdatePodSidecarSetHash(t *testing.T) {
 			},
 			exceptWithoutImageRevision: map[string]SidecarSetUpgradeSpec{},
 		},
+		{
+			name: "pod with nil annotations should not panic",
+			getPod: func() *corev1.Pod {
+				pod := podDemo.DeepCopy()
+				pod.Annotations = nil
+				return pod
+			},
+			getSidecarSet: func() *appsv1beta1.SidecarSet {
+				return sidecarSetDemo.DeepCopy()
+			},
+			exceptRevision: map[string]SidecarSetUpgradeSpec{
+				"test-sidecarset": {
+					SidecarSetHash: "bbb",
+				},
+			},
+			exceptWithoutImageRevision: map[string]SidecarSetUpgradeSpec{},
+		},
 	}
 
 	for _, cs := range cases {
@@ -445,6 +462,16 @@ func TestUpdatePodSidecarSetHash(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestUpdatePodAnnotationsInUpgrade_NilAnnotations(t *testing.T) {
+	control := New(sidecarSetDemo.DeepCopy())
+	pod := podDemo.DeepCopy()
+	pod.Annotations = nil
+	control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
+	if pod.Annotations == nil || pod.Annotations[SidecarsetInplaceUpdateStateKey] == "" {
+		t.Fatalf("expected pod annotations to be initialized and contain in-place update state")
 	}
 }
 

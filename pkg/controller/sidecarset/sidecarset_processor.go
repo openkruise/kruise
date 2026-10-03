@@ -213,6 +213,9 @@ func (p *Processor) updatePodSidecarAndHash(control sidecarcontrol.SidecarContro
 		// which is to improve the performance of the sidecarSet controller
 		sidecarSetNames, ok := podClone.Annotations[sidecarcontrol.SidecarSetListAnnotation]
 		if !ok || len(sidecarSetNames) == 0 {
+			if podClone.Annotations == nil {
+				podClone.Annotations = make(map[string]string)
+			}
 			podClone.Annotations[sidecarcontrol.SidecarSetListAnnotation] = p.listMatchedSidecarSets(podClone)
 		}
 		// patch pod metadata
@@ -616,6 +619,9 @@ func updatePodSidecarContainer(control sidecarcontrol.SidecarControl, pod *corev
 			hotUpgradeContainerInfos := sidecarcontrol.GetPodHotUpgradeInfoInAnnotations(pod)
 			hotUpgradeContainerInfos[sidecarContainer.Name] = newContainer.Name
 			by, _ := json.Marshal(hotUpgradeContainerInfos)
+			if pod.Annotations == nil {
+				pod.Annotations = make(map[string]string)
+			}
 			pod.Annotations[sidecarcontrol.SidecarSetWorkingHotUpgradeContainer] = string(by)
 			// update sidecar container resource version in annotations
 			pod.Annotations[sidecarcontrol.GetPodSidecarSetVersionAnnotation(newContainer.Name)] = sidecarSet.ResourceVersion

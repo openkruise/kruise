@@ -136,6 +136,9 @@ func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string
 	// record sidecar container status information in pod's annotations
 	sidecarUpdateStates[sidecarSet.Name] = inPlaceUpdateState
 	by, _ := json.Marshal(sidecarUpdateStates)
+	if pod.Annotations == nil {
+		pod.Annotations = make(map[string]string)
+	}
 	pod.Annotations[SidecarsetInplaceUpdateStateKey] = string(by)
 }
 
