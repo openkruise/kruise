@@ -38,11 +38,10 @@ func (dm *DurationStore) Push(key string, newDuration time.Duration) {
 }
 
 func (dm *DurationStore) Pop(key string) time.Duration {
-	value, ok := dm.store.Load(key)
+	value, ok := dm.store.LoadAndDelete(key)
 	if !ok {
 		return 0
 	}
-	defer dm.store.Delete(key)
 	requeueDuration, ok := value.(*Duration)
 	if !ok {
 		return 0

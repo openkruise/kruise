@@ -384,3 +384,37 @@ func TestDurationStore_ConcurrentPushPop(t *testing.T) {
 	assert.True(t, nonZeroCount > 0, "Should have at least some successful pops")
 	assert.True(t, nonZeroCount <= numOperations, "Should not have more pops than pushes")
 }
+
+func TestDurationStore_ConcurrentPopDoesNotDropSubsequentPush(t *testing.T) {
+	for round := 0; round < 200; round++ {
+		store := &DurationStore{}
+		key := "race-test-key"
+
+		store.Push(key, 10*time.Second)
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		var poppedDuration time.Duration
+		go func() {
+			defer wg.Done()
+			poppedDuration = store.Pop(key)
+		}()
+
+		go func() {
+			defer wg.Done()
+			store.Push(key, 2*time.Second)
+		}()
+
+		wg.Wait()
+
+		remaining := store.Pop(key)
+		if poppedDuration == 10*time.Second {
+			assert.Equal(t, 2*time.Second, remaining, "concurrently pushed duration should not be dropped by Pop")
+		} else if poppedDuration == 2*time.Second {
+			assert.Equal(t, time.Duration(0), remaining)
+		} else {
+			t.Fatalf("unexpected popped duration: %v", poppedDuration)
+		}
+	}
+}
