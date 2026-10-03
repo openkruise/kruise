@@ -165,6 +165,24 @@ func TestSelectorConflict(t *testing.T) {
 			},
 			Output: false,
 		},
+		{
+			// selector1 says nothing about "a" at all, which is not the same as excluding it:
+			// a pod matching selector1 (via "b=c") and also carrying label "a" satisfies both.
+			Input: [2]metav1.LabelSelector{
+				{
+					MatchLabels: map[string]string{"b": "c"},
+				},
+				{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "a",
+							Operator: metav1.LabelSelectorOpExists,
+						},
+					},
+				},
+			},
+			Output: true,
+		},
 	}
 
 	for i, testCase := range testCases {

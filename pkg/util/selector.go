@@ -46,6 +46,11 @@ func isDisjoint(selector1, selector2 *metav1.LabelSelector) bool {
 	// a in [b,c] convert to a -> [b,c]
 	// a exist convert to a -> [ALL]
 	matchedLabels1 := make(map[string][]string)
+	// notExistKeys1 is the set of keys selector1 requires to be absent (DoesNotExist). A key
+	// missing from matchedLabels1 only means selector1 places no constraint on it, which is not
+	// the same thing: selector2 requiring that key to Exist still overlaps an unconstrained
+	// selector1, just not one that explicitly excludes the key.
+	notExistKeys1 := make(map[string]bool)
 	for key, value := range selector1.MatchLabels {
 		matchedLabels1[key] = []string{value}
 	}
@@ -57,6 +62,8 @@ func isDisjoint(selector1, selector2 *metav1.LabelSelector) bool {
 			}
 		case metav1.LabelSelectorOpExists:
 			matchedLabels1[req.Key] = []string{"ALL"}
+		case metav1.LabelSelectorOpDoesNotExist:
+			notExistKeys1[req.Key] = true
 		}
 	}
 
@@ -81,7 +88,7 @@ func isDisjoint(selector1, selector2 *metav1.LabelSelector) bool {
 				return true
 			}
 		case metav1.LabelSelectorOpExists:
-			if !ok {
+			if notExistKeys1[req.Key] {
 				return true
 			}
 		case metav1.LabelSelectorOpDoesNotExist:
