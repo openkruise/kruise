@@ -22,7 +22,7 @@ func TestSyncProgressingStatus(t *testing.T) {
 
 	timeFn := func(sec int64, nsec int64) time.Time { return time.Unix(sec, nsec) }
 
-	oldTime := metav1.NewTime(time.Date(2025, 7, 20, 11, 0, 0, 0, time.Local))
+	oldTime := metav1.Time{Time: time.Unix(-15, 0)}
 	newStatus := func(replicas, readyReplicas, availableReplicas, updatedReplicas, updatedReadyReplicas,
 		updatedAvailableReplicas, expectedUpdatedReplicas int32, currentRevision, updateRevision string) *appsv1beta1.CloneSetStatus {
 		return &appsv1beta1.CloneSetStatus{
@@ -308,7 +308,7 @@ func TestSyncProgressingStatus(t *testing.T) {
 				LastUpdateTime:     metav1.NewTime(timeFn(0, 10)),
 				LastTransitionTime: metav1.NewTime(timeFn(0, 10)),
 			},
-			expectEnqueue: time.Duration(-1),
+			expectEnqueue: 11 * time.Second,
 		},
 		{
 			name: "startup with CloneSetAvailable condition, and CloneSet scales up replicas, timeout",
@@ -550,8 +550,8 @@ func TestSyncProgressingStatus(t *testing.T) {
 						{
 							Type:               appsv1beta1.CloneSetConditionTypeProgressing,
 							Reason:             string(appsv1beta1.CloneSetProgressUpdated),
-							LastUpdateTime:     metav1.Now(),
-							LastTransitionTime: metav1.Now(),
+							LastUpdateTime:     metav1.NewTime(timeFn(9, 0)),
+							LastTransitionTime: metav1.NewTime(timeFn(9, 0)),
 							Status:             v1.ConditionTrue,
 							Message:            "CloneSet is progressing",
 						},
@@ -1363,8 +1363,22 @@ func TestSyncProgressingStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			oldTimer := timer
+			defer func() { timer = oldTimer }()
+
+			if tt.timer != nil {
+				timer = tt.timer
+			}
+
+			if tt.newStatus != nil && len(tt.newStatus.Conditions) == 0 {
+				tt.newStatus.Conditions = tt.cs.Status.DeepCopy().Conditions
+			}
+
 			r := &realStatusUpdater{}
-			_ = r.calculateProgressingStatus(tt.cs, tt.newStatus)
+			actualEnqueue := r.calculateProgressingStatus(tt.cs, tt.newStatus)
+			if actualEnqueue != tt.expectEnqueue {
+				t.Errorf("expected enqueue duration %v, got %v", tt.expectEnqueue, actualEnqueue)
+			}
 
 			var cond *appsv1beta1.CloneSetCondition
 			if tt.newStatus != nil {
