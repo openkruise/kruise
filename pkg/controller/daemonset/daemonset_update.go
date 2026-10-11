@@ -63,8 +63,9 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1beta
 	//      leaving no budget for the rolling update to proceed.
 	//   2. The selector is narrowed and the excluded pods (which cannot be deleted by the rolling
 	//      update itself) occupy all maxUnavailable slots, so no eligible node can be updated.
+	var orphanedPodsToDelete []string
 	if utilfeature.DefaultFeatureGate.Enabled(features.DaemonSetPruneIneligibleNodes) {
-		nodeToDaemonPods = dsc.pruneNodesAndOrphanedPods(ds, nodeToDaemonPods, nodeList)
+		nodeToDaemonPods, orphanedPodsToDelete = dsc.pruneNodesAndOrphanedPods(ds, nodeToDaemonPods, nodeList)
 	}
 
 	maxSurge, maxUnavailable, err := dsc.updatedDesiredNodeCounts(ds, nodeList, nodeToDaemonPods)
@@ -165,6 +166,10 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1beta
 			}
 		}
 
+		// Pods on nodes that are no longer eligible for this DaemonSet must be deleted outright,
+		// never considered for in-place update.
+		oldPodsToDelete = append(oldPodsToDelete, orphanedPodsToDelete...)
+
 		return dsc.syncNodes(ctx, ds, oldPodsToDelete, nil, hash)
 	}
 
@@ -247,6 +252,9 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1beta
 		remainingSurge = max
 	}
 	newNodesToCreate := append(allowedNewNodes, candidateNewNodes[:remainingSurge]...)
+
+	// Pods on nodes that are no longer eligible for this DaemonSet must be deleted outright.
+	oldPodsToDelete = append(oldPodsToDelete, orphanedPodsToDelete...)
 
 	return dsc.syncNodes(ctx, ds, oldPodsToDelete, newNodesToCreate, hash)
 }

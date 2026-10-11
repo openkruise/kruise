@@ -1,6 +1,7 @@
 package daemonset
 
 import (
+	"fmt"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -14,6 +15,65 @@ import (
 	"github.com/openkruise/kruise/pkg/features"
 	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
+
+// TestPruneNodesAndOrphanedPodsReturnsPodsToDelete is a regression test: pruneNodesAndOrphanedPods
+// used to collect ineligible-node pod names into podsToDelete and then silently discard them,
+// never surfacing them to the caller for actual deletion (see https://github.com/openkruise/kruise/issues/2522).
+func TestPruneNodesAndOrphanedPodsReturnsPodsToDelete(t *testing.T) {
+	ds := newDaemonSet("foo")
+	ds.Spec.Template.Spec.Affinity = &corev1.Affinity{
+		NodeAffinity: &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "kubernetes.io/hostname",
+								Operator: corev1.NodeSelectorOpNotIn,
+								Values:   []string{"node-0", "node-1"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	manager, _, _, err := newTestController(ds)
+	if err != nil {
+		t.Fatalf("error creating DaemonSets controller: %v", err)
+	}
+
+	var nodeList []*corev1.Node
+	nodeToDaemonPods := make(map[string][]*corev1.Pod)
+	wantDeleted := sets.NewString()
+	for i := 0; i < 5; i++ {
+		nodeName := fmt.Sprintf("node-%d", i)
+		nodeList = append(nodeList, newNode(nodeName, map[string]string{"kubernetes.io/hostname": nodeName}))
+		pod := newPod(fmt.Sprintf("pod-%d", i), nodeName, nil, ds)
+		nodeToDaemonPods[nodeName] = []*corev1.Pod{pod}
+		if nodeName == "node-0" || nodeName == "node-1" {
+			wantDeleted.Insert(pod.Name)
+		}
+	}
+
+	prunedMap, podsToDelete := manager.pruneNodesAndOrphanedPods(ds, nodeToDaemonPods, nodeList)
+
+	gotDeleted := sets.NewString(podsToDelete...)
+	if !gotDeleted.Equal(wantDeleted) {
+		t.Fatalf("pruneNodesAndOrphanedPods returned podsToDelete = %v, want %v", gotDeleted.List(), wantDeleted.List())
+	}
+
+	// The pruned map must still exclude the ineligible nodes from maxUnavailable budget accounting.
+	if len(prunedMap) != 3 {
+		t.Fatalf("expected 3 remaining nodes in prunedMap, got %d: %v", len(prunedMap), prunedMap)
+	}
+	for _, excluded := range []string{"node-0", "node-1"} {
+		if _, exists := prunedMap[excluded]; exists {
+			t.Fatalf("expected %s to be removed from nodeToDaemonPods", excluded)
+		}
+	}
+}
 
 func markAllPodsReady(store cache.Store, options []func(*corev1.Pod) bool) {
 	// mark pods as ready
