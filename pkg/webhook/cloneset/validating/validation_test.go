@@ -1,6 +1,7 @@
 package validating
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strconv"
@@ -290,7 +291,7 @@ func TestValidate(t *testing.T) {
 			}
 			h := CloneSetCreateUpdateHandler{Client: fake.NewClientBuilder().WithObjects(&p0).Build()}
 			if successCase.oldSpec == nil {
-				if errs := h.validateCloneSet(&obj, nil); len(errs) != 0 {
+				if errs := h.validateCloneSet(context.TODO(), &obj, nil); len(errs) != 0 {
 					t.Errorf("expected success: %v", errs)
 				}
 			} else {
@@ -300,7 +301,7 @@ func TestValidate(t *testing.T) {
 				}
 				defaults.SetDefaultPodSpec(&oldObj.Spec.Template.Spec)
 				defaults.SetDefaultPodSpec(&obj.Spec.Template.Spec)
-				if errs := h.validateCloneSetUpdate(&obj, &oldObj); len(errs) != 0 {
+				if errs := h.validateCloneSetUpdate(context.TODO(), &obj, &oldObj); len(errs) != 0 {
 					t.Errorf("expected success: %v", errs)
 				}
 			}
@@ -648,13 +649,13 @@ func TestValidate(t *testing.T) {
 			h := CloneSetCreateUpdateHandler{Client: fake.NewClientBuilder().WithObjects(&p0).Build()}
 			var errs field.ErrorList
 			if v.oldSpec == nil {
-				errs = h.validateCloneSet(&obj, nil)
+				errs = h.validateCloneSet(context.TODO(), &obj, nil)
 			} else {
 				oldObj := appsv1alpha1.CloneSet{
 					ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("cs-%v", strings.ToLower(k)), Namespace: metav1.NamespaceDefault, UID: uid, ResourceVersion: "1"},
 					Spec:       *v.oldSpec,
 				}
-				errs = h.validateCloneSetUpdate(&obj, &oldObj)
+				errs = h.validateCloneSetUpdate(context.TODO(), &obj, &oldObj)
 
 			}
 			if len(errs) == 0 {

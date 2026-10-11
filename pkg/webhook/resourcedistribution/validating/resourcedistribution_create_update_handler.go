@@ -63,7 +63,7 @@ func (h *ResourceDistributionCreateUpdateHandler) Handle(ctx context.Context, re
 		}
 	}
 
-	if allErrs := h.validateResourceDistribution(obj, oldObj); len(allErrs) != 0 {
+	if allErrs := h.validateResourceDistribution(ctx, obj, oldObj); len(allErrs) != 0 {
 		klog.V(3).InfoS("all errors of validation", "errors", fmt.Sprintf("%v", allErrs))
 		return admission.Errored(http.StatusUnprocessableEntity, allErrs.ToAggregate())
 	}
@@ -118,13 +118,13 @@ func (h *ResourceDistributionCreateUpdateHandler) decodeOldObject(req admission.
 	}
 }
 
-func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistribution(obj, oldObj *appsv1beta1.ResourceDistribution) (allErrs field.ErrorList) {
+func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistribution(ctx context.Context, obj, oldObj *appsv1beta1.ResourceDistribution) (allErrs field.ErrorList) {
 	allErrs = apimachineryvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
-	allErrs = append(allErrs, h.validateResourceDistributionSpec(obj, oldObj, field.NewPath("spec"))...)
+	allErrs = append(allErrs, h.validateResourceDistributionSpec(ctx, obj, oldObj, field.NewPath("spec"))...)
 	return allErrs
 }
 
-func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpec(obj, oldObj *appsv1beta1.ResourceDistribution, fldPath *field.Path) (allErrs field.ErrorList) {
+func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpec(ctx context.Context, obj, oldObj *appsv1beta1.ResourceDistribution, fldPath *field.Path) (allErrs field.ErrorList) {
 	resource, errs := DeserializeResource(&obj.Spec.Resource, fldPath.Child("resource"))
 	allErrs = append(allErrs, errs...)
 	if resource == nil {
@@ -137,12 +137,12 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 		allErrs = append(allErrs, errs...)
 	}
 
-	allErrs = append(allErrs, h.validateResourceDistributionSpecResource(resource, oldResource, fldPath.Child("resource"))...)
+	allErrs = append(allErrs, h.validateResourceDistributionSpecResource(ctx, resource, oldResource, fldPath.Child("resource"))...)
 	allErrs = append(allErrs, validateResourceDistributionTargets(obj.Spec.Targets, fldPath.Child("targets"))...)
 	return allErrs
 }
 
-func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpecResource(resource, oldResource runtime.Object, fldPath *field.Path) (allErrs field.ErrorList) {
+func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSpecResource(ctx context.Context, resource, oldResource runtime.Object, fldPath *field.Path) (allErrs field.ErrorList) {
 	if !isSupportedGK(resource) {
 		return append(allErrs, field.Invalid(fldPath, resource.GetObjectKind().GroupVersionKind().GroupKind(), fmt.Sprintf("unknown or unsupported resource GroupKind, only support %v", supportedGKList)))
 	}
@@ -153,7 +153,7 @@ func (h *ResourceDistributionCreateUpdateHandler) validateResourceDistributionSp
 	mice := resource.DeepCopyObject().(client.Object)
 	// spec.resource.metadata.namespace is always overridden by the controller per target namespace.
 	ConvertToUnstructured(mice).SetNamespace(webhookutil.GetNamespace())
-	err := h.Client.Create(context.TODO(), mice, &client.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	err := h.Client.Create(ctx, mice, &client.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 	if err == nil || errors.IsAlreadyExists(err) {
 		return allErrs
 	}

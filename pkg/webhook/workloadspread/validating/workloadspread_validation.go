@@ -79,13 +79,13 @@ func verifyGroupKind(ref *appsv1beta1.TargetReference, expectedKind string, expe
 	return false, nil
 }
 
-func (h *WorkloadSpreadCreateUpdateHandler) validatingWorkloadSpreadFn(obj *appsv1beta1.WorkloadSpread) field.ErrorList {
+func (h *WorkloadSpreadCreateUpdateHandler) validatingWorkloadSpreadFn(ctx context.Context, obj *appsv1beta1.WorkloadSpread) field.ErrorList {
 	// validate ws.spec.
-	allErrs := validateWorkloadSpreadSpec(h, obj, field.NewPath("spec"))
+	allErrs := validateWorkloadSpreadSpec(ctx, h, obj, field.NewPath("spec"))
 
 	// validate whether ws.spec.targetRef is in conflict with others.
 	wsList := &appsv1beta1.WorkloadSpreadList{}
-	if err := h.Client.List(context.TODO(), wsList, &client.ListOptions{Namespace: obj.Namespace}); err != nil {
+	if err := h.Client.List(ctx, wsList, &client.ListOptions{Namespace: obj.Namespace}); err != nil {
 		allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("query other WorkloadSpread failed, err: %v", err)))
 	} else {
 		allErrs = append(allErrs, validateWorkloadSpreadConflict(obj, wsList.Items, field.NewPath("spec"))...)
@@ -94,7 +94,7 @@ func (h *WorkloadSpreadCreateUpdateHandler) validatingWorkloadSpreadFn(obj *apps
 	return allErrs
 }
 
-func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv1beta1.WorkloadSpread, fldPath *field.Path) field.ErrorList {
+func validateWorkloadSpreadSpec(ctx context.Context, h *WorkloadSpreadCreateUpdateHandler, obj *appsv1beta1.WorkloadSpread, fldPath *field.Path) field.ErrorList {
 	spec := &obj.Spec
 	allErrs := field.ErrorList{}
 	var workloadTemplate client.Object
@@ -113,7 +113,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for CloneSet."))
 				} else {
 					set := &appsv1alpha1.CloneSet{}
-					if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
+					if getErr := h.Client.Get(ctx, client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
 						workloadTemplate = set
 					}
 				}
@@ -123,7 +123,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for Deployment."))
 				} else {
 					set := &appsv1.Deployment{}
-					if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
+					if getErr := h.Client.Get(ctx, client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
 						workloadTemplate = set
 					}
 				}
@@ -133,7 +133,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for ReplicaSet."))
 				} else {
 					set := &appsv1.ReplicaSet{}
-					if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
+					if getErr := h.Client.Get(ctx, client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
 						workloadTemplate = set
 					}
 				}
@@ -143,7 +143,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for Job."))
 				} else {
 					set := &batchv1.Job{}
-					if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
+					if getErr := h.Client.Get(ctx, client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
 						workloadTemplate = set
 					}
 				}
@@ -153,7 +153,7 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("targetRef"), spec.TargetReference, "TargetReference is not valid for StatefulSet."))
 				} else {
 					set := &appsv1.StatefulSet{}
-					if getErr := h.Client.Get(context.TODO(), client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
+					if getErr := h.Client.Get(ctx, client.ObjectKey{Name: spec.TargetReference.Name, Namespace: obj.Namespace}, set); getErr == nil {
 						workloadTemplate = set
 					}
 				}

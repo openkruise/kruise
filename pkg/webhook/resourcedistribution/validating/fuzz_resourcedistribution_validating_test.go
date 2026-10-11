@@ -17,6 +17,7 @@ limitations under the License.
 package validating
 
 import (
+	"context"
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
@@ -94,7 +95,7 @@ func FuzzValidateResourceDistributionSpec(f *testing.F) {
 			betaOld = &appsv1beta1.ResourceDistribution{}
 			_ = oldObj.ConvertTo(betaOld)
 		}
-		_ = h.validateResourceDistributionSpec(betaNew, betaOld, field.NewPath("spec"))
+		_ = h.validateResourceDistributionSpec(context.TODO(), betaNew, betaOld, field.NewPath("spec"))
 	})
 }
 
@@ -139,7 +140,7 @@ func FuzzValidateResourceDistributionResource(f *testing.F) {
 			}
 		}
 
-		_ = h.validateResourceDistributionSpecResource(newObj, oldObj, field.NewPath("resource"))
+		_ = h.validateResourceDistributionSpecResource(context.TODO(), newObj, oldObj, field.NewPath("resource"))
 	})
 }
 
@@ -170,7 +171,7 @@ func FuzzValidateResourceDistributionSpecV1beta1(f *testing.F) {
 			},
 		}
 
-		_ = h.validateResourceDistribution(newObj, nil)
+		_ = h.validateResourceDistribution(context.TODO(), newObj, nil)
 	})
 }
 
