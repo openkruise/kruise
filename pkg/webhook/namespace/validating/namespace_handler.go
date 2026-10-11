@@ -52,7 +52,7 @@ func (h *NamespaceHandler) Handle(ctx context.Context, req admission.Request) ad
 	if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, obj); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	if err := deletionprotection.ValidateNamespaceDeletion(h.Client, obj); err != nil {
+	if err := deletionprotection.ValidateNamespaceDeletion(ctx, h.Client, obj); err != nil {
 		deletionprotection.NamespaceDeletionProtectionMetrics.WithLabelValues(obj.Name, req.UserInfo.Username).Add(1)
 		util.LoggerProtectionInfo(util.ProtectionEventDeletionProtection, "Namespace", "", obj.Name, req.UserInfo.Username)
 		return admission.Errored(http.StatusForbidden, err)
