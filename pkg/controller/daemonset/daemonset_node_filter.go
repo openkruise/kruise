@@ -29,6 +29,10 @@ func (dsc *ReconcileDaemonSet) pruneNodesAndOrphanedPods(ds *appsv1beta1.DaemonS
 		if deleteNode {
 			nodeToDelete.Insert(nodeName)
 			for _, pod := range pods {
+				// Pods that are already terminating must not be deleted (and counted in the expectations) again.
+				if pod.DeletionTimestamp != nil {
+					continue
+				}
 				podsToDelete.Insert(pod.Name)
 			}
 		}

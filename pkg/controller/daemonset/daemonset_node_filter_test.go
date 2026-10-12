@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
@@ -52,7 +53,13 @@ func TestPruneNodesAndOrphanedPodsReturnsPodsToDelete(t *testing.T) {
 		nodeList = append(nodeList, newNode(nodeName, map[string]string{"kubernetes.io/hostname": nodeName}))
 		pod := newPod(fmt.Sprintf("pod-%d", i), nodeName, nil, ds)
 		nodeToDaemonPods[nodeName] = []*corev1.Pod{pod}
-		if nodeName == "node-0" || nodeName == "node-1" {
+		if nodeName == "node-1" {
+			// Already terminating: it must leave the budget accounting but must not be deleted again.
+			now := metav1.Now()
+			pod.DeletionTimestamp = &now
+			continue
+		}
+		if nodeName == "node-0" {
 			wantDeleted.Insert(pod.Name)
 		}
 	}
