@@ -1304,6 +1304,41 @@ func TestValidateSubsetReplicasReportsMinLessThanOrEqualToMax(t *testing.T) {
 	}
 }
 
+func TestValidateSubsetReplicasMessageFormat(t *testing.T) {
+	replicas := int32(10)
+	repGreater := intstr.FromInt(12)
+	rep2 := intstr.FromInt(5)
+	rep3 := intstr.FromInt(2)
+
+	// Case 1: sumReplicas > expectedReplicas (not all subset replicas provided)
+	errs := validateSubsetReplicas(&replicas, []appsv1alpha1.Subset{
+		{Name: "subset-a", Replicas: &repGreater},
+		{Name: "subset-b"},
+	}, field.NewPath("spec", "topology", "subsets"))
+
+	if len(errs) != 1 {
+		t.Fatalf("expected 1 error, got %v", errs)
+	}
+	expectedMsg := "sum of indicated subset replicas 12 should not be greater than UnitedDeployment replicas 10"
+	if !strings.Contains(errs[0].Error(), expectedMsg) {
+		t.Fatalf("expected error message to contain %q, but got %q", expectedMsg, errs[0].Error())
+	}
+
+	// Case 2: all subset replicas provided and sumReplicas != expectedReplicas (sum < expected)
+	errs = validateSubsetReplicas(&replicas, []appsv1alpha1.Subset{
+		{Name: "subset-a", Replicas: &rep2},
+		{Name: "subset-b", Replicas: &rep3},
+	}, field.NewPath("spec", "topology", "subsets"))
+
+	if len(errs) != 1 {
+		t.Fatalf("expected 1 error, got %v", errs)
+	}
+	expectedMsg = "if replicas of all subsets are provided, the sum of indicated subset replicas 7 should equal UnitedDeployment replicas 10"
+	if !strings.Contains(errs[0].Error(), expectedMsg) {
+		t.Fatalf("expected error message to contain %q, but got %q", expectedMsg, errs[0].Error())
+	}
+}
+
 // alpha adapter helpers — convert v1alpha1 objects to v1beta1 before delegating to
 // the beta validators so that test cases written against the alpha API still work.
 
