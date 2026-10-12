@@ -201,10 +201,10 @@ func validateSubsetReplicas(expectedReplicas *int32, subsets []appsv1alpha1.Subs
 		if *expectedReplicas != -1 {
 			// sum of subset replicas may be less than uniteddployment replicas
 			if sumReplicas > int64(*expectedReplicas) {
-				errList = append(errList, field.Invalid(fldPath, sumReplicas, fmt.Sprintf("sum of indicated subset replicas %d should not be greater than UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
+				errList = append(errList, field.Invalid(fldPath, sumReplicas, fmt.Sprintf("sum of indicated subset replicas %d should not be greater than UnitedDeployment replicas %d", sumReplicas, *expectedReplicas)))
 			}
 			if countReplicas > 0 && countReplicas == len(subsets) && sumReplicas != int64(*expectedReplicas) {
-				errList = append(errList, field.Invalid(fldPath, sumReplicas, fmt.Sprintf("if replicas of all subsets are provided, the sum of indicated subset replicas %d should equal UnitedDeployment replicas %d", sumReplicas, expectedReplicas)))
+				errList = append(errList, field.Invalid(fldPath, sumReplicas, fmt.Sprintf("if replicas of all subsets are provided, the sum of indicated subset replicas %d should equal UnitedDeployment replicas %d", sumReplicas, *expectedReplicas)))
 			}
 		} else if countReplicas != len(subsets) {
 			// validate all of subsets replicas are not nil
