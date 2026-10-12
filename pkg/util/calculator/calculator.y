@@ -318,7 +318,7 @@ factor:
 		calc := yylex.(*yyLex).calc
 		num, err := calc.parseNumber($1)
 		if err != nil {
-			calc.lastError = fmt.Errorf("invalid number: %s", $1)
+			calc.lastError = fmt.Errorf("invalid number %q: %w", $1, err)
 			$$ = nil
 		} else {
 			$$ = &Value{IsQuantity: false, Number: num}

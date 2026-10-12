@@ -763,7 +763,7 @@ yydefault:
 			calc := yylex.(*yyLex).calc
 			num, err := calc.parseNumber(yyDollar[1].str)
 			if err != nil {
-				calc.lastError = fmt.Errorf("invalid number: %s", yyDollar[1].str)
+				calc.lastError = fmt.Errorf("invalid number %q: %w", yyDollar[1].str, err)
 				yyVAL.val = nil
 			} else {
 				yyVAL.val = &Value{IsQuantity: false, Number: num}
