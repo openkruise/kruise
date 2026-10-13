@@ -293,7 +293,7 @@ const yyEofCode = 1
 const yyErrCode = 2
 const yyInitialStackSize = 16
 
-//line calculator.y:378
+//line calculator.y:383
 
 //line yacctab:1
 var yyExca = [...]int8{
@@ -761,12 +761,17 @@ yydefault:
 //line calculator.y:317
 		{
 			calc := yylex.(*yyLex).calc
-			num, _ := calc.parseNumber(yyDollar[1].str)
-			yyVAL.val = &Value{IsQuantity: false, Number: num}
+			num, err := calc.parseNumber(yyDollar[1].str)
+			if err != nil {
+				calc.lastError = fmt.Errorf("invalid number %q: %w", yyDollar[1].str, err)
+				yyVAL.val = nil
+			} else {
+				yyVAL.val = &Value{IsQuantity: false, Number: num}
+			}
 		}
 	case 9:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line calculator.y:322
+//line calculator.y:327
 		{
 			calc := yylex.(*yyLex).calc
 			q, err := calc.parseQuantity(yyDollar[1].str)
@@ -779,7 +784,7 @@ yydefault:
 		}
 	case 10:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line calculator.y:332
+//line calculator.y:337
 		{
 			// Handle variable reference
 			calc := yylex.(*yyLex).calc
@@ -792,19 +797,19 @@ yydefault:
 		}
 	case 11:
 		yyDollar = yyS[yypt-3 : yypt+1]
-//line calculator.y:342
+//line calculator.y:347
 		{
 			yyVAL.val = yyDollar[2].val
 		}
 	case 12:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line calculator.y:345
+//line calculator.y:350
 		{
 			yyVAL.val = yyDollar[1].val
 		}
 	case 13:
 		yyDollar = yyS[yypt-2 : yypt+1]
-//line calculator.y:348
+//line calculator.y:353
 		{
 			if yyDollar[2].val == nil {
 				yyVAL.val = nil
@@ -818,7 +823,7 @@ yydefault:
 		}
 	case 14:
 		yyDollar = yyS[yypt-4 : yypt+1]
-//line calculator.y:362
+//line calculator.y:367
 		{
 			calc := yylex.(*yyLex).calc
 			yyVAL.val = calc.callFunc(yyDollar[1].str, []*Value{yyDollar[3].val})
@@ -828,7 +833,7 @@ yydefault:
 		}
 	case 15:
 		yyDollar = yyS[yypt-6 : yypt+1]
-//line calculator.y:369
+//line calculator.y:374
 		{
 			calc := yylex.(*yyLex).calc
 			yyVAL.val = calc.callFunc(yyDollar[1].str, []*Value{yyDollar[3].val, yyDollar[5].val})
