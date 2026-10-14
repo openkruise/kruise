@@ -18,13 +18,16 @@ package podprobemarker
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -1966,6 +1969,102 @@ func TestUpdateNodePodProbes(t *testing.T) {
 			}
 		})
 	}
+}
+
+// conflictClient fails the first `conflicts` Update calls with a Conflict error, simulating a
+// NodePodProbe being written concurrently by another writer, and counts the calls.
+type conflictClient struct {
+	client.Client
+	conflicts int
+	updates   int
+}
+
+func (c *conflictClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+	c.updates++
+	if c.updates <= c.conflicts {
+		return apierrors.NewConflict(schema.GroupResource{Group: appsv1alpha1.GroupVersion.Group, Resource: "nodepodprobes"},
+			obj.GetName(), goerrors.New("simulated concurrent write"))
+	}
+	return c.Client.Update(ctx, obj, opts...)
+}
+
+// TestUpdateNodePodProbesRetryOnConflict makes sure a conflict while updating the NodePodProbe
+// does not fail the whole reconcile: the read-modify-write cycle is retried against the latest
+// version and the merged probes are still written.
+func TestUpdateNodePodProbesRetryOnConflict(t *testing.T) {
+	ppm := &appsv1alpha1.PodProbeMarker{
+		ObjectMeta: metav1.ObjectMeta{Name: "ppm-1"},
+		Spec: appsv1alpha1.PodProbeMarkerSpec{
+			Probes: []appsv1alpha1.PodContainerProbe{
+				{
+					Name:          "healthy",
+					ContainerName: "main",
+					Probe: appsv1alpha1.ContainerProbeSpec{
+						Probe: corev1.Probe{ProbeHandler: corev1.ProbeHandler{
+							Exec: &corev1.ExecAction{Command: []string{"/bin/sh", "-c", "/healthy.sh"}},
+						}},
+					},
+				},
+			},
+		},
+	}
+	npp := &appsv1alpha1.NodePodProbe{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "default", UID: "pod-1-uid"},
+		Status:     corev1.PodStatus{PodIP: "1.2.3.4"},
+	}
+
+	newClient := func(conflicts int) *conflictClient {
+		base := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(npp.DeepCopy()).Build()
+		return &conflictClient{Client: base, conflicts: conflicts}
+	}
+
+	t.Run("succeeds after conflicts and keeps the merged probes", func(t *testing.T) {
+		c := newClient(2)
+		r := &ReconcilePodProbeMarker{Client: c}
+		if err := r.updateNodePodProbes(ppm, "node-1", []*corev1.Pod{pod}); err != nil {
+			t.Fatalf("expected no error after retrying conflicts, got %v", err)
+		}
+		if c.updates != 3 {
+			t.Fatalf("expected 3 update attempts (2 conflicts + 1 success), got %d", c.updates)
+		}
+		latest := &appsv1alpha1.NodePodProbe{}
+		if err := c.Get(context.TODO(), types.NamespacedName{Name: "node-1"}, latest); err != nil {
+			t.Fatalf("failed to get NodePodProbe: %v", err)
+		}
+		if len(latest.Spec.PodProbes) != 1 || len(latest.Spec.PodProbes[0].Probes) != 1 {
+			t.Fatalf("expected the merged probes to be written, got %v", latest.Spec.PodProbes)
+		}
+		if latest.Spec.PodProbes[0].Probes[0].Name != "ppm-1#healthy" {
+			t.Fatalf("expected probe name ppm-1#healthy, got %s", latest.Spec.PodProbes[0].Probes[0].Name)
+		}
+	})
+
+	t.Run("returns the conflict error when it never stops conflicting", func(t *testing.T) {
+		c := newClient(100)
+		r := &ReconcilePodProbeMarker{Client: c}
+		if err := r.updateNodePodProbes(ppm, "node-1", []*corev1.Pod{pod}); err == nil {
+			t.Fatal("expected an error when conflicts never stop")
+		}
+	})
+
+	t.Run("does not update when the spec is unchanged", func(t *testing.T) {
+		c := newClient(0)
+		r := &ReconcilePodProbeMarker{Client: c}
+		if err := r.updateNodePodProbes(ppm, "node-1", []*corev1.Pod{pod}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if c.updates != 1 {
+			t.Fatalf("expected exactly 1 update, got %d", c.updates)
+		}
+		// Run again: the spec is already up to date, no further update should happen.
+		if err := r.updateNodePodProbes(ppm, "node-1", []*corev1.Pod{pod}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if c.updates != 1 {
+			t.Fatalf("expected no update for an unchanged spec, got %d updates", c.updates)
+		}
+	})
 }
 
 func TestMarkerServerlessPod(t *testing.T) {
