@@ -449,6 +449,102 @@ func TestIsPodContainerDigestEqual(t *testing.T) {
 	}
 }
 
+// TestIsPodContainerDigestEqualIncludingInit covers the init container support of
+// IsPodContainerDigestEqualIncludingInit and its fail-closed behavior.
+func TestIsPodContainerDigestEqualIncludingInit(t *testing.T) {
+	restartAlways := v1.ContainerRestartPolicyAlways
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{Name: "setup", Image: "busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d"},
+				{Name: "sidecar", Image: "busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d", RestartPolicy: &restartAlways},
+			},
+			Containers: []v1.Container{
+				{Name: "main", Image: "busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d"},
+			},
+		},
+		Status: v1.PodStatus{
+			InitContainerStatuses: []v1.ContainerStatus{
+				{Name: "setup", ImageID: "docker-pullable://busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d"},
+				{Name: "sidecar", ImageID: "docker-pullable://busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d"},
+			},
+			ContainerStatuses: []v1.ContainerStatus{
+				{Name: "main", ImageID: "docker-pullable://busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d"},
+			},
+		},
+	}
+
+	tests := []struct {
+		name       string
+		pod        *v1.Pod
+		containers sets.String
+		result     bool
+	}{
+		{
+			name:       "init container digest equal",
+			containers: sets.NewString("sidecar"),
+			result:     true,
+		},
+		{
+			name:       "init and regular containers digest equal",
+			containers: sets.NewString("sidecar", "main"),
+			result:     true,
+		},
+		{
+			name: "init container digest not equal",
+			pod: func() *v1.Pod {
+				p := pod.DeepCopy()
+				p.Status.InitContainerStatuses[1].ImageID = "docker-pullable://busybox@sha256:00006defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d"
+				return p
+			}(),
+			containers: sets.NewString("sidecar"),
+			result:     false,
+		},
+		{
+			name: "init container without status",
+			pod: func() *v1.Pod {
+				p := pod.DeepCopy()
+				p.Status.InitContainerStatuses = p.Status.InitContainerStatuses[:1]
+				return p
+			}(),
+			containers: sets.NewString("sidecar"),
+			result:     false,
+		},
+		{
+			name: "non digest image",
+			pod: func() *v1.Pod {
+				p := pod.DeepCopy()
+				p.Spec.InitContainers[1].Image = "busybox:1.36"
+				return p
+			}(),
+			containers: sets.NewString("sidecar"),
+			result:     false,
+		},
+		{
+			name:       "fail-closed for an unknown container name",
+			containers: sets.NewString("nonexistent"),
+			result:     false,
+		},
+		{
+			name:       "fail-closed for a partially unknown set",
+			containers: sets.NewString("main", "nonexistent"),
+			result:     false,
+		},
+	}
+
+	for i, test := range tests {
+		p := test.pod
+		if p == nil {
+			p = pod
+		}
+		expect := test.result
+		actual := IsPodContainerDigestEqualIncludingInit(test.containers, p)
+		if expect != actual {
+			t.Fatalf("case %d (%s): expect result(%v), but get %v", i, test.name, expect, actual)
+		}
+	}
+}
+
 func TestSetPodConditionIfMsgChanged(t *testing.T) {
 	tests := []struct {
 		pod        *v1.Pod
