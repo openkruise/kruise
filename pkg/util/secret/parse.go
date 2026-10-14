@@ -2,7 +2,6 @@ package secret
 
 import (
 	"context"
-	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -13,7 +12,7 @@ import (
 )
 
 func AuthInfos(ctx context.Context, imageName, tag string, pullSecrets []corev1.Secret) []daemonutil.AuthInfo {
-	imageRef := fmt.Sprintf("%s:%s", imageName, tag)
+	imageRef := daemonutil.JoinImageNameTag(imageName, tag)
 	ref, err := daemonutil.NormalizeImageRef(imageRef)
 	if err != nil {
 		return nil
