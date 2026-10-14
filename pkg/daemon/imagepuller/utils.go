@@ -28,6 +28,7 @@ import (
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	clientbeta1 "github.com/openkruise/kruise/pkg/client/clientset/versioned/typed/apps/v1beta1"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/util"
 )
 
@@ -36,7 +37,7 @@ func logNewImages(oldObj, newObj *appsv1beta1.NodeImage) {
 	if oldObj != nil {
 		for image, imageSpec := range oldObj.Spec.Images {
 			for _, tagSpec := range imageSpec.Tags {
-				fullName := fmt.Sprintf("%v:%v", image, tagSpec.Tag)
+				fullName := daemonutil.JoinImageNameTag(image, tagSpec.Tag)
 				oldImages[fullName] = struct{}{}
 			}
 		}
@@ -44,7 +45,7 @@ func logNewImages(oldObj, newObj *appsv1beta1.NodeImage) {
 
 	for image, imageSpec := range newObj.Spec.Images {
 		for _, tagSpec := range imageSpec.Tags {
-			fullName := fmt.Sprintf("%v:%v", image, tagSpec.Tag)
+			fullName := daemonutil.JoinImageNameTag(image, tagSpec.Tag)
 			if _, ok := oldImages[fullName]; !ok {
 				klog.V(2).InfoS("Received new image", "fullName", fullName)
 			}
@@ -60,13 +61,13 @@ func isImageInPulling(spec *appsv1beta1.NodeImageSpec, status *appsv1beta1.NodeI
 	tagSpecs := make(map[string]appsv1beta1.ImageTagSpec)
 	for image, imageSpec := range spec.Images {
 		for _, tagSpec := range imageSpec.Tags {
-			fullName := fmt.Sprintf("%v:%v", image, tagSpec.Tag)
+			fullName := daemonutil.JoinImageNameTag(image, tagSpec.Tag)
 			tagSpecs[fullName] = tagSpec
 		}
 	}
 	for image, imageStatus := range status.ImageStatuses {
 		for _, tagStatus := range imageStatus.Tags {
-			fullName := fmt.Sprintf("%v:%v", image, tagStatus.Tag)
+			fullName := daemonutil.JoinImageNameTag(image, tagStatus.Tag)
 			if tagSpec, ok := tagSpecs[fullName]; ok && tagSpec.Version != tagStatus.Version {
 				return true
 			}
