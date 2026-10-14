@@ -134,7 +134,21 @@ func (r *realStatusUpdater) calculateProgressingStatus(cs *appsv1beta1.CloneSet,
 		return time.Duration(-1)
 	}
 
-	timeNow := time.Now()
+	timeNow := timer.Now()
+	if newStatus.UpdateRevision != cs.Status.UpdateRevision {
+		condition := clonesetutils.GetCloneSetCondition(
+			*newStatus,
+			appsv1beta1.CloneSetConditionTypeProgressing,
+		)
+
+		if condition != nil &&
+			condition.Reason == string(appsv1beta1.CloneSetProgressDeadlineExceeded) {
+			clonesetutils.RemoveCloneSetCondition(
+				newStatus,
+				appsv1beta1.CloneSetConditionTypeProgressing,
+			)
+		}
+	}
 	switch {
 	case clonesetutils.CloneSetAvailable(cs, newStatus):
 		klog.V(5).InfoS("CloneSet is available", "cloneSet", klog.KObj(cs))
