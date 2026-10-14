@@ -96,6 +96,25 @@ func TestRunProbe(t *testing.T) {
 		},
 
 		{
+			name: "test tcpProbe check, a Host pointing off-pod (SSRF) is rejected",
+			p: &appsv1alpha1.ContainerProbeSpec{
+				Probe: corev1.Probe{
+					ProbeHandler: corev1.ProbeHandler{
+						TCPSocket: &corev1.TCPSocketAction{
+							Host: "169.254.169.254",
+							Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(tPort)},
+						},
+					},
+				},
+			},
+			probeKey: probeKey{
+				podIP: "10.0.0.5",
+			},
+			expectedStatus: probe.Unknown,
+			expectedError:  fmt.Errorf("probe host %q is not allowed: probes may only target the pod IP", "169.254.169.254"),
+		},
+
+		{
 			name: "test httpProbe check, a connection is made and probing would succeed",
 			p: &appsv1alpha1.ContainerProbeSpec{
 				Probe: corev1.Probe{
@@ -331,11 +350,12 @@ func TestNewRequestForHTTPGetAction(t *testing.T) {
 		expectError       bool
 	}{
 		{
+			// Host equal to the Pod IP is the only non-empty value the daemon accepts.
 			name: "valid request with default scheme",
 			httpGet: &corev1.HTTPGetAction{
 				Port:   intstr.FromInt(8080),
 				Path:   "/health",
-				Host:   "localhost",
+				Host:   "192.168.1.1",
 				Scheme: "",
 				HTTPHeaders: []corev1.HTTPHeader{
 					{Name: "X-Custom-Header", Value: "value"},
@@ -343,7 +363,7 @@ func TestNewRequestForHTTPGetAction(t *testing.T) {
 			},
 			podIP:             "192.168.1.1",
 			userAgentFragment: "test",
-			expectURL:         "http://localhost:8080/health",
+			expectURL:         "http://192.168.1.1:8080/health",
 			expectHeader: http.Header{
 				"X-Custom-Header": {"value"},
 				"User-Agent":      {userAgent("test")},
@@ -356,17 +376,40 @@ func TestNewRequestForHTTPGetAction(t *testing.T) {
 			httpGet: &corev1.HTTPGetAction{
 				Port:   intstr.FromInt(8443),
 				Path:   "/secure",
-				Host:   "secure.example.com",
+				Host:   "192.168.1.1",
 				Scheme: corev1.URISchemeHTTPS,
 			},
 			podIP:             "192.168.1.1",
 			userAgentFragment: "test",
-			expectURL:         "https://secure.example.com:8443/secure",
+			expectURL:         "https://192.168.1.1:8443/secure",
 			expectHeader: http.Header{
 				"User-Agent": {userAgent("test")},
 				"Accept":     {"*/*"},
 			},
 			expectError: false,
+		},
+		{
+			name: "host pointing at cloud metadata is rejected (SSRF)",
+			httpGet: &corev1.HTTPGetAction{
+				Port:   intstr.FromInt(80),
+				Path:   "/latest/meta-data/",
+				Host:   "169.254.169.254",
+				Scheme: corev1.URISchemeHTTP,
+			},
+			podIP:             "10.0.0.5",
+			userAgentFragment: "test",
+			expectError:       true,
+		},
+		{
+			name: "empty pod IP is rejected",
+			httpGet: &corev1.HTTPGetAction{
+				Port:   intstr.FromInt(8080),
+				Path:   "/health",
+				Scheme: corev1.URISchemeHTTP,
+			},
+			podIP:             "",
+			userAgentFragment: "test",
+			expectError:       true,
 		},
 		{
 			name: "default host to podIP when not provided",
@@ -389,7 +432,7 @@ func TestNewRequestForHTTPGetAction(t *testing.T) {
 			httpGet: &corev1.HTTPGetAction{
 				Port:   intstr.FromInt(8080),
 				Path:   "/health",
-				Host:   "localhost",
+				Host:   "192.168.1.1",
 				Scheme: corev1.URISchemeHTTP,
 				HTTPHeaders: []corev1.HTTPHeader{
 					{Name: "Accept", Value: "application/json"},
@@ -398,7 +441,7 @@ func TestNewRequestForHTTPGetAction(t *testing.T) {
 			},
 			podIP:             "192.168.1.1",
 			userAgentFragment: "test",
-			expectURL:         "http://localhost:8080/health",
+			expectURL:         "http://192.168.1.1:8080/health",
 			expectHeader: http.Header{
 				"Accept":     {"application/json"},
 				"User-Agent": {"custom-agent"},
@@ -410,7 +453,6 @@ func TestNewRequestForHTTPGetAction(t *testing.T) {
 			httpGet: &corev1.HTTPGetAction{
 				Port:   intstr.FromInt(-1),
 				Path:   "/health",
-				Host:   "localhost",
 				Scheme: corev1.URISchemeHTTP,
 			},
 			podIP:             "192.168.1.1",
@@ -422,7 +464,6 @@ func TestNewRequestForHTTPGetAction(t *testing.T) {
 			httpGet: &corev1.HTTPGetAction{
 				Port:   intstr.FromInt(65536),
 				Path:   "/health",
-				Host:   "localhost",
 				Scheme: corev1.URISchemeHTTP,
 			},
 			podIP:             "192.168.1.1",
@@ -434,7 +475,6 @@ func TestNewRequestForHTTPGetAction(t *testing.T) {
 			httpGet: &corev1.HTTPGetAction{
 				Port:   intstr.FromInt(8080),
 				Path:   "path%notvalid",
-				Host:   "localhost",
 				Scheme: corev1.URISchemeHTTP,
 			},
 			podIP:             "192.168.1.1",
