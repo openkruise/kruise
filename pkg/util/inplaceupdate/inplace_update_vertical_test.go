@@ -152,6 +152,50 @@ func TestIsContainerUpdateCompleted(t *testing.T) {
 			expectedResult: true,
 		},
 		{
+			name: "extended resources absent from container status",
+			container: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:                     resource.MustParse("100m"),
+						v1.ResourceName("example.com/eni"): resource.MustParse("1"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:                     resource.MustParse("50m"),
+						v1.ResourceName("example.com/eni"): resource.MustParse("1"),
+					},
+				},
+			},
+			containerStatus: v1.ContainerStatus{
+				Resources: &v1.ResourceRequirements{
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
+				},
+			},
+			expectedResult: true,
+		},
+		{
+			name: "extended resources present only in container status",
+			container: v1.Container{
+				Resources: v1.ResourceRequirements{
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
+				},
+			},
+			containerStatus: v1.ContainerStatus{
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:                     resource.MustParse("100m"),
+						v1.ResourceName("example.com/eni"): resource.MustParse("1"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:                     resource.MustParse("50m"),
+						v1.ResourceName("example.com/eni"): resource.MustParse("1"),
+					},
+				},
+			},
+			expectedResult: true,
+		},
+		{
 			name: "Test status not ok - cpu limit",
 			container: v1.Container{
 				Resources: v1.ResourceRequirements{
@@ -267,6 +311,80 @@ func TestIsContainerUpdateCompleted(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := v.isContainerUpdateCompleted(&tt.container, &tt.containerStatus)
 			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+}
+
+func TestIsUpdateCompletedWithExtendedResources(t *testing.T) {
+	extendedResource := v1.ResourceName("example.com/eni")
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "proxy",
+					Resources: v1.ResourceRequirements{
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+				},
+				{
+					Name: "proxy-agent",
+					Resources: v1.ResourceRequirements{
+						Limits:   v1.ResourceList{extendedResource: resource.MustParse("1")},
+						Requests: v1.ResourceList{extendedResource: resource.MustParse("1")},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "proxy",
+					Resources: &v1.ResourceRequirements{
+						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("4")},
+						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
+					},
+				},
+				{
+					Name:               "proxy-agent",
+					AllocatedResources: v1.ResourceList{extendedResource: resource.MustParse("1")},
+					Resources:          &v1.ResourceRequirements{},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name              string
+		statusCPULimit    string
+		expectedCompleted bool
+		expectedError     string
+	}{
+		{
+			name:              "resizable resources updated",
+			statusCPULimit:    "4",
+			expectedCompleted: true,
+		},
+		{
+			name:              "resizable resources not updated",
+			statusCPULimit:    "3",
+			expectedCompleted: false,
+			expectedError:     "container proxy resources not changed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testPod := pod.DeepCopy()
+			testPod.Status.ContainerStatuses[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse(tt.statusCPULimit)
+
+			completed, err := (&NativeVerticalUpdate{}).IsUpdateCompleted(testPod)
+			if tt.expectedError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.expectedError)
+			}
+			assert.Equal(t, tt.expectedCompleted, completed)
 		})
 	}
 }
