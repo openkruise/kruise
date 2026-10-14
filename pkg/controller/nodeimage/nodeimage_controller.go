@@ -46,6 +46,7 @@ import (
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	kruiseclient "github.com/openkruise/kruise/pkg/client"
+	daemonutil "github.com/openkruise/kruise/pkg/daemon/util"
 	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util"
 	utilclient "github.com/openkruise/kruise/pkg/util/client"
@@ -286,7 +287,7 @@ func (r *ReconcileNodeImage) doUpdateNodeImage(nodeImage *appsv1beta1.NodeImage,
 		var newTags []appsv1beta1.ImageTagSpec
 		for i := range imageSpec.Tags {
 			tagSpec := &imageSpec.Tags[i]
-			fullName := fmt.Sprintf("%s:%s", name, tagSpec.Tag)
+			fullName := daemonutil.JoinImageNameTag(name, tagSpec.Tag)
 
 			// If createdAt field has not been injected by webhook, delete it
 			if tagSpec.CreatedAt == nil {
@@ -413,7 +414,7 @@ func (r *ReconcileNodeImage) updateNodeImageStatus(nodeImage *appsv1beta1.NodeIm
 		imageStatus := newStatus.ImageStatuses[name]
 		for i := range imageSpec.Tags {
 			tagSpec := &imageSpec.Tags[i]
-			fullName := fmt.Sprintf("%s:%s", name, tagSpec.Tag)
+			fullName := daemonutil.JoinImageNameTag(name, tagSpec.Tag)
 			specFullImages.Insert(fullName)
 			if tagSpec.CreatedAt == nil {
 				continue
@@ -500,7 +501,7 @@ func (r *ReconcileNodeImage) updateNodeImageStatus(nodeImage *appsv1beta1.NodeIm
 		}
 		newTags := make([]appsv1beta1.ImageTagStatus, 0, len(imageStatus.Tags))
 		for _, tagStatus := range imageStatus.Tags {
-			fullName := fmt.Sprintf("%s:%s", name, tagStatus.Tag)
+			fullName := daemonutil.JoinImageNameTag(name, tagStatus.Tag)
 			if !specFullImages.Has(fullName) {
 				continue
 			}

@@ -201,6 +201,41 @@ func TestContainsImage(t *testing.T) {
 			},
 			Expect: true,
 		},
+		{
+			// A digested reference is only ever reported in RepoDigests.
+			name:      "test_digest_in_repo_digests",
+			ImageName: "test/nginx",
+			Tag:       "sha256:f2b6de562150a257551639c432c6999337533816574519989a3f244195a63e63",
+			ImageInfos: []ImageInfo{{
+				RepoTags:    []string{"docker.io/test/nginx:1.0"},
+				RepoDigests: []string{"docker.io/test/nginx@sha256:f2b6de562150a257551639c432c6999337533816574519989a3f244195a63e63"},
+			},
+			},
+			Expect: true,
+		},
+		{
+			name:      "test_digest_not_present",
+			ImageName: "test/nginx",
+			Tag:       "sha256:f2b6de562150a257551639c432c6999337533816574519989a3f244195a63e63",
+			ImageInfos: []ImageInfo{{
+				RepoTags:    []string{"docker.io/test/nginx:1.0"},
+				RepoDigests: []string{"docker.io/test/nginx@sha256:bc8813ea7b3603864987522f02a76101c17ad122e1c46d790efc0fca78ca7bfb"},
+			},
+			},
+			Expect: false,
+		},
+		{
+			// Matching by tag still works when RepoDigests is populated too.
+			name:      "test_tag_with_repo_digests_present",
+			ImageName: "test/nginx",
+			Tag:       "1.0",
+			ImageInfos: []ImageInfo{{
+				RepoTags:    []string{"docker.io/test/nginx:1.0"},
+				RepoDigests: []string{"docker.io/test/nginx@sha256:f2b6de562150a257551639c432c6999337533816574519989a3f244195a63e63"},
+			},
+			},
+			Expect: true,
+		},
 	}
 
 	for _, cs := range cases {
