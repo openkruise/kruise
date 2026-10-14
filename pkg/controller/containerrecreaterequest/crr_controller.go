@@ -244,7 +244,11 @@ func (r *ReconcileContainerRecreateRequest) syncContainerStatuses(crr *appsv1bet
 	syncContainerStatuses := make([]appsv1beta1.ContainerRecreateRequestSyncContainerStatus, 0, len(crr.Spec.Containers))
 	for i := range crr.Spec.Containers {
 		c := &crr.Spec.Containers[i]
-		containerStatus := util.GetContainerStatus(c.Name, pod)
+		// Look up status.initContainerStatuses as well, for a restartable init container
+		// (native sidecar container) reports its status there rather than in
+		// status.containerStatuses. Without it the synced status would be missing and
+		// kruise-daemon could never mark the recreation of such a container as succeeded.
+		containerStatus := util.GetContainerStatusIncludingInit(c.Name, pod)
 		if containerStatus == nil {
 			klog.InfoS("Could not find container in Pod Status for CRR", "containerName", c.Name, "containerRecreateRequest", klog.KObj(crr))
 			continue

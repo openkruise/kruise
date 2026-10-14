@@ -22,12 +22,12 @@ import (
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	apiutil "github.com/openkruise/kruise/pkg/util/api"
+	"github.com/openkruise/kruise/pkg/util/inplaceupdate"
 	"github.com/openkruise/kruise/pkg/util/pvc"
 	webhookutil "github.com/openkruise/kruise/pkg/webhook/util"
 	"github.com/openkruise/kruise/pkg/webhook/util/convertor"
 )
 
-var inPlaceUpdateTemplateSpecPatchRexp = regexp.MustCompile("/containers/([0-9]+)/image")
 var reserveOrdinalRangeRexp = regexp.MustCompile(`^\d+-\d+$`)
 
 func validatePodManagementPolicy(spec *appsv1beta1.StatefulSetSpec, fldPath *field.Path) field.ErrorList {
@@ -362,13 +362,7 @@ func validateTemplateInPlaceOnly(oldTemp, newTemp *v1.PodTemplateSpec) error {
 		return fmt.Errorf("failed calculate patches between old/new template spec")
 	}
 
-	for _, p := range patches {
-		if p.Operation != "replace" || !inPlaceUpdateTemplateSpecPatchRexp.MatchString(p.Path) {
-			return fmt.Errorf("%s %s", p.Operation, p.Path)
-		}
-	}
-
-	return nil
+	return inplaceupdate.ValidateInPlaceOnlyTemplateSpecPatches(patches, oldTemp, newTemp)
 }
 
 // ValidateVolumeClaimTemplateUpdate tests if only size expand when sc allow expansion.
