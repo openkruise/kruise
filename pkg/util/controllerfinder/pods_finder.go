@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	kubecontroller "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openkruise/kruise/pkg/util"
@@ -48,7 +49,7 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, acti
 		} else if rs == nil || !rs.DeletionTimestamp.IsZero() {
 			return nil, 0, nil
 		}
-		workloadReplicas = *rs.Spec.Replicas
+		workloadReplicas = ptr.Deref(rs.Spec.Replicas, 1)
 		workloadUIDs = append(workloadUIDs, rs.UID)
 	// statefulset, rc, cloneSet
 	case ControllerKindSS.Kind, ControllerKindRC.Kind, ControllerKruiseKindCS.Kind, ControllerKruiseKindSS.Kind:
