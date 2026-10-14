@@ -1364,6 +1364,44 @@ func TestWorkloadEventHandlerForUpdate(t *testing.T) {
 			},
 		},
 		{
+			name: "cloneset replicas changed to nil ut",
+			getWorkloads: func() (client.Object, client.Object) {
+				oldObj := cloneSetDemo.DeepCopy()
+				oldObj.Spec.Replicas = pointer.Int32(2)
+				newObj := cloneSetDemo.DeepCopy()
+				newObj.Spec.Replicas = nil
+				return oldObj, newObj
+			},
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1beta1.TargetReference{
+					APIVersion: cloneSetDemo.APIVersion,
+					Kind:       cloneSetDemo.Kind,
+					Name:       cloneSetDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "cloneset replicas changed from nil ut",
+			getWorkloads: func() (client.Object, client.Object) {
+				oldObj := cloneSetDemo.DeepCopy()
+				oldObj.Spec.Replicas = nil
+				newObj := cloneSetDemo.DeepCopy()
+				newObj.Spec.Replicas = pointer.Int32(2)
+				return oldObj, newObj
+			},
+			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1beta1.TargetReference{
+					APIVersion: cloneSetDemo.APIVersion,
+					Kind:       cloneSetDemo.Kind,
+					Name:       cloneSetDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
 			name: "statefulset ut",
 			getWorkloads: func() (client.Object, client.Object) {
 				oldObj := stsDemo.DeepCopy()
