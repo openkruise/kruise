@@ -17,10 +17,12 @@ limitations under the License.
 package util
 
 import (
+	_ "crypto/sha256" // register sha256 so godigest.Digest.Validate can recognize sha256 digests
 	"fmt"
 	"strconv"
 	"strings"
 
+	godigest "github.com/opencontainers/go-digest"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -248,6 +250,12 @@ func GetPodContainerImageIDs(pod *v1.Pod) map[string]string {
 	return cImageIDs
 }
 
+// isBareDigest returns true if imageID is a bare digest with no repository, e.g. "sha256:<hex>",
+// as opposed to a full image reference such as "repo@sha256:<hex>".
+func isBareDigest(imageID string) bool {
+	return godigest.Digest(imageID).Validate() == nil
+}
+
 func IsPodContainerDigestEqual(containers sets.String, pod *v1.Pod) bool {
 	cImageIDs := GetPodContainerImageIDs(pod)
 
@@ -262,6 +270,14 @@ func IsPodContainerDigestEqual(containers sets.String, pod *v1.Pod) bool {
 		imageID, ok := cImageIDs[container.Name]
 		if !ok {
 			return false
+		}
+		// Some container runtimes (e.g. containerd) report status.containerStatuses[x].imageID as a bare
+		// image config digest with no repository, such as "sha256:<hex>", instead of "repo@sha256:<hex>".
+		// That value can never be compared against a digest-pinned spec image (it is a different digest
+		// than the manifest digest, and has no repo to match against), so treat it as inconclusive rather
+		// than reporting the container as inconsistent.
+		if isBareDigest(imageID) {
+			continue
 		}
 		if !IsContainerImageEqual(container.Image, imageID) {
 			return false

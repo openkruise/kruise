@@ -438,6 +438,55 @@ func TestIsPodContainerDigestEqual(t *testing.T) {
 			containers: sets.NewString("c-1", "c-2"),
 			result:     true,
 		},
+		// case 1: containerd reports a bare image config digest (no repository) as imageID for a
+		// digest-pinned spec image; this can never be compared against the spec digest and must not
+		// be treated as inconsistent.
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "c-1",
+							Image: "registry.k8s.io/ingress-nginx/controller@sha256:dc75a7baec7a3b827a5d7ab0acd10ab507904c7dad692365b3e3b596eca1afd2",
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name:    "c-1",
+							ImageID: "sha256:d9b2df1fa40e21139c739be6f30bc530b64a9500e4ccc3d86814d28835f1f4b3",
+						},
+					},
+				},
+			},
+			containers: sets.NewString("c-1"),
+			result:     true,
+		},
+		// case 2: a full image reference imageID that genuinely mismatches the spec digest is still
+		// reported as inconsistent.
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "c-1",
+							Image: "registry.k8s.io/ingress-nginx/controller@sha256:dc75a7baec7a3b827a5d7ab0acd10ab507904c7dad692365b3e3b596eca1afd2",
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name:    "c-1",
+							ImageID: "registry.k8s.io/ingress-nginx/controller@sha256:aaaaaaaaaa7a3b827a5d7ab0acd10ab507904c7dad692365b3e3b596eca1afd2",
+						},
+					},
+				},
+			},
+			containers: sets.NewString("c-1"),
+			result:     false,
+		},
 	}
 
 	for i, test := range tests {
