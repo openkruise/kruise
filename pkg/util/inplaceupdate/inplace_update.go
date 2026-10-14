@@ -179,14 +179,24 @@ func (c *realControl) Refresh(pod *v1.Pod, opts *UpdateOptions) RefreshResult {
 	return RefreshResult{RefreshErr: err}
 }
 
-// updateCondition update the given Pod's condition by updating status on a copy with the same ResourceVersion;
-// no conflict retry or refetch is performed, so it only applies to this specific Pod version.
+// updateCondition sets the condition on a copy with the same ResourceVersion; no conflict
+// retry/refetch, so it applies only to this Pod version.
+//
+// It patches status.conditions instead of a full UpdateStatus: a full status write round-trips
+// PodStatus through kruise's older vendored types and drops status fields kruise doesn't know
+// (e.g. the DRA fields on newer clusters), which can break running pods. See kubernetes/kubernetes#139772.
 func (c *realControl) updateCondition(pod *v1.Pod, condition v1.PodCondition) error {
 	clone := pod.DeepCopy()
 	util.SetPodCondition(clone, condition)
 	// We only update the ready condition to False, and let Kubelet update it to True
 	if condition.Status == v1.ConditionFalse {
 		util.SetPodReadyCondition(clone)
+	}
+	if adp, ok := c.podAdapter.(podadapter.AdapterWithStatusPatch); ok {
+		// Patch only the changed condition; optimistic lock preserves the per-version semantics (#2274).
+		patch := client.StrategicMergeFrom(pod, client.MergeFromWithOptimisticLock{})
+		_, err := adp.PatchPodStatus(clone, patch)
+		return err
 	}
 	return c.podAdapter.UpdatePodStatus(clone)
 }

@@ -39,6 +39,13 @@ type AdapterWithPatch interface {
 	PatchPodResource(pod *v1.Pod, patch client.Patch) (*v1.Pod, error)
 }
 
+// AdapterWithStatusPatch patches the Pod status subresource. Kept separate from
+// AdapterWithPatch so existing implementers aren't forced to add PatchPodStatus.
+type AdapterWithStatusPatch interface {
+	Adapter
+	PatchPodStatus(pod *v1.Pod, patch client.Patch) (*v1.Pod, error)
+}
+
 type AdapterRuntimeClient struct {
 	client.Client
 }
@@ -63,6 +70,10 @@ func (c *AdapterRuntimeClient) PatchPod(pod *v1.Pod, patch client.Patch) (*v1.Po
 
 func (c *AdapterRuntimeClient) PatchPodResource(pod *v1.Pod, patch client.Patch) (*v1.Pod, error) {
 	return pod, c.SubResource("resize").Patch(context.TODO(), pod, patch)
+}
+
+func (c *AdapterRuntimeClient) PatchPodStatus(pod *v1.Pod, patch client.Patch) (*v1.Pod, error) {
+	return pod, c.Status().Patch(context.TODO(), pod, patch)
 }
 
 type AdapterTypedClient struct {
@@ -96,6 +107,14 @@ func (c *AdapterTypedClient) PatchPodResource(pod *v1.Pod, patch client.Patch) (
 		return nil, err
 	}
 	return c.Client.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, patch.Type(), patchData, metav1.PatchOptions{}, "resize")
+}
+
+func (c *AdapterTypedClient) PatchPodStatus(pod *v1.Pod, patch client.Patch) (*v1.Pod, error) {
+	patchData, err := patch.Data(pod)
+	if err != nil {
+		return nil, err
+	}
+	return c.Client.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, patch.Type(), patchData, metav1.PatchOptions{}, "status")
 }
 
 type AdapterInformer struct {
