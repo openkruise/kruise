@@ -267,7 +267,7 @@ func (w *realWorkerPool) UpdateStatus(status *appsv1beta1.ImageTagStatus) {
 }
 
 func newPullWorker(name string, tagSpec appsv1beta1.ImageTagSpec, sandboxConfig *appsv1beta1.SandboxConfig, secrets []v1.Secret, runtime runtimeimage.ImageService, statusUpdater imageStatusUpdater, ref *v1.ObjectReference, eventRecorder record.EventRecorder) *pullWorker {
-	image := name + ":" + tagSpec.Tag
+	image := daemonutil.JoinImageNameTag(name, tagSpec.Tag)
 	klog.V(5).InfoS("new pull worker", "image", image)
 	o := &pullWorker{
 		name:          name,
@@ -326,7 +326,7 @@ type pullWorker struct {
 }
 
 func (w *pullWorker) ImageRef() string {
-	return fmt.Sprintf("%v:%v", w.name, w.tagSpec.Tag)
+	return daemonutil.JoinImageNameTag(w.name, w.tagSpec.Tag)
 }
 
 func (w *pullWorker) Stop() {
@@ -426,7 +426,7 @@ func (w *pullWorker) Run() {
 		}
 		w.finishPulling(newStatus, appsv1beta1.ImagePhaseSucceeded, "")
 		if w.ref != nil && w.eventRecorder != nil {
-			w.eventRecorder.Eventf(w.ref, v1.EventTypeNormal, PullImageSucceed, "Image %v:%v, ecalpsedTime %v", w.name, w.tagSpec.Tag, time.Since(startTime.Time))
+			w.eventRecorder.Eventf(w.ref, v1.EventTypeNormal, PullImageSucceed, "Image %v, ecalpsedTime %v", w.ImageRef(), time.Since(startTime.Time))
 		}
 		cancel()
 		return
@@ -435,10 +435,10 @@ func (w *pullWorker) Run() {
 
 	if w.eventRecorder != nil {
 		for _, owner := range w.tagSpec.OwnerReferences {
-			w.eventRecorder.Eventf(&owner, v1.EventTypeWarning, PullImageFailed, "Image %v:%v %v", w.name, w.tagSpec.Tag, lastError.Error())
+			w.eventRecorder.Eventf(&owner, v1.EventTypeWarning, PullImageFailed, "Image %v %v", w.ImageRef(), lastError.Error())
 		}
 		if w.ref != nil {
-			w.eventRecorder.Eventf(w.ref, v1.EventTypeWarning, PullImageFailed, "Image %v:%v %v", w.name, w.tagSpec.Tag, lastError.Error())
+			w.eventRecorder.Eventf(w.ref, v1.EventTypeWarning, PullImageFailed, "Image %v %v", w.ImageRef(), lastError.Error())
 		}
 	}
 }
@@ -454,7 +454,7 @@ func (w *pullWorker) getImageInfo(ctx context.Context) (*runtimeimage.ImageInfo,
 			return &info, nil
 		}
 	}
-	return nil, fmt.Errorf("image %v:%v not found", w.name, w.tagSpec.Tag)
+	return nil, fmt.Errorf("image %v not found", w.ImageRef())
 }
 
 // Pulling image and update process in status
@@ -500,11 +500,11 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1beta1.Ima
 	case <-w.stopCh:
 		go closeStatusReader()
 		klog.V(2).InfoS("Pulling image stopped", "name", w.name, "tag", tag)
-		return fmt.Errorf("pulling image %s:%s is stopped", w.name, tag)
+		return fmt.Errorf("pulling image %s is stopped", w.ImageRef())
 	case <-ctx.Done():
 		go closeStatusReader()
 		klog.V(2).InfoS("Pulling image canceled", "name", w.name, "tag", tag)
-		return fmt.Errorf("pulling image %s:%s is canceled", w.name, tag)
+		return fmt.Errorf("pulling image %s is canceled", w.ImageRef())
 	case <-pullChan:
 		statusReader = <-readerCh
 		err = <-errCh
@@ -523,15 +523,15 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1beta1.Ima
 		select {
 		case <-w.stopCh:
 			klog.V(2).InfoS("Pulling image stopped", "name", w.name, "tag", tag)
-			return fmt.Errorf("pulling image %s:%s is stopped", w.name, tag)
+			return fmt.Errorf("pulling image %s is stopped", w.ImageRef())
 		case <-ctx.Done():
 			klog.V(2).InfoS("Pulling image canceled", w.name, tag)
-			return fmt.Errorf("pulling image %s:%s is canceled", w.name, tag)
+			return fmt.Errorf("pulling image %s is canceled", w.ImageRef())
 		case <-logTicker.C:
 			klog.V(2).InfoS("Pulling image", "name", w.name, "tag", tag, "cost", time.Since(startTime.Time), "progress", progress, "detail", progressInfo)
 		case progressStatus, ok := <-statusReader.C():
 			if !ok {
-				return fmt.Errorf("pulling image %s:%s internal error", w.name, tag)
+				return fmt.Errorf("pulling image %s internal error", w.ImageRef())
 			}
 			progress = progressStatus.Process
 			progressInfo = progressStatus.DetailInfo
@@ -541,7 +541,7 @@ func (w *pullWorker) doPullImage(ctx context.Context, newStatus *appsv1beta1.Ima
 				if progressStatus.Err == nil {
 					return nil
 				}
-				return fmt.Errorf("pulling image %s:%s error %v", w.name, tag, progressStatus.Err)
+				return fmt.Errorf("pulling image %s error %v", w.ImageRef(), progressStatus.Err)
 			}
 			w.statusUpdater.UpdateStatus(newStatus)
 		}
