@@ -1536,6 +1536,7 @@ var _ = ginkgo.Describe("WorkloadSpread", ginkgo.Label("WorkloadSpread", "operat
 
 			ginkgo.By("List pods of cloneset and check their patch...")
 			pods, err := tester.GetSelectorPods(ns, statefulSet.Spec.Selector)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			var podForSubsetA, podForSubsetB, podForSubsetC int32
 			for _, pod := range pods {
 				switch pod.Annotations["subset"] {
