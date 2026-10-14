@@ -63,7 +63,7 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) Handle(ctx context.Context, re
 			if err := h.Decoder.Decode(req, obj); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}
-			if allErrs := h.validatingPodUnavailableBudgetFnV1beta1(obj, nil); len(allErrs) > 0 {
+			if allErrs := h.validatingPodUnavailableBudgetFnV1beta1(ctx, obj, nil); len(allErrs) > 0 {
 				return admission.Errored(http.StatusBadRequest, allErrs.ToAggregate())
 			}
 		case admissionv1.Update:
@@ -73,7 +73,7 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) Handle(ctx context.Context, re
 			if err := h.Decoder.DecodeRaw(req.AdmissionRequest.OldObject, oldObj); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}
-			if allErrs := h.validatingPodUnavailableBudgetFnV1beta1(obj, oldObj); len(allErrs) > 0 {
+			if allErrs := h.validatingPodUnavailableBudgetFnV1beta1(ctx, obj, oldObj); len(allErrs) > 0 {
 				return admission.Errored(http.StatusBadRequest, allErrs.ToAggregate())
 			}
 		}
@@ -91,7 +91,7 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) Handle(ctx context.Context, re
 			if err := alphaObj.ConvertTo(obj); err != nil {
 				return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to convert v1alpha1 PUB to v1beta1: %w", err))
 			}
-			if allErrs := h.validatingPodUnavailableBudgetFnV1beta1(obj, nil); len(allErrs) > 0 {
+			if allErrs := h.validatingPodUnavailableBudgetFnV1beta1(ctx, obj, nil); len(allErrs) > 0 {
 				return admission.Errored(http.StatusBadRequest, allErrs.ToAggregate())
 			}
 		case admissionv1.Update:
@@ -109,7 +109,7 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) Handle(ctx context.Context, re
 			if err := alphaOldObj.ConvertTo(oldObj); err != nil {
 				return admission.Errored(http.StatusBadRequest, fmt.Errorf("failed to convert old v1alpha1 PUB to v1beta1: %w", err))
 			}
-			if allErrs := h.validatingPodUnavailableBudgetFnV1beta1(obj, oldObj); len(allErrs) > 0 {
+			if allErrs := h.validatingPodUnavailableBudgetFnV1beta1(ctx, obj, oldObj); len(allErrs) > 0 {
 				return admission.Errored(http.StatusBadRequest, allErrs.ToAggregate())
 			}
 		}
@@ -119,7 +119,7 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) Handle(ctx context.Context, re
 	return admission.Errored(http.StatusBadRequest, fmt.Errorf("unsupported version: %s", req.AdmissionRequest.Resource.Version))
 }
 
-func (h *PodUnavailableBudgetCreateUpdateHandler) validatingPodUnavailableBudgetFnV1beta1(obj, old *policyv1beta1.PodUnavailableBudget) field.ErrorList {
+func (h *PodUnavailableBudgetCreateUpdateHandler) validatingPodUnavailableBudgetFnV1beta1(ctx context.Context, obj, old *policyv1beta1.PodUnavailableBudget) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if replicasValue, ok := obj.Annotations[policyv1beta1.PubProtectTotalReplicasAnnotation]; ok {
 		if _, err := strconv.ParseInt(replicasValue, 10, 32); err != nil {
@@ -135,7 +135,7 @@ func (h *PodUnavailableBudgetCreateUpdateHandler) validatingPodUnavailableBudget
 	}
 
 	pubList := &policyv1beta1.PodUnavailableBudgetList{}
-	if err := h.Client.List(context.TODO(), pubList, &client.ListOptions{Namespace: obj.Namespace}); err != nil {
+	if err := h.Client.List(ctx, pubList, &client.ListOptions{Namespace: obj.Namespace}); err != nil {
 		allErrs = append(allErrs, field.InternalError(field.NewPath(""), fmt.Errorf("query other podUnavailableBudget failed, err: %v", err)))
 	} else {
 		allErrs = append(allErrs, validatePubConflictV1beta1(obj, pubList.Items, field.NewPath("spec"))...)
