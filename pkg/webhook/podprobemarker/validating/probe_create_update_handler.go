@@ -97,10 +97,10 @@ func (h *PodProbeMarkerCreateUpdateHandler) Handle(ctx context.Context, req admi
 func (h *PodProbeMarkerCreateUpdateHandler) validatingPodProbeMarkerFn(obj, old *appsv1alpha1.PodProbeMarker) field.ErrorList {
 	//validate ppm.Spec
 	allErrs := validatePodProbeMarkerSpec(obj, field.NewPath("spec"))
-	// when operation is update, validating whether old and new pps conflict
+	// when operation is update, validating whether old and new ppm conflict
 	if old != nil {
 		if !reflect.DeepEqual(old.Spec.Selector, obj.Spec.Selector) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("selector"), obj.Spec.Selector, "selector must be immutable"))
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "selector"), obj.Spec.Selector, "selector must be immutable"))
 		}
 	}
 	return allErrs
@@ -122,48 +122,50 @@ func validatePodProbeMarkerSpec(obj *appsv1alpha1.PodProbeMarker, fldPath *field
 	}
 	uniqueProbe := sets.NewString()
 	uniqueConditionType := sets.NewString()
-	for _, probe := range spec.Probes {
+	for i, probe := range spec.Probes {
+		probePath := fldPath.Child("probes").Index(i)
 		if strings.Contains(probe.Name, "#") {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), probe.Name, "probe name can't contains '#'."))
+			allErrs = append(allErrs, field.Invalid(probePath.Child("name"), probe.Name, "probe name can't contains '#'."))
 			return allErrs
 		}
 		if probe.Name == "" {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), probe.Name, "probe name can't be empty in PodProbeMarker."))
+			allErrs = append(allErrs, field.Invalid(probePath.Child("name"), probe.Name, "probe name can't be empty in PodProbeMarker."))
 			return allErrs
 		}
 		if probe.ContainerName == "" {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), probe.ContainerName, "probe containerName can't be empty in PodProbeMarker."))
+			allErrs = append(allErrs, field.Invalid(probePath.Child("containerName"), probe.ContainerName, "probe containerName can't be empty in PodProbeMarker."))
 			return allErrs
 		}
 		if k8sNativePodConditions.Has(probe.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), probe.Name, fmt.Sprintf("probe name can't be %s", probe.Name)))
+			allErrs = append(allErrs, field.Invalid(probePath.Child("name"), probe.Name, fmt.Sprintf("probe name can't be %s", probe.Name)))
 			return allErrs
 		}
 		if uniqueProbe.Has(probe.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), probe.Name, "probe name must be unique in PodProbeMarker."))
+			allErrs = append(allErrs, field.Invalid(probePath.Child("name"), probe.Name, "probe name must be unique in PodProbeMarker."))
 			return allErrs
 		}
 		uniqueProbe.Insert(probe.Name)
-		allErrs = append(allErrs, validateProbe(&probe.Probe, fldPath.Child("probe"))...)
+		allErrs = append(allErrs, validateProbe(&probe.Probe, probePath.Child("probe"))...)
 		if probe.PodConditionType == "" && len(probe.MarkerPolicy) == 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), probe, "podConditionType and markerPolicy cannot be empty at the same time"))
+			allErrs = append(allErrs, field.Invalid(probePath, probe, "podConditionType and markerPolicy cannot be empty at the same time"))
 			return allErrs
 		}
 		if probe.PodConditionType != "" && uniqueConditionType.Has(probe.PodConditionType) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("probes"), probe.PodConditionType, fmt.Sprintf("podConditionType %s must be unique in podProbeMarker", probe.PodConditionType)))
+			allErrs = append(allErrs, field.Invalid(probePath.Child("podConditionType"), probe.PodConditionType, fmt.Sprintf("podConditionType %s must be unique in podProbeMarker", probe.PodConditionType)))
 			return allErrs
 		} else if probe.PodConditionType != "" {
 			uniqueConditionType.Insert(probe.PodConditionType)
-			allErrs = append(allErrs, metavalidation.ValidateLabelName(probe.PodConditionType, fldPath)...)
+			allErrs = append(allErrs, metavalidation.ValidateLabelName(probe.PodConditionType, probePath.Child("podConditionType"))...)
 		}
 		uniquePolicy := sets.NewString()
-		for _, policy := range probe.MarkerPolicy {
+		for j, policy := range probe.MarkerPolicy {
+			policyPath := probePath.Child("markerPolicy").Index(j)
 			if uniquePolicy.Has(string(policy.State)) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("markerPolicy"), policy.State, "marker policy state must be unique."))
+				allErrs = append(allErrs, field.Invalid(policyPath.Child("state"), policy.State, "marker policy state must be unique."))
 				return allErrs
 			}
 			uniquePolicy.Insert(string(policy.State))
-			allErrs = append(allErrs, validateProbeMarkerPolicy(&policy, fldPath.Child("markerPolicy"))...)
+			allErrs = append(allErrs, validateProbeMarkerPolicy(&policy, policyPath)...)
 		}
 	}
 

@@ -77,6 +77,25 @@ func NormalizeImageRefToNameTag(ref string) (string, string, error) {
 	return reference.FamiliarName(namedRef), getAPITagFromNamedRef(namedRef), nil
 }
 
+// JoinImageNameTag joins an image name and a tag into an image reference.
+// The tag may be a digest, because NormalizeImageRefToNameTag returns the
+// digest as the tag for a digested reference. A digest has to be joined with
+// "@" instead of ":", otherwise the result is not a valid image reference.
+func JoinImageNameTag(name, tag string) string {
+	if IsDigest(tag) {
+		return name + "@" + tag
+	}
+	return name + ":" + tag
+}
+
+// IsDigest returns true if the given tag returned by NormalizeImageRefToNameTag
+// is a digest such as "sha256:xxx" rather than a tag. A tag matches
+// [\w][\w.-]{0,127} and can never contain a colon, so the colon in the
+// algorithm prefix identifies a digest unambiguously.
+func IsDigest(tag string) bool {
+	return strings.Contains(tag, ":")
+}
+
 // getAPITagFromNamedRef returns a tag from the specified reference.
 // This function is necessary as long as the docker "server" api expects
 // digests to be sent as tags and makes a distinction between the name

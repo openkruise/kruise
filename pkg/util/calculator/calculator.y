@@ -316,8 +316,13 @@ term:
 factor:
 	NUMBER {
 		calc := yylex.(*yyLex).calc
-		num, _ := calc.parseNumber($1)
-		$$ = &Value{IsQuantity: false, Number: num}
+		num, err := calc.parseNumber($1)
+		if err != nil {
+			calc.lastError = fmt.Errorf("invalid number %q: %w", $1, err)
+			$$ = nil
+		} else {
+			$$ = &Value{IsQuantity: false, Number: num}
+		}
 	}
 	| QUANTITY {
 		calc := yylex.(*yyLex).calc

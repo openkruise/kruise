@@ -34,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	scaleclient "k8s.io/client-go/scale"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -199,7 +200,7 @@ func (r *ControllerFinder) getPodReplicaSet(ref ControllerReference, namespace s
 	}
 
 	return &ScaleAndSelector{
-		Scale:    *(replicaSet.Spec.Replicas),
+		Scale:    ptr.Deref(replicaSet.Spec.Replicas, 1),
 		Selector: replicaSet.Spec.Selector,
 		ControllerReference: ControllerReference{
 			APIVersion: replicaSet.APIVersion,
@@ -254,7 +255,7 @@ func (r *ControllerFinder) getPodStatefulSet(ref ControllerReference, namespace 
 	}
 
 	return &ScaleAndSelector{
-		Scale:    *(statefulSet.Spec.Replicas),
+		Scale:    ptr.Deref(statefulSet.Spec.Replicas, 1),
 		Selector: statefulSet.Spec.Selector,
 		ControllerReference: ControllerReference{
 			APIVersion: statefulSet.APIVersion,
@@ -286,7 +287,7 @@ func (r *ControllerFinder) getPodDeployment(ref ControllerReference, namespace s
 		return nil, nil
 	}
 	return &ScaleAndSelector{
-		Scale:    *(deployment.Spec.Replicas),
+		Scale:    ptr.Deref(deployment.Spec.Replicas, 1),
 		Selector: deployment.Spec.Selector,
 		ControllerReference: ControllerReference{
 			APIVersion: deployment.APIVersion,
@@ -317,7 +318,7 @@ func (r *ControllerFinder) getPodReplicationController(ref ControllerReference, 
 		return nil, nil
 	}
 	return &ScaleAndSelector{
-		Scale: *(rc.Spec.Replicas),
+		Scale: ptr.Deref(rc.Spec.Replicas, 1),
 		ControllerReference: ControllerReference{
 			APIVersion: rc.APIVersion,
 			Kind:       rc.Kind,
@@ -349,7 +350,7 @@ func (r *ControllerFinder) getPodKruiseCloneSet(ref ControllerReference, namespa
 	}
 
 	return &ScaleAndSelector{
-		Scale:    *(cloneSet.Spec.Replicas),
+		Scale:    ptr.Deref(cloneSet.Spec.Replicas, 1),
 		Selector: cloneSet.Spec.Selector,
 		ControllerReference: ControllerReference{
 			APIVersion: cloneSet.APIVersion,
@@ -382,7 +383,7 @@ func (r *ControllerFinder) getPodKruiseStatefulSet(ref ControllerReference, name
 	}
 
 	return &ScaleAndSelector{
-		Scale:           *(ss.Spec.Replicas),
+		Scale:           ptr.Deref(ss.Spec.Replicas, 1),
 		ReserveOrdinals: apiutil.GetReserveOrdinalIntSet(ss.Spec.ReserveOrdinals),
 		Selector:        ss.Spec.Selector,
 		ControllerReference: ControllerReference{

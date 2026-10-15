@@ -594,3 +594,212 @@ func TestValidateHTTPGetAction(t *testing.T) {
 		})
 	}
 }
+
+func TestValidatingPodProbeMarkerFieldPaths(t *testing.T) {
+	testCases := []struct {
+		name          string
+		getPpm        func() *appsv1alpha1.PodProbeMarker
+		expectedField string
+	}{
+		{
+			name: "spec.selector empty",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Selector = nil
+				return ppm
+			},
+			expectedField: "spec.selector",
+		},
+		{
+			name: "spec.probes empty",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Probes = nil
+				return ppm
+			},
+			expectedField: "spec.probes",
+		},
+		{
+			name: "spec.probes[0].name invalid char",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Probes[0].Name = "probe#1"
+				return ppm
+			},
+			expectedField: "spec.probes[0].name",
+		},
+		{
+			name: "spec.probes[0].name empty",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Probes[0].Name = ""
+				return ppm
+			},
+			expectedField: "spec.probes[0].name",
+		},
+		{
+			name: "spec.probes[0].containerName empty",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Probes[0].ContainerName = ""
+				return ppm
+			},
+			expectedField: "spec.probes[0].containerName",
+		},
+		{
+			name: "spec.probes[0].name k8s native condition",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Probes[0].Name = string(corev1.PodReady)
+				return ppm
+			},
+			expectedField: "spec.probes[0].name",
+		},
+		{
+			name: "spec.probes[1].name duplicate",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Probes = append(ppm.Spec.Probes, appsv1alpha1.PodContainerProbe{
+					Name:          "healthy",
+					ContainerName: "sidecar",
+				})
+				return ppm
+			},
+			expectedField: "spec.probes[1].name",
+		},
+		{
+			name: "spec.probes[0].probe.exec.command empty",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Probes[0].Probe = appsv1alpha1.ContainerProbeSpec{
+					Probe: corev1.Probe{
+						ProbeHandler: corev1.ProbeHandler{
+							Exec: &corev1.ExecAction{Command: []string{}},
+						},
+					},
+				}
+				return ppm
+			},
+			expectedField: "spec.probes[0].probe.exec.command",
+		},
+		{
+			name: "spec.probes[0].podConditionType and markerPolicy both empty",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Probes[0].PodConditionType = ""
+				ppm.Spec.Probes[0].MarkerPolicy = nil
+				return ppm
+			},
+			expectedField: "spec.probes[0]",
+		},
+		{
+			name: "spec.probes[0].podConditionType invalid",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Probes[0].PodConditionType = "#invalid-condition"
+				return ppm
+			},
+			expectedField: "spec.probes[0].podConditionType",
+		},
+		{
+			name: "spec.probes[1].podConditionType duplicate",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Probes = append(ppm.Spec.Probes, appsv1alpha1.PodContainerProbe{
+					Name:             "healthy-2",
+					ContainerName:    "sidecar",
+					Probe:            ppmDemo.Spec.Probes[0].Probe,
+					PodConditionType: ppmDemo.Spec.Probes[0].PodConditionType,
+				})
+				return ppm
+			},
+			expectedField: "spec.probes[1].podConditionType",
+		},
+		{
+			name: "spec.probes[0].markerPolicy[0].state invalid",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Probes[0].MarkerPolicy = []appsv1alpha1.ProbeMarkerPolicy{
+					{
+						State: "InvalidState",
+						Labels: map[string]string{
+							"server-healthy": "true",
+						},
+					},
+				}
+				return ppm
+			},
+			expectedField: "spec.probes[0].markerPolicy[0].state",
+		},
+		{
+			name: "spec.probes[0].markerPolicy[1].state duplicate",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Probes[0].MarkerPolicy = []appsv1alpha1.ProbeMarkerPolicy{
+					{
+						State: appsv1alpha1.ProbeSucceeded,
+						Labels: map[string]string{
+							"server-healthy": "true",
+						},
+					},
+					{
+						State: appsv1alpha1.ProbeSucceeded,
+						Labels: map[string]string{
+							"server-healthy": "true",
+						},
+					},
+				}
+				return ppm
+			},
+			expectedField: "spec.probes[0].markerPolicy[1].state",
+		},
+	}
+
+	decoder := admission.NewDecoder(scheme)
+	handler := PodProbeMarkerCreateUpdateHandler{
+		Decoder: decoder,
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errList := handler.validatingPodProbeMarkerFn(tc.getPpm(), nil)
+			if len(errList) == 0 {
+				t.Fatalf("expected error for field %s, but got no errors", tc.expectedField)
+			}
+			found := false
+			for _, err := range errList {
+				if err.Field == tc.expectedField {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected error field %s, but got fields: %v", tc.expectedField, errList)
+			}
+		})
+	}
+}
+
+func TestValidatingPodProbeMarkerUpdate(t *testing.T) {
+	oldPpm := ppmDemo.DeepCopy()
+	newPpm := ppmDemo.DeepCopy()
+	newPpm.Spec.Selector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"app": "new-test",
+		},
+	}
+
+	decoder := admission.NewDecoder(scheme)
+	handler := PodProbeMarkerCreateUpdateHandler{
+		Decoder: decoder,
+	}
+
+	errList := handler.validatingPodProbeMarkerFn(newPpm, oldPpm)
+	if len(errList) == 0 {
+		t.Fatalf("expected error when selector changed on update, got none")
+	}
+	expectedField := "spec.selector"
+	if errList[0].Field != expectedField {
+		t.Errorf("expected error field %s, got %s", expectedField, errList[0].Field)
+	}
+}

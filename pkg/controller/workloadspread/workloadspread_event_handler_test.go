@@ -1308,11 +1308,87 @@ func TestWorkloadEventHandlerForUpdate(t *testing.T) {
 			},
 		},
 		{
+			name: "job parallelism changed to nil ut",
+			getWorkloads: func() (client.Object, client.Object) {
+				oldObj := jobDemo.DeepCopy()
+				oldObj.Spec.Parallelism = pointer.Int32(2)
+				newObj := jobDemo.DeepCopy()
+				newObj.Spec.Parallelism = nil
+				return oldObj, newObj
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: jobDemo.APIVersion,
+					Kind:       jobDemo.Kind,
+					Name:       jobDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "job parallelism changed from nil ut",
+			getWorkloads: func() (client.Object, client.Object) {
+				oldObj := jobDemo.DeepCopy()
+				oldObj.Spec.Parallelism = nil
+				newObj := jobDemo.DeepCopy()
+				newObj.Spec.Parallelism = pointer.Int32(2)
+				return oldObj, newObj
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: jobDemo.APIVersion,
+					Kind:       jobDemo.Kind,
+					Name:       jobDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
 			name: "cloneset ut",
 			getWorkloads: func() (client.Object, client.Object) {
 				oldObj := cloneSetDemo.DeepCopy()
 				newObj := cloneSetDemo.DeepCopy()
 				newObj.Spec.Replicas = pointer.Int32(*(newObj.Spec.Replicas) + 1)
+				return oldObj, newObj
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: cloneSetDemo.APIVersion,
+					Kind:       cloneSetDemo.Kind,
+					Name:       cloneSetDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "cloneset replicas changed to nil ut",
+			getWorkloads: func() (client.Object, client.Object) {
+				oldObj := cloneSetDemo.DeepCopy()
+				oldObj.Spec.Replicas = pointer.Int32(2)
+				newObj := cloneSetDemo.DeepCopy()
+				newObj.Spec.Replicas = nil
+				return oldObj, newObj
+			},
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
+				ws := workloadSpreadDemo.DeepCopy()
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
+					APIVersion: cloneSetDemo.APIVersion,
+					Kind:       cloneSetDemo.Kind,
+					Name:       cloneSetDemo.Name,
+				}
+				return ws
+			},
+		},
+		{
+			name: "cloneset replicas changed from nil ut",
+			getWorkloads: func() (client.Object, client.Object) {
+				oldObj := cloneSetDemo.DeepCopy()
+				oldObj.Spec.Replicas = nil
+				newObj := cloneSetDemo.DeepCopy()
+				newObj.Spec.Replicas = pointer.Int32(2)
 				return oldObj, newObj
 			},
 			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {

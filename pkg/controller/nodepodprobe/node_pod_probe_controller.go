@@ -337,6 +337,9 @@ func (r *ReconcileNodePodProbe) updatePodProbeStatus(pod *corev1.Pod, status app
 			util.SetPodConditionIfMsgChanged(podClone, condition)
 		}
 		oldMetadata := podClone.ObjectMeta.DeepCopy()
+		if podClone.Labels == nil {
+			podClone.Labels = map[string]string{}
+		}
 		if podClone.Annotations == nil {
 			podClone.Annotations = map[string]string{}
 		}

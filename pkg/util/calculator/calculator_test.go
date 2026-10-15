@@ -1140,14 +1140,20 @@ func TestScientificNotationEdgeCases(t *testing.T) {
 		{
 			name:    "incomplete scientific notation - just e",
 			expr:    "1e",
-			wantErr: false, // Acceptable: parsed as 0 by strconv
-			desc:    "Incomplete exponent - handled by Go's strconv",
+			wantErr: true,
+			desc:    "Incomplete exponent must not silently become 0",
 		},
 		{
 			name:    "incomplete scientific notation - e with sign",
 			expr:    "1e+",
-			wantErr: false, // Acceptable: parsed as 0 by strconv
-			desc:    "Incomplete exponent with sign - handled by Go's strconv",
+			wantErr: true,
+			desc:    "Incomplete exponent with sign must not silently become 0",
+		},
+		{
+			name:    "incomplete exponent multiplying a variable",
+			expr:    "1E * 2",
+			wantErr: true,
+			desc:    "A malformed number inside a larger expression is an error too",
 		},
 		{
 			name:    "double exponent",

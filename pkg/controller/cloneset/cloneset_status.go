@@ -120,7 +120,6 @@ func (r *realStatusUpdater) calculateStatus(cs *appsv1alpha1.CloneSet, newStatus
 	if partition, err := util.CalculatePartitionReplicas(cs.Spec.UpdateStrategy.Partition, cs.Spec.Replicas); err == nil {
 		newStatus.ExpectedUpdatedReplicas = *cs.Spec.Replicas - int32(partition)
 	}
-
 	duration := r.calculateProgressingStatus(cs, newStatus)
 	clonesetutils.DurationStore.Push(clonesetutils.GetControllerKey(cs), duration)
 }

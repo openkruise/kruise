@@ -27,16 +27,21 @@ import (
 	"github.com/stretchr/testify/assert"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	clocktesting "k8s.io/utils/clock/testing"
 	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
@@ -458,4 +463,51 @@ func createReconcileJobWithImageListPullJobIndex(scheme *runtime.Scheme, initObj
 		Clock:    fakeClock,
 	}
 	return reconcileJob
+}
+
+func TestWatchJobOwnerEnqueue(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(batchv1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
+
+	acj := &appsv1beta1.AdvancedCronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-acj",
+			Namespace: "default",
+			UID:       "test-acj-uid",
+		},
+	}
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-acj-12345",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(acj, appsv1beta1.SchemeGroupVersion.WithKind("AdvancedCronJob")),
+			},
+		},
+	}
+
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{appsv1beta1.SchemeGroupVersion, batchv1.SchemeGroupVersion})
+	mapper.Add(appsv1beta1.SchemeGroupVersion.WithKind("AdvancedCronJob"), meta.RESTScopeNamespace)
+	mapper.Add(appsv1beta1.SchemeGroupVersion.WithKind("BroadcastJob"), meta.RESTScopeNamespace)
+
+	// 1. With AdvancedCronJob as ownerType (correct), creating or updating the job enqueues the parent AdvancedCronJob
+	h := handler.TypedEnqueueRequestForOwner[*batchv1.Job](scheme, mapper, &appsv1beta1.AdvancedCronJob{}, handler.OnlyControllerOwner())
+	q := workqueue.NewTypedRateLimitingQueue[reconcile.Request](workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+	defer q.ShutDown()
+
+	h.Create(context.TODO(), event.TypedCreateEvent[*batchv1.Job]{Object: job}, q)
+	assert.Equal(t, 1, q.Len())
+	req, _ := q.Get()
+	assert.Equal(t, "test-acj", req.Name)
+	assert.Equal(t, "default", req.Namespace)
+
+	// 2. With BroadcastJob as ownerType (the previous bug), nothing is enqueued
+	wrongH := handler.TypedEnqueueRequestForOwner[*batchv1.Job](scheme, mapper, &appsv1beta1.BroadcastJob{}, handler.OnlyControllerOwner())
+	wrongQ := workqueue.NewTypedRateLimitingQueue[reconcile.Request](workqueue.DefaultTypedControllerRateLimiter[reconcile.Request]())
+	defer wrongQ.ShutDown()
+
+	wrongH.Create(context.TODO(), event.TypedCreateEvent[*batchv1.Job]{Object: job}, wrongQ)
+	assert.Equal(t, 0, wrongQ.Len())
 }

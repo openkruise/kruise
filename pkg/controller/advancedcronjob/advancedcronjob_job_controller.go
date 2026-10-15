@@ -40,7 +40,7 @@ import (
 
 func watchJob(mgr manager.Manager, c controller.Controller) error {
 	if err := c.Watch(source.Kind(mgr.GetCache(), &batchv1.Job{}, handler.TypedEnqueueRequestForOwner[*batchv1.Job](
-		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1beta1.BroadcastJob{}, handler.OnlyControllerOwner()),
+		mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1beta1.AdvancedCronJob{}, handler.OnlyControllerOwner()),
 		predicate.TypedFuncs[*batchv1.Job]{
 			// only watch create / update event
 			DeleteFunc: func(e event.TypedDeleteEvent[*batchv1.Job]) bool {
