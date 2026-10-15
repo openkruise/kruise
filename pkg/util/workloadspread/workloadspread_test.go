@@ -1290,7 +1290,7 @@ func TestGetWorkloadReplicas(t *testing.T) {
 		},
 		{
 			name: "job with nil parallelism",
-			targetReference: &appsv1beta1.TargetReference{
+			targetReference: &appsv1alpha1.TargetReference{
 				APIVersion: "batch/v1",
 				Kind:       "Job",
 				Name:       "test-nil-parallelism",
@@ -1299,7 +1299,7 @@ func TestGetWorkloadReplicas(t *testing.T) {
 		},
 		{
 			name: "deployment with nil replicas",
-			targetReference: &appsv1beta1.TargetReference{
+			targetReference: &appsv1alpha1.TargetReference{
 				APIVersion: "apps/v1",
 				Kind:       "Deployment",
 				Name:       "test-nil-replicas",
@@ -1308,7 +1308,7 @@ func TestGetWorkloadReplicas(t *testing.T) {
 		},
 		{
 			name: "replicaset",
-			targetReference: &appsv1beta1.TargetReference{
+			targetReference: &appsv1alpha1.TargetReference{
 				APIVersion: "apps/v1",
 				Kind:       "ReplicaSet",
 				Name:       "test",
@@ -1317,7 +1317,7 @@ func TestGetWorkloadReplicas(t *testing.T) {
 		},
 		{
 			name: "replicaset with nil replicas",
-			targetReference: &appsv1beta1.TargetReference{
+			targetReference: &appsv1alpha1.TargetReference{
 				APIVersion: "apps/v1",
 				Kind:       "ReplicaSet",
 				Name:       "test-nil-replicas",
@@ -1326,7 +1326,7 @@ func TestGetWorkloadReplicas(t *testing.T) {
 		},
 		{
 			name: "k8s statefulset",
-			targetReference: &appsv1beta1.TargetReference{
+			targetReference: &appsv1alpha1.TargetReference{
 				APIVersion: "apps/v1",
 				Kind:       "StatefulSet",
 				Name:       "test-k8s-sts",
@@ -1335,7 +1335,7 @@ func TestGetWorkloadReplicas(t *testing.T) {
 		},
 		{
 			name: "k8s statefulset with nil replicas",
-			targetReference: &appsv1beta1.TargetReference{
+			targetReference: &appsv1alpha1.TargetReference{
 				APIVersion: "apps/v1",
 				Kind:       "StatefulSet",
 				Name:       "test-k8s-sts-nil-replicas",
@@ -1344,7 +1344,7 @@ func TestGetWorkloadReplicas(t *testing.T) {
 		},
 		{
 			name: "cloneset",
-			targetReference: &appsv1beta1.TargetReference{
+			targetReference: &appsv1alpha1.TargetReference{
 				APIVersion: "apps.kruise.io/v1alpha1",
 				Kind:       "CloneSet",
 				Name:       "test",
@@ -1353,7 +1353,7 @@ func TestGetWorkloadReplicas(t *testing.T) {
 		},
 		{
 			name: "cloneset with nil replicas",
-			targetReference: &appsv1beta1.TargetReference{
+			targetReference: &appsv1alpha1.TargetReference{
 				APIVersion: "apps.kruise.io/v1alpha1",
 				Kind:       "CloneSet",
 				Name:       "test-nil-replicas",
@@ -1362,7 +1362,7 @@ func TestGetWorkloadReplicas(t *testing.T) {
 		},
 		{
 			name: "Advanced StatefulSet with nil replicas",
-			targetReference: &appsv1beta1.TargetReference{
+			targetReference: &appsv1alpha1.TargetReference{
 				APIVersion: "apps.kruise.io/v1alpha1",
 				Kind:       "StatefulSet",
 				Name:       "test-nil-replicas",
