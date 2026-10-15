@@ -2511,7 +2511,7 @@ func TestGetPodJob(t *testing.T) {
 	cases := []struct {
 		name             string
 		job              *batchv1.Job
-		targetRef        *appsv1beta1.TargetReference
+		targetRef        *appsv1alpha1.TargetReference
 		expectedReplicas int32
 		expectErr        bool
 	}{
@@ -2534,7 +2534,7 @@ func TestGetPodJob(t *testing.T) {
 					},
 				},
 			},
-			targetRef: &appsv1beta1.TargetReference{
+			targetRef: &appsv1alpha1.TargetReference{
 				APIVersion: "batch/v1",
 				Kind:       "Job",
 				Name:       "test-job-parallelism",
@@ -2561,7 +2561,7 @@ func TestGetPodJob(t *testing.T) {
 					},
 				},
 			},
-			targetRef: &appsv1beta1.TargetReference{
+			targetRef: &appsv1alpha1.TargetReference{
 				APIVersion: "batch/v1",
 				Kind:       "Job",
 				Name:       "test-job-nil-parallelism",

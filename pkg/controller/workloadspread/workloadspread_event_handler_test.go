@@ -1316,9 +1316,9 @@ func TestWorkloadEventHandlerForUpdate(t *testing.T) {
 				newObj.Spec.Parallelism = nil
 				return oldObj, newObj
 			},
-			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				ws := workloadSpreadDemo.DeepCopy()
-				ws.Spec.TargetReference = &appsv1beta1.TargetReference{
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
 					APIVersion: jobDemo.APIVersion,
 					Kind:       jobDemo.Kind,
 					Name:       jobDemo.Name,
@@ -1335,9 +1335,9 @@ func TestWorkloadEventHandlerForUpdate(t *testing.T) {
 				newObj.Spec.Parallelism = pointer.Int32(2)
 				return oldObj, newObj
 			},
-			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				ws := workloadSpreadDemo.DeepCopy()
-				ws.Spec.TargetReference = &appsv1beta1.TargetReference{
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
 					APIVersion: jobDemo.APIVersion,
 					Kind:       jobDemo.Kind,
 					Name:       jobDemo.Name,
@@ -1372,9 +1372,9 @@ func TestWorkloadEventHandlerForUpdate(t *testing.T) {
 				newObj.Spec.Replicas = nil
 				return oldObj, newObj
 			},
-			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				ws := workloadSpreadDemo.DeepCopy()
-				ws.Spec.TargetReference = &appsv1beta1.TargetReference{
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
 					APIVersion: cloneSetDemo.APIVersion,
 					Kind:       cloneSetDemo.Kind,
 					Name:       cloneSetDemo.Name,
@@ -1391,9 +1391,9 @@ func TestWorkloadEventHandlerForUpdate(t *testing.T) {
 				newObj.Spec.Replicas = pointer.Int32(2)
 				return oldObj, newObj
 			},
-			getWorkloadSpread: func() *appsv1beta1.WorkloadSpread {
+			getWorkloadSpread: func() *appsv1alpha1.WorkloadSpread {
 				ws := workloadSpreadDemo.DeepCopy()
-				ws.Spec.TargetReference = &appsv1beta1.TargetReference{
+				ws.Spec.TargetReference = &appsv1alpha1.TargetReference{
 					APIVersion: cloneSetDemo.APIVersion,
 					Kind:       cloneSetDemo.Kind,
 					Name:       cloneSetDemo.Name,
