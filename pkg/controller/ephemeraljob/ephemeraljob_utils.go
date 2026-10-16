@@ -25,6 +25,19 @@ func pastActiveDeadline(job *appsv1alpha1.EphemeralJob) bool {
 	return duration >= allowedDuration
 }
 
+// getCreateCount returns how many pods should get ephemeral containers in this round:
+// the free parallelism slots (parallelism minus running pods), capped to the number of pods left to inject.
+func getCreateCount(toCreate, parallelism, running int) int {
+	diff := parallelism - running
+	if diff <= 0 {
+		return 0
+	}
+	if diff > toCreate {
+		return toCreate
+	}
+	return diff
+}
+
 func podMatchedEphemeralJob(pod *v1.Pod, ejob *appsv1alpha1.EphemeralJob) (bool, error) {
 	// if selector not matched, then continue
 	if pod.Namespace != ejob.Namespace {
