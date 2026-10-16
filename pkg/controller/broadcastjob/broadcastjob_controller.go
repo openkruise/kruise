@@ -460,6 +460,7 @@ func (r *ReconcileBroadcastJob) reconcilePods(job *appsv1beta1.BroadcastJob,
 					if err != nil {
 						defer utilruntime.HandleError(err)
 						errCh <- err
+						return
 					}
 					// If succeed, increase active counter
 					activeLock.Lock()
