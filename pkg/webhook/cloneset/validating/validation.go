@@ -384,8 +384,9 @@ func validateUpdateStrategyV1beta1(strategy *v1beta1.CloneSetUpdateStrategy, rep
 
 		// Validate MaxSurge
 		var maxSurge int
+		var maxSurgeErr error
 		if rollingUpdate.MaxSurge != nil {
-			maxSurge, maxSurgeErr := util.GetScaledValueFromIntOrPercent(rollingUpdate.MaxSurge, replicas, true)
+			maxSurge, maxSurgeErr = util.GetScaledValueFromIntOrPercent(rollingUpdate.MaxSurge, replicas, true)
 			if maxSurgeErr != nil {
 				allErrs = append(allErrs, field.Invalid(rollingUpdatePath.Child("maxSurge"), rollingUpdate.MaxSurge.String(),
 					fmt.Sprintf("failed GetScaledValueFromIntOrPercent for maxSurge: %v", maxSurgeErr)))
