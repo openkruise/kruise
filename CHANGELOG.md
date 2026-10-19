@@ -1,5 +1,34 @@
 # Change Log
 
+## v1.9.2
+> Change log since v1.9.1
+
+### Security
+- Disable pprof by default in kruise-manager and kruise-daemon to avoid unauthenticated resource-exhaustion exposure on the admission-webhook process. ([#2613](https://github.com/openkruise/kruise/pull/2613), [@furykerry](https://github.com/furykerry))
+
+### Bug Fixes
+- Fix kruise-controller-manager crash (nil pointer dereference) when WorkloadSpread manages a Job without spec.parallelism, or Deployment/StatefulSet/ReplicaSet/CloneSet without replicas; safely default to 1 via ptr.Deref across the event handler, controller, util and controllerfinder. ([#2568](https://github.com/openkruise/kruise/pull/2568), [@neo0007777](https://github.com/neo0007777))
+- Fix PodUnavailableBudget panic on nil Spec.Replicas during update event. ([#2529](https://github.com/openkruise/kruise/pull/2529), [@vishalmore90](https://github.com/vishalmore90))
+- Fix NodePodProbe panic caused by nil labels. ([#2500](https://github.com/openkruise/kruise/pull/2500), [@Jayant-kernel](https://github.com/Jayant-kernel))
+- Fix occasional restarts of kruise-controller-manager by registering built-in API field indexes first (fail fast) and retrying CRD field-index registration until discovery observes the resource. ([#2382](https://github.com/openkruise/kruise/pull/2382), [@PersistentJZH](https://github.com/PersistentJZH))
+- Fix AdvancedCronJob never being enqueued on child Job completion/failure by watching batchv1.Job with owner AdvancedCronJob instead of BroadcastJob, which left status.active stale. ([#2594](https://github.com/openkruise/kruise/pull/2594), [@bhuvan-somisetty](https://github.com/bhuvan-somisetty))
+- Fix DaemonSet not reconciling v1alpha1-created Pods after upgrade by resolving Pod owner references via Group/Kind, and skip parsing owner refs from unrelated controllers. ([#2518](https://github.com/openkruise/kruise/pull/2518), [@Colvin-Y](https://github.com/Colvin-Y))
+- Fix Pods remaining NotReady when CloneSet UpdateStrategy is set to OnDelete. ([#2291](https://github.com/openkruise/kruise/pull/2291), [@zmberg](https://github.com/zmberg))
+- Fix calculator rejecting malformed numbers instead of silently reading them as 0. ([#2595](https://github.com/openkruise/kruise/pull/2595), [@anishmehta24](https://github.com/anishmehta24))
+- Fix UnitedDeployment validation error printing a pointer address by dereferencing expectedReplicas (*int32) when formatting the message. ([#2597](https://github.com/openkruise/kruise/pull/2597), [@bhuvan-somisetty](https://github.com/bhuvan-somisetty))
+- Fix PodProbeMarker validation webhook reporting flat field paths instead of indexed slice paths (e.g. spec.probes[i].probe, spec.probes[i].markerPolicy[j]). ([#2602](https://github.com/openkruise/kruise/pull/2602), [@bhuvan-somisetty](https://github.com/bhuvan-somisetty))
+- Fix ImagePullJob with a digest failing on every node by joining image name and digest with "@" instead of ":", adding daemonutil.JoinImageNameTag and fixing CRI pull paths, ContainsImage, secret auth-info parsing and related logs/events/status. ([#2556](https://github.com/openkruise/kruise/pull/2556), [@qnduncan](https://github.com/qnduncan))
+
+### Misc (Chores and tests)
+- Bump golangci-lint-action to v9.3.0 to fix cache-restore failure on the release-1.9 CI. (release-1.9 branch)
+- Bump trivy-action to v0.36.0 to fix the lint job failing on a floating master pin whose default trivy CLI was deleted upstream (HTTP 404). (release-1.9 branch)
+
+## v1.9.1
+> Change log since v1.9.0
+
+### Bug Fixes
+- Fix controller panic on startup in ShouldUpdateResourceByResize when the K8s server version carries cloud build metadata (e.g. v1.28+gke.1, v1.30+eks.1), which coreos/go-semver.New cannot parse; strip the leading 'v', clean each dotted component to digits only, and add a deferred recover() to return false safely. ([#2502](https://github.com/openkruise/kruise/pull/2502), [@furykerry](https://github.com/furykerry))
+
 ## v1.9.0
 > Change log since v1.8.2
 
