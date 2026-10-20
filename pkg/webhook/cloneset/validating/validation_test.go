@@ -772,3 +772,94 @@ func TestValidateImagePreDownloadParallelism(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateCloneSetV1beta1ProgressDeadlineSeconds(t *testing.T) {
+	validLabels := map[string]string{"a": "b"}
+	replicas := int32(1)
+	partition := intstr.FromInt(0)
+	maxUnavailable := intstr.FromInt(1)
+
+	tests := []struct {
+		name                    string
+		progressDeadlineSeconds *int32
+		minReadySeconds         int32
+		expectError             bool
+	}{
+		{
+			name:                    "valid greater than minReadySeconds",
+			progressDeadlineSeconds: ptr.To(int32(11)),
+			minReadySeconds:         10,
+			expectError:             false,
+		},
+		{
+			name:                    "valid max int32",
+			progressDeadlineSeconds: ptr.To(int32(math.MaxInt32)),
+			minReadySeconds:         math.MaxInt32,
+			expectError:             false,
+		},
+		{
+			name:                    "invalid negative",
+			progressDeadlineSeconds: ptr.To(int32(-1)),
+			expectError:             true,
+		},
+		{
+			name:                    "invalid equals minReadySeconds",
+			progressDeadlineSeconds: ptr.To(int32(10)),
+			minReadySeconds:         10,
+			expectError:             true,
+		},
+		{
+			name:                    "invalid less than minReadySeconds",
+			progressDeadlineSeconds: ptr.To(int32(9)),
+			minReadySeconds:         10,
+			expectError:             true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cloneSet := &v1beta1.CloneSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "cs-progress-deadline", Namespace: metav1.NamespaceDefault},
+				Spec: v1beta1.CloneSetSpec{
+					Replicas: &replicas,
+					Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: validLabels},
+						Spec: v1.PodSpec{
+							RestartPolicy: v1.RestartPolicyAlways,
+							DNSPolicy:     v1.DNSClusterFirst,
+							Containers: []v1.Container{{
+								Name:                     "abc",
+								Image:                    "image",
+								ImagePullPolicy:          v1.PullIfNotPresent,
+								TerminationMessagePolicy: v1.TerminationMessageReadFile,
+							}},
+						},
+					},
+					UpdateStrategy: v1beta1.CloneSetUpdateStrategy{
+						Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+						RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+							PodUpdatePolicy: v1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType,
+							Partition:       &partition,
+							MaxUnavailable:  &maxUnavailable,
+						},
+					},
+					ProgressDeadlineSeconds: tt.progressDeadlineSeconds,
+					MinReadySeconds:         tt.minReadySeconds,
+				},
+			}
+
+			errs := ValidateCloneSetV1beta1(cloneSet, nil)
+			hasError := false
+			for _, err := range errs {
+				if err.Field == "spec.progressDeadlineSeconds" {
+					hasError = true
+					break
+				}
+			}
+			if hasError != tt.expectError {
+				t.Errorf("expected progressDeadlineSeconds error: %v, got errors: %v", tt.expectError, errs)
+			}
+		})
+	}
+}
