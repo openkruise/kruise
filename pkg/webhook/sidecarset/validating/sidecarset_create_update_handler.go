@@ -95,7 +95,7 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSet(obj *appsv1beta1.Side
 	allErrs = append(allErrs, h.validateSidecarSetSpec(obj, field.NewPath("spec"))...)
 	// when operation is update, older isn't empty, and validating whether old and new containers conflict
 	if older != nil {
-		allErrs = append(allErrs, validateSidecarContainerConflict(obj.Spec.Containers, older.Spec.Containers, field.NewPath("spec.containers"))...)
+		allErrs = append(allErrs, validateSidecarContainerConflict(obj.Spec.Containers, older.Spec.Containers, field.NewPath("spec", "containers"))...)
 	}
 	if len(allErrs) != 0 {
 		return allErrs
@@ -185,28 +185,29 @@ func (h *SidecarSetCreateUpdateHandler) validateSidecarSetSpec(obj *appsv1beta1.
 	// validating sidecar container
 	// if don't have any initContainers, containers
 	if len(spec.InitContainers) == 0 && len(spec.Containers) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Root(), "no initContainer or container defined for SidecarSet"))
+		allErrs = append(allErrs, field.Required(fldPath.Child("containers"), "no initContainer or container defined for SidecarSet"))
 	} else {
-		allErrs = append(allErrs, validateContainersForSidecarSet(spec.InitContainers, spec.Containers, vols, fldPath.Root())...)
+		allErrs = append(allErrs, validateContainersForSidecarSet(spec.InitContainers, spec.Containers, vols, fldPath)...)
 	}
 	// validating metadata
 	annotationKeys := sets.NewString()
 	if err := sidecarcontrol.ValidateSidecarSetPatchMetadataWhitelist(h.Client, obj); err != nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("patchPodMetadata"), err.Error()))
 	}
-	for _, patch := range spec.PatchPodMetadata {
+	for i, patch := range spec.PatchPodMetadata {
+		patchPath := fldPath.Child("patchPodMetadata").Index(i)
 		if len(patch.Annotations) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("patchPodMetadata"), "no annotations defined for SidecarSet"))
+			allErrs = append(allErrs, field.Required(patchPath.Child("annotations"), "no annotations defined for SidecarSet"))
 		} else {
 			metadata := metav1.ObjectMeta{Annotations: patch.Annotations, Name: "fake-name"}
-			allErrs = append(allErrs, genericvalidation.ValidateObjectMeta(&metadata, false, validateSidecarSetName, field.NewPath("patchPodMetadata"))...)
+			allErrs = append(allErrs, genericvalidation.ValidateObjectMeta(&metadata, false, validateSidecarSetName, patchPath.Child("annotations"))...)
 		}
 		if patch.PatchPolicy == "" {
-			allErrs = append(allErrs, field.Required(fldPath.Child("patchPodMetadata"), "no patchPolicy defined for patchPodMetadata"))
+			allErrs = append(allErrs, field.Required(patchPath.Child("patchPolicy"), "no patchPolicy defined for patchPodMetadata"))
 		}
 		for k := range patch.Annotations {
 			if annotationKeys.Has(k) {
-				allErrs = append(allErrs, field.Required(fldPath.Child("patchPodMetadata"), fmt.Sprintf("patch annotation[%s] already exist", k)))
+				allErrs = append(allErrs, field.Required(patchPath.Child("annotations"), fmt.Sprintf("patch annotation[%s] already exist", k)))
 			} else {
 				annotationKeys.Insert(k)
 			}
@@ -230,25 +231,26 @@ func validateSelector(selector *metav1.LabelSelector, fldPath *field.Path) field
 	return allErrs
 }
 
-func (h *SidecarSetCreateUpdateHandler) validateSidecarSetInjectionStrategy(obj *appsv1beta1.SidecarSet, _ *field.Path) field.ErrorList {
+func (h *SidecarSetCreateUpdateHandler) validateSidecarSetInjectionStrategy(obj *appsv1beta1.SidecarSet, fldPath *field.Path) field.ErrorList {
 	errList := field.ErrorList{}
 	revisionInfo := obj.Spec.InjectionStrategy.Revision
 
 	if revisionInfo != nil {
+		revisionPath := fldPath.Child("revision")
 		switch {
 		case revisionInfo.RevisionName == nil && revisionInfo.CustomVersion == nil:
-			errList = append(errList, field.Invalid(field.NewPath("revision"), revisionInfo, "revisionName and customVersion cannot be empty simultaneously"))
+			errList = append(errList, field.Invalid(revisionPath, revisionInfo, "revisionName and customVersion cannot be empty simultaneously"))
 		default:
 			revision, err := sidecarcontrol.NewHistoryControl(h.Client).GetHistorySidecarSet(obj, revisionInfo)
 			if err != nil || revision == nil {
-				errList = append(errList, field.Invalid(field.NewPath("revision"), revision, fmt.Sprintf("Cannot find specific ControllerRevision, err: %v", err)))
+				errList = append(errList, field.Invalid(revisionPath, revision, fmt.Sprintf("Cannot find specific ControllerRevision, err: %v", err)))
 			}
 		}
 
 		switch revisionInfo.Policy {
 		case "", appsv1beta1.AlwaysSidecarSetInjectRevisionPolicy, appsv1beta1.PartialSidecarSetInjectRevisionPolicy:
 		default:
-			errList = append(errList, field.Invalid(field.NewPath("revision").Child("policy"), revisionInfo, fmt.Sprintf("Invalid policy %v, supported: [%s, %s]",
+			errList = append(errList, field.Invalid(revisionPath.Child("policy"), revisionInfo, fmt.Sprintf("Invalid policy %v, supported: [%s, %s]",
 				revisionInfo.Policy, appsv1beta1.AlwaysSidecarSetInjectRevisionPolicy, appsv1beta1.PartialSidecarSetInjectRevisionPolicy)))
 		}
 	}
@@ -271,7 +273,7 @@ func validateSidecarSetUpdateStrategy(strategy *appsv1beta1.SidecarSetUpdateStra
 	// if SidecarSet update strategy is RollingUpdate
 	if strategy.Type == appsv1beta1.RollingUpdateSidecarSetStrategyType {
 		if intStrIsSet(strategy.Partition) && strategy.Selector != nil {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("updateStrategy"), fmt.Sprintf("%++v", strategy), "Partition and Selector cannot be used together"))
+			allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("%++v", strategy), "Partition and Selector cannot be used together"))
 		}
 		if strategy.Selector != nil {
 			allErrs = append(allErrs, validateSelector(strategy.Selector, fldPath.Child("selector"))...)
@@ -302,7 +304,7 @@ func validateContainersForSidecarSet(
 	// validating initContainer
 	var coreInitContainers []core.Container
 	for i, container := range initContainers {
-		idxPath := fldPath.Index(i)
+		idxPath := fldPath.Child("initContainers").Index(i)
 
 		// Validate that initContainers ResourcesPolicy
 		if container.ResourcesPolicy != nil {
@@ -316,7 +318,7 @@ func validateContainersForSidecarSet(
 
 		coreContainer := core.Container{}
 		if err := corev1.Convert_v1_Container_To_core_Container(&container.Container, &coreContainer, nil); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("initContainer"), container.Container, fmt.Sprintf("Convert_v1_Container_To_core_Container failed: %v", err)))
+			allErrs = append(allErrs, field.Invalid(idxPath, container.Container, fmt.Sprintf("Convert_v1_Container_To_core_Container failed: %v", err)))
 			return allErrs
 		}
 		coreInitContainers = append(coreInitContainers, coreContainer)
@@ -325,12 +327,12 @@ func validateContainersForSidecarSet(
 	// validating container
 	var coreContainers []core.Container
 	for i, container := range containers {
-		idxPath := fldPath.Index(i)
+		idxPath := fldPath.Child("containers").Index(i)
 		if container.PodInjectPolicy != appsv1beta1.BeforeAppContainerType && container.PodInjectPolicy != appsv1beta1.AfterAppContainerType {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("container").Child("podInjectPolicy"), container.PodInjectPolicy, "unsupported pod inject policy"))
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("podInjectPolicy"), container.PodInjectPolicy, "unsupported pod inject policy"))
 		}
 		if container.ShareVolumePolicy.Type != appsv1beta1.ShareVolumePolicyEnabled && container.ShareVolumePolicy.Type != appsv1beta1.ShareVolumePolicyDisabled {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("container").Child("shareVolumePolicy"), container.ShareVolumePolicy, "unsupported share volume policy"))
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("shareVolumePolicy"), container.ShareVolumePolicy, "unsupported share volume policy"))
 		}
 		allErrs = append(allErrs, validateDownwardAPI(container.TransferEnv, idxPath.Child("transferEnv"))...)
 
@@ -341,7 +343,7 @@ func validateContainersForSidecarSet(
 
 		coreContainer := core.Container{}
 		if err := corev1.Convert_v1_Container_To_core_Container(&container.Container, &coreContainer, nil); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("container"), container.Container, fmt.Sprintf("Convert_v1_Container_To_core_Container failed: %v", err)))
+			allErrs = append(allErrs, field.Invalid(idxPath, container.Container, fmt.Sprintf("Convert_v1_Container_To_core_Container failed: %v", err)))
 			return allErrs
 		}
 		coreContainers = append(coreContainers, coreContainer)
@@ -386,14 +388,15 @@ func validateSidecarContainerConflict(newContainers, oldContainers []appsv1beta1
 	for _, container := range oldContainers {
 		oldStrategy[container.Name] = container.UpgradeStrategy.UpgradeType
 	}
-	for _, container := range newContainers {
+	for i, container := range newContainers {
+		containerPath := fldPath.Index(i)
 		if strategy, ok := oldStrategy[container.Name]; ok {
 			if strategy != "" && container.UpgradeStrategy.UpgradeType != strategy {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("upgradeStrategy").Child("upgradeType"),
-					container.Name, fmt.Sprintf("container %v upgradeType is immutable", container.Name)))
+				allErrs = append(allErrs, field.Invalid(containerPath.Child("upgradeStrategy", "upgradeType"),
+					container.UpgradeStrategy.UpgradeType, fmt.Sprintf("container %v upgradeType is immutable", container.Name)))
 			}
 		} else {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"),
+			allErrs = append(allErrs, field.Invalid(containerPath.Child("name"),
 				container.Name, fmt.Sprintf("container %v is not found", container.Name)))
 		}
 	}
@@ -454,7 +457,7 @@ func validateSidecarConflict(c client.Client, sidecarSets *appsv1beta1.SidecarSe
 	// whether initContainers conflict
 	for _, container := range sidecarSet.Spec.InitContainers {
 		if other, ok := initContainerInOthers[container.Name]; ok {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("containers"), container.Name, fmt.Sprintf(
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("initContainers"), container.Name, fmt.Sprintf(
 				"container %v already exist in %v", container.Name, other.Name)))
 		}
 	}
@@ -507,9 +510,9 @@ func getSidecarsetVolume(volumeName string, sidecarset *appsv1beta1.SidecarSet) 
 
 func validateDownwardAPI(envs []appsv1beta1.TransferEnvVar, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	for _, tEnv := range envs {
+	for i, tEnv := range envs {
 		if tEnv.SourceContainerNameFrom != nil && tEnv.SourceContainerNameFrom.FieldRef != nil {
-			allErrs = append(allErrs, validateObjectFieldSelector(tEnv.SourceContainerNameFrom.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
+			allErrs = append(allErrs, validateObjectFieldSelector(tEnv.SourceContainerNameFrom.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Index(i).Child("sourceContainerNameFrom", "fieldRef"))...)
 		}
 	}
 	return allErrs
