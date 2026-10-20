@@ -175,6 +175,25 @@ func setDefaultContainer(sidecarContainer *v1alpha1.SidecarContainer) {
 	}
 }
 
+// SetDefaultsConfigMapSet SetDefaults_ConfigMapSet set default values for ConfigMapSet.
+func SetDefaultsConfigMapSet(obj *v1alpha1.ConfigMapSet) {
+	partitionValue := int32(0)
+	maxUnavailableValue := intstr.FromInt32(1)
+	if obj.Spec.UpdateStrategy == nil {
+		obj.Spec.UpdateStrategy = &v1alpha1.ConfigMapSetUpdateStrategy{}
+	}
+	if obj.Spec.UpdateStrategy.Partition == nil {
+		v := intstr.FromInt32(partitionValue)
+		obj.Spec.UpdateStrategy.Partition = &v
+	}
+	if obj.Spec.UpdateStrategy.MaxUnavailable == nil {
+		obj.Spec.UpdateStrategy.MaxUnavailable = &maxUnavailableValue
+	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = ptr.To[int32](5)
+	}
+}
+
 // SetDefaults_UnitedDeployment set default values for UnitedDeployment.
 func SetDefaultsUnitedDeployment(obj *v1alpha1.UnitedDeployment, injectTemplateDefaults bool) {
 	if obj.Spec.Replicas == nil {
