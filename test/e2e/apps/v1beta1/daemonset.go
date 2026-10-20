@@ -331,6 +331,7 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 				err = wait.PollUntilContextTimeout(context.TODO(), v1beta1.DaemonSetRetryPeriod, v1beta1.DaemonSetRetryTimeout, true, func(context.Context) (bool, error) {
 					return tester.CheckDaemonReady(dsName)()
 				})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemonset ready")
 
 				ginkgo.By("Get all new daemon pods")
 				newPodList, err := tester.ListDaemonPods(label)
@@ -515,6 +516,7 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 				}
 				return nodeNameList.Len() == 0, nil
 			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for surging pods created")
 
 			ginkgo.By("Check all old Pods deleted")
 			err = wait.PollUntilContextTimeout(context.TODO(), time.Second, time.Minute, true, func(context.Context) (bool, error) {
@@ -536,6 +538,7 @@ var _ = ginkgo.Describe("DaemonSet", ginkgo.Label("DaemonSet", "workload"), func
 				}
 				return finished, nil
 			})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for old pods deleted")
 		})
 	})
 })
