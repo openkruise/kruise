@@ -7,7 +7,7 @@ import (
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
 
-func (dsc *ReconcileDaemonSet) pruneNodesAndOrphanedPods(ds *appsv1beta1.DaemonSet, nodeToDaemonPods map[string][]*corev1.Pod, nodeList []*corev1.Node) map[string][]*corev1.Pod {
+func (dsc *ReconcileDaemonSet) pruneNodesAndOrphanedPods(ds *appsv1beta1.DaemonSet, nodeToDaemonPods map[string][]*corev1.Pod, nodeList []*corev1.Node) (map[string][]*corev1.Pod, []string) {
 	nodeMap := make(map[string]*corev1.Node)
 	for _, node := range nodeList {
 		nodeMap[node.Name] = node
@@ -29,6 +29,10 @@ func (dsc *ReconcileDaemonSet) pruneNodesAndOrphanedPods(ds *appsv1beta1.DaemonS
 		if deleteNode {
 			nodeToDelete.Insert(nodeName)
 			for _, pod := range pods {
+				// Pods that are already terminating must not be deleted (and counted in the expectations) again.
+				if pod.DeletionTimestamp != nil {
+					continue
+				}
 				podsToDelete.Insert(pod.Name)
 			}
 		}
@@ -37,5 +41,5 @@ func (dsc *ReconcileDaemonSet) pruneNodesAndOrphanedPods(ds *appsv1beta1.DaemonS
 		delete(nodeToDaemonPods, nodeName)
 	}
 
-	return nodeToDaemonPods
+	return nodeToDaemonPods, podsToDelete.List()
 }
