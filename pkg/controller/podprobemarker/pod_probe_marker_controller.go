@@ -289,89 +289,109 @@ func (r *ReconcilePodProbeMarker) markServerlessPod(pod *corev1.Pod, markers map
 	return nil
 }
 
+// updateNodePodProbes merges the probes of the given Pods into the NodePodProbe of the node.
+//
+// A NodePodProbe is written concurrently by every PodProbeMarker that matches Pods on the node
+// and by kruise-daemon, so the update below races by design. The whole read-modify-write cycle
+// is retried on conflict and the merge is recomputed against the latest version, instead of
+// failing the reconcile. Without the retry a conflict also blocks the update of
+// PodProbeMarker.Status.ObservedGeneration, which the downstream consumers wait on.
 func (r *ReconcilePodProbeMarker) updateNodePodProbes(ppm *appsv1alpha1.PodProbeMarker, nodeName string, pods []*corev1.Pod) error {
+	var oldSpec *appsv1alpha1.NodePodProbeSpec
+	updated := false
 	npp := &appsv1alpha1.NodePodProbe{}
-	err := r.Get(context.TODO(), client.ObjectKey{Name: nodeName}, npp)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			klog.InfoS("PodProbeMarker NodePodProbe was Not Found", "podProbeMarker", klog.KObj(ppm), "nodePodProbe", klog.KObj(npp))
-			return nil
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := r.Get(context.TODO(), client.ObjectKey{Name: nodeName}, npp); err != nil {
+			if errors.IsNotFound(err) {
+				klog.InfoS("PodProbeMarker NodePodProbe was Not Found", "podProbeMarker", klog.KObj(ppm), "nodeName", nodeName)
+				return nil
+			}
+			// Error reading the object - requeue the request.
+			klog.ErrorS(err, "PodProbeMarker got NodePodProbe failed", "podProbeMarker", klog.KObj(ppm), "nodeName", nodeName)
+			return err
 		}
-		// Error reading the object - requeue the request.
-		klog.ErrorS(err, "PodProbeMarker got NodePodProbe failed", "podProbeMarker", klog.KObj(ppm), "nodePodProbe", klog.KObj(npp))
-		return err
-	}
 
-	oldSpec := npp.Spec.DeepCopy()
-	for _, pod := range pods {
-		exist := false
-		for i := range npp.Spec.PodProbes {
-			podProbe := &npp.Spec.PodProbes[i]
-			if podProbe.Name == pod.Name && podProbe.Namespace == pod.Namespace && podProbe.UID == string(pod.UID) {
-				exist = true
+		oldSpec = npp.Spec.DeepCopy()
+		for _, pod := range pods {
+			exist := false
+			for i := range npp.Spec.PodProbes {
+				podProbe := &npp.Spec.PodProbes[i]
+				if podProbe.Name == pod.Name && podProbe.Namespace == pod.Namespace && podProbe.UID == string(pod.UID) {
+					exist = true
+					for j := range ppm.Spec.Probes {
+						probe := ppm.Spec.Probes[j]
+						if podProbe.IP == "" {
+							podProbe.IP = pod.Status.PodIP
+						}
+						if probe.Probe.TCPSocket != nil {
+							converted, convErr := convertTcpSocketProbeCheckPort(probe, pod)
+							if convErr != nil {
+								klog.ErrorS(convErr, "Failed to convert tcpSocket probe port", "pod", klog.KObj(pod))
+								continue
+							}
+							probe = converted
+						}
+						if probe.Probe.HTTPGet != nil {
+							converted, convErr := convertHttpGetProbeCheckPort(probe, pod)
+							if convErr != nil {
+								klog.ErrorS(convErr, "Failed to convert httpGet probe port", "pod", klog.KObj(pod))
+								continue
+							}
+							probe = converted
+						}
+						setPodContainerProbes(podProbe, probe, ppm.Name)
+					}
+					break
+				}
+			}
+			if !exist {
+				podProbe := appsv1alpha1.PodProbe{Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID), IP: pod.Status.PodIP}
 				for j := range ppm.Spec.Probes {
 					probe := ppm.Spec.Probes[j]
-					if podProbe.IP == "" {
-						podProbe.IP = pod.Status.PodIP
-					}
+					// look up a port in a container by name & convert container name port
 					if probe.Probe.TCPSocket != nil {
-						probe, err = convertTcpSocketProbeCheckPort(probe, pod)
-						if err != nil {
-							klog.ErrorS(err, "Failed to convert tcpSocket probe port", "pod", klog.KObj(pod))
+						converted, convErr := convertTcpSocketProbeCheckPort(probe, pod)
+						if convErr != nil {
+							klog.ErrorS(convErr, "Failed to convert tcpSocket probe port", "pod", klog.KObj(pod))
 							continue
 						}
+						probe = converted
 					}
 					if probe.Probe.HTTPGet != nil {
-						probe, err = convertHttpGetProbeCheckPort(probe, pod)
-						if err != nil {
-							klog.ErrorS(err, "Failed to convert httpGet probe port", "pod", klog.KObj(pod))
+						converted, convErr := convertHttpGetProbeCheckPort(probe, pod)
+						if convErr != nil {
+							klog.ErrorS(convErr, "Failed to convert httpGet probe port", "pod", klog.KObj(pod))
 							continue
 						}
+						probe = converted
 					}
-					setPodContainerProbes(podProbe, probe, ppm.Name)
+					podProbe.Probes = append(podProbe.Probes, appsv1alpha1.ContainerProbe{
+						Name:          fmt.Sprintf("%s#%s", ppm.Name, probe.Name),
+						ContainerName: probe.ContainerName,
+						Probe:         probe.Probe,
+					})
 				}
-				break
+				npp.Spec.PodProbes = append(npp.Spec.PodProbes, podProbe)
 			}
 		}
-		if !exist {
-			podProbe := appsv1alpha1.PodProbe{Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID), IP: pod.Status.PodIP}
-			for j := range ppm.Spec.Probes {
-				probe := ppm.Spec.Probes[j]
-				// look up a port in a container by name & convert container name port
-				if probe.Probe.TCPSocket != nil {
-					probe, err = convertTcpSocketProbeCheckPort(probe, pod)
-					if err != nil {
-						klog.ErrorS(err, "Failed to convert tcpSocket probe port", "pod", klog.KObj(pod))
-						continue
-					}
-				}
-				if probe.Probe.HTTPGet != nil {
-					probe, err = convertHttpGetProbeCheckPort(probe, pod)
-					if err != nil {
-						klog.ErrorS(err, "Failed to convert httpGet probe port", "pod", klog.KObj(pod))
-						continue
-					}
-				}
-				podProbe.Probes = append(podProbe.Probes, appsv1alpha1.ContainerProbe{
-					Name:          fmt.Sprintf("%s#%s", ppm.Name, probe.Name),
-					ContainerName: probe.ContainerName,
-					Probe:         probe.Probe,
-				})
-			}
-			npp.Spec.PodProbes = append(npp.Spec.PodProbes, podProbe)
-		}
-	}
 
-	if reflect.DeepEqual(npp.Spec, oldSpec) {
+		if reflect.DeepEqual(npp.Spec, *oldSpec) {
+			return nil
+		}
+		if err := r.Update(context.TODO(), npp); err != nil {
+			return err
+		}
+		updated = true
 		return nil
-	}
-	err = r.Update(context.TODO(), npp)
+	})
 	if err != nil {
-		klog.ErrorS(err, "PodProbeMarker updated NodePodProbe failed", "podProbeMarker", klog.KObj(ppm), "nodePodProbeName", npp.Name)
+		klog.ErrorS(err, "PodProbeMarker updated NodePodProbe failed", "podProbeMarker", klog.KObj(ppm), "nodeName", nodeName)
 		return err
 	}
-	klog.V(3).InfoS("PodProbeMarker updated NodePodProbe success", "podProbeMarker", klog.KObj(ppm), "nodePodProbeName", npp.Name,
-		"oldSpec", util.DumpJSON(oldSpec), "newSpec", util.DumpJSON(npp.Spec))
+	if updated {
+		klog.V(3).InfoS("PodProbeMarker updated NodePodProbe success", "podProbeMarker", klog.KObj(ppm), "nodeName", nodeName,
+			"oldSpec", util.DumpJSON(oldSpec), "newSpec", util.DumpJSON(npp.Spec))
+	}
 	return nil
 }
 
