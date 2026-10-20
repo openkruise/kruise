@@ -243,6 +243,33 @@ func TestValidatingPodProbeMarker(t *testing.T) {
 			},
 			expectErrList: 1,
 		},
+		{
+			name: "test12, httpGet Host header is rejected (SSRF)",
+			getPpm: func() *appsv1alpha1.PodProbeMarker {
+				ppm := ppmDemo.DeepCopy()
+				ppm.Spec.Probes = append(ppm.Spec.Probes, appsv1alpha1.PodContainerProbe{
+					Name:          "check",
+					ContainerName: "other",
+					Probe: appsv1alpha1.ContainerProbeSpec{
+						Probe: corev1.Probe{
+							ProbeHandler: corev1.ProbeHandler{
+								HTTPGet: &corev1.HTTPGetAction{
+									Path:   "/index.html",
+									Scheme: corev1.URISchemeHTTP,
+									Port:   intstr.FromInt(80),
+									HTTPHeaders: []corev1.HTTPHeader{
+										{Name: "host", Value: "169.254.169.254"},
+									},
+								},
+							},
+						},
+					},
+					PodConditionType: "game.kruise.io/check",
+				})
+				return ppm
+			},
+			expectErrList: 1,
+		},
 	}
 
 	decoder := admission.NewDecoder(scheme)
