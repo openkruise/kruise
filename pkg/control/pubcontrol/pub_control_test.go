@@ -22,6 +22,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -571,6 +572,112 @@ func TestIsPodReady(t *testing.T) {
 			is := control.IsPodReady(cs.getPod())
 			if cs.expect != is {
 				t.Fatalf("IsPodReady failed")
+			}
+		})
+	}
+}
+
+// TestIsPodStateConsistent covers the digest fast-path of IsPodStateConsistent, including
+// restartable init containers, and makes sure the fast-path can no longer skip the in-place
+// update checks.
+func TestIsPodStateConsistent(t *testing.T) {
+	const (
+		digestImage     = "busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d"
+		digestImageID   = "docker-pullable://busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d"
+		staleImageID    = "docker-pullable://busybox@sha256:00006defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d"
+		tagImage        = "busybox:1.36"
+		tagImageID      = "docker-pullable://busybox:1.36"
+		graceAnnotation = `{"revision":"r2","containerImages":{"main":"busybox:1.37"}}`
+	)
+
+	restartAlways := corev1.ContainerRestartPolicyAlways
+	newPod := func() *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pod-0"},
+			Spec: corev1.PodSpec{
+				InitContainers: []corev1.Container{
+					{Name: "setup", Image: digestImage},
+					{Name: "sidecar", Image: digestImage, RestartPolicy: &restartAlways},
+				},
+				Containers: []corev1.Container{
+					{Name: "main", Image: digestImage},
+				},
+			},
+			Status: corev1.PodStatus{
+				InitContainerStatuses: []corev1.ContainerStatus{
+					{Name: "setup", ImageID: digestImageID},
+					{Name: "sidecar", ImageID: digestImageID},
+				},
+				ContainerStatuses: []corev1.ContainerStatus{
+					{Name: "main", ImageID: digestImageID},
+				},
+			},
+		}
+	}
+
+	cases := []struct {
+		name     string
+		mutate   func(pod *corev1.Pod)
+		expected bool
+	}{
+		{
+			name:     "all digest images consistent",
+			mutate:   func(pod *corev1.Pod) {},
+			expected: true,
+		},
+		{
+			name: "all digest images must not skip the in-place update grace period check",
+			mutate: func(pod *corev1.Pod) {
+				pod.Annotations = map[string]string{pub.InPlaceUpdateGraceKey: graceAnnotation}
+			},
+			expected: false,
+		},
+		{
+			name: "restartable init container with stale imageID is inconsistent",
+			mutate: func(pod *corev1.Pod) {
+				pod.Status.InitContainerStatuses[1].ImageID = staleImageID
+			},
+			expected: false,
+		},
+		{
+			name: "regular init container with stale imageID is skipped",
+			mutate: func(pod *corev1.Pod) {
+				pod.Status.InitContainerStatuses[0].ImageID = staleImageID
+			},
+			expected: true,
+		},
+		{
+			name: "tag images keep the previous behavior",
+			mutate: func(pod *corev1.Pod) {
+				pod.Spec.Containers[0].Image = tagImage
+				pod.Spec.InitContainers[1].Image = tagImage
+				pod.Status.ContainerStatuses[0].ImageID = tagImageID
+				pod.Status.ContainerStatuses[0].Image = tagImage
+				pod.Status.InitContainerStatuses[1].ImageID = tagImageID
+				pod.Status.InitContainerStatuses[1].Image = tagImage
+			},
+			expected: true,
+		},
+		{
+			name: "tag images with unchanged imageID in the update state are inconsistent",
+			mutate: func(pod *corev1.Pod) {
+				pod.Spec.Containers[0].Image = "busybox:1.37"
+				pod.Status.ContainerStatuses[0].ImageID = tagImageID
+				pod.Status.ContainerStatuses[0].Image = tagImage
+				pod.Annotations = map[string]string{pub.InPlaceUpdateStateKey: `{"revision":"r2","lastContainerStatuses":{"main":{"imageID":"` + tagImageID + `"}}}`}
+			},
+			expected: false,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			control := commonControl{}
+			pod := newPod()
+			cs.mutate(pod)
+			is := control.IsPodStateConsistent(pod)
+			if cs.expected != is {
+				t.Fatalf("IsPodStateConsistent expected %v, but got %v", cs.expected, is)
 			}
 		})
 	}
