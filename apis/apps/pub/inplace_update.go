@@ -18,6 +18,7 @@ package pub
 
 import (
 	"encoding/json"
+	"errors"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -135,6 +136,17 @@ func GetInPlaceUpdateState(obj metav1.Object) (string, bool) {
 	}
 	v, ok := obj.GetAnnotations()[InPlaceUpdateStateKeyOld]
 	return v, ok
+}
+
+func ParseInPlaceUpdateState(pod *v1.Pod) (*InPlaceUpdateState, error) {
+	if stateStr, ok := GetInPlaceUpdateState(pod); ok {
+		state := InPlaceUpdateState{}
+		if err := json.Unmarshal([]byte(stateStr), &state); err != nil {
+			return nil, err
+		}
+		return &state, nil
+	}
+	return nil, errors.New("annotation inplace-update-state not found")
 }
 
 func GetInPlaceUpdateGrace(obj metav1.Object) (string, bool) {

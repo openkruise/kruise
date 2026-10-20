@@ -18,7 +18,9 @@ package podadapter
 
 import (
 	"context"
+	"encoding/json"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -98,6 +100,7 @@ func (c *AdapterTypedClient) PatchPodResource(pod *v1.Pod, patch client.Patch) (
 	return c.Client.CoreV1().Pods(pod.Namespace).Patch(context.TODO(), pod.Name, patch.Type(), patchData, metav1.PatchOptions{}, "resize")
 }
 
+// just for sts test
 type AdapterInformer struct {
 	PodInformer coreinformers.PodInformer
 }
@@ -116,4 +119,46 @@ func (c *AdapterInformer) UpdatePod(pod *v1.Pod) (*v1.Pod, error) {
 
 func (c *AdapterInformer) UpdatePodStatus(pod *v1.Pod) error {
 	return c.PodInformer.Informer().GetIndexer().Update(pod)
+}
+
+func patchToRawPod(pod, outPod *v1.Pod, patch client.Patch) (*v1.Pod, error) {
+	patchData, err := patch.Data(pod)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := json.Marshal(outPod)
+	if err != nil {
+		return nil, err
+	}
+
+	patchedPodBytes, err := jsonpatch.MergePatch(raw, patchData)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(patchedPodBytes, outPod)
+	if err != nil {
+		return nil, err
+	}
+	return outPod, nil
+}
+
+func (c *AdapterInformer) PatchPod(pod *v1.Pod, patch client.Patch) (*v1.Pod, error) {
+	rawPod, err := c.GetPod(pod.Namespace, pod.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawPod, err = patchToRawPod(pod, rawPod, patch)
+	if err != nil {
+		return nil, err
+	}
+	err = c.PodInformer.Informer().GetIndexer().Update(rawPod)
+	if err != nil {
+		return nil, err
+	}
+	return rawPod, nil
+}
+
+func (c *AdapterInformer) PatchPodResource(pod *v1.Pod, patch client.Patch) (*v1.Pod, error) {
+	return c.PatchPod(pod, patch)
 }
