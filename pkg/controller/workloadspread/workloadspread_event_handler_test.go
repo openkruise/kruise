@@ -231,6 +231,88 @@ func TestPodEventHandler(t *testing.T) {
 	}
 }
 
+func TestPodEventHandlerUpdateUnschedulable(t *testing.T) {
+	injectWorkloadSpread := &wsutil.InjectWorkloadSpread{
+		Name:   "test-workloadSpread",
+		Subset: "subset-demo",
+	}
+	by, _ := json.Marshal(injectWorkloadSpread)
+
+	scheduledCondition := func(status corev1.ConditionStatus, reason, message string) []corev1.PodCondition {
+		return []corev1.PodCondition{{Type: corev1.PodScheduled, Status: status, Reason: reason, Message: message}}
+	}
+	pendingPod := func(annotated bool, conditions []corev1.PodCondition) *corev1.Pod {
+		pod := podDemo.DeepCopy()
+		pod.Spec.NodeName = ""
+		pod.Status.Phase = corev1.PodPending
+		pod.Status.Conditions = conditions
+		if annotated {
+			pod.Annotations = map[string]string{wsutil.MatchedWorkloadSpreadSubsetAnnotations: string(by)}
+		}
+		return pod
+	}
+
+	cases := []struct {
+		name          string
+		oldPod        *corev1.Pod
+		newPod        *corev1.Pod
+		expectEnqueue bool
+	}{
+		{
+			name:          "pod becomes unschedulable",
+			oldPod:        pendingPod(true, nil),
+			newPod:        pendingPod(true, scheduledCondition(corev1.ConditionFalse, corev1.PodReasonUnschedulable, "0/3 nodes are available")),
+			expectEnqueue: true,
+		},
+		{
+			name:          "pod becomes unschedulable after its scheduling gates are removed",
+			oldPod:        pendingPod(true, scheduledCondition(corev1.ConditionFalse, corev1.PodReasonSchedulingGated, "")),
+			newPod:        pendingPod(true, scheduledCondition(corev1.ConditionFalse, corev1.PodReasonUnschedulable, "0/3 nodes are available")),
+			expectEnqueue: true,
+		},
+		{
+			name:          "unschedulable pod only gets a new message",
+			oldPod:        pendingPod(true, scheduledCondition(corev1.ConditionFalse, corev1.PodReasonUnschedulable, "0/3 nodes are available")),
+			newPod:        pendingPod(true, scheduledCondition(corev1.ConditionFalse, corev1.PodReasonUnschedulable, "0/4 nodes are available")),
+			expectEnqueue: false,
+		},
+		{
+			name:          "pod not managed by a WorkloadSpread becomes unschedulable",
+			oldPod:        pendingPod(false, nil),
+			newPod:        pendingPod(false, scheduledCondition(corev1.ConditionFalse, corev1.PodReasonUnschedulable, "0/3 nodes are available")),
+			expectEnqueue: false,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			handler := &podEventHandler{}
+			updateQ := workqueue.NewTypedRateLimitingQueue(
+				workqueue.DefaultTypedControllerRateLimiter[reconcile.Request](),
+			)
+			updateEvt := event.TypedUpdateEvent[*corev1.Pod]{
+				ObjectOld: cs.oldPod,
+				ObjectNew: cs.newPod,
+			}
+			handler.Update(context.TODO(), updateEvt, updateQ)
+
+			expectLen := 0
+			if cs.expectEnqueue {
+				expectLen = 1
+			}
+			if updateQ.Len() != expectLen {
+				t.Fatalf("unexpected update event handle queue size, expected %d actual %d", expectLen, updateQ.Len())
+			}
+			if cs.expectEnqueue {
+				key, _ := updateQ.Get()
+				if key.Namespace != cs.newPod.Namespace || key.Name != injectWorkloadSpread.Name {
+					t.Errorf("matching WorkloadSpread %s/%s failed, got %s", cs.newPod.Namespace, injectWorkloadSpread.Name, key)
+				}
+			}
+		})
+	}
+}
+
 func TestGetWorkloadSpreadForCloneSet(t *testing.T) {
 	cases := []struct {
 		name                 string

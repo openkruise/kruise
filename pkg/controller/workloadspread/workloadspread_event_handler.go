@@ -66,7 +66,26 @@ func (p *podEventHandler) Update(ctx context.Context, evt event.TypedUpdateEvent
 
 	if kubecontroller.IsPodActive(oldPod) && !kubecontroller.IsPodActive(newPod) || wsutil.GetPodVersion(oldPod) != wsutil.GetPodVersion(newPod) {
 		p.handlePod(q, newPod, UpdateEventAction)
+		return
 	}
+
+	// The adaptive strategy reschedules a Pod only once it has been reported unschedulable, and the
+	// reconcile that sees this condition is the one that requeues for rescheduleCriticalSeconds.
+	// The scheduler usually reports it after the reconciles triggered by the Pod creation have run,
+	// so enqueue when the Pod becomes unschedulable.
+	if !isPodUnschedulable(oldPod) && isPodUnschedulable(newPod) {
+		p.handlePod(q, newPod, UpdateEventAction)
+	}
+}
+
+// isPodUnschedulable returns true if the scheduler has reported the Pod as unschedulable.
+func isPodUnschedulable(pod *corev1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodScheduled {
+			return condition.Status == corev1.ConditionFalse && condition.Reason == corev1.PodReasonUnschedulable
+		}
+	}
+	return false
 }
 
 func (p *podEventHandler) Delete(ctx context.Context, evt event.TypedDeleteEvent[*corev1.Pod], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
