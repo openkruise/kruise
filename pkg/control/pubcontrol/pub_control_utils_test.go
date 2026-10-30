@@ -517,6 +517,54 @@ func TestIsNeedPubProtection(t *testing.T) {
 			expectProtect: true,
 		},
 		{
+			name: "pub protect evict by default when annotation has only invalid operations",
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1beta1.PubProtectOperationAnnotation: "delete,evict",
+				}
+				return pub
+			},
+			operation:     policyv1beta1.PubEvictOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub protect delete by default when annotation has only invalid operations",
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1beta1.PubProtectOperationAnnotation: "xxxxx, ,",
+				}
+				return pub
+			},
+			operation:     policyv1beta1.PubDeleteOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub protect evict when annotation mixes invalid and valid operations",
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1beta1.PubProtectOperationAnnotation: "bogus," + string(policyv1beta1.PubEvictOperation),
+				}
+				return pub
+			},
+			operation:     policyv1beta1.PubEvictOperation,
+			expectProtect: true,
+		},
+		{
+			name: "pub not protect delete when annotation mixes invalid and valid operations",
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
+				pub := pubDemo.DeepCopy()
+				pub.Annotations = map[string]string{
+					policyv1beta1.PubProtectOperationAnnotation: "bogus," + string(policyv1beta1.PubEvictOperation),
+				}
+				return pub
+			},
+			operation:     policyv1beta1.PubDeleteOperation,
+			expectProtect: false,
+		},
+		{
 			name: "pub protect delete by default",
 			getPub: func() *policyv1beta1.PodUnavailableBudget {
 				pub := pubDemo.DeepCopy()
