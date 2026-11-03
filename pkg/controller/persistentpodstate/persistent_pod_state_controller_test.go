@@ -38,7 +38,9 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/features"
 	"github.com/openkruise/kruise/pkg/util/controllerfinder"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 )
 
@@ -548,6 +550,109 @@ func TestReconcilePersistentPodState(t *testing.T) {
 			}
 			if !reflect.DeepEqual(latestPersistentPodState.Status, cs.exceptPersistentPodState().Status) {
 				t.Fatalf("staticIP deepequal failed")
+			}
+		})
+	}
+}
+
+func TestReconcilePersistentPodStateWithStartOrdinal(t *testing.T) {
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetStartOrdinal, true)()
+
+	cases := []struct {
+		name   string
+		getSts func() client.Object
+	}{
+		{
+			name: "kruise statefulset with ordinals.start",
+			getSts: func() client.Object {
+				kruise := kruiseStsDemo.DeepCopy()
+				kruise.Spec.Replicas = ptr.To[int32](3)
+				kruise.Spec.Ordinals = &appsv1beta1.StatefulSetOrdinals{Start: 5}
+				return kruise
+			},
+		},
+		{
+			name: "statefulset with ordinals.start",
+			getSts: func() client.Object {
+				return &appsv1.StatefulSet{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: KindSts.GroupVersion().String(),
+						Kind:       KindSts.Kind,
+					},
+					ObjectMeta: *kruiseStsDemo.ObjectMeta.DeepCopy(),
+					Spec: appsv1.StatefulSetSpec{
+						Replicas: ptr.To[int32](3),
+						Ordinals: &appsv1.StatefulSetOrdinals{Start: 5},
+					},
+				}
+			},
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			sts := cs.getSts()
+			gvk := sts.GetObjectKind().GroupVersionKind()
+			staticIP := staticIPDemo.DeepCopy()
+			staticIP.Spec.TargetReference.APIVersion = gvk.GroupVersion().String()
+			staticIP.Spec.TargetReference.Kind = gvk.Kind
+			staticIP.Status.PodStates = map[string]appsv1beta1.PodState{}
+
+			clientBuilder := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sts)
+			// replicas are test-sts-5, test-sts-6 and test-sts-7, test-sts-6 is being recreated
+			for _, i := range []int{5, 6, 7} {
+				node := nodeDemo.DeepCopy()
+				node.Name = fmt.Sprintf("node-%d", i)
+				node.Labels[podStateZoneTopologyLabel] = fmt.Sprintf("cn-beijing-%d", i)
+				node.Labels[podStateNodeTopologyLabel] = fmt.Sprintf("kube-resource011162007216-%d", i)
+				clientBuilder.WithObjects(node)
+
+				podName := fmt.Sprintf("%s-%d", kruiseStsDemo.Name, i)
+				staticIP.Status.PodStates[podName] = appsv1beta1.PodState{
+					NodeName: node.Name,
+					NodeTopologyLabels: map[string]string{
+						podStateZoneTopologyLabel: node.Labels[podStateZoneTopologyLabel],
+						podStateNodeTopologyLabel: node.Labels[podStateNodeTopologyLabel],
+					},
+				}
+				if i == 6 {
+					continue
+				}
+				pod := podDemo.DeepCopy()
+				pod.Name = podName
+				pod.OwnerReferences[0].APIVersion = gvk.GroupVersion().String()
+				pod.OwnerReferences[0].Kind = gvk.Kind
+				pod.OwnerReferences[0].Name = sts.GetName()
+				pod.OwnerReferences[0].UID = sts.GetUID()
+				pod.Spec.NodeName = node.Name
+				clientBuilder.WithObjects(pod)
+			}
+			expectStatus := *staticIP.Status.DeepCopy()
+
+			fakeClient := clientBuilder.WithObjects(staticIP).
+				WithStatusSubresource(&appsv1beta1.PersistentPodState{}).
+				WithIndex(&corev1.Pod{}, fieldindex.IndexNameForOwnerRefUID, func(obj client.Object) []string {
+					var owners []string
+					for _, ref := range obj.GetOwnerReferences() {
+						owners = append(owners, string(ref.UID))
+					}
+					return owners
+				}).Build()
+			reconciler := ReconcilePersistentPodState{
+				Client: fakeClient,
+				finder: &controllerfinder.ControllerFinder{Client: fakeClient},
+			}
+			request := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: "ns-test", Name: "test-sts"}}
+			if _, err := reconciler.Reconcile(context.TODO(), request); err != nil {
+				t.Fatalf("reconcile failed, err: %v", err)
+			}
+
+			latestPersistentPodState, err := getLatestPersistentPodState(fakeClient, staticIP)
+			if err != nil {
+				t.Fatalf("get latest PersistentPodState failed, err: %v", err)
+			}
+			if !reflect.DeepEqual(latestPersistentPodState.Status, expectStatus) {
+				t.Fatalf("expect status %v, but got %v", expectStatus, latestPersistentPodState.Status)
 			}
 		})
 	}

@@ -40,8 +40,10 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/features"
 	apiutil "github.com/openkruise/kruise/pkg/util/api"
 	"github.com/openkruise/kruise/pkg/util/configuration"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 var Finder *ControllerFinder
@@ -81,6 +83,8 @@ type ScaleAndSelector struct {
 	Scale int32
 	// kruise statefulSet.spec.ReserveOrdinals
 	ReserveOrdinals sets.Set[int]
+	// statefulSet.spec.ordinals.start, the first ordinal of the replicas
+	StartOrdinal int
 	// controller.spec.Selector
 	Selector *metav1.LabelSelector
 	// metadata
@@ -254,9 +258,15 @@ func (r *ControllerFinder) getPodStatefulSet(ref ControllerReference, namespace 
 		return nil, nil
 	}
 
+	startOrdinal := 0
+	if statefulSet.Spec.Ordinals != nil {
+		startOrdinal = int(statefulSet.Spec.Ordinals.Start)
+	}
+
 	return &ScaleAndSelector{
-		Scale:    ptr.Deref(statefulSet.Spec.Replicas, 1),
-		Selector: statefulSet.Spec.Selector,
+		Scale:        ptr.Deref(statefulSet.Spec.Replicas, 1),
+		StartOrdinal: startOrdinal,
+		Selector:     statefulSet.Spec.Selector,
 		ControllerReference: ControllerReference{
 			APIVersion: statefulSet.APIVersion,
 			Kind:       statefulSet.Kind,
@@ -382,9 +392,15 @@ func (r *ControllerFinder) getPodKruiseStatefulSet(ref ControllerReference, name
 		return nil, nil
 	}
 
+	startOrdinal := 0
+	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) && ss.Spec.Ordinals != nil {
+		startOrdinal = int(ss.Spec.Ordinals.Start)
+	}
+
 	return &ScaleAndSelector{
 		Scale:           ptr.Deref(ss.Spec.Replicas, 1),
 		ReserveOrdinals: apiutil.GetReserveOrdinalIntSet(ss.Spec.ReserveOrdinals),
+		StartOrdinal:    startOrdinal,
 		Selector:        ss.Spec.Selector,
 		ControllerReference: ControllerReference{
 			APIVersion: ss.APIVersion,
