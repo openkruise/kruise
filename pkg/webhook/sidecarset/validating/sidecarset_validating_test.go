@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
@@ -1717,6 +1718,223 @@ func TestValidateSidecarSetCanaryAnnotations(t *testing.T) {
 				if !strings.Contains(result[i].Detail, expectedErr.Detail) {
 					t.Errorf("Error[%d]: expected detail %s, got %s", i, expectedErr.Detail, result[i].Detail)
 				}
+			}
+		})
+	}
+}
+
+func TestSidecarSetValidationFieldPaths(t *testing.T) {
+	fakeClient := fake.NewClientBuilder().WithScheme(testScheme).Build()
+	h := &SidecarSetCreateUpdateHandler{Client: fakeClient}
+
+	basePpm := func() *appsv1beta1.SidecarSet {
+		return &appsv1beta1.SidecarSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "test-sidecarset"},
+			Spec: appsv1beta1.SidecarSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"app": "test"},
+				},
+				Containers: []appsv1beta1.SidecarContainer{
+					{
+						Container: corev1.Container{
+							Name:                     "sidecar",
+							Image:                    "test-image",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+						PodInjectPolicy: appsv1beta1.BeforeAppContainerType,
+						ShareVolumePolicy: appsv1beta1.ShareVolumePolicy{
+							Type: appsv1beta1.ShareVolumePolicyDisabled,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	testCases := []struct {
+		name          string
+		getObj        func() *appsv1beta1.SidecarSet
+		getOld        func() *appsv1beta1.SidecarSet
+		expectedField string
+	}{
+		{
+			name: "spec.containers[0].podInjectPolicy invalid",
+			getObj: func() *appsv1beta1.SidecarSet {
+				sc := basePpm()
+				sc.Spec.Containers[0].PodInjectPolicy = "InvalidPolicy"
+				return sc
+			},
+			expectedField: "spec.containers[0].podInjectPolicy",
+		},
+		{
+			name: "spec.containers[0].shareVolumePolicy invalid",
+			getObj: func() *appsv1beta1.SidecarSet {
+				sc := basePpm()
+				sc.Spec.Containers[0].ShareVolumePolicy.Type = "InvalidPolicy"
+				return sc
+			},
+			expectedField: "spec.containers[0].shareVolumePolicy",
+		},
+		{
+			name: "spec.containers[0].resourcesPolicy conflict with resources",
+			getObj: func() *appsv1beta1.SidecarSet {
+				sc := basePpm()
+				sc.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Limits: corev1.ResourceList{
+						corev1.ResourceCPU: resource.MustParse("100m"),
+					},
+				}
+				sc.Spec.Containers[0].ResourcesPolicy = &appsv1beta1.ResourcesPolicy{
+					TargetContainersMode: appsv1beta1.TargetContainersModeSum,
+					TargetContainersNameRegex: ".*",
+					ResourcesExpr: appsv1beta1.ResourcesExpr{
+						Limits: &appsv1beta1.ResourceExprLimits{CPU: "1"},
+					},
+				}
+				return sc
+			},
+			expectedField: "spec.containers[0].resourcesPolicy",
+		},
+		{
+			name: "spec.initContainers[0].resourcesPolicy without restartPolicy Always",
+			getObj: func() *appsv1beta1.SidecarSet {
+				sc := basePpm()
+				sc.Spec.InitContainers = []appsv1beta1.SidecarContainer{
+					{
+						Container: corev1.Container{
+							Name:                     "init-sidecar",
+							Image:                    "test-image",
+							ImagePullPolicy:          corev1.PullIfNotPresent,
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+						},
+						ResourcesPolicy: &appsv1beta1.ResourcesPolicy{
+							TargetContainersMode: appsv1beta1.TargetContainersModeSum,
+							TargetContainersNameRegex: ".*",
+							ResourcesExpr: appsv1beta1.ResourcesExpr{
+								Limits: &appsv1beta1.ResourceExprLimits{CPU: "1"},
+							},
+						},
+					},
+				}
+				return sc
+			},
+			expectedField: "spec.initContainers[0].resourcesPolicy",
+		},
+		{
+			name: "spec.injectionStrategy.revision invalid",
+			getObj: func() *appsv1beta1.SidecarSet {
+				sc := basePpm()
+				sc.Spec.InjectionStrategy = appsv1beta1.SidecarSetInjectionStrategy{
+					Revision: &appsv1beta1.SidecarSetInjectRevision{
+						Policy: appsv1beta1.AlwaysSidecarSetInjectRevisionPolicy,
+					},
+				}
+				return sc
+			},
+			expectedField: "spec.injectionStrategy.revision",
+		},
+		{
+			name: "spec.injectionStrategy.revision.policy invalid",
+			getObj: func() *appsv1beta1.SidecarSet {
+				revName := "test-rev"
+				sc := basePpm()
+				sc.Spec.InjectionStrategy = appsv1beta1.SidecarSetInjectionStrategy{
+					Revision: &appsv1beta1.SidecarSetInjectRevision{
+						RevisionName: &revName,
+						Policy:       "InvalidPolicy",
+					},
+				}
+				return sc
+			},
+			expectedField: "spec.injectionStrategy.revision.policy",
+		},
+		{
+			name: "spec.patchPodMetadata[0].annotations empty",
+			getObj: func() *appsv1beta1.SidecarSet {
+				sc := basePpm()
+				sc.Spec.PatchPodMetadata = []appsv1beta1.SidecarSetPatchPodMetadata{
+					{
+						PatchPolicy: appsv1beta1.SidecarSetRetainPatchPolicy,
+					},
+				}
+				return sc
+			},
+			expectedField: "spec.patchPodMetadata[0].annotations",
+		},
+		{
+			name: "spec.patchPodMetadata[0].patchPolicy empty",
+			getObj: func() *appsv1beta1.SidecarSet {
+				sc := basePpm()
+				sc.Spec.PatchPodMetadata = []appsv1beta1.SidecarSetPatchPodMetadata{
+					{
+						Annotations: map[string]string{"foo": "bar"},
+					},
+				}
+				return sc
+			},
+			expectedField: "spec.patchPodMetadata[0].patchPolicy",
+		},
+		{
+			name: "spec.updateStrategy partition and selector conflict",
+			getObj: func() *appsv1beta1.SidecarSet {
+				sc := basePpm()
+				sc.Spec.UpdateStrategy = appsv1beta1.SidecarSetUpdateStrategy{
+					Type:      appsv1beta1.RollingUpdateSidecarSetStrategyType,
+					Partition: ptr.To(intstr.FromInt(1)),
+					Selector:  &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				}
+				return sc
+			},
+			expectedField: "spec.updateStrategy",
+		},
+		{
+			name: "spec.containers[0].upgradeStrategy.upgradeType immutable on update",
+			getObj: func() *appsv1beta1.SidecarSet {
+				sc := basePpm()
+				sc.Spec.Containers[0].UpgradeStrategy.UpgradeType = appsv1beta1.SidecarContainerHotUpgrade
+				return sc
+			},
+			getOld: func() *appsv1beta1.SidecarSet {
+				sc := basePpm()
+				sc.Spec.Containers[0].UpgradeStrategy.UpgradeType = appsv1beta1.SidecarContainerColdUpgrade
+				return sc
+			},
+			expectedField: "spec.containers[0].upgradeStrategy.upgradeType",
+		},
+		{
+			name: "spec.containers[0].name not found on update",
+			getObj: func() *appsv1beta1.SidecarSet {
+				sc := basePpm()
+				sc.Spec.Containers[0].Name = "new-sidecar"
+				return sc
+			},
+			getOld: func() *appsv1beta1.SidecarSet {
+				return basePpm()
+			},
+			expectedField: "spec.containers[0].name",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var old *appsv1beta1.SidecarSet
+			if tc.getOld != nil {
+				old = tc.getOld()
+			}
+			errList := h.validateSidecarSet(tc.getObj(), old)
+			if len(errList) == 0 {
+				t.Fatalf("expected error for field %s, but got no errors", tc.expectedField)
+			}
+			found := false
+			for _, err := range errList {
+				if err.Field == tc.expectedField {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected error field %q, but got fields: %v", tc.expectedField, errList)
 			}
 		})
 	}
