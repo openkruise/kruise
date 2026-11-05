@@ -42,9 +42,22 @@ import (
 )
 
 var (
-	containerImagePatchRexp     = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
+	containerImagePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
+	// containerResourcesPatchRexp intentionally matches the regular containers only. The resources
+	// of a restartable init container are not in-place updatable, so such a patch falls through to
+	// the fallback of defaultCalculateInPlaceUpdateSpec and the Pod gets recreated.
 	containerResourcesPatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/resources/.*$")
+	// initContainerImagePatchRexp matches the image of an init container. Only restartable init
+	// containers (native sidecar containers) can be in-place updated, and it is guarded by the
+	// InPlaceUpdateRestartableInitContainer feature-gate. See defaultCalculateInPlaceUpdateSpec.
+	initContainerImagePatchRexp = regexp.MustCompile("^/spec/initContainers/([0-9]+)/image$")
 	rfc6901Decoder              = strings.NewReplacer("~1", "/", "~0", "~")
+
+	// The two regexps below match the patches calculated between two PodTemplateSpec.Spec, so
+	// they have no leading "/spec". They are used by the InPlaceOnly validation of the workload
+	// webhooks. See ValidateInPlaceOnlyTemplateSpecPatches.
+	inPlaceOnlyContainerImagePatchRexp     = regexp.MustCompile("^/containers/([0-9]+)/image$")
+	inPlaceOnlyInitContainerImagePatchRexp = regexp.MustCompile("^/initContainers/([0-9]+)/image$")
 
 	Clock clock.Clock = clock.RealClock{}
 )
@@ -86,7 +99,11 @@ type Interface interface {
 type UpdateSpec struct {
 	Revision string `json:"revision"`
 
-	ContainerImages       map[string]string                  `json:"containerImages,omitempty"`
+	ContainerImages map[string]string `json:"containerImages,omitempty"`
+	// InitContainerImages is the images of the restartable init containers (native sidecar
+	// containers) that need to in-place update. It is only calculated when the
+	// InPlaceUpdateRestartableInitContainer feature-gate is enabled.
+	InitContainerImages   map[string]string                  `json:"initContainerImages,omitempty"`
 	ContainerRefMetadata  map[string]metav1.ObjectMeta       `json:"containerRefMetadata,omitempty"`
 	ContainerResources    map[string]v1.ResourceRequirements `json:"containerResources,omitempty"`
 	MetaDataPatch         []byte                             `json:"metaDataPatch,omitempty"`
@@ -98,7 +115,8 @@ type UpdateSpec struct {
 }
 
 func (u *UpdateSpec) VerticalUpdateOnly() bool {
-	return len(u.ContainerResources) > 0 && len(u.ContainerImages) == 0 && !u.UpdateEnvFromMetadata
+	return len(u.ContainerResources) > 0 && len(u.ContainerImages) == 0 &&
+		len(u.InitContainerImages) == 0 && !u.UpdateEnvFromMetadata
 }
 
 type realControl struct {
@@ -380,7 +398,7 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 			Revision:              spec.Revision,
 			UpdateTimestamp:       metav1.NewTime(Clock.Now()),
 			UpdateEnvFromMetadata: spec.UpdateEnvFromMetadata,
-			UpdateImages:          len(spec.ContainerImages) > 0,
+			UpdateImages:          len(spec.ContainerImages) > 0 || len(spec.InitContainerImages) > 0,
 			UpdateResources:       len(spec.ContainerResources) > 0,
 		}
 		inPlaceUpdateStateJSON, _ := json.Marshal(inPlaceUpdateState)
@@ -472,7 +490,9 @@ func doPreCheckBeforeNext(pod *v1.Pod, preCheck *appspub.InPlaceUpdatePreCheckBe
 		return nil
 	}
 	for _, cName := range preCheck.ContainersRequiredReady {
-		cStatus := util.GetContainerStatus(cName, pod)
+		// Look up init container statuses as well, for restartable init containers may also be
+		// recorded in ContainersRequiredReady when they are in-place updated.
+		cStatus := util.GetContainerStatusIncludingInit(cName, pod)
 		if cStatus == nil {
 			return fmt.Errorf("not found container %s in pod status", cName)
 		}

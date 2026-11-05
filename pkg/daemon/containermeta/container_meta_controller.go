@@ -156,26 +156,67 @@ func eventFilter(oldPod, newPod *v1.Pod) bool {
 		return true
 	}
 	containerMetaSet, _ := appspub.GetRuntimeContainerMetaSet(newPod)
-	for i := range newPod.Status.ContainerStatuses {
-		if newPod.Status.ContainerStatuses[i].ContainerID == "" {
-			continue
+
+	// Look up the reported meta by container name rather than by index, because the meta set
+	// contains the restartable init containers (native sidecar containers) as well and therefore
+	// no longer aligns with status.containerStatuses positionally.
+	var metaByName map[string]*appspub.RuntimeContainerMeta
+	if containerMetaSet != nil {
+		metaByName = make(map[string]*appspub.RuntimeContainerMeta, len(containerMetaSet.Containers))
+		for i := range containerMetaSet.Containers {
+			metaByName[containerMetaSet.Containers[i].Name] = &containerMetaSet.Containers[i]
 		}
-		if containerMetaSet == nil || len(containerMetaSet.Containers) != len(newPod.Status.ContainerStatuses) {
-			return true
-		}
-		if containerMetaSet.Containers[i].ContainerID != newPod.Status.ContainerStatuses[i].ContainerID {
-			return true
-		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceUpdateEnvFromMetadata) {
-			hasher := utilcontainermeta.NewEnvFromMetadataHasher()
-			newHash := hasher.GetExpectHash(&newPod.Spec.Containers[i], newPod)
-			if newHash != containerMetaSet.Containers[i].Hashes.ExtractedEnvFromMetadataHash {
+	}
+
+	// expectedCount counts the containers that should be reported, so that a stale meta set which
+	// still contains a removed container can be detected.
+	var expectedCount int
+	changed := func(statuses []v1.ContainerStatus, onlyRestartableInit bool) bool {
+		for i := range statuses {
+			cs := &statuses[i]
+			containerSpec := util.GetContainer(cs.Name, newPod)
+			if containerSpec == nil {
+				continue
+			}
+			if onlyRestartableInit && !util.IsRestartableInitContainer(containerSpec) {
+				continue
+			}
+			expectedCount++
+			if cs.ContainerID == "" {
+				continue
+			}
+			if containerMetaSet == nil {
 				return true
 			}
-			if oldPod != nil && newHash != hasher.GetExpectHash(&oldPod.Spec.Containers[i], oldPod) {
+			meta, ok := metaByName[cs.Name]
+			if !ok || meta.ContainerID != cs.ContainerID {
 				return true
 			}
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceUpdateEnvFromMetadata) {
+				hasher := utilcontainermeta.NewEnvFromMetadataHasher()
+				newHash := hasher.GetExpectHash(containerSpec, newPod)
+				if newHash != meta.Hashes.ExtractedEnvFromMetadataHash {
+					return true
+				}
+				if oldPod != nil {
+					if oldSpec := util.GetContainer(cs.Name, oldPod); oldSpec != nil &&
+						newHash != hasher.GetExpectHash(oldSpec, oldPod) {
+						return true
+					}
+				}
+			}
 		}
+		return false
+	}
+
+	if changed(newPod.Status.InitContainerStatuses, true) {
+		return true
+	}
+	if changed(newPod.Status.ContainerStatuses, false) {
+		return true
+	}
+	if containerMetaSet != nil && expectedCount > 0 && len(containerMetaSet.Containers) != expectedCount {
+		return true
 	}
 	return false
 }
@@ -319,66 +360,98 @@ func (c *Controller) reportContainerMetaSet(pod *v1.Pod, oldMetaSet, newMetaSet 
 }
 
 func (c *Controller) manageContainerMetaSet(pod *v1.Pod, kubePodStatus *kubeletcontainer.PodStatus, oldMetaSet *appspub.RuntimeContainerMetaSet, criRuntime criapi.RuntimeService) *appspub.RuntimeContainerMetaSet {
-	var err error
-	metaSet := appspub.RuntimeContainerMetaSet{Containers: make([]appspub.RuntimeContainerMeta, 0, len(pod.Status.ContainerStatuses))}
-	for _, cs := range pod.Status.ContainerStatuses {
-		status := kubePodStatus.FindContainerStatusByName(cs.Name)
-		if status == nil {
+	metaSet := appspub.RuntimeContainerMetaSet{
+		Containers: make([]appspub.RuntimeContainerMeta, 0, len(pod.Status.InitContainerStatuses)+len(pod.Status.ContainerStatuses)),
+	}
+
+	// Report the restartable init containers (native sidecar containers) as well, so that the
+	// workload controllers can verify their in-place update with the container hash, instead of
+	// falling back to the weaker imageID comparison.
+	//
+	// Regular init containers are skipped on purpose: they exit after completion and kubelet
+	// never restarts them when their spec changes, so their runtime meta would never become
+	// consistent and their containerID may already have been garbage collected.
+	//
+	// Note that the order here must be stable, for the meta set is compared with the previous one
+	// to decide whether the Pod annotation has to be patched.
+	for i := range pod.Status.InitContainerStatuses {
+		containerSpec := util.GetContainer(pod.Status.InitContainerStatuses[i].Name, pod)
+		if containerSpec == nil || !util.IsRestartableInitContainer(containerSpec) {
 			continue
 		}
-		containerSpec := util.GetContainer(cs.Name, pod)
+		if meta := c.buildContainerMeta(pod, containerSpec, kubePodStatus, oldMetaSet, criRuntime); meta != nil {
+			metaSet.Containers = append(metaSet.Containers, *meta)
+		}
+	}
+
+	for i := range pod.Status.ContainerStatuses {
+		containerSpec := util.GetContainer(pod.Status.ContainerStatuses[i].Name, pod)
 		if containerSpec == nil {
 			continue
 		}
-
-		var containerMeta *appspub.RuntimeContainerMeta
-		if oldMetaSet != nil {
-			for i := range oldMetaSet.Containers {
-				if oldMetaSet.Containers[i].ContainerID == status.ID.String() {
-					containerMeta = oldMetaSet.Containers[i].DeepCopy()
-				}
-			}
+		if meta := c.buildContainerMeta(pod, containerSpec, kubePodStatus, oldMetaSet, criRuntime); meta != nil {
+			metaSet.Containers = append(metaSet.Containers, *meta)
 		}
-		if containerMeta == nil {
-			containerMeta = &appspub.RuntimeContainerMeta{
-				Name:         status.Name,
-				ContainerID:  status.ID.String(),
-				RestartCount: int32(status.RestartCount),
-				Hashes: appspub.RuntimeContainerHashes{
-					PlainHash: status.Hash,
-				},
-			}
-		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceUpdateEnvFromMetadata) {
-			envHasher := utilcontainermeta.NewEnvFromMetadataHasher()
-
-			if containerMeta.Hashes.ExtractedEnvFromMetadataHash == 0 && status.State == kubeletcontainer.ContainerStateRunning {
-				envGetter := wrapEnvGetter(criRuntime, status.ID.ID, fmt.Sprintf("container %s (%s) in Pod %s/%s", containerSpec.Name, status.ID.String(), pod.Namespace, pod.Name))
-				containerMeta.Hashes.ExtractedEnvFromMetadataHash, err = envHasher.GetCurrentHash(containerSpec, envGetter)
-				if err != nil {
-					klog.ErrorS(err, "Failed to hash container with env for Pod", "containerName", containerSpec.Name, "containerID", status.ID.String(), "namespace", pod.Namespace, "podName", pod.Name)
-					enqueueAfter(c.queue, pod, time.Second*3)
-				} else {
-					klog.V(4).InfoS("Extracted env from metadata for container",
-						"containerName", containerSpec.Name, "containerID", status.ID.String(), "namespace", pod.Namespace, "podName", pod.Name, "hash", containerMeta.Hashes.ExtractedEnvFromMetadataHash)
-				}
-			}
-
-			// Trigger restarting only if it is in-place updating
-			_, condition := podutil.GetPodCondition(&pod.Status, appspub.InPlaceUpdateReady)
-			if condition != nil && condition.Status == v1.ConditionFalse {
-				// Trigger restarting when expected env hash is not equal to current hash
-				if containerMeta.Hashes.ExtractedEnvFromMetadataHash > 0 && containerMeta.Hashes.ExtractedEnvFromMetadataHash != envHasher.GetExpectHash(containerSpec, pod) {
-					// Maybe checking PlainHash inconsistent here can skip to trigger restart. But it is not a good idea for some special scenarios.
-					klog.V(2).InfoS("Triggering container in Pod to restart, for it has inconsistent hash of env from metadata", "containerName", containerSpec.Name, "containerID", status.ID.String(), "namespace", pod.Namespace, "podName", pod.Name)
-					c.restarter.queue.AddRateLimited(status.ID)
-				}
-			}
-		}
-
-		metaSet.Containers = append(metaSet.Containers, *containerMeta)
 	}
+
 	return &metaSet
+}
+
+// buildContainerMeta builds the runtime meta for a single container. It returns nil if the
+// container has not been created by the runtime yet.
+func (c *Controller) buildContainerMeta(pod *v1.Pod, containerSpec *v1.Container, kubePodStatus *kubeletcontainer.PodStatus, oldMetaSet *appspub.RuntimeContainerMetaSet, criRuntime criapi.RuntimeService) *appspub.RuntimeContainerMeta {
+	var err error
+	status := kubePodStatus.FindContainerStatusByName(containerSpec.Name)
+	if status == nil {
+		return nil
+	}
+
+	var containerMeta *appspub.RuntimeContainerMeta
+	if oldMetaSet != nil {
+		for i := range oldMetaSet.Containers {
+			if oldMetaSet.Containers[i].ContainerID == status.ID.String() {
+				containerMeta = oldMetaSet.Containers[i].DeepCopy()
+			}
+		}
+	}
+	if containerMeta == nil {
+		containerMeta = &appspub.RuntimeContainerMeta{
+			Name:         status.Name,
+			ContainerID:  status.ID.String(),
+			RestartCount: int32(status.RestartCount),
+			Hashes: appspub.RuntimeContainerHashes{
+				PlainHash: status.Hash,
+			},
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceUpdateEnvFromMetadata) {
+		envHasher := utilcontainermeta.NewEnvFromMetadataHasher()
+
+		if containerMeta.Hashes.ExtractedEnvFromMetadataHash == 0 && status.State == kubeletcontainer.ContainerStateRunning {
+			envGetter := wrapEnvGetter(criRuntime, status.ID.ID, fmt.Sprintf("container %s (%s) in Pod %s/%s", containerSpec.Name, status.ID.String(), pod.Namespace, pod.Name))
+			containerMeta.Hashes.ExtractedEnvFromMetadataHash, err = envHasher.GetCurrentHash(containerSpec, envGetter)
+			if err != nil {
+				klog.ErrorS(err, "Failed to hash container with env for Pod", "containerName", containerSpec.Name, "containerID", status.ID.String(), "namespace", pod.Namespace, "podName", pod.Name)
+				enqueueAfter(c.queue, pod, time.Second*3)
+			} else {
+				klog.V(4).InfoS("Extracted env from metadata for container",
+					"containerName", containerSpec.Name, "containerID", status.ID.String(), "namespace", pod.Namespace, "podName", pod.Name, "hash", containerMeta.Hashes.ExtractedEnvFromMetadataHash)
+			}
+		}
+
+		// Trigger restarting only if it is in-place updating
+		_, condition := podutil.GetPodCondition(&pod.Status, appspub.InPlaceUpdateReady)
+		if condition != nil && condition.Status == v1.ConditionFalse {
+			// Trigger restarting when expected env hash is not equal to current hash
+			if containerMeta.Hashes.ExtractedEnvFromMetadataHash > 0 && containerMeta.Hashes.ExtractedEnvFromMetadataHash != envHasher.GetExpectHash(containerSpec, pod) {
+				// Maybe checking PlainHash inconsistent here can skip to trigger restart. But it is not a good idea for some special scenarios.
+				klog.V(2).InfoS("Triggering container in Pod to restart, for it has inconsistent hash of env from metadata", "containerName", containerSpec.Name, "containerID", status.ID.String(), "namespace", pod.Namespace, "podName", pod.Name)
+				c.restarter.queue.AddRateLimited(status.ID)
+			}
+		}
+	}
+
+	return containerMeta
 }
 
 func wrapEnvGetter(criRuntime criapi.RuntimeService, containerID, logID string) func(string) (string, error) {
