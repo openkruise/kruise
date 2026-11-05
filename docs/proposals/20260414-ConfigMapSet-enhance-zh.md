@@ -60,12 +60,6 @@ spec:
     mountPath: /data/conf3
   # 用于更新配置文件的容器，在Pod创建时注入
   reloadSidecarConfig:
-    # k8s直接注入的方式
-    type: k8s
-    config:
-      name: reload-sidecar
-      image: openkruise/reload-sidecar:v1.0.0
-      restartPolicy: Always
     # 通过引用Openkruise SidecarSet的方式注入
     type: sidecarset
     config:
@@ -82,7 +76,7 @@ spec:
         namespace: default
   effectPolicy:
     # reload-sidecar和业务容器都会重启，reload-sidecar先于业务容器重启
-    type: ReStart
+    type: Restart
     # 仅reload-sidecar容器重启，重启完成后，执行HTTP/TCP触发业务容器更新配置
     type: PostHook
     postHook:
@@ -186,29 +180,10 @@ spec:
     mountPath: /data/conf3 
 ```
 
-## Reload Sidecar容器注入
+## Reload Sidecar容器注入
 
-Reload sidecar容器配置了注入到Pod中用于自动更新配置文件的Container
-
-### 显示声明reloadContainer注入
-
-```yaml
-apiVersion: xxx/v1alpha1
-kind: ConfigMapSet
-# ...
-spec:
-  # ...
-  reloadSidecarConfig:
-    # k8s直接注入的方式
-    type: k8s
-    config:
-      name: reload-sidecar
-      image: openkruise/reload-sidecar:v1.0.0
-      restartPolicy: Always
-
-```
-
-该种方式会直接在Pod创建的时候，通过webhook注入Container的方式注入到Pod中，并自动生成emptyDir volume和InitContainer volumeMount，同时业务容器也会注入相应的volumeMount。该container注入时，会启用apps.kruise.io/container-launch-priority: Ordered注解，用于保证先于业务容器启动。
+Reload sidecar容器配置了注入到Pod中用于自动更新配置文件的Container。
+如果在ConfigMapSet上未声明 `reloadSidecarConfig`，或者未声明其 `type`，或者 `type` 为 `custom` 但未指定 `configMapRef` 时，系统将自动加载默认的ConfigMap配置（`namespace: kruise-system`, `name: default-reload-sidecar-config`）。该默认配置可以在helm清单中自由定义。
 
 ### 引用SidecarSet注入声明
 
@@ -301,7 +276,7 @@ spec:
     
 3.  根据effectPolicy策略，进行配置生效
     
-    1.  ReStart（默认）：
+    1.  Restart（默认）：
         
         1.  先重启reload-sidecar容器
             
