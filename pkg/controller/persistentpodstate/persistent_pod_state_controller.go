@@ -146,6 +146,8 @@ type innerStatefulset struct {
 	// kruise statefulset filed
 	ReserveOrdinals   sets.Set[int]
 	DeletionTimestamp *metav1.Time
+	// statefulset spec.ordinals.start
+	StartOrdinal int
 }
 
 // ReconcilePersistentPodState reconciles a PersistentPodState object
@@ -308,6 +310,7 @@ func (r *ReconcilePersistentPodState) getPodsAndStatefulset(persistentPodState *
 	}
 	inner.Replicas = workload.Scale
 	inner.ReserveOrdinals = workload.ReserveOrdinals
+	inner.StartOrdinal = workload.StartOrdinal
 	inner.DeletionTimestamp = workload.Metadata.DeletionTimestamp
 
 	// DisableDeepCopy:true, indicates must be deep copy before update pod objection
@@ -353,7 +356,7 @@ func (r *ReconcilePersistentPodState) getPodState(pod *corev1.Pod, nodeTopologyK
 
 func isInStatefulSetReplicas(index int, sts *innerStatefulset) bool {
 	replicas := sets.NewInt()
-	replicaIndex := 0
+	replicaIndex := sts.StartOrdinal
 	for realReplicaCount := 0; realReplicaCount < int(sts.Replicas); replicaIndex++ {
 		if sts.ReserveOrdinals.Has(replicaIndex) {
 			continue
