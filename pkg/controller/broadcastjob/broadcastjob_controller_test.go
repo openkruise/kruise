@@ -37,6 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
@@ -675,4 +676,53 @@ func patchPodName(pod *v1.Pod) {
 	if pod != nil && pod.Name == "" {
 		pod.Name = pod.GenerateName + string(uuid.NewUUID())
 	}
+}
+
+// Test scenario:
+// 3 nodes without pod running
+// parallelism = 3
+// every pod creation fails, so no pod must be counted as active
+func TestReconcileJobCreatePodFailedNotCountedAsActive(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
+
+	job := createJob("job-create-fail", intstr.FromInt(3))
+	node1 := createNode("node1")
+	node2 := createNode("node2")
+	node3 := createNode("node3")
+
+	reconcileJob := createReconcileJob(scheme, job, node1, node2, node3)
+	reconcileJob.Client = interceptor.NewClient(reconcileJob.Client.(client.WithWatch), interceptor.Funcs{
+		Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+			if _, ok := obj.(*v1.Pod); ok {
+				return fmt.Errorf("injected pod create error")
+			}
+			return c.Create(ctx, obj, opts...)
+		},
+	})
+
+	request := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "job-create-fail",
+			Namespace: "default",
+		},
+	}
+
+	_, err := reconcileJob.Reconcile(context.TODO(), request)
+	assert.Error(t, err)
+
+	retrievedJob := &appsv1beta1.BroadcastJob{}
+	err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
+	assert.NoError(t, err)
+
+	podList := &v1.PodList{}
+	err = reconcileJob.List(context.TODO(), podList, client.InNamespace(request.Namespace))
+	assert.NoError(t, err)
+
+	// no pod was created
+	assert.Empty(t, podList.Items)
+	// failed creations must not be counted as active
+	assert.Equal(t, int32(0), retrievedJob.Status.Active)
+	assert.Equal(t, int32(3), retrievedJob.Status.Desired)
 }

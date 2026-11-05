@@ -95,6 +95,8 @@ func setupController(client clientset.Interface, kruiseClient kruiseclientset.In
 		// informerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
 		informerFactory.Core().V1().Pods().Informer().HasSynced,
 		informerFactory.Apps().V1().ControllerRevisions().Informer().HasSynced,
+		informerFactory.Core().V1().PersistentVolumeClaims().Informer().HasSynced,
+		informerFactory.Storage().V1().StorageClasses().Informer().HasSynced,
 	)
 	return om, ssu, ssc, stop
 }
