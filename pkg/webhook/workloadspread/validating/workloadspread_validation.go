@@ -191,12 +191,12 @@ func validateWorkloadSpreadSpec(h *WorkloadSpreadCreateUpdateHandler, obj *appsv
 	if spec.ScheduleStrategy.Adaptive != nil {
 		if spec.ScheduleStrategy.Type != appsv1beta1.AdaptiveWorkloadSpreadScheduleStrategyType {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("scheduleStrategy").Child("type"),
-				spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, "the scheduleStrategy's type must be adaptive when using adaptive scheduleStrategy"))
+				spec.ScheduleStrategy.Type, "the scheduleStrategy's type must be adaptive when using adaptive scheduleStrategy"))
 		}
 
 		if len(spec.Subsets) > 1 && spec.Subsets[len(spec.Subsets)-1].MaxReplicas != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("scheduleStrategy").Child("adaptive"),
-				spec.ScheduleStrategy.Adaptive.RescheduleCriticalSeconds, "the last subset's maxReplicas must be not specified when using adaptive scheduleStrategy"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("subsets").Index(len(spec.Subsets)-1).Child("maxReplicas"),
+				spec.Subsets[len(spec.Subsets)-1].MaxReplicas, "the last subset's maxReplicas must be not specified when using adaptive scheduleStrategy"))
 		}
 
 		allowedMaxSeconds := int32(math.MaxInt32)
@@ -272,7 +272,7 @@ func validateWorkloadSpreadSubsets(ws *appsv1beta1.WorkloadSpread, subsets []app
 			for j, term := range subset.PreferredNodeSelector {
 				corePreferredSchedulingTerm := &core.PreferredSchedulingTerm{}
 				if err := corev1.Convert_v1_PreferredSchedulingTerm_To_core_PreferredSchedulingTerm(term.DeepCopy(), corePreferredSchedulingTerm, nil); err != nil {
-					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("preferredNodeSelector").Index(j), subset.PreferredNodeSelector, fmt.Sprintf("Convert_v1_PreferredSchedulingTerm_To_core_PreferredSchedulingTerm failed: %v", err)))
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("preferredNodeSelector").Index(j), term, fmt.Sprintf("Convert_v1_PreferredSchedulingTerm_To_core_PreferredSchedulingTerm failed: %v", err)))
 				} else {
 					corePreferredSchedulingTerms = append(corePreferredSchedulingTerms, *corePreferredSchedulingTerm)
 				}
@@ -286,7 +286,7 @@ func validateWorkloadSpreadSubsets(ws *appsv1beta1.WorkloadSpread, subsets []app
 			for j, toleration := range subset.Tolerations {
 				coreToleration := &core.Toleration{}
 				if err := corev1.Convert_v1_Toleration_To_core_Toleration(&toleration, coreToleration, nil); err != nil {
-					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("tolerations").Index(j), subset.Tolerations, fmt.Sprintf("Convert_v1_Toleration_To_core_Toleration failed: %v", err)))
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("tolerations").Index(j), toleration, fmt.Sprintf("Convert_v1_Toleration_To_core_Toleration failed: %v", err)))
 				} else {
 					coreTolerations = append(coreTolerations, *coreToleration)
 				}
