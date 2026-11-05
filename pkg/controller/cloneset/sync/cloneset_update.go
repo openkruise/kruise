@@ -208,6 +208,9 @@ func (c *realControl) refreshPodState(cs *appsv1beta1.CloneSet, coreControl clon
 			} else {
 				state = appspub.LifecycleStateNormal
 			}
+			//patch restart_cnt to annotation
+			pod, _ = c.inplaceControl.RefreshRestartCountBaseToPod(pod)
+			inplaceupdate.CalcInplaceUpdateDuration(pod)
 		}
 	case appspub.LifecycleStateUpdated:
 		if cs.Spec.Lifecycle == nil ||

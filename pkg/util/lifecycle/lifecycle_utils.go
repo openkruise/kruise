@@ -150,9 +150,6 @@ func (c *realControl) UpdatePodLifecycle(pod *v1.Pod, state appspub.LifecycleSta
 			time.Now().Format(time.RFC3339),
 		)
 		gotPod, err = adp.PatchPod(pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
-	} else {
-		SetPodLifecycle(state)(pod)
-		gotPod, err = c.adp.UpdatePod(pod)
 	}
 
 	return true, gotPod, err
@@ -194,17 +191,6 @@ func (c *realControl) UpdatePodLifecycleWithHandler(pod *v1.Pod, state appspub.L
 			finalizersHandler,
 		)
 		gotPod, err = adp.PatchPod(pod, client.RawPatch(types.StrategicMergePatchType, []byte(body)))
-	} else {
-		if pod.Labels == nil {
-			pod.Labels = make(map[string]string)
-		}
-		for k, v := range inPlaceUpdateHandler.LabelsHandler {
-			pod.Labels[k] = v
-		}
-		pod.Finalizers = append(pod.Finalizers, inPlaceUpdateHandler.FinalizersHandler...)
-
-		SetPodLifecycle(state)(pod)
-		gotPod, err = c.adp.UpdatePod(pod)
 	}
 
 	return true, gotPod, err
