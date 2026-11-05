@@ -772,3 +772,95 @@ func TestValidateImagePreDownloadParallelism(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateUpdateStrategyV1beta1MaxSurgeShadow is a regression test for the variable shadowing
+// bug in validateUpdateStrategyV1beta1 where `maxSurge, maxSurgeErr :=` inside the if-block
+// created a new inner variable, leaving the outer maxSurge always 0.  As a result the
+// combined check `maxUnavailable < 1 && maxSurge < 1` at line 400 incorrectly rejected
+// configurations with maxUnavailable=0 and maxSurge>0, which are perfectly valid.
+func TestValidateUpdateStrategyV1beta1MaxSurgeShadow(t *testing.T) {
+	maxUnavailable := intstr.FromInt32(0)
+	maxSurge := intstr.FromInt32(1)
+	partition := intstr.FromInt32(0)
+
+	tests := []struct {
+		name          string
+		strategy      *v1beta1.CloneSetUpdateStrategy
+		replicas      int
+		expectErr     bool
+		forbiddenPath string
+	}{
+		{
+			// maxUnavailable=0, maxSurge=1 is a valid surge-only rolling update.
+			// Before the fix the combined check saw outer maxSurge==0 and raised
+			// a spurious "maxUnavailable and maxSurge should not both be less than 1" error.
+			name: "valid maxUnavailable=0 maxSurge=1 should not error",
+			strategy: &v1beta1.CloneSetUpdateStrategy{
+				Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+				RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+					PodUpdatePolicy: v1beta1.RecreateCloneSetPodUpdateStrategyType,
+					MaxUnavailable:  &maxUnavailable,
+					MaxSurge:        &maxSurge,
+					Partition:       &partition,
+				},
+			},
+			replicas:  3,
+			expectErr: false,
+		},
+		{
+			// maxUnavailable=0, maxSurge=0: genuinely invalid; both are less than 1.
+			name: "invalid maxUnavailable=0 maxSurge=0 should error",
+			strategy: &v1beta1.CloneSetUpdateStrategy{
+				Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+				RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+					PodUpdatePolicy: v1beta1.RecreateCloneSetPodUpdateStrategyType,
+					MaxUnavailable:  &maxUnavailable,
+					MaxSurge:        func() *intstr.IntOrString { s := intstr.FromInt32(0); return &s }(),
+					Partition:       &partition,
+				},
+			},
+			replicas:      3,
+			expectErr:     true,
+			forbiddenPath: "updateStrategy.rollingUpdate.maxUnavailable",
+		},
+		{
+			// InPlaceOnly + maxSurge>0 must still be rejected.
+			name: "InPlaceOnly with maxSurge=1 should error",
+			strategy: &v1beta1.CloneSetUpdateStrategy{
+				Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+				RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+					PodUpdatePolicy: v1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType,
+					MaxUnavailable:  &maxUnavailable,
+					MaxSurge:        &maxSurge,
+					Partition:       &partition,
+				},
+			},
+			replicas:      3,
+			expectErr:     true,
+			forbiddenPath: "updateStrategy.rollingUpdate.maxSurge",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			allErrs := validateUpdateStrategyV1beta1(tt.strategy, tt.replicas, field.NewPath("updateStrategy"))
+			hasErr := len(allErrs) > 0
+			if hasErr != tt.expectErr {
+				t.Errorf("expected error=%v, got error=%v, errs=%v", tt.expectErr, hasErr, allErrs)
+				return
+			}
+			if tt.expectErr && tt.forbiddenPath != "" {
+				found := false
+				for _, e := range allErrs {
+					if e.Field == tt.forbiddenPath {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected error at field %q, got: %v", tt.forbiddenPath, allErrs)
+				}
+			}
+		})
+	}
+}
