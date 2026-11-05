@@ -425,10 +425,10 @@ func (c *Controller) getRuntimeForPod(pod *v1.Pod) (criapi.RuntimeService, kuber
 	}
 
 	containerID := kubeletcontainer.ContainerID{}
-	if err := containerID.ParseString(pod.Status.ContainerStatuses[0].ContainerID); err != nil {
-		return nil, nil, fmt.Errorf("failed to parse containerID %s: %v", pod.Status.ContainerStatuses[0].ContainerID, err)
+	if err := containerID.ParseString(existingID); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse containerID %s: %v", existingID, err)
 	} else if containerID.Type == "" {
-		return nil, nil, fmt.Errorf("no runtime name in containerID %s", pod.Status.ContainerStatuses[0].ContainerID)
+		return nil, nil, fmt.Errorf("no runtime name in containerID %s", existingID)
 	}
 
 	runtimeName := containerID.Type
