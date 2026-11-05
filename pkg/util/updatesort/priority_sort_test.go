@@ -26,7 +26,7 @@ import (
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 )
 
-func TestCompare(t *testing.T) {
+func TestPrioritySortPairs(t *testing.T) {
 	cases := []struct {
 		strategy *appspub.UpdatePriorityStrategy
 		podI     map[string]string
@@ -182,7 +182,11 @@ func TestCompare(t *testing.T) {
 
 	for i, tc := range cases {
 		ps := prioritySort{strategy: tc.strategy}
-		got := ps.compare(tc.podI, tc.podJ, true)
+		pods := []*v1.Pod{
+			{ObjectMeta: metav1.ObjectMeta{Labels: tc.podI}},
+			{ObjectMeta: metav1.ObjectMeta{Labels: tc.podJ}},
+		}
+		got := ps.Sort(pods, []int{0, 1})[0] == 0
 		if got != tc.expected {
 			t.Fatalf("case #%d expected %v, got %v", i, tc.expected, got)
 		}
@@ -354,5 +358,138 @@ func Test_prioritySort_Sort(t *testing.T) {
 				t.Errorf("prioritySort.Sort() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestPrioritySortCandidates(t *testing.T) {
+	pods := []*v1.Pod{
+		{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"zone": "a", "rank": "pod-3"}}},
+		{},
+		{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"zone": "b", "rank": "pod-10"}}},
+		{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"zone": "a", "rank": "invalid"}}},
+		nil, // Unselected pods must not be inspected.
+		{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"zone": "a", "backup": "pod-20"}}},
+	}
+	original := make([]*v1.Pod, len(pods))
+	for i := range pods {
+		original[i] = pods[i].DeepCopy()
+	}
+	weight := appspub.UpdatePriorityWeightTerm{
+		Weight: 10, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"zone": "a"}},
+	}
+	invalid := appspub.UpdatePriorityWeightTerm{
+		Weight: 100, MatchSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+			{Key: "zone", Operator: "invalid"},
+		}},
+	}
+	for _, tc := range []struct {
+		name     string
+		strategy *appspub.UpdatePriorityStrategy
+		want     []int
+	}{
+		{
+			name: "nil strategy", want: []int{5, 2, 3, 0, 1, 5},
+		},
+		{
+			name: "empty strategy", strategy: &appspub.UpdatePriorityStrategy{},
+			want: []int{5, 2, 3, 0, 1, 5},
+		},
+		{
+			name: "overlapping weights and stable ties",
+			strategy: &appspub.UpdatePriorityStrategy{WeightPriority: []appspub.UpdatePriorityWeightTerm{
+				weight,
+				{Weight: 7, MatchSelector: metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+					{Key: "rank", Operator: metav1.LabelSelectorOpExists},
+				}}},
+			}},
+			want: []int{3, 0, 5, 5, 2, 1},
+		},
+		{
+			name: "invalid selectors are skipped",
+			strategy: &appspub.UpdatePriorityStrategy{WeightPriority: []appspub.UpdatePriorityWeightTerm{
+				invalid, weight,
+			}},
+			want: []int{5, 3, 0, 5, 2, 1},
+		},
+		{
+			name:     "all invalid selectors preserve order",
+			strategy: &appspub.UpdatePriorityStrategy{WeightPriority: []appspub.UpdatePriorityWeightTerm{invalid}},
+			want:     []int{5, 2, 3, 0, 1, 5},
+		},
+		{
+			name: "no matches preserve order",
+			strategy: &appspub.UpdatePriorityStrategy{WeightPriority: []appspub.UpdatePriorityWeightTerm{
+				{Weight: 10, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"zone": "missing"}}},
+			}},
+			want: []int{5, 2, 3, 0, 1, 5},
+		},
+		{
+			name: "ordered keys retain missing label and suffix behavior",
+			strategy: &appspub.UpdatePriorityStrategy{OrderPriority: []appspub.UpdatePriorityOrderTerm{
+				{OrderedKey: "rank"}, {OrderedKey: "backup"},
+			}},
+			want: []int{1, 2, 0, 3, 5, 5},
+		},
+		{
+			name: "weights take precedence over ordered keys",
+			strategy: &appspub.UpdatePriorityStrategy{
+				WeightPriority: []appspub.UpdatePriorityWeightTerm{weight},
+				OrderPriority:  []appspub.UpdatePriorityOrderTerm{{OrderedKey: "rank"}},
+			},
+			want: []int{5, 3, 0, 5, 2, 1},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			indexes := []int{5, 2, 3, 0, 1, 5}
+			got := NewPrioritySorter(tc.strategy).Sort(pods, indexes)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("want %v, got %v", tc.want, got)
+			}
+			if &got[0] != &indexes[0] || !reflect.DeepEqual(indexes, tc.want) {
+				t.Fatal("Sort must update and return the input slice")
+			}
+			if !reflect.DeepEqual(pods, original) {
+				t.Fatal("Sort modified the pods")
+			}
+		})
+	}
+}
+
+func TestPrioritySortReused(t *testing.T) {
+	strategy := &appspub.UpdatePriorityStrategy{WeightPriority: []appspub.UpdatePriorityWeightTerm{
+		{Weight: 10, MatchSelector: metav1.LabelSelector{MatchLabels: map[string]string{"zone": "a"}}},
+	}}
+	sorter := NewPrioritySorter(strategy)
+	pods := []*v1.Pod{
+		{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"zone": "a"}}},
+		{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"zone": "b"}}},
+	}
+	check := func(want []int) {
+		t.Helper()
+		if got := sorter.Sort(pods, []int{0, 1}); !reflect.DeepEqual(got, want) {
+			t.Fatalf("want %v, got %v", want, got)
+		}
+	}
+	check([]int{0, 1})
+	pods[0].Labels["zone"], pods[1].Labels["zone"] = "b", "a"
+	check([]int{1, 0})
+	strategy.WeightPriority[0].MatchSelector.MatchLabels["zone"] = "b"
+	check([]int{0, 1})
+	strategy.WeightPriority = nil
+	strategy.OrderPriority = []appspub.UpdatePriorityOrderTerm{{OrderedKey: "rank"}}
+	pods[0].Labels["rank"], pods[1].Labels["rank"] = "pod-1", "pod-2"
+	check([]int{1, 0})
+	pods[0].Labels["rank"] = "pod-3"
+	check([]int{0, 1})
+}
+
+func TestPrioritySortEmptyCandidates(t *testing.T) {
+	sorter := NewPrioritySorter(&appspub.UpdatePriorityStrategy{
+		OrderPriority: []appspub.UpdatePriorityOrderTerm{{OrderedKey: "rank"}},
+	})
+	for _, indexes := range [][]int{nil, {}, {0}} {
+		if got := sorter.Sort([]*v1.Pod{nil}, indexes); !reflect.DeepEqual(got, indexes) {
+			t.Fatalf("want %v, got %v", indexes, got)
+		}
 	}
 }

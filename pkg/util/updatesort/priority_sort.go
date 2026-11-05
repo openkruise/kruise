@@ -37,49 +37,48 @@ func NewPrioritySorter(s *appspub.UpdatePriorityStrategy) Sorter {
 
 // Sort helps sort the indexes of pods by UpdatePriorityStrategy.
 func (ps *prioritySort) Sort(pods []*v1.Pod, indexes []int) []int {
-	if ps.strategy == nil || (len(ps.strategy.WeightPriority) == 0 && len(ps.strategy.OrderPriority) == 0) {
+	if ps.strategy == nil || (len(ps.strategy.WeightPriority) == 0 && len(ps.strategy.OrderPriority) == 0) || len(indexes) < 2 {
 		return indexes
 	}
 
-	f := func(i, j int) bool {
-		podI := pods[indexes[i]]
-		podJ := pods[indexes[j]]
-		return ps.compare(podI.Labels, podJ.Labels, i < j)
+	// Keep priorities local to this sort so later calls observe changed pod labels and rules.
+	priorities := make([]struct {
+		index int
+		level int64
+		order int64
+	}, len(indexes))
+	for i, index := range indexes {
+		priorities[i].index = index
 	}
 
-	sort.SliceStable(indexes, f)
-	return indexes
-}
-
-func (ps *prioritySort) compare(podI, podJ map[string]string, defaultVal bool) bool {
 	if len(ps.strategy.WeightPriority) > 0 {
-		if wI, wJ := ps.getPodWeightPriority(podI), ps.getPodWeightPriority(podJ); wI != wJ {
-			return wI > wJ
+		for _, term := range ps.strategy.WeightPriority {
+			selector, err := util.ValidatedLabelSelectorAsSelector(&term.MatchSelector)
+			if err != nil {
+				continue
+			}
+			for i := range priorities {
+				if selector.Matches(labels.Set(pods[priorities[i].index].Labels)) {
+					priorities[i].order += int64(term.Weight)
+				}
+			}
 		}
-	} else if len(ps.strategy.OrderPriority) > 0 {
-		levelI, orderI := ps.getPodOrderPriority(podI)
-		levelJ, orderJ := ps.getPodOrderPriority(podJ)
-		if levelI != levelJ {
-			return levelI < levelJ
-		} else if orderI != orderJ {
-			return orderI > orderJ
+	} else {
+		for i := range priorities {
+			priorities[i].level, priorities[i].order = ps.getPodOrderPriority(pods[priorities[i].index].Labels)
 		}
 	}
-	return defaultVal
-}
 
-func (ps *prioritySort) getPodWeightPriority(podLabels map[string]string) int64 {
-	var weight int64
-	for _, p := range ps.strategy.WeightPriority {
-		selector, err := util.ValidatedLabelSelectorAsSelector(&p.MatchSelector)
-		if err != nil {
-			continue
+	sort.SliceStable(priorities, func(i, j int) bool {
+		if priorities[i].level != priorities[j].level {
+			return priorities[i].level < priorities[j].level
 		}
-		if selector.Matches(labels.Set(podLabels)) {
-			weight += int64(p.Weight)
-		}
+		return priorities[i].order > priorities[j].order
+	})
+	for i := range priorities {
+		indexes[i] = priorities[i].index
 	}
-	return weight
+	return indexes
 }
 
 func (ps *prioritySort) getPodOrderPriority(podLabels map[string]string) (int64, int64) {
