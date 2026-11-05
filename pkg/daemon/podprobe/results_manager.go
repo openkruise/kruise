@@ -38,7 +38,8 @@ type Update struct {
 
 // resultManager implementation, store container probe result
 type resultManager struct {
-	// map of container ID -> probe Result
+	// map of probeKey -> probe Result. A container may have multiple probes,
+	// so keying by container ID alone would make them overwrite each other.
 	cache *sync.Map
 	queue workqueue.RateLimitingInterface
 }
@@ -63,13 +64,13 @@ func (m *resultManager) listResults() []Update {
 
 func (m *resultManager) set(id string, key probeKey, result appsv1alpha1.ProbeState, msg string) {
 	currentTime := metav1.Now()
-	prev, exists := m.cache.Load(id)
-	if !exists || prev.(Update).State != result || prev.(Update).Msg != msg || currentTime.Sub(prev.(Update).LastProbeTime.Time).Seconds() >= maxSyncProbeTime {
-		m.cache.Store(id, Update{id, key, result, msg, currentTime})
+	prev, exists := m.cache.Load(key)
+	if !exists || prev.(Update).ContainerID != id || prev.(Update).State != result || prev.(Update).Msg != msg || currentTime.Sub(prev.(Update).LastProbeTime.Time).Seconds() >= maxSyncProbeTime {
+		m.cache.Store(key, Update{id, key, result, msg, currentTime})
 		m.queue.Add("updateStatus")
 	}
 }
 
-func (m *resultManager) remove(id string) {
-	m.cache.Delete(id)
+func (m *resultManager) remove(key probeKey) {
+	m.cache.Delete(key)
 }
