@@ -151,12 +151,12 @@ func validateAdvancedCronJobSpecTemplate(spec *appsv1beta1.AdvancedCronJobSpec, 
 	templateCount := 0
 	if spec.Template.JobTemplate != nil {
 		templateCount++
-		allErrs = append(allErrs, validateJobTemplateSpec(spec.Template.JobTemplate, fldPath)...)
+		allErrs = append(allErrs, validateJobTemplateSpec(spec.Template.JobTemplate, fldPath.Child("template").Child("jobTemplate").Child("spec"))...)
 	}
 
 	if spec.Template.BroadcastJobTemplate != nil {
 		templateCount++
-		allErrs = append(allErrs, validateBroadcastJobTemplateSpec(spec.Template.BroadcastJobTemplate, fldPath)...)
+		allErrs = append(allErrs, validateBroadcastJobTemplateSpec(spec.Template.BroadcastJobTemplate, fldPath.Child("template").Child("broadcastJobTemplate").Child("spec"))...)
 	}
 
 	if spec.Template.ImageListPullJobTemplate != nil {
@@ -164,7 +164,7 @@ func validateAdvancedCronJobSpecTemplate(spec *appsv1beta1.AdvancedCronJobSpec, 
 		switch spec.ConcurrencyPolicy {
 		case appsv1beta1.ReplaceConcurrent, appsv1beta1.ForbidConcurrent:
 		default:
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("spec").Child("concurrencyPolicy"), spec.ConcurrencyPolicy, fmt.Sprintf("concurrencyPolicy should be Replace or Forbid, but current value is: %s", spec.ConcurrencyPolicy)))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("concurrencyPolicy"), spec.ConcurrencyPolicy, fmt.Sprintf("concurrencyPolicy should be Replace or Forbid, but current value is: %s", spec.ConcurrencyPolicy)))
 		}
 		allErrs = append(allErrs, validateImageListPullJobTemplateSpec(spec.Template.ImageListPullJobTemplate, fldPath.Child("template").Child("imageListPullJobTemplate"))...)
 	}
