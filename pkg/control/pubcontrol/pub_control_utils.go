@@ -299,8 +299,22 @@ func isPodNoProtection(pod *corev1.Pod) bool {
 	return false
 }
 
+// isValidPubOperation reports whether op is one of the operations a PUB can protect.
+func isValidPubOperation(op policyv1beta1.PubOperation) bool {
+	switch op {
+	case policyv1beta1.PubDeleteOperation,
+		policyv1beta1.PubUpdateOperation,
+		policyv1beta1.PubEvictOperation,
+		policyv1beta1.PubResizeOperation:
+		return true
+	}
+	return false
+}
+
 // getPubProtectOperations returns the effective beta protection list.
 // It prefers the typed beta spec field and falls back to the deprecated annotation for compatibility.
+// Unknown values in the deprecated annotation are ignored, so an annotation without any valid
+// operation does not turn off the default protection.
 func getPubProtectOperations(pub *policyv1beta1.PodUnavailableBudget) sets.Set[policyv1beta1.PubOperation] {
 	operations := sets.New[policyv1beta1.PubOperation]()
 
@@ -314,7 +328,9 @@ func getPubProtectOperations(pub *policyv1beta1.PodUnavailableBudget) sets.Set[p
 			if action == "" {
 				continue
 			}
-			operations.Insert(policyv1beta1.PubOperation(action))
+			if op := policyv1beta1.PubOperation(action); isValidPubOperation(op) {
+				operations.Insert(op)
+			}
 		}
 		if operations.Len() > 0 {
 			return operations
