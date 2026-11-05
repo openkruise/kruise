@@ -117,7 +117,6 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, acti
 		return matchedPods, nil
 	}
 
-	var err error
 	var matchedPods []*corev1.Pod
 	for _, uid := range workloadUIDs {
 		listOption := client.ListOptions{
@@ -137,7 +136,17 @@ func (r *ControllerFinder) GetPodsForRef(apiVersion, kind, ns, name string, acti
 	// Pods' ownerReferences do not contain the workload, so we have to retry
 	// to use the label selector to list the Pods.
 	if labelSelector != nil && len(matchedPods) == 0 {
-		selector, _ := metav1.LabelSelectorAsSelector(labelSelector)
+		// An empty selector (e.g. a custom workload that has not reported
+		// status.selector in its scale subresource yet) means the workload has
+		// no Pods yet. LabelSelectorAsSelector would turn it into
+		// labels.Everything() and match every Pod in the namespace.
+		if len(labelSelector.MatchLabels)+len(labelSelector.MatchExpressions) == 0 {
+			return matchedPods, workloadReplicas, nil
+		}
+		selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+		if err != nil {
+			return nil, -1, err
+		}
 		listOption := client.ListOptions{
 			Namespace:     ns,
 			LabelSelector: selector,
