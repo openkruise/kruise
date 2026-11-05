@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	appspub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
@@ -1122,6 +1123,155 @@ func TestValidateDaemonSetSpecV1beta1(t *testing.T) {
 			}
 			if !tt.expectErr && len(errs) != 0 {
 				t.Errorf("expected no error but got: %v", errs)
+			}
+		})
+	}
+}
+
+
+func TestValidateDaemonSetUpdateStrategyFieldPaths(t *testing.T) {
+	invalidType := appsv1alpha1.DaemonSetUpdateStrategyType("InvalidStrategy")
+	invalidRollingType := appsv1alpha1.RollingUpdateType("InvalidRollingType")
+	invalidNegativePartition := intstr.FromInt(-1)
+	invalidPercentPartition := intstr.FromString("150%")
+	maxUnavailable := intstr.FromInt(1)
+
+	tests := []struct {
+		name          string
+		strategy      *appsv1alpha1.DaemonSetUpdateStrategy
+		expectedField string
+	}{
+		{
+			name: "invalid update strategy type",
+			strategy: &appsv1alpha1.DaemonSetUpdateStrategy{
+				Type: invalidType,
+			},
+			expectedField: "updateStrategy.type",
+		},
+		{
+			name: "invalid rolling update type",
+			strategy: &appsv1alpha1.DaemonSetUpdateStrategy{
+				Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+					Type:           invalidRollingType,
+					MaxUnavailable: &maxUnavailable,
+				},
+			},
+			expectedField: "updateStrategy.rollingUpdate.type",
+		},
+		{
+			name: "invalid negative partition",
+			strategy: &appsv1alpha1.DaemonSetUpdateStrategy{
+				Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+					MaxUnavailable: &maxUnavailable,
+					Partition:      &invalidNegativePartition,
+				},
+			},
+			expectedField: "updateStrategy.rollingUpdate.partition",
+		},
+		{
+			name: "invalid percent partition >100%",
+			strategy: &appsv1alpha1.DaemonSetUpdateStrategy{
+				Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+					MaxUnavailable: &maxUnavailable,
+					Partition:      &invalidPercentPartition,
+				},
+			},
+			expectedField: "updateStrategy.rollingUpdate.partition",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validateDaemonSetUpdateStrategy(tt.strategy, field.NewPath("updateStrategy"))
+			if len(errs) == 0 {
+				t.Fatalf("expected error, got none")
+			}
+			found := false
+			for _, err := range errs {
+				if err.Field == tt.expectedField {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected field %q, got errors: %v", tt.expectedField, errs)
+			}
+		})
+	}
+}
+
+func TestValidateDaemonSetUpdateStrategyV1beta1FieldPaths(t *testing.T) {
+	invalidType := appsv1beta1.DaemonSetUpdateStrategyType("InvalidStrategy")
+	invalidRollingType := appsv1beta1.RollingUpdateType("InvalidRollingType")
+	invalidNegativePartition := intstr.FromInt(-1)
+	invalidPercentPartition := intstr.FromString("150%")
+	maxUnavailable := intstr.FromInt(1)
+
+	tests := []struct {
+		name          string
+		strategy      *appsv1beta1.DaemonSetUpdateStrategy
+		expectedField string
+	}{
+		{
+			name: "invalid update strategy type",
+			strategy: &appsv1beta1.DaemonSetUpdateStrategy{
+				Type: invalidType,
+			},
+			expectedField: "updateStrategy.type",
+		},
+		{
+			name: "invalid rolling update type",
+			strategy: &appsv1beta1.DaemonSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+					Type:           invalidRollingType,
+					MaxUnavailable: &maxUnavailable,
+				},
+			},
+			expectedField: "updateStrategy.rollingUpdate.type",
+		},
+		{
+			name: "invalid negative partition",
+			strategy: &appsv1beta1.DaemonSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+					MaxUnavailable: &maxUnavailable,
+					Partition:      &invalidNegativePartition,
+				},
+			},
+			expectedField: "updateStrategy.rollingUpdate.partition",
+		},
+		{
+			name: "invalid percent partition >100%",
+			strategy: &appsv1beta1.DaemonSetUpdateStrategy{
+				Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+					MaxUnavailable: &maxUnavailable,
+					Partition:      &invalidPercentPartition,
+				},
+			},
+			expectedField: "updateStrategy.rollingUpdate.partition",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validateDaemonSetUpdateStrategyV1beta1(tt.strategy, field.NewPath("updateStrategy"))
+			if len(errs) == 0 {
+				t.Fatalf("expected error, got none")
+			}
+			found := false
+			for _, err := range errs {
+				if err.Field == tt.expectedField {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected field %q, got errors: %v", tt.expectedField, errs)
 			}
 		})
 	}
