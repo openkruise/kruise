@@ -124,10 +124,9 @@ func (r *ReconcileAdvancedCronJob) reconcileJob(ctx context.Context, req ctrl.Re
 		}
 	}
 
-	if mostRecentTime != nil {
+	// the history limits may have deleted the newest child jobs, so never move the recorded time back
+	if mostRecentTime != nil && (advancedCronJob.Status.LastScheduleTime == nil || mostRecentTime.After(advancedCronJob.Status.LastScheduleTime.Time)) {
 		advancedCronJob.Status.LastScheduleTime = &metav1.Time{Time: *mostRecentTime}
-	} else {
-		advancedCronJob.Status.LastScheduleTime = nil
 	}
 
 	advancedCronJob.Status.Active = nil

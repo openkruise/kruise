@@ -465,6 +465,123 @@ func createReconcileJobWithImageListPullJobIndex(scheme *runtime.Scheme, initObj
 	return reconcileJob
 }
 
+// The recorded lastScheduleTime must survive a reconcile that finds no child job, or only one older
+// than it (history limit 0 deletes the newer ones), or every slot since creation counts as missed.
+func TestReconcileKeepsLastScheduleTime(t *testing.T) {
+	scheme := runtime.NewScheme()
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
+	utilruntime.Must(batchv1.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
+
+	childMeta := func(owner *appsv1beta1.AdvancedCronJob, at time.Time) metav1.ObjectMeta {
+		return metav1.ObjectMeta{
+			Name:        "old",
+			Namespace:   owner.Namespace,
+			Annotations: map[string]string{scheduledTimeAnnotation: at.Format(time.RFC3339)},
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(owner, appsv1beta1.SchemeGroupVersion.WithKind("AdvancedCronJob")),
+			},
+		}
+	}
+	tests := []struct {
+		name          string
+		template      appsv1beta1.CronJobTemplate
+		now           func() time.Time
+		newReconciler func(*runtime.Scheme, ...client.Object) ReconcileAdvancedCronJob
+		jobList       client.ObjectList
+		failedChild   func(owner *appsv1beta1.AdvancedCronJob, at time.Time) client.Object
+	}{
+		{"BroadcastJob", broadcastJobTemplate(), time.Now, createReconcileJobWithBroadcastJobIndex, &appsv1beta1.BroadcastJobList{},
+			func(owner *appsv1beta1.AdvancedCronJob, at time.Time) client.Object {
+				return &appsv1beta1.BroadcastJob{ObjectMeta: childMeta(owner, at), Status: appsv1beta1.BroadcastJobStatus{
+					Conditions: []appsv1beta1.JobCondition{{Type: appsv1beta1.JobFailed, Status: v1.ConditionTrue}}}}
+			}},
+		{"Job", jobTemplate(), time.Now, createReconcileJobWithBatchJobIndex, &batchv1.JobList{},
+			func(owner *appsv1beta1.AdvancedCronJob, at time.Time) client.Object {
+				return &batchv1.Job{ObjectMeta: childMeta(owner, at), Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{{Type: batchv1.JobFailed, Status: v1.ConditionTrue}}}}
+			}},
+		{"ImageListPullJob", imageListPullJobTemplate(), fakeClock.Now, createReconcileJobWithImageListPullJobIndex, &appsv1beta1.ImageListPullJobList{},
+			func(owner *appsv1beta1.AdvancedCronJob, at time.Time) client.Object {
+				job := createImageListPullJob(0, 2, 1, 2, owner)
+				job.Annotations[scheduledTimeAnnotation] = at.Format(time.RFC3339)
+				return job
+			}},
+	}
+	for _, tc := range tests {
+		for _, scenario := range []struct {
+			name               string
+			childAge           time.Duration
+			noLastScheduleTime bool
+			paused             bool
+			wantJobs           int
+		}{
+			{"oldChild=false", 0, false, false, 1},
+			{"oldChild=true", -150 * time.Minute, false, false, 2},
+			{"newerChild", -time.Minute, false, true, 0},
+			{"firstChild", -time.Minute, true, true, 0},
+		} {
+			t.Run(fmt.Sprintf("%s/%s", tc.name, scenario.name), func(t *testing.T) {
+				now := tc.now()
+				lastScheduleTime := metav1.NewTime(now.Add(-2 * time.Minute).Truncate(time.Minute))
+				wantLastScheduleTime := lastScheduleTime
+				job1 := createJob("job1", tc.template)
+				job1.Spec.Schedule = "* * * * *"
+				job1.Spec.SuccessfulJobsHistoryLimit = utilpointer.Int32(0)
+				job1.Spec.FailedJobsHistoryLimit = utilpointer.Int32(0)
+				job1.Spec.Paused = utilpointer.Bool(scenario.paused)
+				job1.CreationTimestamp = metav1.NewTime(now.Add(-3 * time.Hour))
+				if !scenario.noLastScheduleTime {
+					job1.Status.LastScheduleTime = &lastScheduleTime
+				}
+				initObjs := []client.Object{job1}
+				if scenario.childAge != 0 {
+					childTime := now.Add(scenario.childAge).Truncate(time.Minute)
+					initObjs = append(initObjs, tc.failedChild(job1, childTime))
+					if scenario.paused {
+						wantLastScheduleTime = metav1.NewTime(childTime)
+					} else {
+						job1.Spec.FailedJobsHistoryLimit = utilpointer.Int32(1)
+					}
+				}
+
+				reconcileJob := tc.newReconciler(scheme, initObjs...)
+				request := reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      "job1",
+						Namespace: "default",
+					},
+				}
+
+				_, err := reconcileJob.Reconcile(context.TODO(), request)
+				assert.NoError(t, err)
+				retrievedJob := &appsv1beta1.AdvancedCronJob{}
+				err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
+				assert.NoError(t, err)
+				if assert.NotNil(t, retrievedJob.Status.LastScheduleTime) {
+					assert.Equal(t, wantLastScheduleTime.Unix(), retrievedJob.Status.LastScheduleTime.Unix())
+				}
+
+				err = reconcileJob.List(context.TODO(), tc.jobList, client.InNamespace(request.Namespace))
+				assert.NoError(t, err)
+				assert.Equal(t, scenario.wantJobs, meta.LenList(tc.jobList))
+
+				if scenario.paused {
+					// Reconcile after history cleanup has deleted the newest child.
+					_, err = reconcileJob.Reconcile(context.TODO(), request)
+					assert.NoError(t, err)
+					retrievedJob = &appsv1beta1.AdvancedCronJob{}
+					err = reconcileJob.Get(context.TODO(), request.NamespacedName, retrievedJob)
+					assert.NoError(t, err)
+					if assert.NotNil(t, retrievedJob.Status.LastScheduleTime) {
+						assert.Equal(t, wantLastScheduleTime.Unix(), retrievedJob.Status.LastScheduleTime.Unix())
+					}
+				}
+			})
+		}
+	}
+}
+
 func TestWatchJobOwnerEnqueue(t *testing.T) {
 	scheme := runtime.NewScheme()
 	utilruntime.Must(batchv1.AddToScheme(scheme))
