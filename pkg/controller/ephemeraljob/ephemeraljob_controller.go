@@ -323,18 +323,13 @@ func (r *ReconcileEphemeralJob) syncTargetPods(job *appsv1alpha1.EphemeralJob, t
 		parallelism = int(*job.Spec.Parallelism)
 	}
 
-	if len(toCreatePods) < parallelism {
-		parallelism = len(toCreatePods)
-	}
-
-	diff := parallelism - int(job.Status.Running)
-	if diff < 0 {
+	if int(job.Status.Running) > parallelism {
 		klog.InfoS("Error sync EphemeralJob for parallisem less than running pod", "ephemeralJob", klog.KObj(job),
 			"parallelism", parallelism, "runningPodCount", job.Status.Running)
 		return nil
 	}
 
-	toCreatePods = toCreatePods[:diff]
+	toCreatePods = toCreatePods[:getCreateCount(len(toCreatePods), parallelism, int(job.Status.Running))]
 
 	podsCreationChan := make(chan *v1.Pod, len(toCreatePods))
 	for _, p := range toCreatePods {
