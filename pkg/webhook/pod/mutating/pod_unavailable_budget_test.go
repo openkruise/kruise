@@ -22,10 +22,12 @@ import (
 	"testing"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -43,6 +45,7 @@ func TestPubMutatingPod(t *testing.T) {
 		getPod              func() *v1.Pod
 		getPub              func() *policyv1beta1.PodUnavailableBudget
 		getWorkload         func() *appsv1alpha1.CloneSet
+		getExtraObjects     func() []client.Object
 		expectedAnnotations map[string]string
 	}{
 		{
@@ -255,6 +258,170 @@ func TestPubMutatingPod(t *testing.T) {
 				"version": "test",
 			},
 		},
+		{
+			// The pod's ReplicaSet is owned by a StatefulSet (standing in for any non-Deployment
+			// owner, e.g. an Argo Rollout), so GetScaleAndSelectorForRef must climb past the RS to
+			// its owner instead of only recognizing Deployment as in the old hardcoded check.
+			name: "pub, targetRef to replicaSet's non-deployment owner, matched",
+			getPod: func() *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							"version": "test",
+						},
+						Namespace: "test",
+						Name:      "pod-1",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps/v1",
+								Kind:       "ReplicaSet",
+								Name:       "rs-1",
+								UID:        "rs-uid",
+								Controller: &lTrue,
+							},
+						},
+					},
+				}
+			},
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
+				return &policyv1beta1.PodUnavailableBudget{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pub-1",
+						Namespace: "test",
+					},
+					Spec: policyv1beta1.PodUnavailableBudgetSpec{
+						TargetReference: &policyv1beta1.TargetReference{
+							APIVersion: "apps/v1",
+							Kind:       "StatefulSet",
+							Name:       "ss-1",
+						},
+					},
+				}
+			},
+			getExtraObjects: func() []client.Object {
+				replicas := int32(2)
+				return []client.Object{
+					&apps.ReplicaSet{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       "ReplicaSet",
+							APIVersion: "apps/v1",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "rs-1",
+							Namespace: "test",
+							UID:       "rs-uid",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									APIVersion: "apps/v1",
+									Kind:       "StatefulSet",
+									Name:       "ss-1",
+									UID:        "ss-uid",
+									Controller: &lTrue,
+								},
+							},
+						},
+						Spec: apps.ReplicaSetSpec{
+							Replicas: &replicas,
+							Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}},
+						},
+					},
+					&apps.StatefulSet{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       "StatefulSet",
+							APIVersion: "apps/v1",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "ss-1",
+							Namespace: "test",
+							UID:       "ss-uid",
+						},
+						Spec: apps.StatefulSetSpec{
+							Replicas: &replicas,
+							Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}},
+						},
+					},
+				}
+			},
+			expectedAnnotations: map[string]string{
+				"version":                          "test",
+				pubcontrol.PodRelatedPubAnnotation: "pub-1",
+				pubcontrol.DeprecatedPodRelatedPubAnnotation: "pub-1",
+			},
+		},
+		{
+			// The replicaSet's owner (a custom, non-builtin kind) can't be resolved at all, so the
+			// finder must fall back to treating the replicaSet itself as the workload, same as before.
+			name: "pub, targetRef to replicaSet's unresolvable owner falls back to replicaSet",
+			getPod: func() *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Annotations: map[string]string{
+							"version": "test",
+						},
+						Namespace: "test",
+						Name:      "pod-1",
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: "apps/v1",
+								Kind:       "ReplicaSet",
+								Name:       "rs-2",
+								UID:        "rs2-uid",
+								Controller: &lTrue,
+							},
+						},
+					},
+				}
+			},
+			getPub: func() *policyv1beta1.PodUnavailableBudget {
+				return &policyv1beta1.PodUnavailableBudget{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pub-1",
+						Namespace: "test",
+					},
+					Spec: policyv1beta1.PodUnavailableBudgetSpec{
+						TargetReference: &policyv1beta1.TargetReference{
+							APIVersion: "apps/v1",
+							Kind:       "ReplicaSet",
+							Name:       "rs-2",
+						},
+					},
+				}
+			},
+			getExtraObjects: func() []client.Object {
+				replicas := int32(2)
+				return []client.Object{
+					&apps.ReplicaSet{
+						TypeMeta: metav1.TypeMeta{
+							Kind:       "ReplicaSet",
+							APIVersion: "apps/v1",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "rs-2",
+							Namespace: "test",
+							UID:       "rs2-uid",
+							OwnerReferences: []metav1.OwnerReference{
+								{
+									APIVersion: "argoproj.io/v1alpha1",
+									Kind:       "Rollout",
+									Name:       "demo",
+									UID:        "rollout-uid",
+									Controller: &lTrue,
+								},
+							},
+						},
+						Spec: apps.ReplicaSetSpec{
+							Replicas: &replicas,
+							Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "web"}},
+						},
+					},
+				}
+			},
+			expectedAnnotations: map[string]string{
+				"version":                          "test",
+				pubcontrol.PodRelatedPubAnnotation: "pub-1",
+				pubcontrol.DeprecatedPodRelatedPubAnnotation: "pub-1",
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -265,6 +432,9 @@ func TestPubMutatingPod(t *testing.T) {
 			builder.WithObjects(pub)
 			if c.getWorkload != nil {
 				builder.WithObjects(c.getWorkload())
+			}
+			if c.getExtraObjects != nil {
+				builder.WithObjects(c.getExtraObjects()...)
 			}
 			testClient := builder.Build()
 			controllerfinder.Finder = &controllerfinder.ControllerFinder{Client: testClient}
