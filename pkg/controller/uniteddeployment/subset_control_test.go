@@ -1,6 +1,7 @@
 package uniteddeployment
 
 import (
+	"context"
 	"encoding/hex"
 	"math/rand"
 	"reflect"
@@ -12,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openkruise/kruise/apis/apps/v1beta1"
@@ -239,5 +241,50 @@ func TestSubsetControl_convertToSubset(t *testing.T) {
 				t.Errorf("convertToSubset() got = %+v, want %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSubsetControl_GetAllSubsetsIgnoresOtherNamespaces(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1beta1.AddToScheme(scheme)
+	_ = appsv1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+
+	selectorLabels := map[string]string{"app": "demo"}
+	ud := &appsv1beta1.UnitedDeployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "ud", Namespace: "tenant-a", UID: "ud-uid"},
+		Spec: appsv1beta1.UnitedDeploymentSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: selectorLabels},
+		},
+	}
+	// The DeploymentAdapter lists Deployments, so the foreign orphan below is a Deployment.
+	foreign := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "payments", Namespace: "tenant-b", Labels: selectorLabels},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: selectorLabels},
+		},
+	}
+
+	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ud, foreign).Build()
+	m := &SubsetControl{
+		Client:  c,
+		scheme:  scheme,
+		adapter: &adapter.DeploymentAdapter{Client: c, Scheme: scheme},
+	}
+
+	subsets, err := m.GetAllSubsets(ud, "v1")
+	if err != nil {
+		t.Fatalf("GetAllSubsets() unexpected error: %v", err)
+	}
+	if len(subsets) != 0 {
+		t.Fatalf("GetAllSubsets() returned subsets from another namespace: %+v", subsets)
+	}
+
+	got := &appsv1.Deployment{}
+	if err := c.Get(context.TODO(), client.ObjectKeyFromObject(foreign), got); err != nil {
+		t.Fatalf("failed to get Deployment: %v", err)
+	}
+	if len(got.OwnerReferences) != 0 {
+		t.Fatalf("Deployment in another namespace was adopted: %+v", got.OwnerReferences)
 	}
 }

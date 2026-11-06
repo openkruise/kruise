@@ -47,7 +47,7 @@ func (m *SubsetControl) GetAllSubsets(ud *beta1.UnitedDeployment, updatedRevisio
 	}
 
 	setList := m.adapter.NewResourceListObject()
-	err = m.Client.List(context.TODO(), setList, &client.ListOptions{LabelSelector: selector})
+	err = m.Client.List(context.TODO(), setList, &client.ListOptions{Namespace: ud.Namespace, LabelSelector: selector})
 	if err != nil {
 		return nil, err
 	}
