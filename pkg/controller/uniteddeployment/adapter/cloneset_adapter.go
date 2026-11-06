@@ -182,7 +182,7 @@ func (a *CloneSetAdapter) getCloneSetPods(set *beta1.CloneSet) ([]*corev1.Pod, e
 
 	podList := &corev1.PodList{}
 
-	err = a.Client.List(context.TODO(), podList, &client.ListOptions{LabelSelector: selector})
+	err = a.Client.List(context.TODO(), podList, &client.ListOptions{Namespace: set.Namespace, LabelSelector: selector})
 
 	if err != nil {
 		return nil, err

@@ -47,7 +47,7 @@ func (r *ReconcileUnitedDeployment) controlledHistories(ud *appsv1beta1.UnitedDe
 		return nil, err
 	}
 	histories := &apps.ControllerRevisionList{}
-	err = r.Client.List(context.TODO(), histories, &client.ListOptions{LabelSelector: selector})
+	err = r.Client.List(context.TODO(), histories, &client.ListOptions{Namespace: ud.Namespace, LabelSelector: selector})
 	if err != nil {
 		return nil, err
 	}
