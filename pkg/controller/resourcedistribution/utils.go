@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"maps"
 	"reflect"
 	"sync"
 	"time"
@@ -345,7 +346,12 @@ func listNamespacesForDistributor(handlerClient client.Client, targets *appsv1be
 	return matchedSet.List(), unmatchedSet.List(), nil
 }
 
+// needToUpdate reports whether writing new would change old. new must come from
+// makeResourceObject, so that the metadata it merges or sets is not a difference.
 func needToUpdate(old, new *unstructured.Unstructured) bool {
+	if !maps.Equal(old.GetLabels(), new.GetLabels()) || !maps.Equal(old.GetAnnotations(), new.GetAnnotations()) {
+		return true
+	}
 	oldObject := old.DeepCopy().Object
 	newObject := new.DeepCopy().Object
 	oldObject["metadata"] = nil
