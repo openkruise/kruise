@@ -236,6 +236,11 @@ func (r *ReconcileEphemeralJob) filterPods(job *appsv1alpha1.EphemeralJob) ([]*v
 	if err != nil {
 		return nil, err
 	}
+	// If an EphemeralJob with a nil or empty selector creeps in, it should
+	// match nothing, not every pod in the namespace.
+	if selector.Empty() {
+		return nil, nil
+	}
 
 	opts := &client.ListOptions{
 		Namespace:     job.Namespace,
@@ -278,6 +283,11 @@ func (r *ReconcileEphemeralJob) filterInjectedPods(job *appsv1alpha1.EphemeralJo
 	selector, err := util.ValidatedLabelSelectorAsSelector(job.Spec.Selector)
 	if err != nil {
 		return nil, err
+	}
+	// If an EphemeralJob with a nil or empty selector creeps in, it should
+	// match nothing, not every pod in the namespace.
+	if selector.Empty() {
+		return nil, nil
 	}
 
 	opts := &client.ListOptions{
