@@ -1236,10 +1236,11 @@ func testWithResizePolicy(resizePolicy []v1.ContainerResizePolicy) {
 			// fix https://github.com/openkruise/kruise/issues/1925
 			t = nginxContainerStatus.State.Running.StartedAt.Time
 		}
-		gomega.Expect(t.After(redisContainerStatus.State.Running.StartedAt.Time.Add(time.Second*10))).
-			Should(gomega.Equal(true), fmt.Sprintf("nginx finish at %v is not after redis start %v + 10s",
-				nginxContainerStatus.LastTerminationState.Terminated.FinishedAt,
-				redisContainerStatus.State.Running.StartedAt))
+		redisStartedAt := redisContainerStatus.State.Running.StartedAt.Time
+		gomega.Expect(t).Should(
+			gomega.BeTemporally(">", redisStartedAt.Add(10*time.Second)),
+			"expected the nginx update timestamp to be more than 10s after redis started at %v", redisStartedAt,
+		)
 
 		ginkgo.By("Verify in-place update state in two batches")
 		inPlaceUpdateState := appspub.InPlaceUpdateState{}
