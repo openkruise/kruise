@@ -18,6 +18,7 @@ package resourcedistribution
 
 import (
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -129,4 +130,135 @@ func TestMakeResourceObjectRewritesOwnerRefToBeta(t *testing.T) {
 
 func ptrTo[T any](value T) *T {
 	return &value
+}
+
+// buildNewConditions returns a full set of conditions with the fixed type order.
+func buildNewConditions() []appsv1beta1.ResourceDistributionCondition {
+	conditions := make([]appsv1beta1.ResourceDistributionCondition, NumberOfConditionTypes)
+	initConditionType(conditions)
+	return conditions
+}
+
+// TestCalculateNewStatusWithPartiallyPopulatedConditions ensures that a status
+// carrying only a part of the conditions (e.g. written by an older version)
+// does not lead to an index out of range panic.
+func TestCalculateNewStatusWithPartiallyPopulatedConditions(t *testing.T) {
+	lastTransition := metav1.NewTime(time.Now().Add(-time.Hour).Truncate(time.Second))
+	distributor := &appsv1beta1.ResourceDistribution{
+		ObjectMeta: metav1.ObjectMeta{Generation: 3},
+		Status: appsv1beta1.ResourceDistributionStatus{
+			Conditions: []appsv1beta1.ResourceDistributionCondition{
+				{
+					Type:               appsv1beta1.ResourceDistributionConflictOccurred,
+					Status:             appsv1beta1.ResourceDistributionConditionTrue,
+					LastTransitionTime: lastTransition,
+				},
+			},
+		},
+	}
+
+	newConditions := buildNewConditions()
+	// Keep the conflict condition failed, so that its status stays True.
+	newConditions[ConflictConditionID].FailedNamespaces = []string{"ns-1"}
+
+	status := calculateNewStatus(distributor, newConditions, 2, 1)
+
+	if status.Desired != 2 || status.Succeeded != 1 || status.Failed != 1 || status.ObservedGeneration != 3 {
+		t.Fatalf("unexpected status counters: desired=%d succeeded=%d failed=%d generation=%d",
+			status.Desired, status.Succeeded, status.Failed, status.ObservedGeneration)
+	}
+	if len(status.Conditions) != NumberOfConditionTypes {
+		t.Fatalf("expected %d conditions, got %d", NumberOfConditionTypes, len(status.Conditions))
+	}
+
+	conflict := getConditionByType(status.Conditions, appsv1beta1.ResourceDistributionConflictOccurred)
+	if conflict == nil {
+		t.Fatalf("conflict condition is missing in the new status")
+	}
+	if !conflict.LastTransitionTime.Time.Equal(lastTransition.Time) {
+		t.Fatalf("expected the transition time of the untouched conflict condition to be preserved, got %v, expect %v",
+			conflict.LastTransitionTime, lastTransition)
+	}
+
+	for i := range status.Conditions {
+		condition := &status.Conditions[i]
+		if condition.Type == appsv1beta1.ResourceDistributionConflictOccurred {
+			continue
+		}
+		if condition.LastTransitionTime.IsZero() {
+			t.Fatalf("expected a new transition time for condition %s", condition.Type)
+		}
+	}
+}
+
+// TestCalculateNewStatusKeepsTransitionTimeWhenConditionsReordered ensures that
+// the previous condition is matched by type, no matter in which order the
+// conditions are stored in the status.
+func TestCalculateNewStatusKeepsTransitionTimeWhenConditionsReordered(t *testing.T) {
+	base := time.Now().Add(-time.Hour).Truncate(time.Second)
+
+	// Build the conditions in the fixed type order first, then store them in the
+	// status in reverse order with a distinguishable transition time each.
+	newConditions := buildNewConditions()
+	expectedTransitionTimes := make(map[appsv1beta1.ResourceDistributionConditionType]metav1.Time)
+	oldConditions := make([]appsv1beta1.ResourceDistributionCondition, 0, NumberOfConditionTypes)
+	for i := NumberOfConditionTypes - 1; i >= 0; i-- {
+		conditionType := newConditions[i].Type
+		transitionTime := metav1.NewTime(base.Add(time.Duration(i) * time.Minute))
+		expectedTransitionTimes[conditionType] = transitionTime
+		oldConditions = append(oldConditions, appsv1beta1.ResourceDistributionCondition{
+			Type:               conditionType,
+			Status:             appsv1beta1.ResourceDistributionConditionFalse,
+			LastTransitionTime: transitionTime,
+		})
+	}
+
+	distributor := &appsv1beta1.ResourceDistribution{
+		Status: appsv1beta1.ResourceDistributionStatus{Conditions: oldConditions},
+	}
+
+	status := calculateNewStatus(distributor, newConditions, 1, 1)
+
+	for i := range status.Conditions {
+		condition := &status.Conditions[i]
+		// No failed namespaces, so every condition stays False and therefore keeps
+		// the transition time of the condition with the same type.
+		expected := expectedTransitionTimes[condition.Type]
+		if !condition.LastTransitionTime.Time.Equal(expected.Time) {
+			t.Fatalf("condition %s: expected transition time %v, got %v",
+				condition.Type, expected, condition.LastTransitionTime)
+		}
+	}
+}
+
+// TestCalculateNewStatusUpdatesTransitionTimeOnStatusChange ensures that the
+// transition time is refreshed once the status of a condition flips.
+func TestCalculateNewStatusUpdatesTransitionTimeOnStatusChange(t *testing.T) {
+	lastTransition := metav1.NewTime(time.Now().Add(-time.Hour).Truncate(time.Second))
+	distributor := &appsv1beta1.ResourceDistribution{
+		Status: appsv1beta1.ResourceDistributionStatus{
+			Conditions: []appsv1beta1.ResourceDistributionCondition{
+				{
+					Type:               appsv1beta1.ResourceDistributionGetResourceFailed,
+					Status:             appsv1beta1.ResourceDistributionConditionTrue,
+					LastTransitionTime: lastTransition,
+				},
+			},
+		},
+	}
+
+	// The condition is not failed any more, so its status flips to False.
+	status := calculateNewStatus(distributor, buildNewConditions(), 1, 1)
+
+	condition := getConditionByType(status.Conditions, appsv1beta1.ResourceDistributionGetResourceFailed)
+	if condition == nil {
+		t.Fatalf("get condition is missing in the new status")
+	}
+	if condition.Status != appsv1beta1.ResourceDistributionConditionFalse {
+		t.Fatalf("expected condition status False, got %s", condition.Status)
+	}
+	if !condition.LastTransitionTime.After(lastTransition.Time) {
+		t.Fatalf("expected a refreshed transition time, got %v, previous %v",
+			condition.LastTransitionTime, lastTransition)
+	}
 }
