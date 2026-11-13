@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	pub "github.com/openkruise/kruise/apis/apps/pub"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
 	"github.com/openkruise/kruise/pkg/util/configuration"
@@ -337,6 +338,56 @@ func TestGetPodSidecarSetRevision(t *testing.T) {
 				t.Fatalf("except sidecar container test-sidecarset WithoutImageRevision %s, but get %s", cs.exceptWithoutImageRevision, withoutRevision)
 			}
 		})
+	}
+}
+
+// TestUpdatePodSidecarSetHashWithoutAnnotations ensures that a Pod created
+// without any annotation (nil map) does not panic and gets the hash annotation.
+func TestUpdatePodSidecarSetHashWithoutAnnotations(t *testing.T) {
+	pod := podDemo.DeepCopy()
+	pod.Annotations = nil
+	sidecarSet := sidecarSetDemo.DeepCopy()
+
+	UpdatePodSidecarSetHash(pod, sidecarSet)
+
+	if pod.Annotations == nil {
+		t.Fatalf("expect pod annotations to be initialized, but got nil")
+	}
+	sidecarSetHash := make(map[string]SidecarSetUpgradeSpec)
+	if err := json.Unmarshal([]byte(pod.Annotations[SidecarSetHashAnnotation]), &sidecarSetHash); err != nil {
+		t.Fatalf("parse pod sidecarSet hash failed: %v", err)
+	}
+	got, ok := sidecarSetHash[sidecarSet.Name]
+	if !ok {
+		t.Fatalf("expect hash of sidecarSet %s in pod annotations, but got %v", sidecarSet.Name, pod.Annotations)
+	}
+	if got.SidecarSetHash != GetSidecarSetRevision(sidecarSet) {
+		t.Fatalf("expect sidecarSet revision %s, but got %s", GetSidecarSetRevision(sidecarSet), got.SidecarSetHash)
+	}
+}
+
+// TestUpdatePodAnnotationsInUpgradeWithoutAnnotations ensures that the in-place
+// upgrade state can be recorded on a Pod created without any annotation.
+func TestUpdatePodAnnotationsInUpgradeWithoutAnnotations(t *testing.T) {
+	pod := podDemo.DeepCopy()
+	pod.Annotations = nil
+	control := New(sidecarSetDemo.DeepCopy())
+
+	control.UpdatePodAnnotationsInUpgrade([]string{"cold-sidecar"}, pod)
+
+	if pod.Annotations == nil {
+		t.Fatalf("expect pod annotations to be initialized, but got nil")
+	}
+	stateStr, ok := pod.Annotations[SidecarsetInplaceUpdateStateKey]
+	if !ok || len(stateStr) == 0 {
+		t.Fatalf("expect in-place update state in pod annotations, but got %v", pod.Annotations)
+	}
+	states := make(map[string]*pub.InPlaceUpdateState)
+	if err := json.Unmarshal([]byte(stateStr), &states); err != nil {
+		t.Fatalf("parse in-place update state failed: %v", err)
+	}
+	if _, ok := states[sidecarSetDemo.Name]; !ok {
+		t.Fatalf("expect in-place update state of sidecarSet %s, but got %v", sidecarSetDemo.Name, states)
 	}
 }
 

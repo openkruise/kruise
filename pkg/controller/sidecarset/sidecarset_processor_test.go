@@ -26,6 +26,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -80,6 +81,29 @@ func TestUpdatePodSidecarAndHashPodNotFound(t *testing.T) {
 	control := sidecarcontrol.New(sidecarSet)
 	if err := processor.updatePodSidecarAndHash(control, pod); err == nil {
 		t.Fatalf("expect updatePodSidecarAndHash to return error when pod not found, but got nil")
+	}
+}
+
+// TestUpdatePodSidecarAndHashPodWithoutAnnotations ensures that updating a Pod
+// created without any annotation (nil map) does not panic.
+func TestUpdatePodSidecarAndHashPodWithoutAnnotations(t *testing.T) {
+	sidecarSet := sidecarSetDemo.DeepCopy()
+	pod := podDemo.DeepCopy()
+	pod.Annotations = nil
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet, pod).Build()
+	processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
+	control := sidecarcontrol.New(sidecarSet)
+
+	if err := processor.updatePodSidecarAndHash(control, pod); err != nil {
+		t.Fatalf("expect updatePodSidecarAndHash to succeed, but got %v", err)
+	}
+
+	updated := &corev1.Pod{}
+	if err := fakeClient.Get(context.TODO(), types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, updated); err != nil {
+		t.Fatalf("failed to get updated pod: %v", err)
+	}
+	if _, ok := updated.Annotations[sidecarcontrol.SidecarSetListAnnotation]; !ok {
+		t.Fatalf("expect pod to be annotated with %s, but got %v", sidecarcontrol.SidecarSetListAnnotation, updated.Annotations)
 	}
 }
 

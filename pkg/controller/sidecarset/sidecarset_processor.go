@@ -213,6 +213,9 @@ func (p *Processor) updatePodSidecarAndHash(control sidecarcontrol.SidecarContro
 		// which is to improve the performance of the sidecarSet controller
 		sidecarSetNames, ok := podClone.Annotations[sidecarcontrol.SidecarSetListAnnotation]
 		if !ok || len(sidecarSetNames) == 0 {
+			if podClone.Annotations == nil {
+				podClone.Annotations = map[string]string{}
+			}
 			podClone.Annotations[sidecarcontrol.SidecarSetListAnnotation] = p.listMatchedSidecarSets(podClone)
 		}
 		// patch pod metadata
