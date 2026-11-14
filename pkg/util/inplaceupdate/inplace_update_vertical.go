@@ -28,6 +28,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+
+	"github.com/openkruise/kruise/pkg/util"
 )
 
 // interface for In-place workload vertical scaling
@@ -41,8 +43,9 @@ type VerticalUpdateInterface interface {
 	// UpdateResource some or all containers of a pod can be updated at once within this interface.
 	// container or pod level resources can be updated by this interface
 	UpdateResource(pod *v1.Pod, expectedResources map[string]*v1.ResourceRequirements)
-	// IsUpdateCompleted To determine whether the pod has been successfully vertical updated
-	IsUpdateCompleted(pod *v1.Pod) (bool, error)
+	// IsUpdateCompleted determines whether the pod has been successfully vertical updated.
+	// expectedInitResources identifies native sidecars targeted by the current batch.
+	IsUpdateCompleted(pod *v1.Pod, expectedInitResources map[string]v1.ResourceRequirements) (bool, error)
 	// GenerateResourcePatch generate the resource patch for the pod
 	GenerateResourcePatch(pod *v1.Pod, expectedResources map[string]*v1.ResourceRequirements) []byte
 }
@@ -70,13 +73,20 @@ type NativeVerticalUpdate struct{}
 var _ VerticalUpdateInterface = &NativeVerticalUpdate{}
 
 func (v *NativeVerticalUpdate) UpdateInplaceUpdateMetadata(op *jsonpatch.Operation, oldTemp *v1.PodTemplateSpec, updateSpec *UpdateSpec) error {
-	// for example: /spec/containers/0/resources/limits/cpu
+	// for example: /spec/containers/0/resources/limits/cpu or
+	// /spec/initContainers/0/resources/requests/memory
 	words := strings.Split(op.Path, "/")
 	if len(words) != 7 {
 		return fmt.Errorf("invalid resource path: %s", op.Path)
 	}
+	containers := oldTemp.Spec.Containers
+	if words[2] == "initContainers" {
+		containers = oldTemp.Spec.InitContainers
+	} else if words[2] != "containers" {
+		return fmt.Errorf("invalid resource path: %s", op.Path)
+	}
 	idx, err := strconv.Atoi(words[3])
-	if err != nil || len(oldTemp.Spec.Containers) <= idx {
+	if err != nil || idx < 0 || len(containers) <= idx {
 		return fmt.Errorf("invalid container index: %s", op.Path)
 	}
 	if op.Operation == "remove" || op.Operation == "add" {
@@ -97,7 +107,7 @@ func (v *NativeVerticalUpdate) UpdateInplaceUpdateMetadata(op *jsonpatch.Operati
 		return fmt.Errorf("disallowed inplace update resource: %s", words[6])
 	}
 
-	cName := oldTemp.Spec.Containers[idx].Name
+	cName := containers[idx].Name
 	if _, ok := updateSpec.ContainerResources[cName]; !ok {
 		updateSpec.ContainerResources[cName] = v1.ResourceRequirements{
 			Limits:   make(v1.ResourceList),
@@ -172,13 +182,43 @@ func (v *NativeVerticalUpdate) UpdateResource(pod *v1.Pod, expectedResources map
 		}
 		v.updateContainerResource(c, newResource)
 	}
-	return
+	for i := range pod.Spec.InitContainers {
+		c := &pod.Spec.InitContainers[i]
+		if !util.IsRestartableInitContainer(c) {
+			continue
+		}
+		newResource, resourceExists := expectedResources[c.Name]
+		if !resourceExists {
+			continue
+		}
+		v.updateContainerResource(c, newResource)
+	}
 }
 
 func (v *NativeVerticalUpdate) GenerateResourcePatch(pod *v1.Pod, expectedResources map[string]*v1.ResourceRequirements) []byte {
+	var patchGroups []string
+	if patchContainers := v.generateContainerResourcePatches(pod.Spec.Containers, expectedResources); len(patchContainers) > 0 {
+		patchGroups = append(patchGroups, fmt.Sprintf(`"containers":[%s]`, strings.Join(patchContainers, ",")))
+	}
+	var initContainers []v1.Container
+	for i := range pod.Spec.InitContainers {
+		if util.IsRestartableInitContainer(&pod.Spec.InitContainers[i]) {
+			initContainers = append(initContainers, pod.Spec.InitContainers[i])
+		}
+	}
+	if patchContainers := v.generateContainerResourcePatches(initContainers, expectedResources); len(patchContainers) > 0 {
+		patchGroups = append(patchGroups, fmt.Sprintf(`"initContainers":[%s]`, strings.Join(patchContainers, ",")))
+	}
+	if len(patchGroups) == 0 {
+		return nil
+	}
+	return []byte(fmt.Sprintf(`{"spec":{%s}}`, strings.Join(patchGroups, ",")))
+}
+
+func (v *NativeVerticalUpdate) generateContainerResourcePatches(containers []v1.Container, expectedResources map[string]*v1.ResourceRequirements) []string {
 	var patchContainers []string
-	for i := range pod.Spec.Containers {
-		c := &pod.Spec.Containers[i]
+	for i := range containers {
+		c := &containers[i]
 		newResource, resourceExists := expectedResources[c.Name]
 		if !resourceExists {
 			continue
@@ -191,7 +231,7 @@ func (v *NativeVerticalUpdate) GenerateResourcePatch(pod *v1.Pod, expectedResour
 			if resources.Limits == nil {
 				resources.Limits = make(v1.ResourceList)
 			}
-			if pod.Spec.Containers[i].Resources.Limits != nil && pod.Spec.Containers[i].Resources.Limits[key].Equal(quantity) {
+			if c.Resources.Limits != nil && c.Resources.Limits[key].Equal(quantity) {
 				continue
 			}
 			resources.Limits[key] = quantity
@@ -203,7 +243,7 @@ func (v *NativeVerticalUpdate) GenerateResourcePatch(pod *v1.Pod, expectedResour
 			if resources.Requests == nil {
 				resources.Requests = make(v1.ResourceList)
 			}
-			if pod.Spec.Containers[i].Resources.Requests != nil && pod.Spec.Containers[i].Resources.Requests[key].Equal(quantity) {
+			if c.Resources.Requests != nil && c.Resources.Requests[key].Equal(quantity) {
 				continue
 			}
 			resources.Requests[key] = quantity
@@ -213,13 +253,10 @@ func (v *NativeVerticalUpdate) GenerateResourcePatch(pod *v1.Pod, expectedResour
 			patchContainers = append(patchContainers, fmt.Sprintf(`{"name":"%s","resources":%s}`, c.Name, string(resourcePatch)))
 		}
 	}
-	if len(patchContainers) == 0 {
-		return nil
-	}
-	return []byte(fmt.Sprintf(`{"spec":{"containers":[%s]}}`, strings.Join(patchContainers, ",")))
+	return patchContainers
 }
 
-func (v *NativeVerticalUpdate) IsUpdateCompleted(pod *v1.Pod) (bool, error) {
+func (v *NativeVerticalUpdate) IsUpdateCompleted(pod *v1.Pod, expectedResources map[string]v1.ResourceRequirements) (bool, error) {
 	containers := make(map[string]*v1.Container, len(pod.Spec.Containers))
 	for i := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[i]
@@ -231,6 +268,19 @@ func (v *NativeVerticalUpdate) IsUpdateCompleted(pod *v1.Pod) (bool, error) {
 	for _, cs := range pod.Status.ContainerStatuses {
 		if !v.isContainerUpdateCompleted(containers[cs.Name], &cs) {
 			return false, fmt.Errorf("container %s resources not changed", cs.Name)
+		}
+	}
+	for i := range pod.Spec.InitContainers {
+		c := &pod.Spec.InitContainers[i]
+		if !util.IsRestartableInitContainer(c) {
+			continue
+		}
+		if _, targeted := expectedResources[c.Name]; !targeted {
+			continue
+		}
+		containerStatus := util.GetContainerStatusIncludingInit(c.Name, pod)
+		if !v.isContainerUpdateCompleted(c, containerStatus) {
+			return false, fmt.Errorf("sidecar container %s resources not changed or status is not reported", c.Name)
 		}
 	}
 	return true, nil

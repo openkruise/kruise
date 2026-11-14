@@ -161,6 +161,25 @@ const (
 	// node affinity, then the pods on the nodes that have undergone
 	// this reduction will not be counted in the maxUnavailable.
 	DaemonSetPruneIneligibleNodes featuregate.Feature = "DaemonSetPruneIneligibleNodes"
+
+	// InPlaceUpdateRestartableInitContainer enables CloneSet/Advanced StatefulSet/Advanced DaemonSet
+	// controllers to in-place update the images of restartable init containers, a.k.a. the native
+	// sidecar containers that have `restartPolicy: Always` in spec.initContainers.
+	//
+	// It requires the SidecarContainers feature of Kubernetes, which is GA since v1.33 and enabled
+	// by default since v1.29. Note that only restartable init containers are supported: kubelet
+	// restarts an init container on image change only when its restartPolicy is Always, so a regular
+	// init container would never report a new imageID and the in-place update would never complete.
+	//
+	// Images can always be in-place updated when this gate is enabled. CPU and memory resources
+	// additionally require InPlaceWorkloadVerticalScaling and Kubernetes support for resizing native
+	// sidecar containers. Any other change under spec.initContainers still falls back to recreating
+	// the Pod. Restartable init containers do not participate in container launch priority batching;
+	// they are always updated in the current batch.
+	//
+	// When this feature is disabled, changing any field under spec.initContainers falls back to
+	// recreating the Pod, which is the behavior before this feature was introduced.
+	InPlaceUpdateRestartableInitContainer featuregate.Feature = "InPlaceUpdateRestartableInitContainer"
 )
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
@@ -204,6 +223,8 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	DefaultHostNetworkHostPortsInPodTemplates: {Default: false, PreRelease: featuregate.Alpha},
 
 	DaemonSetPruneIneligibleNodes: {Default: false, PreRelease: featuregate.Alpha},
+
+	InPlaceUpdateRestartableInitContainer: {Default: false, PreRelease: featuregate.Alpha},
 }
 
 func init() {

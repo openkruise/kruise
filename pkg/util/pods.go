@@ -221,6 +221,26 @@ func GetContainerStatus(name string, pod *v1.Pod) *v1.ContainerStatus {
 	return nil
 }
 
+// GetContainerStatusIncludingInit returns the status of the container with the given name,
+// looking up both status.containerStatuses and status.initContainerStatuses.
+// It is needed because restartable init containers (native sidecar containers) report their
+// status in status.initContainerStatuses rather than status.containerStatuses.
+func GetContainerStatusIncludingInit(name string, pod *v1.Pod) *v1.ContainerStatus {
+	if pod == nil {
+		return nil
+	}
+	if cs := GetContainerStatus(name, pod); cs != nil {
+		return cs
+	}
+	for i := range pod.Status.InitContainerStatuses {
+		v := &pod.Status.InitContainerStatuses[i]
+		if v.Name == name {
+			return v
+		}
+	}
+	return nil
+}
+
 func GetPodVolume(pod *v1.Pod, volumeName string) *v1.Volume {
 	for idx, v := range pod.Spec.Volumes {
 		if v.Name == volumeName {

@@ -55,13 +55,22 @@ func GetCurrentServerVersion() *version.Info {
 
 // ShouldUpdateResourceByResize returns whether should update resource by resize
 // The resize sub-resource was introduced in version 1.32, https://github.com/kubernetes/kubernetes/pull/128266
-func ShouldUpdateResourceByResize() (result bool) {
+func ShouldUpdateResourceByResize() bool {
+	return isCurrentServerVersionAtLeast("1.32.0")
+}
+
+// ShouldUpdateSidecarResourceByResize returns whether the Kubernetes version supports
+// in-place resizing native sidecar containers. Support was added in Kubernetes 1.34.
+func ShouldUpdateSidecarResourceByResize() bool {
+	return isCurrentServerVersionAtLeast("1.34.0")
+}
+
+func isCurrentServerVersionAtLeast(minimumVersion string) (result bool) {
 	defer func() {
 		if r := recover(); r != nil {
 			// semver.New panics on strings that are not in dotted-tri format
 			// (e.g. unexpected non-numeric content from custom build metadata).
-			// Treat that as "not >= 1.32" so the caller falls back to the
-			// pre-1.32 update path.
+			// Treat that as an unsupported version so the caller uses its fallback path.
 			_ = r
 			result = false
 		}
@@ -79,7 +88,7 @@ func ShouldUpdateResourceByResize() (result bool) {
 		parts[i] = digitsOnly(p)
 	}
 	cur := semver.New(strings.Join(parts, "."))
-	return cur.Compare(*semver.New("1.32.0")) >= 0
+	return cur.Compare(*semver.New(minimumVersion)) >= 0
 }
 
 // digitsOnly returns the leading numeric prefix of a version component.

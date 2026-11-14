@@ -165,5 +165,19 @@ func diffImagesBetweenRevisions(oldRevisions []*apps.ControllerRevision, newRevi
 			containerImages[name] = newImage
 		}
 	}
+	// Also pre-download the images of restartable init containers (native sidecar containers)
+	// when they can be in-place updated. An image is pre-downloaded as long as it differs from
+	// any of the old revisions, which keeps the same semantics as the loop above.
+	initOldTemps := oldTemps
+	if len(initOldTemps) == 0 {
+		// Diff against an empty template, so that every restartable init container image is
+		// pre-downloaded. It matches the `!found` branch of the loop above.
+		initOldTemps = []*v1.PodTemplateSpec{{}}
+	}
+	for _, oldTemp := range initOldTemps {
+		for name, image := range inplaceupdate.DiffRestartableInitContainerImages(oldTemp, newTemp) {
+			containerImages[name] = image
+		}
+	}
 	return containerImages
 }
