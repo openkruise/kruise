@@ -171,10 +171,11 @@ const (
 	// restarts an init container on image change only when its restartPolicy is Always, so a regular
 	// init container would never report a new imageID and the in-place update would never complete.
 	//
-	// Only the image is in-place updatable. Any other change under spec.initContainers, including
-	// the resources of a restartable init container, still falls back to recreating the Pod.
-	// Restartable init containers do not participate in the container launch priority batching
-	// either, they are always updated in the current batch.
+	// Images can always be in-place updated when this gate is enabled. CPU and memory resources
+	// additionally require InPlaceWorkloadVerticalScaling and Kubernetes support for resizing native
+	// sidecar containers. Any other change under spec.initContainers still falls back to recreating
+	// the Pod. Restartable init containers do not participate in container launch priority batching;
+	// they are always updated in the current batch.
 	//
 	// When this feature is disabled, changing any field under spec.initContainers falls back to
 	// recreating the Pod, which is the behavior before this feature was introduced.

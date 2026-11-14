@@ -43,6 +43,8 @@ import (
 	"github.com/openkruise/kruise/pkg/util/volumeclaimtemplate"
 )
 
+var shouldUpdateSidecarResourceByResize = client.ShouldUpdateSidecarResourceByResize
+
 func SetOptionsDefaults(opts *UpdateOptions) *UpdateOptions {
 	if opts == nil {
 		opts = &UpdateOptions{}
@@ -125,12 +127,17 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 	}
 	// Restartable init containers (native sidecar containers) do not participate in the container
 	// launch priority batching, because the priority env is only injected into spec.containers.
-	// They are always updated in the current batch. They are still recorded in containersToUpdate
-	// so that the lower-priority containers wait for them to become ready before being updated.
+	// Image and resource updates are always applied in the current batch. They are still recorded
+	// in containersToUpdate so lower-priority containers wait for them to become ready.
 	initContainersToUpdate := sets.NewString()
 	for i := range pod.Spec.InitContainers {
 		c := &pod.Spec.InitContainers[i]
-		if _, exists := spec.InitContainerImages[c.Name]; !exists {
+		if !util.IsRestartableInitContainer(c) {
+			continue
+		}
+		_, existsImage := spec.InitContainerImages[c.Name]
+		_, existsResource := spec.ContainerResources[c.Name]
+		if !existsImage && !existsResource {
 			continue
 		}
 		initContainersToUpdate.Insert(c.Name)
@@ -211,12 +218,39 @@ func defaultPatchUpdateSpecToPod(pod *v1.Pod, spec *UpdateSpec, state *appspub.I
 				state.NextContainerResources[c.Name] = newResource
 			}
 		}
+		for i := range pod.Spec.InitContainers {
+			c := &pod.Spec.InitContainers[i]
+			if !util.IsRestartableInitContainer(c) {
+				continue
+			}
+			newResource, resourceExists := spec.ContainerResources[c.Name]
+			if !resourceExists {
+				continue
+			}
+			if initContainersToUpdate.Has(c.Name) {
+				expectedResources[c.Name] = &newResource
+			} else {
+				state.NextContainerResources[c.Name] = newResource
+			}
+		}
 
 		// vertical update containers in a batch,
 		// or internal enterprise implementations can update+sync pod resources here at once
 		if !client.ShouldUpdateResourceByResize() {
 			verticalUpdateImpl.UpdateResource(pod, expectedResources)
 		}
+	}
+	state.CurrentInitContainerResources = nil
+	for i := range pod.Spec.InitContainers {
+		c := &pod.Spec.InitContainers[i]
+		resources, targeted := expectedResources[c.Name]
+		if !util.IsRestartableInitContainer(c) || !targeted {
+			continue
+		}
+		if state.CurrentInitContainerResources == nil {
+			state.CurrentInitContainerResources = make(map[string]v1.ResourceRequirements)
+		}
+		state.CurrentInitContainerResources[c.Name] = *resources
 	}
 
 	// update annotations and labels for the containers to update
@@ -404,8 +438,26 @@ func defaultCalculateInPlaceUpdateSpec(oldRevision, newRevision *apps.Controller
 			continue
 		}
 
+		isInitContainerResourcePatch := initContainerResourcesPatchRexp.MatchString(op.Path)
 		if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) &&
-			containerResourcesPatchRexp.MatchString(op.Path) {
+			(containerResourcesPatchRexp.MatchString(op.Path) || isInitContainerResourcePatch) {
+			if isInitContainerResourcePatch {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.InPlaceUpdateRestartableInitContainer) ||
+					!shouldUpdateSidecarResourceByResize() {
+					return nil
+				}
+				words := strings.Split(op.Path, "/")
+				idx, _ := strconv.Atoi(words[3])
+				if len(oldTemp.Spec.InitContainers) <= idx || len(newTemp.Spec.InitContainers) <= idx {
+					return nil
+				}
+				if !util.IsRestartableInitContainer(&oldTemp.Spec.InitContainers[idx]) ||
+					!util.IsRestartableInitContainer(&newTemp.Spec.InitContainers[idx]) {
+					klog.V(4).InfoS("Can not in-place update resources of a non-restartable init container",
+						"initContainerName", oldTemp.Spec.InitContainers[idx].Name)
+					return nil
+				}
+			}
 			err = verticalUpdateImpl.UpdateInplaceUpdateMetadata(&op, oldTemp, updateSpec)
 			if err != nil {
 				klog.InfoS("UpdateInplaceUpdateMetadata error", "err", err)
@@ -608,7 +660,7 @@ func defaultCheckContainersInPlaceUpdateCompleted(pod *v1.Pod, inPlaceUpdateStat
 
 	// only UpdateResources, we check resources in status updated
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlaceWorkloadVerticalScaling) && inPlaceUpdateState.UpdateResources {
-		if completed, err := verticalUpdateImpl.IsUpdateCompleted(pod); !completed {
+		if completed, err := verticalUpdateImpl.IsUpdateCompleted(pod, inPlaceUpdateState.CurrentInitContainerResources); !completed {
 			return err
 		}
 	}
@@ -790,9 +842,18 @@ func defaultCheckPodNeedsBeUnready(pod *v1.Pod, spec *UpdateSpec) bool {
 	// For example:
 	// 		we should not restart the container
 	//		when only resize cpu in container with memory RestartContainer RestartPolicy,
+	containers := make([]*v1.Container, 0, len(pod.Spec.Containers)+len(pod.Spec.InitContainers))
+	for i := range pod.Spec.Containers {
+		containers = append(containers, &pod.Spec.Containers[i])
+	}
+	for i := range pod.Spec.InitContainers {
+		if util.IsRestartableInitContainer(&pod.Spec.InitContainers[i]) {
+			containers = append(containers, &pod.Spec.InitContainers[i])
+		}
+	}
 	needRestart := false
 OuterLoop:
-	for _, container := range pod.Spec.Containers {
+	for _, container := range containers {
 		if flag, exist := resourceFlag[container.Name]; exist {
 			for _, resizePolicy := range container.ResizePolicy {
 				if resizePolicy.RestartPolicy != v1.RestartContainer {

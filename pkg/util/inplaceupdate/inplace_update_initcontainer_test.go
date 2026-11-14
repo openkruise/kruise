@@ -24,6 +24,7 @@ import (
 	"github.com/appscode/jsonpatch"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeletcontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -467,5 +468,320 @@ func TestValidateInPlaceOnlyTemplateSpecPatches(t *testing.T) {
 				t.Fatalf("expected no error, got %v (patches: %v)", err, patches)
 			}
 		})
+	}
+}
+
+func setRestartableInitResourceGates(t *testing.T, initGate, verticalGate bool) {
+	t.Helper()
+	setInitContainerGate(t, initGate)
+	if err := utilfeature.DefaultMutableFeatureGate.Set(
+		fmt.Sprintf("%s=%v", features.InPlaceWorkloadVerticalScaling, verticalGate)); err != nil {
+		t.Fatalf("failed to set vertical scaling feature-gate: %v", err)
+	}
+}
+
+func initContainerTestResources(cpu, memory string) v1.ResourceList {
+	return v1.ResourceList{
+		v1.ResourceCPU:    resource.MustParse(cpu),
+		v1.ResourceMemory: resource.MustParse(memory),
+	}
+}
+
+func guaranteedInitTestContainer(name string, restartable bool, cpu, memory string) v1.Container {
+	c := v1.Container{
+		Name:  name,
+		Image: name + ":latest",
+		Resources: v1.ResourceRequirements{
+			Limits:   initContainerTestResources(cpu, memory),
+			Requests: initContainerTestResources(cpu, memory),
+		},
+	}
+	if restartable {
+		c.RestartPolicy = restartAlways()
+	}
+	return c
+}
+
+func resourceRevision(t *testing.T, name string, main, init v1.Container) *apps.ControllerRevision {
+	t.Helper()
+	raw, err := json.Marshal(map[string]interface{}{
+		"spec": map[string]interface{}{
+			"template": v1.PodTemplateSpec{Spec: v1.PodSpec{
+				Containers:     []v1.Container{main},
+				InitContainers: []v1.Container{init},
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal revision: %v", err)
+	}
+	return revisionOf(name, string(raw))
+}
+
+func TestCalculateSpecForRestartableInitContainerResources(t *testing.T) {
+	main := guaranteedInitTestContainer("main", false, "1", "1Gi")
+	oldSidecar := guaranteedInitTestContainer("sidecar", true, "100m", "128Mi")
+	newSidecar := *oldSidecar.DeepCopy()
+	newSidecar.Resources = v1.ResourceRequirements{
+		Limits:   initContainerTestResources("200m", "256Mi"),
+		Requests: initContainerTestResources("200m", "256Mi"),
+	}
+	oldRegular := *oldSidecar.DeepCopy()
+	oldRegular.RestartPolicy = nil
+	newRegular := *newSidecar.DeepCopy()
+	newRegular.RestartPolicy = nil
+	qosChangedSidecar := *newSidecar.DeepCopy()
+	qosChangedSidecar.Resources.Requests = initContainerTestResources("100m", "128Mi")
+
+	cases := []struct {
+		name               string
+		initGate           bool
+		verticalGate       bool
+		unsupportedCluster bool
+		oldInit            v1.Container
+		newInit            v1.Container
+		expectInPlace      bool
+	}{
+		{
+			name:          "both gates enabled",
+			initGate:      true,
+			verticalGate:  true,
+			oldInit:       oldSidecar,
+			newInit:       newSidecar,
+			expectInPlace: true,
+		},
+		{
+			name:         "restartable init gate disabled",
+			initGate:     false,
+			verticalGate: true,
+			oldInit:      oldSidecar,
+			newInit:      newSidecar,
+		},
+		{
+			name:         "vertical scaling gate disabled",
+			initGate:     true,
+			verticalGate: false,
+			oldInit:      oldSidecar,
+			newInit:      newSidecar,
+		},
+		{
+			name:               "unsupported Kubernetes version falls back to recreate",
+			initGate:           true,
+			verticalGate:       true,
+			unsupportedCluster: true,
+			oldInit:            oldSidecar,
+			newInit:            newSidecar,
+		},
+		{
+			name:         "regular init container falls back to recreate",
+			initGate:     true,
+			verticalGate: true,
+			oldInit:      oldRegular,
+			newInit:      newRegular,
+		},
+		{
+			name:         "QoS change falls back to recreate",
+			initGate:     true,
+			verticalGate: true,
+			oldInit:      oldSidecar,
+			newInit:      qosChangedSidecar,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			setRestartableInitResourceGates(t, tc.initGate, tc.verticalGate)
+			defer setRestartableInitResourceGates(t, false, false)
+			originalCapabilityCheck := shouldUpdateSidecarResourceByResize
+			shouldUpdateSidecarResourceByResize = func() bool { return !tc.unsupportedCluster }
+			defer func() { shouldUpdateSidecarResourceByResize = originalCapabilityCheck }()
+			got := defaultCalculateInPlaceUpdateSpec(
+				resourceRevision(t, "old", main, tc.oldInit),
+				resourceRevision(t, "new", main, tc.newInit), nil)
+			if !tc.expectInPlace {
+				if got != nil {
+					t.Fatalf("expected nil spec (recreate), got %+v", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatal("expected a non-nil in-place update spec")
+			}
+			resources := got.ContainerResources["sidecar"]
+			if !resources.Limits.Cpu().Equal(resource.MustParse("200m")) ||
+				!resources.Requests.Memory().Equal(resource.MustParse("256Mi")) {
+				t.Fatalf("unexpected sidecar resources: %+v", resources)
+			}
+			if !got.VerticalUpdateOnly() {
+				t.Fatalf("expected a resource-only update, got %+v", got)
+			}
+		})
+	}
+}
+
+func TestPatchRestartableInitContainerResourcesToPod(t *testing.T) {
+	setRestartableInitResourceGates(t, true, true)
+	defer setRestartableInitResourceGates(t, false, false)
+
+	main := guaranteedInitTestContainer("main", false, "1", "1Gi")
+	sidecar := guaranteedInitTestContainer("sidecar", true, "100m", "128Mi")
+	setup := guaranteedInitTestContainer("setup", false, "50m", "64Mi")
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "p1", Annotations: map[string]string{}},
+		Spec: v1.PodSpec{
+			Containers:     []v1.Container{main},
+			InitContainers: []v1.Container{sidecar, setup},
+		},
+	}
+	newResources := v1.ResourceRequirements{
+		Limits:   initContainerTestResources("200m", "256Mi"),
+		Requests: initContainerTestResources("200m", "256Mi"),
+	}
+	spec := &UpdateSpec{ContainerResources: map[string]v1.ResourceRequirements{
+		"sidecar": newResources,
+		"setup":   newResources,
+	}}
+	state := &appspub.InPlaceUpdateState{}
+
+	got, _, err := defaultPatchUpdateSpecToPod(pod, spec, state)
+	if err != nil {
+		t.Fatalf("failed to patch Pod: %v", err)
+	}
+	if !got.Spec.InitContainers[0].Resources.Limits.Cpu().Equal(resource.MustParse("200m")) ||
+		!got.Spec.InitContainers[0].Resources.Requests.Memory().Equal(resource.MustParse("256Mi")) {
+		t.Fatalf("sidecar resources were not updated: %+v", got.Spec.InitContainers[0].Resources)
+	}
+	if !got.Spec.InitContainers[1].Resources.Limits.Cpu().Equal(resource.MustParse("50m")) {
+		t.Fatalf("regular init container must not be updated: %+v", got.Spec.InitContainers[1].Resources)
+	}
+	if len(state.NextContainerResources) != 0 {
+		t.Fatalf("sidecar resources must be updated in the current batch: %v", state.NextContainerResources)
+	}
+	var persistedState appspub.InPlaceUpdateState
+	if err := json.Unmarshal([]byte(got.Annotations[appspub.InPlaceUpdateStateKey]), &persistedState); err != nil {
+		t.Fatalf("failed to decode in-place update state: %v", err)
+	}
+	if _, ok := persistedState.CurrentInitContainerResources["sidecar"]; !ok {
+		t.Fatalf("sidecar resource target was not persisted: %+v", persistedState.CurrentInitContainerResources)
+	}
+	if _, ok := persistedState.CurrentInitContainerResources["setup"]; ok {
+		t.Fatalf("regular init container must not be persisted as a resize target: %+v", persistedState.CurrentInitContainerResources)
+	}
+	if len(state.ContainerBatchesRecord) != 1 {
+		t.Fatalf("expected one batch record, got %+v", state.ContainerBatchesRecord)
+	}
+	for _, name := range state.ContainerBatchesRecord[0].Containers {
+		if name == "setup" {
+			t.Fatalf("regular init container entered an in-place update batch: %+v", state.ContainerBatchesRecord[0])
+		}
+	}
+}
+
+func TestGenerateResourcePatchForRestartableInitContainer(t *testing.T) {
+	main := guaranteedInitTestContainer("main", false, "1", "1Gi")
+	sidecar := guaranteedInitTestContainer("sidecar", true, "100m", "128Mi")
+	setup := guaranteedInitTestContainer("setup", false, "50m", "64Mi")
+	pod := &v1.Pod{Spec: v1.PodSpec{
+		Containers:     []v1.Container{main},
+		InitContainers: []v1.Container{sidecar, setup},
+	}}
+	newResources := v1.ResourceRequirements{
+		Limits:   initContainerTestResources("200m", "256Mi"),
+		Requests: initContainerTestResources("200m", "256Mi"),
+	}
+	patchBytes := verticalUpdateImpl.GenerateResourcePatch(pod, map[string]*v1.ResourceRequirements{
+		"main":    &newResources,
+		"sidecar": &newResources,
+		"setup":   &newResources,
+	})
+	var patch struct {
+		Spec struct {
+			Containers     []v1.Container `json:"containers"`
+			InitContainers []v1.Container `json:"initContainers"`
+		} `json:"spec"`
+	}
+	if err := json.Unmarshal(patchBytes, &patch); err != nil {
+		t.Fatalf("failed to unmarshal resize patch %s: %v", patchBytes, err)
+	}
+	if len(patch.Spec.Containers) != 1 || patch.Spec.Containers[0].Name != "main" {
+		t.Fatalf("unexpected regular container patch: %+v", patch.Spec.Containers)
+	}
+	if len(patch.Spec.InitContainers) != 1 || patch.Spec.InitContainers[0].Name != "sidecar" {
+		t.Fatalf("unexpected init container patch: %+v", patch.Spec.InitContainers)
+	}
+	if !patch.Spec.InitContainers[0].Resources.Limits.Cpu().Equal(resource.MustParse("200m")) {
+		t.Fatalf("unexpected sidecar patch resources: %+v", patch.Spec.InitContainers[0].Resources)
+	}
+}
+
+func TestRestartableInitContainerResourceCompletion(t *testing.T) {
+	main := guaranteedInitTestContainer("main", false, "1", "1Gi")
+	sidecar := guaranteedInitTestContainer("sidecar", true, "200m", "256Mi")
+	setup := guaranteedInitTestContainer("setup", false, "50m", "64Mi")
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers:     []v1.Container{main},
+			InitContainers: []v1.Container{sidecar, setup},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{{
+				Name: "main", Resources: main.Resources.DeepCopy(),
+			}},
+			InitContainerStatuses: []v1.ContainerStatus{{
+				Name: "sidecar", Resources: sidecar.Resources.DeepCopy(),
+			}},
+		},
+	}
+	completed, err := verticalUpdateImpl.IsUpdateCompleted(pod, map[string]v1.ResourceRequirements{"sidecar": sidecar.Resources})
+	if err != nil || !completed {
+		t.Fatalf("expected sidecar resize to be completed, completed=%v, err=%v", completed, err)
+	}
+
+	oldResources := guaranteedInitTestContainer("sidecar", true, "100m", "128Mi").Resources
+	pod.Status.InitContainerStatuses[0].Resources = &oldResources
+	completed, err = verticalUpdateImpl.IsUpdateCompleted(pod, map[string]v1.ResourceRequirements{"sidecar": sidecar.Resources})
+	if err == nil || completed {
+		t.Fatalf("expected incomplete sidecar resize, completed=%v, err=%v", completed, err)
+	}
+
+	pod.Status.InitContainerStatuses[0].Resources = nil
+	completed, err = verticalUpdateImpl.IsUpdateCompleted(pod, map[string]v1.ResourceRequirements{"sidecar": sidecar.Resources})
+	if err == nil || completed {
+		t.Fatalf("targeted sidecar without resource status must stay incomplete, completed=%v, err=%v", completed, err)
+	}
+	completed, err = verticalUpdateImpl.IsUpdateCompleted(pod, nil)
+	if err != nil || !completed {
+		t.Fatalf("regular-only resize must ignore unrelated sidecar status, completed=%v, err=%v", completed, err)
+	}
+}
+
+func TestRestartableInitContainerResourceResizePolicy(t *testing.T) {
+	setRestartableInitResourceGates(t, true, true)
+	defer setRestartableInitResourceGates(t, false, false)
+
+	sidecar := guaranteedInitTestContainer("sidecar", true, "100m", "128Mi")
+	sidecar.ResizePolicy = []v1.ContainerResizePolicy{{
+		ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer,
+	}}
+	pod := &v1.Pod{Spec: v1.PodSpec{
+		InitContainers: []v1.Container{sidecar},
+		ReadinessGates: []v1.PodReadinessGate{{ConditionType: appspub.InPlaceUpdateReady}},
+	}}
+	spec := &UpdateSpec{ContainerResources: map[string]v1.ResourceRequirements{
+		"sidecar": {Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")}},
+	}}
+	if !defaultCheckPodNeedsBeUnready(pod, spec) {
+		t.Fatal("expected RestartContainer resize policy to mark the Pod unready")
+	}
+
+	pod.Spec.InitContainers[0].ResizePolicy[0].RestartPolicy = v1.NotRequired
+	if defaultCheckPodNeedsBeUnready(pod, spec) {
+		t.Fatal("NotRequired resize policy should keep the Pod ready")
+	}
+
+	pod.Spec.InitContainers[0].RestartPolicy = nil
+	pod.Spec.InitContainers[0].ResizePolicy[0].RestartPolicy = v1.RestartContainer
+	if defaultCheckPodNeedsBeUnready(pod, spec) {
+		t.Fatal("regular init containers must not enter sidecar resource resize handling")
 	}
 }

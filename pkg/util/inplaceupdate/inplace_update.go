@@ -42,11 +42,11 @@ import (
 )
 
 var (
-	containerImagePatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
-	// containerResourcesPatchRexp intentionally matches the regular containers only. The resources
-	// of a restartable init container are not in-place updatable, so such a patch falls through to
-	// the fallback of defaultCalculateInPlaceUpdateSpec and the Pod gets recreated.
+	containerImagePatchRexp     = regexp.MustCompile("^/spec/containers/([0-9]+)/image$")
 	containerResourcesPatchRexp = regexp.MustCompile("^/spec/containers/([0-9]+)/resources/.*$")
+	// initContainerResourcesPatchRexp is guarded by both InPlaceUpdateRestartableInitContainer and
+	// InPlaceWorkloadVerticalScaling. Only restartable init containers can use this path.
+	initContainerResourcesPatchRexp = regexp.MustCompile("^/spec/initContainers/([0-9]+)/resources/.*$")
 	// initContainerImagePatchRexp matches the image of an init container. Only restartable init
 	// containers (native sidecar containers) can be in-place updated, and it is guarded by the
 	// InPlaceUpdateRestartableInitContainer feature-gate. See defaultCalculateInPlaceUpdateSpec.
@@ -103,8 +103,10 @@ type UpdateSpec struct {
 	// InitContainerImages is the images of the restartable init containers (native sidecar
 	// containers) that need to in-place update. It is only calculated when the
 	// InPlaceUpdateRestartableInitContainer feature-gate is enabled.
-	InitContainerImages   map[string]string                  `json:"initContainerImages,omitempty"`
-	ContainerRefMetadata  map[string]metav1.ObjectMeta       `json:"containerRefMetadata,omitempty"`
+	InitContainerImages  map[string]string            `json:"initContainerImages,omitempty"`
+	ContainerRefMetadata map[string]metav1.ObjectMeta `json:"containerRefMetadata,omitempty"`
+	// ContainerResources contains regular containers and restartable init containers. Container
+	// names are unique across both lists in a Pod, so the existing annotation schema stays compatible.
 	ContainerResources    map[string]v1.ResourceRequirements `json:"containerResources,omitempty"`
 	MetaDataPatch         []byte                             `json:"metaDataPatch,omitempty"`
 	UpdateEnvFromMetadata bool                               `json:"updateEnvFromMetadata,omitempty"`
