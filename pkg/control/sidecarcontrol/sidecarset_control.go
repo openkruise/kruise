@@ -97,9 +97,8 @@ func (c *commonControl) IsPodReady(pod *v1.Pod) bool {
 }
 
 func (c *commonControl) UpdatePodAnnotationsInUpgrade(changedContainers []string, pod *v1.Pod) {
-	// Pods created without any annotation have a nil annotations map.
 	if pod.Annotations == nil {
-		pod.Annotations = map[string]string{}
+		pod.Annotations = make(map[string]string)
 	}
 	sidecarSet := c.GetSidecarset()
 	// record the ImageID, before update pod sidecar container

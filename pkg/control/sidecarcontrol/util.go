@@ -218,9 +218,8 @@ func IsPodSidecarUpdated(sidecarSet *appsv1beta1.SidecarSet, pod *corev1.Pod) bo
 
 // UpdatePodSidecarSetHash when sidecarSet in-place update sidecar container, Update sidecarSet hash in Pod annotations[kruise.io/sidecarset-hash]
 func UpdatePodSidecarSetHash(pod *corev1.Pod, sidecarSet *appsv1beta1.SidecarSet) {
-	// Pods created without any annotation have a nil annotations map.
 	if pod.Annotations == nil {
-		pod.Annotations = map[string]string{}
+		pod.Annotations = make(map[string]string)
 	}
 	hashKey := SidecarSetHashAnnotation
 	sidecarSetHash := make(map[string]SidecarSetUpgradeSpec)
