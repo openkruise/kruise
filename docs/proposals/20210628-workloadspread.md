@@ -199,7 +199,7 @@ WorkloadSpread has both webhook and controller. Controller should collaborate wi
 
 The webhook is responsible for injecting rules into pod, updating `missingReplicas` and recording the creation or deletion entry of Pod into map.
 
-The controller is responsible for updating the missingReplicas along with other statics, and cleaning `creatingPods` and `deletingPods` map.
+The controller is responsible for updating the missingReplicas along with other statistics, and cleaning `creatingPods` and `deletingPods` map.
 
 ### Replicas control
 
