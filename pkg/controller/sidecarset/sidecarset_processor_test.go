@@ -83,6 +83,83 @@ func TestUpdatePodSidecarAndHashPodNotFound(t *testing.T) {
 	}
 }
 
+// TestUpdatePodSidecarAndHashPodWithoutAnnotations verifies that the controller
+// does not panic when a pod has nil Annotations. Before the fix, three write
+// sites — UpdatePodSidecarSetHash, UpdatePodAnnotationsInUpgrade, and the
+// SidecarSetListAnnotation write — would panic with "assignment to entry in
+// nil map". Each site now initializes the map first.
+func TestUpdatePodSidecarAndHashPodWithoutAnnotations(t *testing.T) {
+	sidecarSet := sidecarSetDemo.DeepCopy()
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod-no-annotations",
+			Namespace: "default",
+			Labels:    map[string]string{"app": "nginx"},
+			// Annotations intentionally nil to reproduce the panic
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "nginx",
+					Image: "nginx:1.15.1",
+				},
+				{
+					Name:  "test-sidecar",
+					Image: "test-image:v1",
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				},
+			},
+			ContainerStatuses: []corev1.ContainerStatus{
+				{
+					Name:    "nginx",
+					Image:   "nginx:1.15.1",
+					ImageID: "docker-pullable://nginx@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d",
+					Ready:   true,
+				},
+				{
+					Name:    "test-sidecar",
+					Image:   "test-image:v1",
+					ImageID: testImageV1ImageID,
+					Ready:   true,
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(sidecarSet, pod).Build()
+	processor := NewSidecarSetProcessor(fakeClient, record.NewFakeRecorder(10))
+	control := sidecarcontrol.New(sidecarSet)
+	if err := processor.updatePodSidecarAndHash(control, pod); err != nil {
+		t.Fatalf("updatePodSidecarAndHash failed: %v", err)
+	}
+
+	// Verify the pod's annotations were safely initialized and populated.
+	updatedPod, err := getLatestPod(fakeClient, pod)
+	if err != nil {
+		t.Fatalf("get latest pod failed: %v", err)
+	}
+	if updatedPod.Annotations == nil {
+		t.Fatalf("expected annotations to be initialized, but got nil")
+	}
+	if _, ok := updatedPod.Annotations[sidecarcontrol.SidecarSetHashAnnotation]; !ok {
+		t.Fatalf("expected annotation %s to be set", sidecarcontrol.SidecarSetHashAnnotation)
+	}
+	if _, ok := updatedPod.Annotations[sidecarcontrol.SidecarsetInplaceUpdateStateKey]; !ok {
+		t.Fatalf("expected annotation %s to be set", sidecarcontrol.SidecarsetInplaceUpdateStateKey)
+	}
+	if _, ok := updatedPod.Annotations[sidecarcontrol.SidecarSetListAnnotation]; !ok {
+		t.Fatalf("expected annotation %s to be set", sidecarcontrol.SidecarSetListAnnotation)
+	}
+}
+
 func testUpdateColdUpgradeSidecar(t *testing.T, podDemo *corev1.Pod, sidecarSetInput *appsv1beta1.SidecarSet, handlers map[string]HandlePod) {
 	podInput1 := podDemo.DeepCopy()
 	podInput2 := podDemo.DeepCopy()

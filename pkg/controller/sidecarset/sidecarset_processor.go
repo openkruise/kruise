@@ -207,6 +207,14 @@ func (p *Processor) updatePodSidecarAndHash(control sidecarcontrol.SidecarContro
 			klog.ErrorS(err, "SidecarSet got updated pod from client failed", "sidecarSet", klog.KObj(sidecarSet), "pod", klog.KObj(pod))
 			return err
 		}
+
+		// Pods created without any annotation have a nil annotations map, and
+		// updatePodSidecarContainer writes annotations for hot-upgrade sidecars
+		// before it refreshes the sidecarSet hash.
+		if podClone.Annotations == nil {
+			podClone.Annotations = map[string]string{}
+		}
+
 		// update pod sidecar container
 		updatePodSidecarContainer(control, podClone)
 		// older pod don't have SidecarSetListAnnotation
