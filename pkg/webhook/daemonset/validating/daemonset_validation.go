@@ -93,7 +93,7 @@ func validateDaemonSetUpdateStrategy(strategy *appsv1alpha1.DaemonSetUpdateStrat
 		allErrs = append(allErrs, validateRollingUpdateDaemonSet(strategy.RollingUpdate, fldPath.Child("rollingUpdate"))...)
 	default:
 		validValues := []string{string(appsv1alpha1.RollingUpdateDaemonSetStrategyType), string(appsv1alpha1.OnDeleteDaemonSetStrategyType)}
-		allErrs = append(allErrs, field.NotSupported(fldPath, strategy, validValues))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), strategy.Type, validValues))
 	}
 	return allErrs
 }
@@ -131,12 +131,12 @@ func validateRollingUpdateDaemonSet(rollingUpdate *appsv1alpha1.RollingUpdateDae
 		}
 	default:
 		validValues := []string{string(appsv1alpha1.StandardRollingUpdateType), string(appsv1alpha1.DeprecatedSurgingRollingUpdateType), string(appsv1alpha1.InplaceRollingUpdateType)}
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rollingUpdate").Child("type"), rollingUpdate.Type, validValues))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), rollingUpdate.Type, validValues))
 	}
 
 	if rollingUpdate.Partition != nil {
-		allErrs = append(allErrs, validateNonnegativeIntOrPercent(*rollingUpdate.Partition, fldPath.Child("rollingUpdate").Child("partition"))...)
-		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*rollingUpdate.Partition, fldPath.Child("rollingUpdate").Child("partition"))...)
+		allErrs = append(allErrs, validateNonnegativeIntOrPercent(*rollingUpdate.Partition, fldPath.Child("partition"))...)
+		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*rollingUpdate.Partition, fldPath.Child("partition"))...)
 	}
 
 	return allErrs
@@ -245,7 +245,7 @@ func validateDaemonSetUpdateStrategyV1beta1(strategy *appsv1beta1.DaemonSetUpdat
 		allErrs = append(allErrs, validateRollingUpdateDaemonSetV1beta1(strategy.RollingUpdate, fldPath.Child("rollingUpdate"))...)
 	default:
 		validValues := []string{string(appsv1beta1.RollingUpdateDaemonSetStrategyType), string(appsv1beta1.OnDeleteDaemonSetStrategyType)}
-		allErrs = append(allErrs, field.NotSupported(fldPath, strategy, validValues))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), strategy.Type, validValues))
 	}
 	return allErrs
 }
@@ -279,12 +279,12 @@ func validateRollingUpdateDaemonSetV1beta1(rollingUpdate *appsv1beta1.RollingUpd
 		}
 	default:
 		validValues := []string{string(appsv1beta1.StandardRollingUpdateType), string(appsv1beta1.InplaceRollingUpdateType)}
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("rollingUpdate").Child("type"), rollingUpdate.Type, validValues))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), rollingUpdate.Type, validValues))
 	}
 
 	if rollingUpdate.Partition != nil {
-		allErrs = append(allErrs, validateNonnegativeIntOrPercent(*rollingUpdate.Partition, fldPath.Child("rollingUpdate").Child("partition"))...)
-		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*rollingUpdate.Partition, fldPath.Child("rollingUpdate").Child("partition"))...)
+		allErrs = append(allErrs, validateNonnegativeIntOrPercent(*rollingUpdate.Partition, fldPath.Child("partition"))...)
+		allErrs = append(allErrs, appsvalidation.IsNotMoreThan100Percent(*rollingUpdate.Partition, fldPath.Child("partition"))...)
 	}
 
 	return allErrs
