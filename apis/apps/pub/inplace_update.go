@@ -66,6 +66,11 @@ type InPlaceUpdateState struct {
 	// UpdateResources indicates there are resources that should be in-place update.
 	UpdateResources bool `json:"updateResources,omitempty"`
 
+	// CurrentInitContainerResources records the native sidecar resource targets patched in the
+	// current batch. It lets completion checks distinguish targeted sidecars from unrelated ones.
+	// The field is optional so annotations written by older versions remain compatible.
+	CurrentInitContainerResources map[string]v1.ResourceRequirements `json:"currentInitContainerResources,omitempty"`
+
 	// UpdateImages indicates there are images that should be in-place update.
 	UpdateImages bool `json:"updateImages,omitempty"`
 

@@ -132,3 +132,28 @@ func TestShouldUpdateResourceByResize(t *testing.T) {
 		})
 	}
 }
+
+func TestShouldUpdateSidecarResourceByResize(t *testing.T) {
+	original := curVersion
+	t.Cleanup(func() { curVersion = original })
+
+	cases := []struct {
+		gitVersion string
+		want       bool
+	}{
+		{gitVersion: "v1.32.10", want: false},
+		{gitVersion: "v1.33.0", want: false},
+		{gitVersion: "v1.34.0", want: true},
+		{gitVersion: "v1.35.2", want: true},
+		{gitVersion: "v1.34.0-rc.0", want: true},
+		{gitVersion: "garbage", want: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.gitVersion, func(t *testing.T) {
+			curVersion = &version.Info{GitVersion: tc.gitVersion}
+			if got := ShouldUpdateSidecarResourceByResize(); got != tc.want {
+				t.Fatalf("ShouldUpdateSidecarResourceByResize() for %q = %v, want %v", tc.gitVersion, got, tc.want)
+			}
+		})
+	}
+}
