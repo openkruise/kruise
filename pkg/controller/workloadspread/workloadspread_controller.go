@@ -164,15 +164,32 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
-	if len(whiteList.Workloads) > 0 {
+	watchable := watchableCustomWorkloads(whiteList.Workloads)
+	if len(watchable) > 0 {
 		workloadHandler := &workloadEventHandler{Reader: mgr.GetClient()}
-		for _, workload := range whiteList.Workloads {
+		for _, workload := range watchable {
 			if _, err := ctrlUtil.AddWatcherDynamically(mgr, c, workloadHandler, workload.GroupVersionKind, "WorkloadSpread"); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+// watchableCustomWorkloads drops the whitelist entries that cannot be watched, so one bad
+// entry does not stop the controller for every WorkloadSpread. A watch needs the full
+// group, version and kind, an entry without a version would make the informer fail forever.
+func watchableCustomWorkloads(workloads []configuration.CustomWorkload) []configuration.CustomWorkload {
+	watchable := make([]configuration.CustomWorkload, 0, len(workloads))
+	for _, workload := range workloads {
+		if workload.Version == "" || workload.Kind == "" {
+			klog.ErrorS(nil, "Skip the custom workload in the WorkloadSpread watch whitelist, it needs group, version and kind",
+				"group", workload.Group, "version", workload.Version, "kind", workload.Kind)
+			continue
+		}
+		watchable = append(watchable, workload)
+	}
+	return watchable
 }
 
 // newReconciler returns a new reconcile.Reconciler
