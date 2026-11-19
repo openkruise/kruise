@@ -270,6 +270,59 @@ func IsPodContainerDigestEqual(containers sets.String, pod *v1.Pod) bool {
 	return true
 }
 
+// GetPodContainerImageIDsIncludingInit works like GetPodContainerImageIDs, but covers the init
+// containers as well. Restartable init containers (native sidecar containers) report their
+// imageID in status.initContainerStatuses rather than status.containerStatuses.
+func GetPodContainerImageIDsIncludingInit(pod *v1.Pod) map[string]string {
+	cImageIDs := GetPodContainerImageIDs(pod)
+	for i := range pod.Status.InitContainerStatuses {
+		c := &pod.Status.InitContainerStatuses[i]
+		imageID := c.ImageID
+		if strings.Contains(imageID, "://") {
+			imageID = strings.Split(imageID, "://")[1]
+		}
+		cImageIDs[c.Name] = imageID
+	}
+	return cImageIDs
+}
+
+// IsPodContainerDigestEqualIncludingInit works like IsPodContainerDigestEqual, but looks up both
+// spec.containers and spec.initContainers. Unlike IsPodContainerDigestEqual, it is fail-closed:
+// a name that is not found in the Pod spec at all is reported as inconsistent, instead of
+// silently consistent.
+func IsPodContainerDigestEqualIncludingInit(containers sets.String, pod *v1.Pod) bool {
+	cImageIDs := GetPodContainerImageIDsIncludingInit(pod)
+
+	found := sets.NewString()
+	check := func(container *v1.Container) bool {
+		if !containers.Has(container.Name) {
+			return true
+		}
+		found.Insert(container.Name)
+		// image must be digest format
+		if !IsImageDigest(container.Image) {
+			return false
+		}
+		imageID, ok := cImageIDs[container.Name]
+		if !ok {
+			return false
+		}
+		return IsContainerImageEqual(container.Image, imageID)
+	}
+
+	for i := range pod.Spec.InitContainers {
+		if !check(&pod.Spec.InitContainers[i]) {
+			return false
+		}
+	}
+	for i := range pod.Spec.Containers {
+		if !check(&pod.Spec.Containers[i]) {
+			return false
+		}
+	}
+	return found.Equal(containers)
+}
+
 func MergeVolumeMountsInContainer(origin *v1.Container, other v1.Container) {
 	mountExist := make(map[string]bool)
 	for _, volume := range origin.VolumeMounts {

@@ -281,14 +281,15 @@ func (c *commonControl) GetPodsForPub(pub *policyv1beta1.PodUnavailableBudget) (
 }
 
 func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
-	// if all container image is digest format
-	// by comparing status.containers[x].ImageID with spec.container[x].Image can determine whether pod is consistent
-	allDigestImage := true
+	// If a container image is digest format, for example
+	// docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d,
+	// it is compared with the imageID in the status directly, which can find the containers
+	// recreated or updated without Kruise.
+	// Note that passing the digest comparison does NOT conclude the Pod is consistent: the
+	// sidecar and in-place update states below are always checked, because the digest comparison
+	// can not tell an in-place update in the grace period or a pending env-from-metadata refresh.
 	for _, container := range pod.Spec.Containers {
-		//whether image is digest format,
-		//for example: docker.io/busybox@sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d
 		if !util.IsImageDigest(container.Image) {
-			allDigestImage = false
 			continue
 		}
 
@@ -297,9 +298,23 @@ func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
 			return false
 		}
 	}
-	// If all spec.container[x].image is digest format, only check digest imageId
-	if allDigestImage {
-		return true
+	// Restartable init containers (native sidecar containers) are checked in the same way, for
+	// they can be in-place updated and their imageID in status.initContainerStatuses may lag
+	// behind the spec. Regular init containers are skipped: kubelet never restarts them on
+	// spec change, so their imageID would always lag after a Pod recreation.
+	for i := range pod.Spec.InitContainers {
+		container := &pod.Spec.InitContainers[i]
+		if !util.IsRestartableInitContainer(container) {
+			continue
+		}
+		if !util.IsImageDigest(container.Image) {
+			continue
+		}
+
+		if !util.IsPodContainerDigestEqualIncludingInit(sets.NewString(container.Name), pod) {
+			klog.V(5).InfoS("Pod init container image was inconsistent", "pod", klog.KObj(pod), "containerName", container.Name)
+			return false
+		}
 	}
 
 	// check whether injected sidecar container is consistent
