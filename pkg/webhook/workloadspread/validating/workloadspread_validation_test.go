@@ -16,6 +16,7 @@ limitations under the License.
 package validating
 
 import (
+	"reflect"
 	"strconv"
 	"testing"
 
@@ -475,6 +476,7 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 		name              string
 		getWorkloadSpread func() *appsv1beta1.WorkloadSpread
 		errorSuffix       string
+		expectedBadValue  any
 	}{
 		{
 			name: "targetRef is nil",
@@ -789,7 +791,8 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 				}
 				return workloadSpread
 			},
-			errorSuffix: "spec.scheduleStrategy.type",
+			errorSuffix:      "spec.scheduleStrategy.type",
+			expectedBadValue: appsv1beta1.FixedWorkloadSpreadScheduleStrategyType,
 		},
 		{
 			name: "the last subset's maxReplicas is not nil when using adaptive",
@@ -805,7 +808,8 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 				workloadSpread.Spec.Subsets[2].MaxReplicas = &maxReplicasDemo
 				return workloadSpread
 			},
-			errorSuffix: "spec.scheduleStrategy.adaptive",
+			errorSuffix:      "spec.subsets[2].maxReplicas",
+			expectedBadValue: &maxReplicasDemo,
 		},
 	}
 
@@ -818,16 +822,18 @@ func TestValidateWorkloadSpreadCreate(t *testing.T) {
 				t.Errorf("expected failure for %s", errorCase.name)
 			}
 
-			var exist bool
+			var matchedErr *field.Error
 			for i := range errs {
 				f := errs[i].Field
 				if f == errorCase.errorSuffix {
-					exist = true
+					matchedErr = errs[i]
 					break
 				}
 			}
-			if !exist {
+			if matchedErr == nil {
 				t.Errorf("%s: missing prefix for: %v", errorCase.name, errs)
+			} else if errorCase.expectedBadValue != nil && !reflect.DeepEqual(matchedErr.BadValue, errorCase.expectedBadValue) {
+				t.Errorf("%s: expected badValue %v, got %v", errorCase.name, errorCase.expectedBadValue, matchedErr.BadValue)
 			}
 		})
 	}
