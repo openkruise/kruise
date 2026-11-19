@@ -648,6 +648,69 @@ func TestValidateDaemonSetSpec(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			name: "with valid burstReplicas",
+			spec: &appsv1alpha1.DaemonSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Labels: validLabels},
+					Spec: corev1.PodSpec{
+						RestartPolicy: corev1.RestartPolicyAlways,
+						Containers:    []corev1.Container{{Name: "test", Image: "test:v1"}},
+					},
+				},
+				UpdateStrategy: appsv1alpha1.DaemonSetUpdateStrategy{
+					Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
+					RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+						MaxUnavailable: &maxUnavailable,
+					},
+				},
+				BurstReplicas: &maxUnavailable, // Valid positive integer
+			},
+			expectErr: false,
+		},
+		{
+			name: "with zero burstReplicas",
+			spec: &appsv1alpha1.DaemonSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Labels: validLabels},
+					Spec: corev1.PodSpec{
+						RestartPolicy: corev1.RestartPolicyAlways,
+						Containers:    []corev1.Container{{Name: "test", Image: "test:v1"}},
+					},
+				},
+				UpdateStrategy: appsv1alpha1.DaemonSetUpdateStrategy{
+					Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
+					RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+						MaxUnavailable: &maxUnavailable,
+					},
+				},
+				BurstReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+			},
+			expectErr: false,
+		},
+		{
+			name: "with invalid negative burstReplicas",
+			spec: &appsv1alpha1.DaemonSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Labels: validLabels},
+					Spec: corev1.PodSpec{
+						RestartPolicy: corev1.RestartPolicyAlways,
+						Containers:    []corev1.Container{{Name: "test", Image: "test:v1"}},
+					},
+				},
+				UpdateStrategy: appsv1alpha1.DaemonSetUpdateStrategy{
+					Type: appsv1alpha1.RollingUpdateDaemonSetStrategyType,
+					RollingUpdate: &appsv1alpha1.RollingUpdateDaemonSet{
+						MaxUnavailable: &maxUnavailable,
+					},
+				},
+				BurstReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: -5},
+			},
+			expectErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1109,6 +1172,69 @@ func TestValidateDaemonSetSpecV1beta1(t *testing.T) {
 				Lifecycle: &appspub.Lifecycle{
 					InPlaceUpdate: &appspub.LifecycleHook{},
 				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "with valid burstReplicas",
+			spec: &appsv1beta1.DaemonSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Labels: validLabels},
+					Spec: corev1.PodSpec{
+						RestartPolicy: corev1.RestartPolicyAlways,
+						Containers:    []corev1.Container{{Name: "test", Image: "test:v1"}},
+					},
+				},
+				UpdateStrategy: appsv1beta1.DaemonSetUpdateStrategy{
+					Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+					RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+						MaxUnavailable: &maxUnavailable,
+					},
+				},
+				BurstReplicas: &maxUnavailable,
+			},
+			expectErr: false,
+		},
+		{
+			name: "with zero burstReplicas",
+			spec: &appsv1beta1.DaemonSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Labels: validLabels},
+					Spec: corev1.PodSpec{
+						RestartPolicy: corev1.RestartPolicyAlways,
+						Containers:    []corev1.Container{{Name: "test", Image: "test:v1"}},
+					},
+				},
+				UpdateStrategy: appsv1beta1.DaemonSetUpdateStrategy{
+					Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+					RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+						MaxUnavailable: &maxUnavailable,
+					},
+				},
+				BurstReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: 0},
+			},
+			expectErr: false,
+		},
+		{
+			name: "with invalid negative burstReplicas",
+			spec: &appsv1beta1.DaemonSetSpec{
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Labels: validLabels},
+					Spec: corev1.PodSpec{
+						RestartPolicy: corev1.RestartPolicyAlways,
+						Containers:    []corev1.Container{{Name: "test", Image: "test:v1"}},
+					},
+				},
+				UpdateStrategy: appsv1beta1.DaemonSetUpdateStrategy{
+					Type: appsv1beta1.RollingUpdateDaemonSetStrategyType,
+					RollingUpdate: &appsv1beta1.RollingUpdateDaemonSet{
+						MaxUnavailable: &maxUnavailable,
+					},
+				},
+				BurstReplicas: &intstr.IntOrString{Type: intstr.Int, IntVal: -5},
 			},
 			expectErr: true,
 		},

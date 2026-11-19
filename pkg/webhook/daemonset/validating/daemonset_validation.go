@@ -66,6 +66,10 @@ func validateDaemonSetSpec(spec *appsv1alpha1.DaemonSetSpec, fldPath *field.Path
 	}
 	allErrs = append(allErrs, corevalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
 
+	if spec.BurstReplicas != nil {
+		allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*spec.BurstReplicas, fldPath.Child("burstReplicas"))...)
+	}
+
 	allErrs = append(allErrs, validateDaemonSetUpdateStrategy(&spec.UpdateStrategy, fldPath.Child("updateStrategy"))...)
 	if spec.RevisionHistoryLimit != nil {
 		// zero is a valid RevisionHistoryLimit
@@ -217,6 +221,10 @@ func validateDaemonSetSpecV1beta1(spec *appsv1beta1.DaemonSetSpec, fldPath *fiel
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("template", "spec", "activeDeadlineSeconds"), "activeDeadlineSeconds in DaemonSet is not Supported"))
 	}
 	allErrs = append(allErrs, corevalidation.ValidateNonnegativeField(int64(spec.MinReadySeconds), fldPath.Child("minReadySeconds"))...)
+
+	if spec.BurstReplicas != nil {
+		allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*spec.BurstReplicas, fldPath.Child("burstReplicas"))...)
+	}
 
 	allErrs = append(allErrs, validateDaemonSetUpdateStrategyV1beta1(&spec.UpdateStrategy, fldPath.Child("updateStrategy"))...)
 	if spec.RevisionHistoryLimit != nil {
