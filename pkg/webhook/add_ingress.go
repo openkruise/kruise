@@ -17,13 +17,13 @@ limitations under the License.
 package webhook
 
 import (
-	"github.com/openkruise/kruise/pkg/features"
-	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 	"github.com/openkruise/kruise/pkg/webhook/ingress/validating"
 )
 
 func init() {
-	addHandlersWithGate(validating.HandlerGetterMap, func() (enabled bool) {
-		return utilfeature.DefaultFeatureGate.Enabled(features.ResourcesDeletionProtection)
-	})
+	// Registered like the other deletion-protection webhooks: the handler always
+	// exists and ValidateIngressDeletion checks ResourcesDeletionProtection itself.
+	// Gating registration made kruise-manager drop these entries from the
+	// ValidatingWebhookConfiguration the chart installs.
+	addHandlers(validating.HandlerGetterMap)
 }
