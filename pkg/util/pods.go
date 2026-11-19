@@ -386,7 +386,7 @@ func SetPodReadyCondition(pod *v1.Pod) {
 		}
 	}
 
-	SetPodCondition(pod, newPodReady)
+	SetPodConditionIfMsgChanged(pod, newPodReady)
 }
 
 func ExtractPort(param intstr.IntOrString, container v1.Container) (int, error) {

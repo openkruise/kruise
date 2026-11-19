@@ -19,6 +19,7 @@ package util
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -1055,6 +1056,61 @@ func TestSetPodReadyCondition(t *testing.T) {
 		if expect != actual {
 			t.Fatalf("case %d: expect PodReady Conditions(%s), but get %s", i, expect, actual)
 		}
+	}
+}
+
+// TestSetPodReadyCondition_MessageUpdatesWhenBlockingGateChanges reproduces a pod with two
+// readiness gates where, across two reconciles, PodReady stays False both times but the gate
+// actually blocking readiness changes from type-A to type-B. SetPodReadyCondition should update
+// the message to name the gate that's blocking it now, not keep repeating the first one.
+func TestSetPodReadyCondition_MessageUpdatesWhenBlockingGateChanges(t *testing.T) {
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			ReadinessGates: []v1.PodReadinessGate{
+				{ConditionType: "type-A"},
+				{ConditionType: "type-B"},
+			},
+		},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{Type: "type-A", Status: v1.ConditionFalse},
+				{Type: "type-B", Status: v1.ConditionTrue},
+				{Type: v1.PodReady, Status: v1.ConditionTrue},
+				{Type: v1.ContainersReady, Status: v1.ConditionTrue},
+			},
+		},
+	}
+
+	// Round 1: type-A is the blocking gate.
+	SetPodReadyCondition(pod)
+	first := GetCondition(pod, v1.PodReady)
+	if first.Status != v1.ConditionFalse {
+		t.Fatalf("round 1: expect PodReady False, got %s", first.Status)
+	}
+	if !strings.Contains(first.Message, "type-A") {
+		t.Fatalf("round 1: expect message to name type-A, got %q", first.Message)
+	}
+
+	// Round 2: type-A has recovered, type-B is now the blocking gate instead. PodReady's Status
+	// doesn't change (still False), only which gate is actually responsible changes.
+	for i := range pod.Status.Conditions {
+		switch pod.Status.Conditions[i].Type {
+		case "type-A":
+			pod.Status.Conditions[i].Status = v1.ConditionTrue
+		case "type-B":
+			pod.Status.Conditions[i].Status = v1.ConditionFalse
+		}
+	}
+	SetPodReadyCondition(pod)
+	second := GetCondition(pod, v1.PodReady)
+	if second.Status != v1.ConditionFalse {
+		t.Fatalf("round 2: expect PodReady False, got %s", second.Status)
+	}
+	if !strings.Contains(second.Message, "type-B") {
+		t.Fatalf("round 2: expect message to name type-B (the gate actually blocking readiness now), got %q", second.Message)
+	}
+	if strings.Contains(second.Message, "type-A") {
+		t.Fatalf("round 2: message still blames type-A, which is ready again: %q", second.Message)
 	}
 }
 
