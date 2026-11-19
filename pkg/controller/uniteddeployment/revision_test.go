@@ -25,8 +25,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilretry "k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 )
@@ -136,4 +138,41 @@ func TestRevisionManage(t *testing.T) {
 	revisionList = &appsv1.ControllerRevisionList{}
 	g.Expect(c.List(context.TODO(), revisionList, &client.ListOptions{})).Should(gomega.BeNil())
 	g.Expect(len(revisionList.Items)).Should(gomega.BeEquivalentTo(2))
+}
+
+func TestControlledHistoriesIgnoresOtherNamespaces(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1beta1.AddToScheme(scheme)
+	_ = appsv1.AddToScheme(scheme)
+
+	selectorLabels := map[string]string{"app": "demo"}
+	ud := &appsv1beta1.UnitedDeployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "ud", Namespace: "tenant-a", UID: "ud-uid"},
+		Spec: appsv1beta1.UnitedDeploymentSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: selectorLabels},
+		},
+	}
+	foreign := &appsv1.ControllerRevision{
+		ObjectMeta: metav1.ObjectMeta{Name: "other-rev", Namespace: "tenant-b", Labels: selectorLabels},
+		Revision:   1,
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ud, foreign).Build()
+	r := &ReconcileUnitedDeployment{Client: fakeClient, scheme: scheme}
+
+	histories, err := r.controlledHistories(ud)
+	if err != nil {
+		t.Fatalf("controlledHistories() unexpected error: %v", err)
+	}
+	if len(histories) != 0 {
+		t.Fatalf("controlledHistories() returned revisions from another namespace: %+v", histories)
+	}
+
+	got := &appsv1.ControllerRevision{}
+	if err := fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(foreign), got); err != nil {
+		t.Fatalf("failed to get ControllerRevision: %v", err)
+	}
+	if len(got.OwnerReferences) != 0 {
+		t.Fatalf("ControllerRevision in another namespace was adopted: %+v", got.OwnerReferences)
+	}
 }

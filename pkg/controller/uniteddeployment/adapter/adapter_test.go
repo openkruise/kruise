@@ -17,11 +17,14 @@ limitations under the License.
 package adapter
 
 import (
+	"context"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -156,6 +159,65 @@ func TestApplySubsetTemplate(t *testing.T) {
 			}, t)
 			compareMap(getPodAnnotationsFromSubset(subset), map[string]string{"patched-key": "patched-value"}, t)
 		})
+	}
+}
+
+func TestGetSubsetPodsIgnoresOtherNamespaces(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = appsv1beta1.AddToScheme(scheme)
+	_ = appsv1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+
+	selectorLabels := map[string]string{"app": "demo"}
+	selector := &metav1.LabelSelector{MatchLabels: selectorLabels}
+	objectMeta := func(name, namespace, uid string) metav1.ObjectMeta {
+		return metav1.ObjectMeta{Name: name, Namespace: namespace, UID: types.UID(uid), Labels: selectorLabels}
+	}
+
+	sts := &appsv1.StatefulSet{ObjectMeta: objectMeta("sts", "tenant-a", "sts-uid"), Spec: appsv1.StatefulSetSpec{Selector: selector}}
+	asts := &v1beta1.StatefulSet{ObjectMeta: objectMeta("asts", "tenant-a", "asts-uid"), Spec: v1beta1.StatefulSetSpec{Selector: selector}}
+	cs := &appsv1beta1.CloneSet{ObjectMeta: objectMeta("cs", "tenant-a", "cs-uid"), Spec: appsv1beta1.CloneSetSpec{Selector: selector}}
+	deploy := &appsv1.Deployment{ObjectMeta: objectMeta("deploy", "tenant-a", "deploy-uid"), Spec: appsv1.DeploymentSpec{Selector: selector}}
+	rs := &appsv1.ReplicaSet{ObjectMeta: objectMeta("deploy-rs", "tenant-a", "rs-uid"), Spec: appsv1.ReplicaSetSpec{Selector: selector}}
+	rs.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(deploy, appsv1.SchemeGroupVersion.WithKind("Deployment"))}
+
+	// Orphans in another namespace that carry the same labels.
+	foreignRS := &appsv1.ReplicaSet{ObjectMeta: objectMeta("other-rs", "tenant-b", ""), Spec: appsv1.ReplicaSetSpec{Selector: selector}}
+	foreignPod := &corev1.Pod{ObjectMeta: objectMeta("other-pod", "tenant-b", "")}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme).
+		WithObjects(sts, asts, cs, deploy, rs, foreignRS, foreignPod).Build()
+
+	testCases := []struct {
+		name    string
+		adapter Adapter
+		subset  metav1.Object
+	}{
+		{name: "StatefulSet", adapter: &StatefulSetAdapter{Client: fakeClient, Scheme: scheme}, subset: sts},
+		{name: "AdvancedStatefulSet", adapter: &AdvancedStatefulSetAdapter{Client: fakeClient, Scheme: scheme}, subset: asts},
+		{name: "CloneSet", adapter: &CloneSetAdapter{Client: fakeClient, Scheme: scheme}, subset: cs},
+		{name: "Deployment", adapter: &DeploymentAdapter{Client: fakeClient, Scheme: scheme}, subset: deploy},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pods, err := tc.adapter.GetSubsetPods(tc.subset)
+			if err != nil {
+				t.Fatalf("GetSubsetPods() unexpected error: %v", err)
+			}
+			if len(pods) != 0 {
+				t.Fatalf("GetSubsetPods() returned pods from another namespace: %+v", pods)
+			}
+		})
+	}
+
+	for _, obj := range []client.Object{foreignRS, foreignPod} {
+		got := obj.DeepCopyObject().(client.Object)
+		if err := fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(obj), got); err != nil {
+			t.Fatalf("failed to get %s: %v", client.ObjectKeyFromObject(obj), err)
+		}
+		if refs := got.GetOwnerReferences(); len(refs) != 0 {
+			t.Fatalf("%s in another namespace was adopted: %+v", client.ObjectKeyFromObject(obj), refs)
+		}
 	}
 }
 

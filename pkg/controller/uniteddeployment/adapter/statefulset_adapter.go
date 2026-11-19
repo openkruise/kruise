@@ -208,7 +208,7 @@ func (a *StatefulSetAdapter) getStatefulSetPods(set *appsv1.StatefulSet) ([]*cor
 		return nil, err
 	}
 	podList := &corev1.PodList{}
-	err = a.Client.List(context.TODO(), podList, &client.ListOptions{LabelSelector: selector})
+	err = a.Client.List(context.TODO(), podList, &client.ListOptions{Namespace: set.Namespace, LabelSelector: selector})
 	if err != nil {
 		return nil, err
 	}
