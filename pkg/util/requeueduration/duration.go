@@ -37,12 +37,17 @@ func (dm *DurationStore) Push(key string, newDuration time.Duration) {
 	requeueDuration.Update(newDuration)
 }
 
+// Pop atomically removes the Duration of the key and returns its value.
+//
+// It must use LoadAndDelete rather than Load followed by a deferred Delete:
+// with the latter, a Push coming from another goroutine between the Load and
+// the Delete would be wiped out, and the controller would silently lose its
+// requeue backoff.
 func (dm *DurationStore) Pop(key string) time.Duration {
-	value, ok := dm.store.Load(key)
+	value, ok := dm.store.LoadAndDelete(key)
 	if !ok {
 		return 0
 	}
-	defer dm.store.Delete(key)
 	requeueDuration, ok := value.(*Duration)
 	if !ok {
 		return 0

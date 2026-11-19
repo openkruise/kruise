@@ -348,6 +348,75 @@ func TestDuration_ExtremeValues(t *testing.T) {
 	assert.Equal(t, smallDuration, duration.Get())
 }
 
+// TestDurationStore_PopDoesNotDropConcurrentPush verifies that Pop removes the
+// entry atomically, so a Push that lands while a Pop is in flight can never be
+// wiped out by the deletion of the Pop.
+func TestDurationStore_PopDoesNotDropConcurrentPush(t *testing.T) {
+	store := &DurationStore{}
+	key := "pop-in-flight"
+	pushed := time.Millisecond
+
+	// A previous reconcile has already stored a long requeue duration for the key.
+	store.Push(key, time.Hour)
+	value, ok := store.store.Load(key)
+	if !ok {
+		t.Fatal("expected the pushed entry to be stored")
+	}
+	stored, ok := value.(*Duration)
+	if !ok {
+		t.Fatalf("unexpected value type %T", value)
+	}
+
+	// Hold the entry lock, so that Pop gets stuck between having taken the
+	// entry out of the store and returning its value. This is exactly the
+	// window in which the deferred Delete of the old implementation wiped out
+	// a Push landing in between.
+	stored.Lock()
+
+	var popped time.Duration
+	popDone := make(chan struct{})
+	go func() {
+		defer close(popDone)
+		popped = store.Pop(key)
+	}()
+
+	// Wait until Pop has taken the entry out of the store: with the atomic
+	// LoadAndDelete this happens before Pop blocks on the entry lock.
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if _, exists := store.store.Load(key); !exists {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("Pop did not take the entry out of the store before reading its value, so it is not atomic")
+		}
+		time.Sleep(50 * time.Microsecond)
+	}
+
+	// This Push lands while Pop is still in flight, and it must not be lost.
+	// It cannot block on the entry locked above, because that entry is no
+	// longer in the store: Push stores a fresh one instead.
+	store.Push(key, pushed)
+
+	// Let Pop return the value of the entry it took out.
+	stored.Unlock()
+	<-popDone
+
+	if popped != time.Hour {
+		t.Fatalf("expected Pop to return the previously stored duration %v, got %v", time.Hour, popped)
+	}
+	// Pop did not observe the pushed duration, so the store must still hold it.
+	value, ok = store.store.Load(key)
+	if !ok {
+		t.Fatal("duration pushed while Pop was in flight got lost")
+	}
+	remaining, ok := value.(*Duration)
+	if !ok {
+		t.Fatalf("unexpected value type %T", value)
+	}
+	assert.Equal(t, pushed, remaining.Get())
+}
+
 func TestDurationStore_ConcurrentPushPop(t *testing.T) {
 	store := &DurationStore{}
 	key := "concurrent-test"
