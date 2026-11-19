@@ -89,7 +89,7 @@ func (w *worker) run() {
 		// Clean up.
 		probeTicker.Stop()
 		if w.containerID != "" {
-			w.probeController.result.remove(w.containerID)
+			w.probeController.result.remove(w.key)
 		}
 		w.probeController.removeWorker(w.key)
 	}()
@@ -128,7 +128,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 
 	if w.containerID != container.Id {
 		if w.containerID != "" {
-			w.probeController.result.remove(w.containerID)
+			w.probeController.result.remove(w.key)
 		}
 		klog.V(5).InfoS("Pod container Id changed", "namespace", w.key.podNs, "podName", w.key.podName, "from", w.containerID, "to", container.Id)
 		w.containerID = container.Id

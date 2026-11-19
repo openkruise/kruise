@@ -297,7 +297,7 @@ func TestResultManagerSet(t *testing.T) {
 			r := newResultManager(updateQueue)
 			prev := cs.getPrev()
 			if prev != nil {
-				r.cache.Store(prev.ContainerID, Update{prev.ContainerID, prev.Key, prev.State, prev.Msg, prev.LastProbeTime})
+				r.cache.Store(prev.Key, Update{prev.ContainerID, prev.Key, prev.State, prev.Msg, prev.LastProbeTime})
 			}
 			cur := cs.getCur()
 			r.set(cur.ContainerID, cur.Key, cur.State, cur.Msg)
@@ -320,5 +320,74 @@ func TestResultManagerSet(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestResultManagerMultipleProbesSameContainer(t *testing.T) {
+	const containerID = "cc4c81e9128bf1489fa0975f8cd2ca949423acd840a909c31dfa753fa6cc61f6"
+
+	keyA := probeKey{
+		podNs:         "default",
+		podName:       "test-pod",
+		podUID:        "fe2ad1bb-f32a-407d-9f43-884b5dff267e",
+		containerName: "main",
+		probeName:     "marker#probe-a",
+	}
+	keyB := keyA
+	keyB.probeName = "marker#probe-b"
+
+	updateQueue := workqueue.NewNamedRateLimitingQueue(
+		workqueue.NewItemExponentialFailureRateLimiter(500*time.Millisecond, 50*time.Second),
+		"update_node_pod_probe_status",
+	)
+	defer updateQueue.ShutDown()
+	r := newResultManager(updateQueue)
+
+	listByKey := func() map[probeKey]Update {
+		results := make(map[probeKey]Update)
+		for _, result := range r.listResults() {
+			results[result.Key] = result
+		}
+		return results
+	}
+
+	// Two probes with the same state and message must both be recorded, even
+	// though they belong to the same container.
+	r.set(containerID, keyA, appsalphav1.ProbeSucceeded, "")
+	r.set(containerID, keyB, appsalphav1.ProbeSucceeded, "")
+	results := listByKey()
+	if len(results) != 2 {
+		t.Fatalf("expect 2 probe results, but got %d: %v", len(results), results)
+	}
+	if results[keyA].State != appsalphav1.ProbeSucceeded || results[keyB].State != appsalphav1.ProbeSucceeded {
+		t.Fatalf("expect both probes to be succeeded, but got %v", results)
+	}
+
+	// Updating one probe must not affect the result of its sibling.
+	r.set(containerID, keyA, appsalphav1.ProbeFailed, "probe a failed")
+	results = listByKey()
+	if results[keyA].State != appsalphav1.ProbeFailed || results[keyA].Msg != "probe a failed" {
+		t.Fatalf("expect probe a to be failed, but got %v", util.DumpJSON(results[keyA]))
+	}
+	if results[keyB].State != appsalphav1.ProbeSucceeded {
+		t.Fatalf("expect probe b to be unaffected, but got %v", util.DumpJSON(results[keyB]))
+	}
+
+	// Removing one probe must only remove its own result.
+	r.remove(keyA)
+	results = listByKey()
+	if len(results) != 1 {
+		t.Fatalf("expect 1 probe result after remove, but got %d: %v", len(results), results)
+	}
+	if results[keyB].State != appsalphav1.ProbeSucceeded {
+		t.Fatalf("expect probe b to remain, but got %v", results)
+	}
+
+	// A container restart produces a new container ID, so the probe result must
+	// be refreshed instead of being skipped as unchanged.
+	r.set("new-container-id", keyB, appsalphav1.ProbeSucceeded, "")
+	results = listByKey()
+	if results[keyB].ContainerID != "new-container-id" {
+		t.Fatalf("expect probe b to use the new container ID, but got %v", util.DumpJSON(results[keyB]))
 	}
 }
