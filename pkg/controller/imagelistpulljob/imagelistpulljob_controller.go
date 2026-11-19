@@ -276,7 +276,7 @@ func (r *ReconcileImageListPullJob) calculateStatus(job *appsv1beta1.ImageListPu
 			failedImagePullJobStatus := &appsv1beta1.FailedImageStatus{
 				ImagePullJob: imagePullJob.Name,
 				Name:         imagePullJob.Spec.Image,
-				Message:      fmt.Sprintf("Please check for details which nodes failed by 'kubectl get ImagePullJob %s'.", imagePullJob.Name),
+				Message:      fmt.Sprintf("Please check for details which nodes failed by 'kubectl get ImagePullJob %s -n %s'.", imagePullJob.Name, imagePullJob.Namespace),
 			}
 			failedImageStatuses = append(failedImageStatuses, failedImagePullJobStatus)
 		}

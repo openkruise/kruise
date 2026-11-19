@@ -53,7 +53,7 @@ func init() {
 func TestReconcile(t *testing.T) {
 	now := metav1.Now()
 	instance := &appsv1beta1.ImageListPullJob{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default", UID: types.UID(jobUID)},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-preheat", UID: types.UID(jobUID)},
 		Spec: appsv1beta1.ImageListPullJobSpec{
 			Images: images,
 		},
@@ -160,7 +160,9 @@ func TestReconcile(t *testing.T) {
 			assert.Equal(t, int32(1), retrievedJob.Status.Active)
 			assert.Equal(t, int32(1), retrievedJob.Status.Succeeded)
 			assert.Equal(t, int32(2), retrievedJob.Status.Completed)
-			assert.Equal(t, 1, len(retrievedJob.Status.FailedImageStatuses))
+			if assert.Len(t, retrievedJob.Status.FailedImageStatuses, 1) {
+				assert.Contains(t, retrievedJob.Status.FailedImageStatuses[0].Message, "'kubectl get ImagePullJob j03 -n test-preheat'")
+			}
 			for _, job := range imagePullJobList.Items {
 				assert.Contains(t, instance.Spec.Images, job.Spec.Image)
 			}
