@@ -153,6 +153,17 @@ func initConditionType(conditions []appsv1beta1.ResourceDistributionCondition) {
 	conditions[NotExistConditionID].Type = appsv1beta1.ResourceDistributionNamespaceNotExists
 }
 
+// getConditionByType returns the condition of the given type in conditions,
+// or nil if there is no such condition.
+func getConditionByType(conditions []appsv1beta1.ResourceDistributionCondition, conditionType appsv1beta1.ResourceDistributionConditionType) *appsv1beta1.ResourceDistributionCondition {
+	for i := range conditions {
+		if conditions[i].Type == conditionType {
+			return &conditions[i]
+		}
+	}
+	return nil
+}
+
 // calculateNewStatus returns a complete new status to update distributor.status
 func calculateNewStatus(distributor *appsv1beta1.ResourceDistribution, newConditions []appsv1beta1.ResourceDistributionCondition, desired, succeeded int32) *appsv1beta1.ResourceDistributionStatus {
 	status := &appsv1beta1.ResourceDistributionStatus{}
@@ -176,11 +187,15 @@ func calculateNewStatus(distributor *appsv1beta1.ResourceDistribution, newCondit
 		} else {
 			newConditions[i].Status = appsv1beta1.ResourceDistributionConditionTrue
 		}
-		if len(oldConditions) == 0 || oldConditions[i].Status != newConditions[i].Status {
+		// Conditions is a list without a guaranteed order, and it may be
+		// partially populated by an older version, so the previous condition of
+		// the same type must be looked up by type instead of by index.
+		oldCondition := getConditionByType(oldConditions, newConditions[i].Type)
+		if oldCondition == nil || oldCondition.Status != newConditions[i].Status {
 			// if .conditions.status changed
 			newConditions[i].LastTransitionTime = metav1.Time{Time: time.Now()}
 		} else {
-			newConditions[i].LastTransitionTime = oldConditions[i].LastTransitionTime
+			newConditions[i].LastTransitionTime = oldCondition.LastTransitionTime
 		}
 	}
 	status.Conditions = newConditions
