@@ -35,6 +35,9 @@ const (
 	// PodWebhook enables webhook for Pods creations. This is also related to SidecarSet.
 	PodWebhook featuregate.Feature = "PodWebhook"
 
+	// WebhookSelectorOverrides allows replacing selectors on named admission webhooks.
+	WebhookSelectorOverrides featuregate.Feature = "WebhookSelectorOverrides"
+
 	// CloneSetShortHash enables CloneSet controller only set revision hash name to pod label.
 	CloneSetShortHash featuregate.Feature = "CloneSetShortHash"
 
@@ -195,6 +198,7 @@ var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	StatefulSetStartOrdinal:                   {Default: false, PreRelease: featuregate.Alpha},
 	PodIndexLabel:                             {Default: true, PreRelease: featuregate.Beta},
 	EnableExternalCerts:                       {Default: false, PreRelease: featuregate.Alpha},
+	WebhookSelectorOverrides:                  {Default: false, PreRelease: featuregate.Alpha},
 	StatefulSetAutoResizePVCGate:              {Default: false, PreRelease: featuregate.Alpha},
 	ForceDeleteTimeoutExpectationFeatureGate:  {Default: false, PreRelease: featuregate.Alpha},
 	InPlaceWorkloadVerticalScaling:            {Default: false, PreRelease: featuregate.Alpha},
