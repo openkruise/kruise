@@ -111,6 +111,300 @@ func TestValidateCronJobSpec(t *testing.T) {
 	}
 }
 
+func TestValidateAdvancedCronJobFieldPaths(t *testing.T) {
+	invalidPodTemplateSpec := v1.PodTemplateSpec{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "", Image: "foo:latest"},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+
+	tests := []struct {
+		name          string
+		spec          *appsv1beta1.AdvancedCronJobSpec
+		expectedField string
+	}{
+		{
+			name: "concurrencyPolicy invalid for ImageListPullJobTemplate",
+			spec: &appsv1beta1.AdvancedCronJobSpec{
+				Schedule:          "0 * * * *",
+				ConcurrencyPolicy: appsv1beta1.AllowConcurrent,
+				Template: appsv1beta1.CronJobTemplate{
+					ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+						Spec: appsv1beta1.ImageListPullJobSpec{
+							Images: []string{"nginx:latest"},
+							ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+								CompletionPolicy: appsv1beta1.CompletionPolicy{
+									Type: appsv1beta1.Always,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedField: "spec.concurrencyPolicy",
+		},
+		{
+			name: "pod template error for JobTemplate",
+			spec: &appsv1beta1.AdvancedCronJobSpec{
+				Schedule: "0 * * * *",
+				Template: appsv1beta1.CronJobTemplate{
+					JobTemplate: &batchv1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
+							Template: invalidPodTemplateSpec,
+						},
+					},
+				},
+			},
+			expectedField: "spec.template.jobTemplate.spec.template.spec.containers[0].name",
+		},
+		{
+			name: "pod template error for BroadcastJobTemplate",
+			spec: &appsv1beta1.AdvancedCronJobSpec{
+				Schedule: "0 * * * *",
+				Template: appsv1beta1.CronJobTemplate{
+					BroadcastJobTemplate: &appsv1beta1.BroadcastJobTemplateSpec{
+						Spec: appsv1beta1.BroadcastJobSpec{
+							Template: invalidPodTemplateSpec,
+						},
+					},
+				},
+			},
+			expectedField: "spec.template.broadcastJobTemplate.spec.template.spec.containers[0].name",
+		},
+		{
+			name: "timeZone is Local",
+			spec: &appsv1beta1.AdvancedCronJobSpec{
+				Schedule: "0 * * * *",
+				TimeZone: pointer.String("Local"),
+				Template: appsv1beta1.CronJobTemplate{
+					JobTemplate: &batchv1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
+							Template: createValidPodTemplateSpec(),
+						},
+					},
+				},
+			},
+			expectedField: "spec.timeZone",
+		},
+		{
+			name: "timeZone is empty string",
+			spec: &appsv1beta1.AdvancedCronJobSpec{
+				Schedule: "0 * * * *",
+				TimeZone: pointer.String(""),
+				Template: appsv1beta1.CronJobTemplate{
+					JobTemplate: &batchv1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
+							Template: createValidPodTemplateSpec(),
+						},
+					},
+				},
+			},
+			expectedField: "spec.timeZone",
+		},
+		{
+			name: "schedule with TZ and timeZone set",
+			spec: &appsv1beta1.AdvancedCronJobSpec{
+				Schedule: "CRON_TZ=UTC 0 * * * *",
+				TimeZone: pointer.String("America/New_York"),
+				Template: appsv1beta1.CronJobTemplate{
+					JobTemplate: &batchv1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
+							Template: createValidPodTemplateSpec(),
+						},
+					},
+				},
+			},
+			expectedField: "spec.schedule",
+		},
+		{
+			name: "negative startingDeadlineSeconds",
+			spec: &appsv1beta1.AdvancedCronJobSpec{
+				Schedule:                "0 * * * *",
+				StartingDeadlineSeconds: int64Ptr(-1),
+				Template: appsv1beta1.CronJobTemplate{
+					JobTemplate: &batchv1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
+							Template: createValidPodTemplateSpec(),
+						},
+					},
+				},
+			},
+			expectedField: "spec.startingDeadlineSeconds",
+		},
+		{
+			name: "negative successfulJobsHistoryLimit",
+			spec: &appsv1beta1.AdvancedCronJobSpec{
+				Schedule:                   "0 * * * *",
+				SuccessfulJobsHistoryLimit: int32Ptr(-1),
+				Template: appsv1beta1.CronJobTemplate{
+					JobTemplate: &batchv1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
+							Template: createValidPodTemplateSpec(),
+						},
+					},
+				},
+			},
+			expectedField: "spec.successfulJobsHistoryLimit",
+		},
+		{
+			name: "negative failedJobsHistoryLimit",
+			spec: &appsv1beta1.AdvancedCronJobSpec{
+				Schedule:               "0 * * * *",
+				FailedJobsHistoryLimit: int32Ptr(-1),
+				Template: appsv1beta1.CronJobTemplate{
+					JobTemplate: &batchv1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
+							Template: createValidPodTemplateSpec(),
+						},
+					},
+				},
+			},
+			expectedField: "spec.failedJobsHistoryLimit",
+		},
+		{
+			name: "duplicate image names in ImageListPullJobTemplate",
+			spec: &appsv1beta1.AdvancedCronJobSpec{
+				Schedule:          "0 * * * *",
+				ConcurrencyPolicy: appsv1beta1.ForbidConcurrent,
+				Template: appsv1beta1.CronJobTemplate{
+					ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+						Spec: appsv1beta1.ImageListPullJobSpec{
+							Images: []string{"nginx:latest", "nginx:latest"},
+							ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+								CompletionPolicy: appsv1beta1.CompletionPolicy{
+									Type: appsv1beta1.Always,
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedField: "spec.template.imageListPullJobTemplate.spec.images",
+		},
+		{
+			name: "ttlSecondsAfterFinished set in ImageListPullJobTemplate",
+			spec: &appsv1beta1.AdvancedCronJobSpec{
+				Schedule:          "0 * * * *",
+				ConcurrencyPolicy: appsv1beta1.ForbidConcurrent,
+				Template: appsv1beta1.CronJobTemplate{
+					ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+						Spec: appsv1beta1.ImageListPullJobSpec{
+							Images: []string{"nginx:latest"},
+							ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+								CompletionPolicy: appsv1beta1.CompletionPolicy{
+									Type:                    appsv1beta1.Always,
+									TTLSecondsAfterFinished: int32Ptr(100),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedField: "spec.template.imageListPullJobTemplate.spec.completionPolicy.ttlSecondsAfterFinished",
+		},
+		{
+			name: "activeDeadlineSeconds exceeds maximum in ImageListPullJobTemplate",
+			spec: &appsv1beta1.AdvancedCronJobSpec{
+				Schedule:          "0 * * * *",
+				ConcurrencyPolicy: appsv1beta1.ForbidConcurrent,
+				Template: appsv1beta1.CronJobTemplate{
+					ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+						Spec: appsv1beta1.ImageListPullJobSpec{
+							Images: []string{"nginx:latest"},
+							ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+								CompletionPolicy: appsv1beta1.CompletionPolicy{
+									Type:                  appsv1beta1.Always,
+									ActiveDeadlineSeconds: int64Ptr(MaxActiveDeadLineSeconds + 1),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedField: "spec.template.imageListPullJobTemplate.spec.completionPolicy.activeDeadlineSeconds",
+		},
+		{
+			name: "activeDeadlineSeconds less than timeoutSeconds in ImageListPullJobTemplate",
+			spec: &appsv1beta1.AdvancedCronJobSpec{
+				Schedule:          "0 * * * *",
+				ConcurrencyPolicy: appsv1beta1.ForbidConcurrent,
+				Template: appsv1beta1.CronJobTemplate{
+					ImageListPullJobTemplate: &appsv1beta1.ImageListPullJobTemplateSpec{
+						Spec: appsv1beta1.ImageListPullJobSpec{
+							Images: []string{"nginx:latest"},
+							ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+								PullPolicy: &appsv1beta1.PullPolicy{
+									TimeoutSeconds: int32Ptr(100),
+								},
+								CompletionPolicy: appsv1beta1.CompletionPolicy{
+									Type:                  appsv1beta1.Always,
+									ActiveDeadlineSeconds: int64Ptr(50),
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedField: "spec.template.imageListPullJobTemplate.spec.completionPolicy.activeDeadlineSeconds",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validateAdvancedCronJobSpec(tt.spec, field.NewPath("spec"))
+			if len(errs) == 0 {
+				t.Fatalf("expected validation errors, got none")
+			}
+			found := false
+			for _, err := range errs {
+				if err.Field == tt.expectedField {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected error field %q, got errors: %v", tt.expectedField, errs)
+			}
+		})
+	}
+}
+
+func TestValidateAdvancedCronJobName(t *testing.T) {
+	tests := []struct {
+		name      string
+		cronName  string
+		expectErr bool
+	}{
+		{
+			name:      "valid name",
+			cronName:  "valid-cronjob-123",
+			expectErr: false,
+		},
+		{
+			name:      "invalid characters in name",
+			cronName:  "invalid.cronjob_name",
+			expectErr: true,
+		},
+		{
+			name:      "name too long",
+			cronName:  "this-is-a-very-long-name-that-exceeds-the-maximum-allowed-length-of-sixty-three-characters",
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validateAdvancedCronJobName(tt.cronName, false)
+			if (len(errs) > 0) != tt.expectErr {
+				t.Errorf("validateAdvancedCronJobName(%s) error = %v, expectErr = %v", tt.cronName, errs, tt.expectErr)
+			}
+		})
+	}
+}
+
 func TestAdvancedCronJobCreateUpdateHandler_Handle(t *testing.T) {
 	utilruntime.Must(apis.AddToScheme(scheme.Scheme))
 
