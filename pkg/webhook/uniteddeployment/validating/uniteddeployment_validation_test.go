@@ -1339,6 +1339,109 @@ func TestValidateSubsetReplicasMessageFormat(t *testing.T) {
 	}
 }
 
+func TestValidateSubsetTemplateV1beta1AdvancedStatefulSetFieldPath(t *testing.T) {
+	replicas := int32(1)
+	ud := &appsv1beta1.UnitedDeployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "ud-adv", Namespace: metav1.NamespaceDefault},
+		Spec: appsv1beta1.UnitedDeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+			Template: appsv1beta1.SubsetTemplate{
+				AdvancedStatefulSetTemplate: &appsv1beta1.AdvancedStatefulSetTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{"app": "bar"},
+					},
+					Spec: appsv1beta1.StatefulSetSpec{
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "foo"}},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{Name: "c1", Image: "nginx"},
+								},
+							},
+						},
+					},
+				},
+			},
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
+					{
+						Name: "subset-a",
+					},
+				},
+			},
+		},
+	}
+
+	errs := validateUnitedDeploymentV1beta1(ud)
+	var foundMismatchErr bool
+	for _, err := range errs {
+		if strings.Contains(err.Detail, "`selector` does not match template `labels`") {
+			foundMismatchErr = true
+			expectedField := "spec.template.advancedStatefulSetTemplate.metadata.labels"
+			if err.Field != expectedField {
+				t.Fatalf("expected error field %q, but got %q", expectedField, err.Field)
+			}
+		}
+	}
+	if !foundMismatchErr {
+		t.Fatalf("expected selector mismatch error, got errs: %v", errs)
+	}
+}
+
+func TestValidateUnitedDeploymentTopologyV1beta1TolerationUpdateNoDuplicates(t *testing.T) {
+	replicas := int32(1)
+	labels := map[string]string{"app": "foo"}
+	oldUD := &appsv1beta1.UnitedDeployment{
+		ObjectMeta: metav1.ObjectMeta{Name: "ud-tol", Namespace: metav1.NamespaceDefault, ResourceVersion: "1"},
+		Spec: appsv1beta1.UnitedDeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{MatchLabels: labels},
+			Template: appsv1beta1.SubsetTemplate{
+				StatefulSetTemplate: &appsv1beta1.StatefulSetTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Labels: labels},
+					Spec: apps.StatefulSetSpec{
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{Labels: labels},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{{Name: "c1", Image: "nginx"}},
+							},
+						},
+					},
+				},
+			},
+			Topology: appsv1beta1.Topology{
+				Subsets: []appsv1beta1.Subset{
+					{
+						Name: "subset-a",
+						Tolerations: []corev1.Toleration{
+							{Key: "key1", Operator: corev1.TolerationOpEqual, Value: "val1", Effect: corev1.TaintEffectNoSchedule},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	newUD := oldUD.DeepCopy()
+	newUD.ResourceVersion = "2"
+	newUD.Spec.Topology.Subsets[0].Tolerations = []corev1.Toleration{
+		{Key: "key2", Operator: corev1.TolerationOpEqual, Value: "val2", Effect: corev1.TaintEffectNoSchedule},
+	}
+
+	errs := ValidateUnitedDeploymentUpdateV1beta1(newUD, oldUD)
+	var tolerationErrors []string
+	for _, err := range errs {
+		if err.Field == "spec.topology.subsets[0].tolerations" {
+			tolerationErrors = append(tolerationErrors, err.Error())
+		}
+	}
+
+	if len(tolerationErrors) != 1 {
+		t.Fatalf("expected exactly 1 toleration immutability error without duplicates, got %d errors: %v", len(tolerationErrors), tolerationErrors)
+	}
+}
+
 // alpha adapter helpers — convert v1alpha1 objects to v1beta1 before delegating to
 // the beta validators so that test cases written against the alpha API still work.
 

@@ -279,14 +279,6 @@ func validateUnitedDeploymentTopologyV1beta1(topology, oldTopology *appsv1beta1.
 		}
 	}
 
-	for i, subset := range topology.Subsets {
-		if oldSubset, exist := oldSubsets[subset.Name]; exist {
-			if !apiequality.Semantic.DeepEqual(oldSubset.Tolerations, subset.Tolerations) {
-				allErrs = append(allErrs, field.Forbidden(fldPath.Child("subsets").Index(i).Child("tolerations"), "may not be changed in an update"))
-			}
-		}
-	}
-
 	return allErrs
 }
 
@@ -334,7 +326,7 @@ func validateSubsetTemplateV1beta1(template *appsv1beta1.SubsetTemplate, selecto
 	} else if template.AdvancedStatefulSetTemplate != nil {
 		labels := labels.Set(template.AdvancedStatefulSetTemplate.Labels)
 		if !selector.Matches(labels) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("statefulSetTemplate", "metadata", "labels"), template.AdvancedStatefulSetTemplate.Labels, "`selector` does not match template `labels`"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("advancedStatefulSetTemplate", "metadata", "labels"), template.AdvancedStatefulSetTemplate.Labels, "`selector` does not match template `labels`"))
 		}
 		allErrs = append(allErrs, validateAdvancedStatefulSetV1beta1(template.AdvancedStatefulSetTemplate, fldPath.Child("advancedStatefulSetTemplate"))...)
 		podTemplate := template.AdvancedStatefulSetTemplate.Spec.Template
