@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/appscode/jsonpatch"
-	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
@@ -152,9 +151,27 @@ func (v *NativeVerticalUpdate) isContainerUpdateCompleted(container *v1.Containe
 	if containerStatus == nil || containerStatus.Resources == nil || container == nil {
 		return false
 	}
-	if !cmp.Equal(container.Resources.Limits, containerStatus.Resources.Limits) ||
-		!cmp.Equal(container.Resources.Requests, containerStatus.Resources.Requests) {
-		return false
+	return v.isResourceListUpdateCompleted(container.Resources.Limits, containerStatus.Resources.Limits) &&
+		v.isResourceListUpdateCompleted(container.Resources.Requests, containerStatus.Resources.Requests)
+}
+
+func (v *NativeVerticalUpdate) isResourceListUpdateCompleted(expected, actual v1.ResourceList) bool {
+	for resourceName, expectedQuantity := range expected {
+		if !v.CanResourcesResizeInPlace(string(resourceName)) {
+			continue
+		}
+		actualQuantity, actualExists := actual[resourceName]
+		if !actualExists || !expectedQuantity.Equal(actualQuantity) {
+			return false
+		}
+	}
+	for resourceName := range actual {
+		if !v.CanResourcesResizeInPlace(string(resourceName)) {
+			continue
+		}
+		if _, expectedExists := expected[resourceName]; !expectedExists {
+			return false
+		}
 	}
 	return true
 }
