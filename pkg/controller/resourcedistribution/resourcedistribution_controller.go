@@ -258,8 +258,8 @@ func (r *ReconcileResourceDistribution) distributeResource(distributor *appsv1be
 		}
 
 		// 4. check whether resource need to update
-		if needToUpdate(oldResource, utils.ConvertToUnstructured(resource)) {
-			newResource := makeResourceObject(distributor, namespace, resource, resourceHashCode, oldResource)
+		newResource := makeResourceObject(distributor, namespace, resource, resourceHashCode, oldResource)
+		if needToUpdate(oldResource, utils.ConvertToUnstructured(newResource)) {
 			if updateErr := r.Client.Update(context.TODO(), newResource.(client.Object)); updateErr != nil {
 				klog.ErrorS(updateErr, "Error occurred when updating resource in namespace", "namespace", namespace, "resourceDistribution", klog.KObj(distributor))
 				return &UnexpectedError{

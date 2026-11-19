@@ -127,6 +127,80 @@ func TestMakeResourceObjectRewritesOwnerRefToBeta(t *testing.T) {
 	}
 }
 
+func TestNeedToUpdate(t *testing.T) {
+	newObject := func(data string, labels, annotations map[string]string) *unstructured.Unstructured {
+		object := &unstructured.Unstructured{Object: map[string]interface{}{
+			"data": map[string]interface{}{"key": data},
+		}}
+		object.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ConfigMap"))
+		object.SetName("cm")
+		object.SetLabels(labels)
+		object.SetAnnotations(annotations)
+		return object
+	}
+	labels := map[string]string{"env": "prod"}
+	annotations := map[string]string{"note": "first"}
+	withResourceVersion := newObject("v1", labels, annotations)
+	withResourceVersion.SetResourceVersion("7")
+
+	cases := []struct {
+		name string
+		old  *unstructured.Unstructured
+		new  *unstructured.Unstructured
+		want bool
+	}{
+		{
+			name: "unchanged",
+			old:  newObject("v1", labels, annotations),
+			new:  newObject("v1", labels, annotations),
+			want: false,
+		},
+		{
+			name: "missing and empty labels and annotations are the same",
+			old:  newObject("v1", nil, nil),
+			new:  newObject("v1", map[string]string{}, map[string]string{}),
+			want: false,
+		},
+		{
+			name: "other metadata is ignored",
+			old:  withResourceVersion,
+			new:  newObject("v1", labels, annotations),
+			want: false,
+		},
+		{
+			name: "data changed",
+			old:  newObject("v1", labels, annotations),
+			new:  newObject("v2", labels, annotations),
+			want: true,
+		},
+		{
+			name: "label changed",
+			old:  newObject("v1", labels, annotations),
+			new:  newObject("v1", map[string]string{"env": "staging"}, annotations),
+			want: true,
+		},
+		{
+			name: "label added",
+			old:  newObject("v1", nil, annotations),
+			new:  newObject("v1", labels, annotations),
+			want: true,
+		},
+		{
+			name: "annotation changed",
+			old:  newObject("v1", labels, annotations),
+			new:  newObject("v1", labels, map[string]string{"note": "second"}),
+			want: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := needToUpdate(tc.old, tc.new); got != tc.want {
+				t.Fatalf("needToUpdate() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func ptrTo[T any](value T) *T {
 	return &value
 }

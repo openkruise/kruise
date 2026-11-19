@@ -18,6 +18,7 @@ package resourcedistribution
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -93,6 +94,70 @@ func TestDoReconcile(t *testing.T) {
 		if err := reconcileHandler.Client.Get(context.TODO(), types.NamespacedName{Namespace: namespace, Name: "test-secret-1"}, resource); err == nil || !errors.IsNotFound(err) {
 			t.Fatalf("failed to delete resource from fake client, err %v", err)
 		}
+	}
+}
+
+func TestDoReconcileSyncsResourceMetadata(t *testing.T) {
+	// The template also sets an annotation the controller overwrites, which must
+	// not count as a difference on later reconciles.
+	newRaw := func(env, note string) runtime.RawExtension {
+		return runtime.RawExtension{Raw: []byte(fmt.Sprintf(`{
+			"apiVersion": "v1",
+			"data": {"test": "test"},
+			"kind": "Secret",
+			"metadata": {
+				"name": "test-secret-1",
+				"labels": {"env": %q},
+				"annotations": {"note": %q, %q: "from-template"}
+			},
+			"type": "Opaque"
+		}`, env, note, utils.SourceResourceDistributionOfResource))}
+	}
+	reconcileAndGet := func(distributor *appsv1beta1.ResourceDistribution) *corev1.Secret {
+		t.Helper()
+		if _, err := reconcileHandler.doReconcile(distributor); err != nil {
+			t.Fatalf("failed to test doReconcile, err %v", err)
+		}
+		secret := &corev1.Secret{}
+		if err := reconcileHandler.Client.Get(context.TODO(), types.NamespacedName{Namespace: "ns-1", Name: "test-secret-1"}, secret); err != nil {
+			t.Fatalf("failed to get resource from fake client, err %v", err)
+		}
+		return secret
+	}
+
+	distributor := buildResourceDistribution(newRaw("prod", "first"))
+	makeClientEnvironment(distributor)
+
+	secret := reconcileAndGet(distributor)
+	if secret.Labels["env"] != "prod" {
+		t.Fatalf("expected label env=prod after the first reconcile, got %v", secret.Labels)
+	}
+
+	// metadata set by someone else on the distributed resource must survive
+	secret.Labels["other"] = "kept"
+	if err := reconcileHandler.Client.Update(context.TODO(), secret); err != nil {
+		t.Fatalf("failed to update resource, err %v", err)
+	}
+
+	// change only the metadata of the template
+	distributor.Spec.Resource = newRaw("staging", "second")
+	secret = reconcileAndGet(distributor)
+	if secret.Labels["env"] != "staging" || secret.Annotations["note"] != "second" {
+		t.Fatalf("expected the new template metadata, got labels %v annotations %v", secret.Labels, secret.Annotations)
+	}
+	if secret.Labels["other"] != "kept" {
+		t.Fatalf("expected label other=kept to survive, got %v", secret.Labels)
+	}
+	if got, want := secret.Annotations[utils.ResourceHashCodeAnnotation], hashResource(distributor.Spec.Resource); got != want {
+		t.Fatalf("expected hash annotation %s, got %s", want, got)
+	}
+	if got := secret.Annotations[utils.SourceResourceDistributionOfResource]; got != distributor.Name {
+		t.Fatalf("expected source annotation %s, got %s", distributor.Name, got)
+	}
+
+	// nothing changed, so another reconcile must not write the resource again
+	if got := reconcileAndGet(distributor); got.ResourceVersion != secret.ResourceVersion {
+		t.Fatalf("expected no update without a change, resourceVersion went from %s to %s", secret.ResourceVersion, got.ResourceVersion)
 	}
 }
 
