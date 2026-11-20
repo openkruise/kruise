@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -67,6 +68,54 @@ func TestValidateBroadcastJobSpec(t *testing.T) {
 	assert.Equal(t, fieldErrorList[1].Field, "spec.completionPolicy.activeDeadlineSeconds")
 	assert.Equal(t, fieldErrorList[2].Field, "spec.template.spec.restartPolicy")
 	assert.Equal(t, fieldErrorList[3].Field, "spec.template.metadata.labels")
+}
+
+func TestValidateBroadcastJobSpecParallelism(t *testing.T) {
+	fromInt := func(i int32) *intstr.IntOrString {
+		v := intstr.FromInt32(i)
+		return &v
+	}
+	fromString := func(s string) *intstr.IntOrString {
+		v := intstr.FromString(s)
+		return &v
+	}
+
+	tests := []struct {
+		name        string
+		parallelism *intstr.IntOrString
+		wantInvalid bool
+	}{
+		{name: "unset means no limit", parallelism: nil},
+		{name: "zero", parallelism: fromInt(0)},
+		{name: "positive integer", parallelism: fromInt(3)},
+		{name: "percentage", parallelism: fromString("50%")},
+		{name: "negative integer", parallelism: fromInt(-1), wantInvalid: true},
+		{name: "integer written as a string", parallelism: fromString("2"), wantInvalid: true},
+		{name: "not a number", parallelism: fromString("abc"), wantInvalid: true},
+		{name: "negative percentage", parallelism: fromString("-10%"), wantInvalid: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := &appsv1beta1.BroadcastJobSpec{
+				Parallelism: tt.parallelism,
+				Template: v1.PodTemplateSpec{
+					Spec: v1.PodSpec{
+						Containers:    []v1.Container{{Name: "test", Image: "nginx:latest"}},
+						RestartPolicy: v1.RestartPolicyOnFailure,
+					},
+				},
+			}
+			errs := validateBroadcastJobSpec(spec, field.NewPath("spec"))
+			if !tt.wantInvalid {
+				assert.Empty(t, errs)
+				return
+			}
+			if assert.Len(t, errs, 1) {
+				assert.Equal(t, "spec.parallelism", errs[0].Field)
+			}
+		})
+	}
 }
 
 func TestBroadcastJobCreateUpdateHandler_Handle(t *testing.T) {
@@ -173,6 +222,43 @@ func TestBroadcastJobCreateUpdateHandler_Handle(t *testing.T) {
 											"broadcastjob-name": "forbidden", // This should be forbidden
 										},
 									},
+									Spec: v1.PodSpec{
+										Containers: []v1.Container{
+											{
+												Name:  "test",
+												Image: "nginx:latest",
+											},
+										},
+										RestartPolicy: v1.RestartPolicyOnFailure,
+									},
+								},
+							},
+						}),
+					},
+				},
+			},
+			expectedResult: false,
+			expectedError:  true,
+		},
+		{
+			name: "create invalid v1beta1 BroadcastJob with a parallelism that is neither an integer nor a percentage",
+			request: admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Operation: admissionv1.Create,
+					Resource: metav1.GroupVersionResource{
+						Group:    appsv1beta1.GroupVersion.Group,
+						Version:  appsv1beta1.GroupVersion.Version,
+						Resource: "broadcastjobs",
+					},
+					Object: runtime.RawExtension{
+						Raw: createBroadcastJobV1Beta1JSON(t, &appsv1beta1.BroadcastJob{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "test-bj-parallelism",
+								Namespace: "default",
+							},
+							Spec: appsv1beta1.BroadcastJobSpec{
+								Parallelism: &intstr.IntOrString{Type: intstr.String, StrVal: "2"},
+								Template: v1.PodTemplateSpec{
 									Spec: v1.PodSpec{
 										Containers: []v1.Container{
 											{

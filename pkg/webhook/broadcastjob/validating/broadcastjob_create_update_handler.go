@@ -26,6 +26,7 @@ import (
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -75,6 +76,13 @@ func validateBroadcastJob(obj *appsv1beta1.BroadcastJob) field.ErrorList {
 
 func validateBroadcastJobSpec(spec *appsv1beta1.BroadcastJobSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+
+	// parallelism must be a non-negative integer or a percentage such as "50%".
+	// The controller reads any string as a percentage, so "2" silently means 2%,
+	// and a negative or malformed value stops the job from creating Pods.
+	if spec.Parallelism != nil {
+		allErrs = append(allErrs, appsvalidation.ValidatePositiveIntOrPercent(*spec.Parallelism, fldPath.Child("parallelism"))...)
+	}
 
 	switch spec.CompletionPolicy.Type {
 	case appsv1beta1.Always:
