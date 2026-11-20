@@ -270,7 +270,7 @@ func (c *realControl) updateNextBatch(pod *v1.Pod, opts *UpdateOptions) (bool, e
 			return err
 		}
 
-		if len(state.NextContainerImages) == 0 && len(state.NextContainerRefMetadata) == 0 {
+		if len(state.NextContainerImages) == 0 && len(state.NextContainerRefMetadata) == 0 && len(state.NextContainerResources) == 0 {
 			return nil
 		}
 
