@@ -18,6 +18,7 @@ package inplaceupdate
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
@@ -25,9 +26,11 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -646,5 +649,82 @@ func TestRefresh(t *testing.T) {
 		if !reflect.DeepEqual(testCase.expectedPod, got) {
 			t.Fatalf("case %s failed, expected \n%v\n got \n%v", testCase.name, util.DumpJSON(testCase.expectedPod), util.DumpJSON(got))
 		}
+	}
+}
+
+func TestRefreshNextBatchOnlyResources(t *testing.T) {
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlaceWorkloadVerticalScaling, true)()
+
+	aHourAgo := metav1.NewTime(time.Unix(time.Now().Add(-time.Hour).Unix(), 0))
+	defer func(origClock clock.Clock) { Clock = origClock }(Clock)
+	Clock = testingclock.NewFakeClock(aHourAgo.Time)
+
+	oldResources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+		Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("100m")},
+	}
+	newResources := v1.ResourceRequirements{
+		Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+		Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("200m")},
+	}
+
+	// c1 has already been updated in the first batch. c2 has a lower priority and its resources
+	// are the only change left for the next batch (no image or metadata change for it).
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod-resources-only",
+			Labels: map[string]string{
+				apps.StatefulSetRevisionLabel: "new-revision",
+			},
+			Annotations: map[string]string{
+				appspub.InPlaceUpdateStateKey: util.DumpJSON(appspub.InPlaceUpdateState{
+					Revision:               "new-revision",
+					UpdateTimestamp:        aHourAgo,
+					LastContainerStatuses:  map[string]appspub.InPlaceUpdateContainerStatus{"c1": {ImageID: "c1-img1-ID"}},
+					ContainerBatchesRecord: []appspub.InPlaceUpdateContainerBatch{{Timestamp: aHourAgo, Containers: []string{"c1"}}},
+					NextContainerResources: map[string]v1.ResourceRequirements{"c2": newResources},
+				}),
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "c1", Image: "c1-img2"},
+				{Name: "c2", Image: "c2-img1", Resources: oldResources},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{Name: "c1", ImageID: "c1-img2-ID"},
+				{Name: "c2", ImageID: "c2-img1-ID"},
+			},
+			Conditions: []v1.PodCondition{{Type: v1.ContainersReady, Status: v1.ConditionTrue}},
+		},
+	}
+
+	cli := fake.NewClientBuilder().WithObjects(pod).Build()
+	ctrl := New(cli, revisionadapter.NewDefaultImpl())
+	if res := ctrl.Refresh(pod, nil); res.RefreshErr != nil {
+		t.Fatalf("failed to refresh: %v", res.RefreshErr)
+	}
+
+	got := &v1.Pod{}
+	if err := cli.Get(context.TODO(), types.NamespacedName{Name: pod.Name}, got); err != nil {
+		t.Fatalf("failed to get pod: %v", err)
+	}
+
+	if !got.Spec.Containers[1].Resources.Requests.Cpu().Equal(*newResources.Requests.Cpu()) ||
+		!got.Spec.Containers[1].Resources.Limits.Cpu().Equal(*newResources.Limits.Cpu()) {
+		t.Fatalf("expected the resources of c2 to be updated in the next batch, got %v", util.DumpJSON(got.Spec.Containers[1].Resources))
+	}
+
+	state := appspub.InPlaceUpdateState{}
+	if err := json.Unmarshal([]byte(got.Annotations[appspub.InPlaceUpdateStateKey]), &state); err != nil {
+		t.Fatalf("failed to parse in-place update state: %v", err)
+	}
+	if len(state.NextContainerResources) != 0 {
+		t.Fatalf("expected no resources left for the next batch, got %v", util.DumpJSON(state.NextContainerResources))
+	}
+	if len(state.ContainerBatchesRecord) != 2 {
+		t.Fatalf("expected the next batch to be recorded, got %v", util.DumpJSON(state.ContainerBatchesRecord))
 	}
 }
