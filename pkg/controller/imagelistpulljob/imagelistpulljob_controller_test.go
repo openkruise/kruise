@@ -19,6 +19,7 @@ package imagelistpulljob
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
@@ -34,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 	"github.com/openkruise/kruise/pkg/util/fieldindex"
 )
 
@@ -441,4 +443,95 @@ func createReconcileJob(scheme *k8sruntime.Scheme, initObjs ...client.Object) Re
 		clock:    clock.RealClock{},
 	}
 	return reconcileJob
+}
+
+func TestReconcile_ExpectationTimeoutRecovery(t *testing.T) {
+	oldTimeout := expectations.ExpectationTimeout
+	expectations.ExpectationTimeout = 10 * time.Millisecond
+	defer func() {
+		expectations.ExpectationTimeout = oldTimeout
+	}()
+
+	t.Run("deletes expired scaleExpectations and continues reconcile", func(t *testing.T) {
+		instance := &appsv1beta1.ImageListPullJob{
+			ObjectMeta: metav1.ObjectMeta{Name: "scale-timeout-list-job", Namespace: "default", UID: types.UID("uid-list-scale")},
+			Spec: appsv1beta1.ImageListPullJobSpec{
+				Images: []string{"nginx:1.25"},
+			},
+		}
+		reconcileJob := createReconcileJob(testscheme, instance)
+		req := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: instance.Namespace, Name: instance.Name}}
+		defer scaleExpectations.DeleteExpectations(req.String())
+
+		scaleExpectations.ExpectScale(req.String(), expectations.Create, "missing-child-job")
+
+		res, err := reconcileJob.Reconcile(context.TODO(), req)
+		assert.NoError(t, err)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
+
+		time.Sleep(15 * time.Millisecond)
+
+		_, err = reconcileJob.Reconcile(context.TODO(), req)
+		assert.NoError(t, err)
+
+		// Child ImagePullJob should have been created after clearing the expired expectation
+		imagePullJobList := &appsv1beta1.ImagePullJobList{}
+		err = reconcileJob.List(context.TODO(), imagePullJobList, client.InNamespace(instance.Namespace))
+		assert.NoError(t, err)
+		assert.Len(t, imagePullJobList.Items, 1)
+	})
+
+	t.Run("deletes expired resourceVersionExpectations on owned ImagePullJob and continues reconcile", func(t *testing.T) {
+		instance := &appsv1beta1.ImageListPullJob{
+			ObjectMeta: metav1.ObjectMeta{Name: "rv-timeout-list-job", Namespace: "default", UID: types.UID("uid-list-rv")},
+			Spec: appsv1beta1.ImageListPullJobSpec{
+				Images: []string{"nginx:1.25"},
+			},
+		}
+		childJob := &appsv1beta1.ImagePullJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "child-j01",
+				Namespace:       instance.Namespace,
+				UID:             types.UID("uid-child-j01"),
+				ResourceVersion: "1",
+				OwnerReferences: []metav1.OwnerReference{
+					{UID: instance.UID, Name: instance.Name},
+				},
+			},
+			Spec: appsv1beta1.ImagePullJobSpec{
+				Image: "nginx:1.25",
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
+				},
+			},
+			Status: appsv1beta1.ImagePullJobStatus{
+				Desired: 1,
+				Active:  1,
+			},
+		}
+		reconcileJob := createReconcileJob(testscheme, instance, childJob)
+		req := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: instance.Namespace, Name: instance.Name}}
+		defer resourceVersionExpectations.Delete(childJob)
+
+		expectedChild := childJob.DeepCopy()
+		expectedChild.ResourceVersion = "999"
+		resourceVersionExpectations.Expect(expectedChild)
+
+		res, err := reconcileJob.Reconcile(context.TODO(), req)
+		assert.NoError(t, err)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
+
+		time.Sleep(15 * time.Millisecond)
+
+		_, err = reconcileJob.Reconcile(context.TODO(), req)
+		assert.NoError(t, err)
+
+		satisfied, _ := resourceVersionExpectations.IsSatisfied(childJob)
+		assert.True(t, satisfied, "expired resourceVersion expectation should be cleared after timeout")
+
+		retrieved := &appsv1beta1.ImageListPullJob{}
+		err = reconcileJob.Get(context.TODO(), req.NamespacedName, retrieved)
+		assert.NoError(t, err)
+		assert.Equal(t, int32(1), retrieved.Status.Desired)
+	})
 }

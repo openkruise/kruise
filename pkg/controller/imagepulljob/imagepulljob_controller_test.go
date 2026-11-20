@@ -18,9 +18,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/openkruise/kruise/apis/apps/defaults"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
 	"github.com/openkruise/kruise/pkg/util"
+	"github.com/openkruise/kruise/pkg/util/expectations"
 )
 
 func TestReconcileImagePullJob_calculateStatus(t *testing.T) {
@@ -2322,7 +2326,7 @@ func TestSyncJobPullSecrets_EarlyReturn(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test-job",
 					Namespace:         "default",
-					DeletionTimestamp:  &now,
+					DeletionTimestamp: &now,
 					Finalizers:        []string{"test"},
 				},
 				Spec: appsv1beta1.ImagePullJobSpec{},
@@ -3016,4 +3020,138 @@ func TestClaimImagePullJobSecrets_UpdateError(t *testing.T) {
 	_, err := r.claimImagePullJobSecrets(job, pullSecrets)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "update error")
+}
+
+func TestReconcile_ExpectationTimeoutRecoveryAndDeletion(t *testing.T) {
+	oldTimeout := expectations.ExpectationTimeout
+	expectations.ExpectationTimeout = 10 * time.Millisecond
+	defer func() {
+		expectations.ExpectationTimeout = oldTimeout
+	}()
+
+	t.Run("deletes expired scaleExpectations and continues reconcile", func(t *testing.T) {
+		job := &appsv1beta1.ImagePullJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "scale-timeout-job",
+				Namespace: "default",
+				UID:       types.UID("uid-scale-timeout"),
+			},
+			Spec: appsv1beta1.ImagePullJobSpec{
+				Image: "nginx:1.25",
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
+				},
+			},
+		}
+		ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ns, job).WithStatusSubresource(job).Build()
+		r := &ReconcileImagePullJob{
+			Client:                   fakeClient,
+			scheme:                   scheme,
+			clock:                    k8stesting.NewFakeClock(time.Now()),
+			generateRandomStringFunc: defaultGenerateRandomString,
+		}
+		req := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: "default", Name: job.Name}}
+		defer scaleExpectations.DeleteExpectations(req.String())
+
+		scaleExpectations.ExpectScale(req.String(), expectations.Create, "missing-secret")
+		// First reconcile records firstUnsatisfiedTimestamp and requeues
+		res, err := r.Reconcile(context.TODO(), req)
+		assert.NoError(t, err)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
+
+		time.Sleep(15 * time.Millisecond)
+
+		// After ExpectationTimeout, expired expectation must be deleted so reconcile proceeds
+		_, err = r.Reconcile(context.TODO(), req)
+		assert.NoError(t, err)
+		satisfied, _, _ := scaleExpectations.SatisfiedExpectations(req.String())
+		assert.True(t, satisfied, "expired scale expectation should be cleared after timeout")
+	})
+
+	t.Run("deletes expired resourceVersionExpectations and continues reconcile", func(t *testing.T) {
+		job := &appsv1beta1.ImagePullJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "rv-timeout-job",
+				Namespace:       "default",
+				UID:             types.UID("uid-rv-timeout"),
+				ResourceVersion: "1",
+			},
+			Spec: appsv1beta1.ImagePullJobSpec{
+				Image: "nginx:1.25",
+				ImagePullJobTemplate: appsv1beta1.ImagePullJobTemplate{
+					CompletionPolicy: appsv1beta1.CompletionPolicy{Type: appsv1beta1.Always},
+				},
+			},
+		}
+		ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(ns, job).WithStatusSubresource(job).Build()
+		r := &ReconcileImagePullJob{
+			Client:                   fakeClient,
+			scheme:                   scheme,
+			clock:                    k8stesting.NewFakeClock(time.Now()),
+			generateRandomStringFunc: defaultGenerateRandomString,
+		}
+		req := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: "default", Name: job.Name}}
+		defer resourceVersionExpectations.Delete(job)
+
+		expectedJob := job.DeepCopy()
+		expectedJob.ResourceVersion = "999"
+		resourceVersionExpectations.Expect(expectedJob)
+
+		res, err := r.Reconcile(context.TODO(), req)
+		assert.NoError(t, err)
+		assert.Greater(t, res.RequeueAfter, time.Duration(0))
+
+		time.Sleep(15 * time.Millisecond)
+
+		_, err = r.Reconcile(context.TODO(), req)
+		assert.NoError(t, err)
+		updated := &appsv1beta1.ImagePullJob{}
+		err = fakeClient.Get(context.TODO(), req.NamespacedName, updated)
+		assert.NoError(t, err)
+		assert.True(t, controllerutil.ContainsFinalizer(updated, defaults.ProtectionFinalizer), "reconcile should proceed after deleting expired resourceVersion expectation")
+		satisfied, _ := resourceVersionExpectations.IsSatisfied(updated)
+		assert.True(t, satisfied, "resourceVersion expectation should be satisfied for updated job")
+	})
+
+	t.Run("finalizes deleting job even with unsatisfied expectations", func(t *testing.T) {
+		now := metav1.Now()
+		job := &appsv1beta1.ImagePullJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "deleting-job",
+				Namespace:         "default",
+				UID:               types.UID("uid-deleting"),
+				DeletionTimestamp: &now,
+				Finalizers:        []string{defaults.ProtectionFinalizer},
+			},
+			Spec: appsv1beta1.ImagePullJobSpec{
+				Image: "nginx:1.25",
+			},
+		}
+		kruiseNs := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: util.GetKruiseDaemonConfigNamespace()}}
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme).WithObjects(kruiseNs, job).Build()
+		r := &ReconcileImagePullJob{
+			Client:                   fakeClient,
+			scheme:                   scheme,
+			clock:                    k8stesting.NewFakeClock(time.Now()),
+			generateRandomStringFunc: defaultGenerateRandomString,
+		}
+		req := reconcile.Request{NamespacedName: types.NamespacedName{Namespace: "default", Name: job.Name}}
+		defer scaleExpectations.DeleteExpectations(req.String())
+
+		scaleExpectations.ExpectScale(req.String(), expectations.Create, "stuck-secret")
+
+		_, err := r.Reconcile(context.TODO(), req)
+		assert.NoError(t, err)
+
+		satisfied, _, _ := scaleExpectations.SatisfiedExpectations(req.String())
+		assert.True(t, satisfied, "scale expectations should be cleared on deletion")
+
+		updated := &appsv1beta1.ImagePullJob{}
+		err = fakeClient.Get(context.TODO(), req.NamespacedName, updated)
+		if err == nil {
+			assert.False(t, controllerutil.ContainsFinalizer(updated, defaults.ProtectionFinalizer), "protection finalizer should be removed")
+		}
+	})
 }

@@ -177,36 +177,39 @@ func (r *ReconcileImagePullJob) Reconcile(_ context.Context, request reconcile.R
 		if errors.IsNotFound(err) {
 			// Object not found, return.  Created objects are automatically garbage collected.
 			// For additional cleanup logic use finalizers.
+			scaleExpectations.DeleteExpectations(request.String())
 			return reconcile.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
 
+	if job.DeletionTimestamp != nil {
+		scaleExpectations.DeleteExpectations(request.String())
+		resourceVersionExpectations.Delete(job)
+		// ensure the GC of secrets and remove protection finalizer
+		return reconcile.Result{}, r.finalize(job)
+	}
+
 	// If scale expectations have not satisfied yet, just skip this reconcile
 	if scaleSatisfied, unsatisfiedDuration, dirtyData := scaleExpectations.SatisfiedExpectations(request.String()); !scaleSatisfied {
-		if unsatisfiedDuration >= expectations.ExpectationTimeout {
-			klog.InfoS("ImagePullJob: expectation unsatisfied overtime", "imagePullJob", request, "dirtyData", dirtyData, "overTime", unsatisfiedDuration)
-			return reconcile.Result{}, nil
+		if unsatisfiedDuration < expectations.ExpectationTimeout {
+			klog.V(4).InfoS("ImagePullJob: not satisfied scale", "imagePullJob", request, "dirtyData", dirtyData)
+			return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 		}
-		klog.V(4).InfoS("ImagePullJob: not satisfied scale", "imagePullJob", request, "dirtyData", dirtyData)
-		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
+		klog.InfoS("ImagePullJob: expectation unsatisfied overtime, deleting expired scale expectations", "imagePullJob", request, "dirtyData", dirtyData, "overTime", unsatisfiedDuration)
+		scaleExpectations.DeleteExpectations(request.String())
 	}
 
 	// If resourceVersion expectations have not satisfied yet, just skip this reconcile
 	resourceVersionExpectations.Observe(job)
 	if isSatisfied, unsatisfiedDuration := resourceVersionExpectations.IsSatisfied(job); !isSatisfied {
-		if unsatisfiedDuration >= expectations.ExpectationTimeout {
-			klog.InfoS("Expectation unsatisfied overtime", "imagePullJob", request, "timeout", unsatisfiedDuration)
-			return reconcile.Result{}, nil
+		if unsatisfiedDuration < expectations.ExpectationTimeout {
+			klog.V(4).InfoS("Not satisfied resourceVersion", "imagePullJob", request)
+			return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
 		}
-		klog.V(4).InfoS("Not satisfied resourceVersion", "imagePullJob", request)
-		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
-	}
-
-	if job.DeletionTimestamp != nil {
-		// ensure the GC of secrets and remove protection finalizer
-		return reconcile.Result{}, r.finalize(job)
+		klog.InfoS("Expectation unsatisfied overtime, deleting expired resourceVersion expectation", "imagePullJob", request, "timeout", unsatisfiedDuration)
+		resourceVersionExpectations.Delete(job)
 	}
 
 	// The Job has been finished
