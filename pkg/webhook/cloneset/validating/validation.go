@@ -477,8 +477,10 @@ func ValidateCloneSetUpdateV1beta1(cloneSet, oldCloneSet *v1beta1.CloneSet) fiel
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to cloneset spec for fields other than 'replicas', 'template', 'lifecycle', 'scaleStrategy', 'updateStrategy', 'minReadySeconds', 'progressDeadlineSeconds', 'volumeClaimTemplates' and 'revisionHistoryLimit' are forbidden"))
 	}
 
-	// Note: v1beta1 CloneSet cannot use the v1alpha1 core control for validation
-	// For now, we'll do basic validation; the controller will convert it to v1alpha1 for full validation
+	coreControl := clonesetcore.New(cloneSet)
+	if err := coreControl.ValidateCloneSetUpdate(oldCloneSet, cloneSet); err != nil {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), err.Error()))
+	}
 
 	allErrs = append(allErrs, ValidateCloneSetV1beta1(cloneSet, oldCloneSet)...)
 	return allErrs

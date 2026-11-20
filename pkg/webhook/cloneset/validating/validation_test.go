@@ -864,3 +864,119 @@ func TestValidateUpdateStrategyV1beta1MaxSurgeShadow(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateCloneSetUpdateV1beta1InPlaceOnly checks that a v1beta1 CloneSet update that uses the
+// InPlaceOnly pod update policy is only admitted when the pod template change is limited to
+// container images, as the v1alpha1 webhook already enforces.
+func TestValidateCloneSetUpdateV1beta1InPlaceOnly(t *testing.T) {
+	validLabels := map[string]string{"a": "b"}
+	replicas := int32(2)
+	partition := intstr.FromInt32(0)
+	maxUnavailable := intstr.FromInt32(1)
+
+	newCloneSet := func(policy v1beta1.CloneSetPodUpdateStrategyType, image string, env []v1.EnvVar) *v1beta1.CloneSet {
+		return &v1beta1.CloneSet{
+			ObjectMeta: metav1.ObjectMeta{Name: "cs-inplace-only", Namespace: metav1.NamespaceDefault, UID: "cs-uid", ResourceVersion: "1"},
+			Spec: v1beta1.CloneSetSpec{
+				Replicas: &replicas,
+				Selector: &metav1.LabelSelector{MatchLabels: validLabels},
+				Template: v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Labels: validLabels},
+					Spec: v1.PodSpec{
+						RestartPolicy: v1.RestartPolicyAlways,
+						DNSPolicy:     v1.DNSClusterFirst,
+						Containers: []v1.Container{{
+							Name:                     "abc",
+							Image:                    image,
+							Env:                      env,
+							ImagePullPolicy:          v1.PullIfNotPresent,
+							TerminationMessagePolicy: v1.TerminationMessageReadFile,
+						}},
+					},
+				},
+				UpdateStrategy: v1beta1.CloneSetUpdateStrategy{
+					Type: v1beta1.RollingUpdateCloneSetUpdateStrategyType,
+					RollingUpdate: &v1beta1.RollingUpdateCloneSetStrategy{
+						PodUpdatePolicy: policy,
+						Partition:       &partition,
+						MaxUnavailable:  &maxUnavailable,
+					},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name      string
+		oldPolicy v1beta1.CloneSetPodUpdateStrategyType
+		newPolicy v1beta1.CloneSetPodUpdateStrategyType
+		newImage  string
+		newEnv    []v1.EnvVar
+		expectErr bool
+	}{
+		{
+			name:      "InPlaceOnly with only the image changed is allowed",
+			oldPolicy: v1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType,
+			newPolicy: v1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType,
+			newImage:  "image:v2",
+		},
+		{
+			name:      "InPlaceOnly with an env change is rejected",
+			oldPolicy: v1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType,
+			newPolicy: v1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType,
+			newImage:  "image:v1",
+			newEnv:    []v1.EnvVar{{Name: "FOO", Value: "bar"}},
+			expectErr: true,
+		},
+		{
+			name:      "InPlaceOnly with image and env changed is rejected",
+			oldPolicy: v1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType,
+			newPolicy: v1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType,
+			newImage:  "image:v2",
+			newEnv:    []v1.EnvVar{{Name: "FOO", Value: "bar"}},
+			expectErr: true,
+		},
+		{
+			name:      "switching to InPlaceOnly together with an env change is rejected",
+			oldPolicy: v1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType,
+			newPolicy: v1beta1.InPlaceOnlyCloneSetPodUpdateStrategyType,
+			newImage:  "image:v1",
+			newEnv:    []v1.EnvVar{{Name: "FOO", Value: "bar"}},
+			expectErr: true,
+		},
+		{
+			name:      "InPlaceIfPossible with an env change is allowed",
+			oldPolicy: v1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType,
+			newPolicy: v1beta1.InPlaceIfPossibleCloneSetPodUpdateStrategyType,
+			newImage:  "image:v1",
+			newEnv:    []v1.EnvVar{{Name: "FOO", Value: "bar"}},
+		},
+		{
+			name:      "Recreate with an env change is allowed",
+			oldPolicy: v1beta1.RecreateCloneSetPodUpdateStrategyType,
+			newPolicy: v1beta1.RecreateCloneSetPodUpdateStrategyType,
+			newImage:  "image:v1",
+			newEnv:    []v1.EnvVar{{Name: "FOO", Value: "bar"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oldCS := newCloneSet(tt.oldPolicy, "image:v1", nil)
+			newCS := newCloneSet(tt.newPolicy, tt.newImage, tt.newEnv)
+			newCS.ResourceVersion = "2"
+
+			var found bool
+			for _, err := range ValidateCloneSetUpdateV1beta1(newCS, oldCS) {
+				if err.Field == "spec" && strings.Contains(err.Detail, "only allowed to update images") {
+					found = true
+				} else {
+					t.Errorf("unexpected validation error: %v", err)
+				}
+			}
+			if found != tt.expectErr {
+				t.Errorf("expected InPlaceOnly template error=%v, got error=%v", tt.expectErr, found)
+			}
+		})
+	}
+}
