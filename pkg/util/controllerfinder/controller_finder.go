@@ -174,7 +174,9 @@ var (
 	validWorkloadList = []schema.GroupVersionKind{ControllerKindRS, ControllerKindSS, ControllerKindRC, ControllerKindDep, ControllerKruiseKindCS, ControllerKruiseKindSS}
 )
 
-// getPodReplicaSet finds a replicaset which has no matching deployments.
+// getPodReplicaSet resolves a ReplicaSet, climbing to its controlling
+// parent workload when managed by a Deployment or another controller (such as
+// a custom workload implementing the scale subresource).
 func (r *ControllerFinder) getPodReplicaSet(ref ControllerReference, namespace string) (*ScaleAndSelector, error) {
 	// This error is irreversible, so there is no need to return error
 	ok, _ := verifyGroupKind(ref.APIVersion, ref.Kind, ControllerKindRS)
@@ -189,14 +191,19 @@ func (r *ControllerFinder) getPodReplicaSet(ref ControllerReference, namespace s
 		return nil, nil
 	}
 	controllerRef := metav1.GetControllerOf(replicaSet)
-	if controllerRef != nil && controllerRef.Kind == ControllerKindDep.Kind {
-		refSs := ControllerReference{
-			APIVersion: controllerRef.APIVersion,
-			Kind:       controllerRef.Kind,
-			Name:       controllerRef.Name,
-			UID:        controllerRef.UID,
+	if controllerRef != nil {
+		if controllerRef.Kind == ControllerKindDep.Kind {
+			refSs := ControllerReference{
+				APIVersion: controllerRef.APIVersion,
+				Kind:       controllerRef.Kind,
+				Name:       controllerRef.Name,
+				UID:        controllerRef.UID,
+			}
+			return r.getPodDeployment(refSs, namespace)
 		}
-		return r.getPodDeployment(refSs, namespace)
+		if controllerRef.Kind != ControllerKindRS.Kind {
+			return r.GetScaleAndSelectorForRef(controllerRef.APIVersion, controllerRef.Kind, namespace, controllerRef.Name, controllerRef.UID)
+		}
 	}
 
 	return &ScaleAndSelector{
