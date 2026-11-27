@@ -131,6 +131,7 @@ func (dsc *ReconcileDaemonSet) rollingUpdate(ctx context.Context, ds *appsv1beta
 						allowedReplacementPods = make([]string, 0, len(nodeToDaemonPods))
 					}
 					allowedReplacementPods = append(allowedReplacementPods, oldPod.Name)
+					numUnavailable++
 				case numUnavailable >= maxUnavailable:
 					// no point considering any other candidates
 					continue

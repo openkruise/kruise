@@ -155,6 +155,73 @@ func TestDaemonSetUpdatesWhenNewPosIsNotReady(t *testing.T) {
 	clearExpectations(t, manager, ds, podControl)
 }
 
+func TestDaemonSetUpdatesSomeOldPodsNotReady(t *testing.T) {
+	ds := newDaemonSet("foo")
+	manager, podControl, _, err := newTestController(ds)
+	if err != nil {
+		t.Fatalf("error creating DaemonSets controller: %v", err)
+	}
+	maxUnavailable := 2
+	addNodes(manager.nodeStore, 0, 5, nil)
+	err = manager.dsStore.Add(ds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
+	markPodsReady(podControl.podStore)
+
+	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
+	ds.Spec.UpdateStrategy.Type = appsv1beta1.RollingUpdateDaemonSetStrategyType
+	intStr := intstr.FromInt(maxUnavailable)
+	ds.Spec.UpdateStrategy.RollingUpdate = &appsv1beta1.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
+	err = manager.dsStore.Update(ds)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// All old pods are available, should update 2
+	clearExpectations(t, manager, ds, podControl)
+	expectSyncDaemonSets(t, manager, ds, podControl, 0, maxUnavailable, 0)
+
+	clearExpectations(t, manager, ds, podControl)
+	expectSyncDaemonSets(t, manager, ds, podControl, maxUnavailable, 0, 0)
+
+	clearExpectations(t, manager, ds, podControl)
+	expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
+	clearExpectations(t, manager, ds, podControl)
+
+	// Perform another update, verify we delete and create 2 pods, three available should remain untouched
+	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar3"
+	err = manager.dsStore.Update(ds)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clearExpectations(t, manager, ds, podControl)
+	expectSyncDaemonSets(t, manager, ds, podControl, 0, maxUnavailable, 0)
+
+	clearExpectations(t, manager, ds, podControl)
+	expectSyncDaemonSets(t, manager, ds, podControl, maxUnavailable, 0, 0)
+
+	clearExpectations(t, manager, ds, podControl)
+	expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
+	clearExpectations(t, manager, ds, podControl)
+
+	readyCount := 0
+	expectedReadyCount := 5 - maxUnavailable
+	for _, obj := range podControl.podStore.List() {
+		pod := obj.(*corev1.Pod)
+		n, condition := podutil.GetPodCondition(&pod.Status, corev1.PodReady)
+		if n != -1 && condition.Status == corev1.ConditionTrue {
+			readyCount++
+		}
+	}
+
+	if readyCount != expectedReadyCount {
+		t.Fatalf("Expected %d old ready pods, but found %d", expectedReadyCount, readyCount)
+	}
+}
+
 func TestDaemonSetUpdatesAllOldPodsNotReady(t *testing.T) {
 	ds := newDaemonSet("foo")
 	manager, podControl, _, err := newTestController(ds)
