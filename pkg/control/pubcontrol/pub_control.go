@@ -293,6 +293,13 @@ func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
 		}
 
 		if !util.IsPodContainerDigestEqual(sets.NewString(container.Name), pod) {
+			if hasBareDigestImageID(pod, container.Name) {
+				// containerd reports a bare config digest (`sha256:...`) without a repository in
+				// status.containerStatuses[*].imageID, which differs from the manifest digest in
+				// spec.containers[*].image; fall through to the sidecar / in-place update checks.
+				allDigestImage = false
+				continue
+			}
 			klog.V(5).InfoS("Pod container image was inconsistent", "pod", klog.KObj(pod), "containerName", container.Name)
 			return false
 		}
@@ -317,6 +324,42 @@ func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
 		return false
 	}
 
+	return true
+}
+
+func hasBareDigestImageID(pod *corev1.Pod, containerName string) bool {
+	imageID, ok := util.GetPodContainerImageIDs(pod)[containerName]
+	if !ok {
+		return false
+	}
+	return isBareOCIDigest(imageID)
+}
+
+func isBareOCIDigest(s string) bool {
+	algo, encoded, found := strings.Cut(s, ":")
+	if !found {
+		return false
+	}
+	var expectedLen int
+	switch algo {
+	case "sha256":
+		expectedLen = 64
+	case "sha384":
+		expectedLen = 96
+	case "sha512":
+		expectedLen = 128
+	default:
+		return false
+	}
+	if len(encoded) != expectedLen {
+		return false
+	}
+	for i := 0; i < len(encoded); i++ {
+		c := encoded[i]
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return false
+		}
+	}
 	return true
 }
 
