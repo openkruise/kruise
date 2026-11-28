@@ -34,6 +34,8 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 const (
@@ -87,11 +89,14 @@ func registerFieldIndexes(c cache.Cache) (err error) {
 	}
 
 	// CRDs can be established slightly later than the controller starts, so
-	// retry their index registration on discovery NoMatch errors.
-	if err = registerCRDFieldIndex(c, &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
+	// retry their index registration on discovery NoMatch errors. When the
+	// corresponding feature gate is disabled and the CRD is absent, skip
+	// registration on NoMatchError without waiting for the CRD to appear.
+	imagePullJobEnabled := isImagePullJobEnabled()
+	if err = registerOptionalCRDFieldIndex(c, &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc, imagePullJobEnabled); err != nil {
 		return
 	}
-	if err = registerCRDFieldIndex(c, &appsv1beta1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc); err != nil {
+	if err = registerOptionalCRDFieldIndex(c, &appsv1beta1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc, imagePullJobEnabled); err != nil {
 		return
 	}
 	if err = indexBroadcastCronJob(c); err != nil {
@@ -118,9 +123,30 @@ func registerFieldIndexes(c cache.Cache) (err error) {
 	return
 }
 
+func isImagePullJobEnabled() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.KruiseDaemon) &&
+		(utilfeature.DefaultFeatureGate.Enabled(features.ImagePullJobGate) ||
+			utilfeature.DefaultFeatureGate.Enabled(features.PreDownloadImageForInPlaceUpdate) ||
+			utilfeature.DefaultFeatureGate.Enabled(features.PreDownloadImageForDaemonSetUpdate))
+}
+
 func registerFieldIndex(c cache.Cache, obj client.Object, field string, extractValue client.IndexerFunc) error {
 	if err := c.IndexField(context.TODO(), obj, field, extractValue); err != nil {
 		return fmt.Errorf("failed to register field index %q for %T: %w", field, obj, err)
+	}
+	return nil
+}
+
+func registerOptionalCRDFieldIndex(c cache.Cache, obj client.Object, field string, extractValue client.IndexerFunc, enabled bool) error {
+	if enabled {
+		return registerCRDFieldIndex(c, obj, field, extractValue)
+	}
+	if err := registerFieldIndex(c, obj, field, extractValue); err != nil {
+		if meta.IsNoMatchError(err) {
+			klog.InfoS("CRD is not installed and feature gate is disabled, skipping field index", "object", fmt.Sprintf("%T", obj), "field", field)
+			return nil
+		}
+		return err
 	}
 	return nil
 }
@@ -231,7 +257,7 @@ func indexBroadcastCronJobV1Beta1(c cache.Cache) error {
 }
 
 func indexImageListPullJobV1Beta1(c cache.Cache) error {
-	return registerCRDFieldIndex(c, &appsv1beta1.ImageListPullJob{}, IndexNameForController, func(rawObj client.Object) []string {
+	return registerOptionalCRDFieldIndex(c, &appsv1beta1.ImageListPullJob{}, IndexNameForController, func(rawObj client.Object) []string {
 		// grab the job object, extract the owner...
 		job := rawObj.(*appsv1beta1.ImageListPullJob)
 		owner := metav1.GetControllerOf(job)
@@ -246,24 +272,24 @@ func indexImageListPullJobV1Beta1(c cache.Cache) error {
 
 		// ...and if so, return it
 		return []string{owner.Name}
-	})
+	}, isImagePullJobEnabled())
 }
 
 func indexImagePullJobActive(c cache.Cache) error {
-	return registerCRDFieldIndex(c, &appsv1alpha1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
+	return registerOptionalCRDFieldIndex(c, &appsv1alpha1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
 		obj := rawObj.(*appsv1alpha1.ImagePullJob)
 		isActive := "false"
 		if obj.DeletionTimestamp == nil && obj.Status.CompletionTime == nil {
 			isActive = "true"
 		}
 		return []string{isActive}
-	})
+	}, isImagePullJobEnabled())
 }
 
 func indexImagePullJobActiveV1Beta1(c cache.Cache) error {
-	return registerCRDFieldIndex(c, &appsv1beta1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
+	return registerOptionalCRDFieldIndex(c, &appsv1beta1.ImagePullJob{}, IndexNameForIsActive, func(rawObj client.Object) []string {
 		return IndexImagePullJob(rawObj)
-	})
+	}, isImagePullJobEnabled())
 }
 
 func IndexImagePullJob(rawObj client.Object) []string {
@@ -299,9 +325,9 @@ func IndexSidecarSet(rawObj client.Object) []string {
 }
 
 func indexSidecarSet(c cache.Cache) error {
-	return registerCRDFieldIndex(c, &appsv1alpha1.SidecarSet{}, IndexNameForSidecarSetNamespace, func(rawObj client.Object) []string {
+	return registerOptionalCRDFieldIndex(c, &appsv1alpha1.SidecarSet{}, IndexNameForSidecarSetNamespace, func(rawObj client.Object) []string {
 		return IndexSidecarSet(rawObj)
-	})
+	}, utilfeature.DefaultFeatureGate.Enabled(features.PodWebhook))
 }
 
 func IndexSidecarSetV1Beta1(rawObj client.Object) []string {
@@ -326,7 +352,7 @@ func IndexSidecarSetV1Beta1(rawObj client.Object) []string {
 }
 
 func indexSidecarSetV1Beta1(c cache.Cache) error {
-	return registerCRDFieldIndex(c, &appsv1beta1.SidecarSet{}, IndexNameForSidecarSetNamespace, func(rawObj client.Object) []string {
+	return registerOptionalCRDFieldIndex(c, &appsv1beta1.SidecarSet{}, IndexNameForSidecarSetNamespace, func(rawObj client.Object) []string {
 		return IndexSidecarSetV1Beta1(rawObj)
-	})
+	}, utilfeature.DefaultFeatureGate.Enabled(features.PodWebhook))
 }
