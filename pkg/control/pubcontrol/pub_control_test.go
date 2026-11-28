@@ -575,3 +575,79 @@ func TestIsPodReady(t *testing.T) {
 		})
 	}
 }
+
+func TestIsPodStateConsistent(t *testing.T) {
+	const (
+		manifestImage = "registry.k8s.io/ingress-nginx/controller:v1.13.0@sha256:dc75a7baec7a3b827a5d7ab0acd10ab507904c7dad692365b3e3b596eca1afd2"
+		otherManifest = "registry.k8s.io/ingress-nginx/controller:v1.12.0@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		containerdID  = "sha256:d9b2df1fa40e21139c739be6f30bc530b64a9500e4ccc3d86814d28835f1f4b3"
+	)
+	cases := []struct {
+		name   string
+		getPod func() *corev1.Pod
+		expect bool
+	}{
+		{
+			name: "digest image matching full repo@digest imageID",
+			getPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Image = manifestImage
+				demo.Status.ContainerStatuses[0].ImageID = manifestImage
+				return demo
+			},
+			expect: true,
+		},
+		{
+			name: "digest image with containerd bare config digest imageID",
+			getPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Image = manifestImage
+				demo.Status.ContainerStatuses[0].Image = containerdID
+				demo.Status.ContainerStatuses[0].ImageID = containerdID
+				return demo
+			},
+			expect: true,
+		},
+		{
+			name: "digest image with repo-qualified mismatched imageID still false",
+			getPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Image = manifestImage
+				demo.Status.ContainerStatuses[0].ImageID = otherManifest
+				return demo
+			},
+			expect: false,
+		},
+		{
+			name: "digest image with missing imageID still false",
+			getPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Image = manifestImage
+				demo.Status.ContainerStatuses[0].ImageID = ""
+				return demo
+			},
+			expect: false,
+		},
+		{
+			name: "digest image with bare imageID still checks in-place update grace state",
+			getPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Image = manifestImage
+				demo.Status.ContainerStatuses[0].ImageID = containerdID
+				demo.Annotations[pub.InPlaceUpdateGraceKey] = `{"revision":"rev-2"}`
+				return demo
+			},
+			expect: false,
+		},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			control := commonControl{}
+			got := control.IsPodStateConsistent(cs.getPod())
+			if got != cs.expect {
+				t.Fatalf("IsPodStateConsistent() = %v, expect %v", got, cs.expect)
+			}
+		})
+	}
+}
