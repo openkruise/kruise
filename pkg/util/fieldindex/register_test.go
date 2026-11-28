@@ -19,6 +19,8 @@ import (
 
 	appsv1alpha1 "github.com/openkruise/kruise/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/openkruise/kruise/apis/apps/v1beta1"
+	"github.com/openkruise/kruise/pkg/features"
+	utilfeature "github.com/openkruise/kruise/pkg/util/feature"
 )
 
 type fakeIndexCache struct {
@@ -278,4 +280,193 @@ func TestIndexImagePullJob(t *testing.T) {
 		},
 	}
 	assert.Equal(t, []string{"false"}, IndexImagePullJob(deletedJob), "Expected deleted job to return 'false'")
+}
+
+func TestIsImagePullJobEnabled(t *testing.T) {
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.KruiseDaemon, true)()
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.ImagePullJobGate, false)()
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.PreDownloadImageForInPlaceUpdate, false)()
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.PreDownloadImageForDaemonSetUpdate, false)()
+	assert.False(t, isImagePullJobEnabled())
+
+	func() {
+		defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.ImagePullJobGate, true)()
+		assert.True(t, isImagePullJobEnabled())
+	}()
+
+	func() {
+		defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.PreDownloadImageForInPlaceUpdate, true)()
+		assert.True(t, isImagePullJobEnabled())
+	}()
+
+	func() {
+		defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.PreDownloadImageForDaemonSetUpdate, true)()
+		assert.True(t, isImagePullJobEnabled())
+	}()
+
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.KruiseDaemon, false)()
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.ImagePullJobGate, true)()
+	assert.False(t, isImagePullJobEnabled())
+}
+
+func TestRegisterFieldIndexesSkipsMissingCRDsWhenFeatureGatesDisabled(t *testing.T) {
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.KruiseDaemon, false)()
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.ImagePullJobGate, false)()
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.PreDownloadImageForInPlaceUpdate, false)()
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.PreDownloadImageForDaemonSetUpdate, false)()
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.PodWebhook, false)()
+
+	noMatchErr := newNoMatchError()
+	fakeCache := &fakeIndexCache{
+		indexFieldFunc: func(ctx context.Context, obj client.Object, field string, extractValue client.IndexerFunc) error {
+			switch obj.(type) {
+			case *appsv1alpha1.ImagePullJob, *appsv1beta1.ImagePullJob, *appsv1beta1.ImageListPullJob,
+				*appsv1alpha1.SidecarSet, *appsv1beta1.SidecarSet:
+				return noMatchErr
+			default:
+				return nil
+			}
+		},
+	}
+
+	err := registerFieldIndexes(fakeCache)
+	assert.NoError(t, err)
+	assert.Equal(t, 13, fakeCache.calls)
+}
+
+func TestRegisterFieldIndexesPropagatesNonNoMatchErrorWhenFeatureGateDisabled(t *testing.T) {
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.KruiseDaemon, false)()
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.ImagePullJobGate, false)()
+
+	cases := []struct {
+		name  string
+		match func(client.Object) bool
+	}{
+		{
+			name: "v1alpha1 ImagePullJob",
+			match: func(obj client.Object) bool {
+				_, ok := obj.(*appsv1alpha1.ImagePullJob)
+				return ok
+			},
+		},
+		{
+			name: "v1beta1 ImagePullJob",
+			match: func(obj client.Object) bool {
+				_, ok := obj.(*appsv1beta1.ImagePullJob)
+				return ok
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			expectedErr := errors.New("apiserver unavailable")
+			fakeCache := &fakeIndexCache{
+				indexFieldFunc: func(ctx context.Context, obj client.Object, field string, extractValue client.IndexerFunc) error {
+					if tc.match(obj) {
+						return expectedErr
+					}
+					return nil
+				},
+			}
+
+			err := registerFieldIndexes(fakeCache)
+			assert.ErrorIs(t, err, expectedErr)
+		})
+	}
+}
+
+func TestOptionalCRDFieldIndexExtractors(t *testing.T) {
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.KruiseDaemon, false)()
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.ImagePullJobGate, false)()
+	defer utilfeature.SetFeatureGateDuringTest(t, utilfeature.DefaultMutableFeatureGate, features.PodWebhook, false)()
+
+	extractors := make(map[string]client.IndexerFunc)
+	fakeCache := &fakeIndexCache{
+		indexFieldFunc: func(ctx context.Context, obj client.Object, field string, extractValue client.IndexerFunc) error {
+			key := fmt.Sprintf("%T:%s", obj, field)
+			extractors[key] = extractValue
+			return nil
+		},
+	}
+
+	assert.NoError(t, indexImageListPullJobV1Beta1(fakeCache))
+	assert.NoError(t, indexImagePullJobActive(fakeCache))
+	assert.NoError(t, indexImagePullJobActiveV1Beta1(fakeCache))
+	assert.NoError(t, indexSidecarSet(fakeCache))
+	assert.NoError(t, indexSidecarSetV1Beta1(fakeCache))
+
+	isController := true
+	ilpjExtractor := extractors[fmt.Sprintf("%T:%s", &appsv1beta1.ImageListPullJob{}, IndexNameForController)]
+	assert.Nil(t, ilpjExtractor(&appsv1beta1.ImageListPullJob{}))
+	assert.Nil(t, ilpjExtractor(&appsv1beta1.ImageListPullJob{
+		ObjectMeta: metav1.ObjectMeta{
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: "batch/v1",
+				Kind:       "CronJob",
+				Name:       "other",
+				Controller: &isController,
+			}},
+		},
+	}))
+	assert.Equal(t, []string{"nightly-pull"}, ilpjExtractor(&appsv1beta1.ImageListPullJob{
+		ObjectMeta: metav1.ObjectMeta{
+			OwnerReferences: []metav1.OwnerReference{{
+				APIVersion: appsv1beta1.SchemeGroupVersion.String(),
+				Kind:       appsv1beta1.AdvancedCronJobKind,
+				Name:       "nightly-pull",
+				Controller: &isController,
+			}},
+		},
+	}))
+
+	ipjV1Alpha1Extractor := extractors[fmt.Sprintf("%T:%s", &appsv1alpha1.ImagePullJob{}, IndexNameForIsActive)]
+	assert.Equal(t, []string{"true"}, ipjV1Alpha1Extractor(&appsv1alpha1.ImagePullJob{}))
+	assert.Equal(t, []string{"false"}, ipjV1Alpha1Extractor(&appsv1alpha1.ImagePullJob{
+		Status: appsv1alpha1.ImagePullJobStatus{CompletionTime: &metav1.Time{Time: time.Now()}},
+	}))
+
+	ipjV1Beta1Extractor := extractors[fmt.Sprintf("%T:%s", &appsv1beta1.ImagePullJob{}, IndexNameForIsActive)]
+	assert.Equal(t, []string{"true"}, ipjV1Beta1Extractor(&appsv1beta1.ImagePullJob{}))
+
+	sidecarV1Alpha1Extractor := extractors[fmt.Sprintf("%T:%s", &appsv1alpha1.SidecarSet{}, IndexNameForSidecarSetNamespace)]
+	assert.Equal(t, []string{"app-ns"}, sidecarV1Alpha1Extractor(&appsv1alpha1.SidecarSet{
+		Spec: appsv1alpha1.SidecarSetSpec{Namespace: "app-ns"},
+	}))
+
+	sidecarV1Beta1Extractor := extractors[fmt.Sprintf("%T:%s", &appsv1beta1.SidecarSet{}, IndexNameForSidecarSetNamespace)]
+	assert.Nil(t, sidecarV1Beta1Extractor((*appsv1beta1.SidecarSet)(nil)))
+	assert.Equal(t, []string{"default"}, sidecarV1Beta1Extractor(&appsv1beta1.SidecarSet{
+		Spec: appsv1beta1.SidecarSetSpec{
+			NamespaceSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{LabelMetadataName: "default"},
+			},
+		},
+	}))
+	assert.Equal(t, []string{"team-a"}, sidecarV1Beta1Extractor(&appsv1beta1.SidecarSet{
+		Spec: appsv1beta1.SidecarSetSpec{
+			NamespaceSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{{
+					Key:      LabelMetadataName,
+					Operator: metav1.LabelSelectorOpIn,
+					Values:   []string{"team-a"},
+				}},
+			},
+		},
+	}))
+	assert.Equal(t, []string{IndexValueSidecarSetClusterScope}, sidecarV1Beta1Extractor(&appsv1beta1.SidecarSet{}))
+}
+
+func TestRegisterOptionalCRDFieldIndexRetriesWhenEnabled(t *testing.T) {
+	fakeCache := &fakeIndexCache{}
+	fakeCache.indexFieldFunc = func(ctx context.Context, obj client.Object, field string, extractValue client.IndexerFunc) error {
+		if fakeCache.calls == 1 {
+			return newNoMatchError()
+		}
+		return nil
+	}
+
+	err := registerOptionalCRDFieldIndex(fakeCache, &appsv1alpha1.ImagePullJob{}, IndexNameForOwnerRefUID, ownerIndexFunc, true)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, fakeCache.calls)
 }
