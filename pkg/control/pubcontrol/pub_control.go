@@ -329,7 +329,7 @@ func (c *commonControl) IsPodStateConsistent(pod *corev1.Pod) bool {
 
 func hasBareDigestImageID(pod *corev1.Pod, containerName string) bool {
 	imageID, ok := util.GetPodContainerImageIDs(pod)[containerName]
-	if !ok || imageID == "" {
+	if !ok {
 		return false
 	}
 	return isBareOCIDigest(imageID)

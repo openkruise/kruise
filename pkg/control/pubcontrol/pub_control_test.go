@@ -18,6 +18,7 @@ package pubcontrol
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -629,6 +630,16 @@ func TestIsPodStateConsistent(t *testing.T) {
 			expect: false,
 		},
 		{
+			name: "digest image with missing containerStatus still false",
+			getPod: func() *corev1.Pod {
+				demo := podDemo.DeepCopy()
+				demo.Spec.Containers[0].Image = manifestImage
+				demo.Status.ContainerStatuses = nil
+				return demo
+			},
+			expect: false,
+		},
+		{
 			name: "digest image with bare imageID still checks in-place update grace state",
 			getPod: func() *corev1.Pod {
 				demo := podDemo.DeepCopy()
@@ -647,6 +658,33 @@ func TestIsPodStateConsistent(t *testing.T) {
 			got := control.IsPodStateConsistent(cs.getPod())
 			if got != cs.expect {
 				t.Fatalf("IsPodStateConsistent() = %v, expect %v", got, cs.expect)
+			}
+		})
+	}
+}
+
+func TestIsBareOCIDigest(t *testing.T) {
+	cases := []struct {
+		name   string
+		input  string
+		expect bool
+	}{
+		{name: "valid sha256", input: "sha256:" + strings.Repeat("a", 64), expect: true},
+		{name: "valid sha384", input: "sha384:" + strings.Repeat("b", 96), expect: true},
+		{name: "valid sha512", input: "sha512:" + strings.Repeat("0", 128), expect: true},
+		{name: "empty", input: "", expect: false},
+		{name: "missing colon", input: strings.Repeat("a", 64), expect: false},
+		{name: "unsupported algo", input: "md5:" + strings.Repeat("a", 32), expect: false},
+		{name: "wrong length", input: "sha256:abcd", expect: false},
+		{name: "non-hex character", input: "sha256:" + strings.Repeat("g", 64), expect: false},
+		{name: "uppercase hex rejected", input: "sha256:" + strings.Repeat("A", 64), expect: false},
+		{name: "repo qualified rejected", input: "repo@sha256:" + strings.Repeat("a", 64), expect: false},
+	}
+
+	for _, cs := range cases {
+		t.Run(cs.name, func(t *testing.T) {
+			if got := isBareOCIDigest(cs.input); got != cs.expect {
+				t.Fatalf("isBareOCIDigest(%q) = %v, expect %v", cs.input, got, cs.expect)
 			}
 		})
 	}
